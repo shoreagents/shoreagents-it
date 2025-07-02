@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import AppPage from './Dashboard'
 import Dashboard from './Dashboard'
+import { Button } from '@shoreagents/shoreagents-shared-ui/src/components/Button'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -110,19 +111,9 @@ export default function LoginForm() {
               />
             </div>
             <div className="space-y-6 mt-15">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 px-4 rounded-md text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ 
-                  backgroundColor: '#7EAC0B',
-                  border: 'none'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#97BC34'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#7EAC0B'}
-              >
+              <Button type="submit" disabled={loading}>
                 {loading ? 'Signing in...' : 'Login Now'}
-              </button>
+              </Button>
               <button
                 type="button"
                 className="w-full py-3 px-4 rounded-md border border-gray-300 flex items-center justify-center gap-2 bg-white text-gray-700 font-semibold hover:bg-gray-50 transition-colors"

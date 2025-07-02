@@ -21,12 +21,12 @@ export default function Dashboard({ email = '', onLogout }: DashboardProps) {
       {/* Header Bar */}
       <header className="bg-[#7EAC0B] rounded-2xl px-6 py-3 flex items-center justify-between">
         <span className="text-white font-semibold text-lg truncate max-w-xs">{email}</span>
-        <button
-          onClick={handleLogout}
+            <button
+              onClick={handleLogout}
           className="bg-white hover:bg-gray-100 text-[#7EAC0B] font-semibold px-4 py-2 rounded-md transition-colors"
-        >
-          Logout
-        </button>
+            >
+              Logout
+            </button>
       </header>
 
       {/* Main Card Grid */}

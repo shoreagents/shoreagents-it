@@ -12,6 +12,7 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@shoreagents/shoreagents-shared-ui": "github:shoreagents/shoreagents-shared-ui",
     "@supabase/supabase-js": "^2.50.2",
     "next": "15.3.4",
     "react": "^19.0.0",
