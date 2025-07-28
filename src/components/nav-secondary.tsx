@@ -1,7 +1,7 @@
 "use client"
 
-import * as React from "react"
-import { type Icon } from "@tabler/icons-react"
+import { type LucideIcon } from "lucide-react"
+import { usePathname } from "next/navigation"
 
 import {
   SidebarGroup,
@@ -13,28 +13,38 @@ import {
 
 export function NavSecondary({
   items,
-  ...props
+  className,
 }: {
   items: {
     title: string
     url: string
-    icon: Icon
+    icon?: LucideIcon
   }[]
-} & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
+  className?: string
+}) {
+  const pathname = usePathname()
+  
   return (
-    <SidebarGroup {...props}>
-      <SidebarGroupContent>
+    <SidebarGroup className={className}>
+      <SidebarGroupContent className="flex flex-col gap-2">
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild>
-                <a href={item.url}>
-                  <item.icon />
-                  <span>{item.title}</span>
-                </a>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {items.map((item) => {
+            const isActive = pathname === item.url || pathname === item.url + "/"
+            return (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton 
+                  asChild 
+                  tooltip={item.title}
+                  className={isActive ? "bg-gray-200 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-800 focus:bg-gray-200 dark:focus:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-800 text-sidebar-accent-foreground" : "text-sidebar-accent-foreground hover:text-sidebar-accent-foreground"}
+                >
+                  <a href={item.url}>
+                    {item.icon && <item.icon className="h-4 w-4" />}
+                    <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
