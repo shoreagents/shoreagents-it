@@ -23,8 +23,8 @@ function createWindow() {
   // Load the app
   if (isDev) {
     // In development, load from the Next.js dev server
-    console.log('Loading from development server: http://localhost:3000');
-    mainWindow.loadURL('http://localhost:3000');
+    console.log('Loading from development server: http://localhost:3001');
+    mainWindow.loadURL('http://localhost:3001');
     // Open DevTools in development
     mainWindow.webContents.openDevTools();
     
@@ -33,7 +33,7 @@ function createWindow() {
       console.error('Failed to load:', errorCode, errorDescription);
       // Retry after a short delay
       setTimeout(() => {
-        mainWindow.loadURL('http://localhost:3000');
+        mainWindow.loadURL('http://localhost:3001');
       }, 2000);
     });
   } else {

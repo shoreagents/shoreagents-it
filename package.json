@@ -4,16 +4,18 @@
   "private": true,
   "main": "electron/main.js",
   "scripts": {
-    "dev": "concurrently \"next dev --turbopack\" \"wait-on http://localhost:3000 && electron .\"",
-    "dev:web": "next dev --turbopack",
-    "dev:electron": "wait-on http://localhost:3000 && electron .",
+    "dev": "concurrently \"next dev --turbopack --port 3001\" \"wait-on http://localhost:3001 && electron .\"",
+    "dev:web": "next dev --turbopack --port 3001",
+    "dev:electron": "wait-on http://localhost:3001 && electron .",
     "build": "next build",
-    "start": "next start",
+    "start": "next start --port 3001",
     "lint": "next lint",
     "electron": "electron .",
-    "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3001 && electron .\"",
     "electron-pack": "npm run build && electron-builder",
-    "electron-build": "next build && next export && electron-builder"
+    "electron-build": "next build && next export && electron-builder",
+    "setup-db": "node scripts/setup-db.js",
+    "add-position": "node scripts/add-position-column.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -42,6 +44,7 @@
     "motion": "^12.23.11",
     "next": "15.4.4",
     "next-themes": "^0.4.6",
+    "pg": "^8.11.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "recharts": "^2.15.4",
@@ -49,7 +52,8 @@
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",
-    "zod": "^4.0.10"
+    "zod": "^4.0.10",
+    "dotenv": "^16.4.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
