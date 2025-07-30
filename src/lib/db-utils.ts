@@ -16,7 +16,6 @@ export interface Ticket {
   resolved_at: string | null
   created_at: string
   updated_at: string
-  station_id: string | null
   profile_picture: string | null
   first_name: string | null
   last_name: string | null
@@ -25,9 +24,8 @@ export interface Ticket {
 // Get all tickets
 export async function getAllTickets(): Promise<Ticket[]> {
   const result = await query(`
-    SELECT t.*, s.station_id, pi.profile_picture, pi.first_name, pi.last_name
+    SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
     FROM public.tickets t
-    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     ORDER BY t.status, t.position ASC, t.created_at DESC
   `)
@@ -37,9 +35,8 @@ export async function getAllTickets(): Promise<Ticket[]> {
 // Get tickets by status
 export async function getTicketsByStatus(status: string): Promise<Ticket[]> {
   const result = await query(`
-    SELECT t.*, s.station_id, pi.profile_picture, pi.first_name, pi.last_name
+    SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
     FROM public.tickets t
-    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     WHERE t.status = $1 
     ORDER BY t.position ASC, t.created_at DESC
@@ -59,10 +56,20 @@ export async function createTicket(ticket: Omit<Ticket, 'id' | 'created_at' | 'u
 // Update ticket status
 export async function updateTicketStatus(id: number, status: string): Promise<Ticket> {
   try {
-    const result = await query(
-      'UPDATE public.tickets SET status = $1 WHERE id = $2 RETURNING *',
-      [status, id]
-    )
+    let result
+    if (status === 'Completed') {
+      // When marking as completed, set resolved_at timestamp
+      result = await query(
+        'UPDATE public.tickets SET status = $1, resolved_at = (now() AT TIME ZONE \'Asia/Manila\'::text) WHERE id = $2 RETURNING *',
+        [status, id]
+      )
+    } else {
+      // For other status changes, clear resolved_at and resolved_by fields
+      result = await query(
+        'UPDATE public.tickets SET status = $1, resolved_at = NULL, resolved_by = NULL WHERE id = $2 RETURNING *',
+        [status, id]
+      )
+    }
     return result.rows[0]
   } catch (error) {
     console.error('Database update failed:', error)
@@ -101,9 +108,8 @@ export async function deleteTicket(id: number): Promise<void> {
 // Get ticket by ID
 export async function getTicketById(id: number): Promise<Ticket | null> {
   const result = await query(`
-    SELECT t.*, s.station_id, pi.profile_picture, pi.first_name, pi.last_name
+    SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
     FROM public.tickets t
-    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     WHERE t.id = $1
   `, [id])
@@ -113,9 +119,8 @@ export async function getTicketById(id: number): Promise<Ticket | null> {
 // Get ticket by ticket_id
 export async function getTicketByTicketId(ticketId: string): Promise<Ticket | null> {
   const result = await query(`
-    SELECT t.*, s.station_id, pi.profile_picture, pi.first_name, pi.last_name
+    SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
     FROM public.tickets t
-    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     WHERE t.ticket_id = $1
   `, [ticketId])
@@ -125,9 +130,8 @@ export async function getTicketByTicketId(ticketId: string): Promise<Ticket | nu
 // Search tickets
 export async function searchTickets(searchTerm: string): Promise<Ticket[]> {
   const result = await query(`
-    SELECT t.*, s.station_id, pi.profile_picture, pi.first_name, pi.last_name
+    SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
     FROM public.tickets t
-    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     WHERE t.concern ILIKE $1 OR t.details ILIKE $1 OR t.ticket_id ILIKE $1 
     ORDER BY t.created_at DESC

@@ -21,6 +21,7 @@ import {
   UsersIcon,
   TicketIcon,
   UserCheckIcon,
+  HistoryIcon,
 } from "lucide-react"
 import { LaptopMinimalCheckIcon } from "@/components/icons/laptop-minimal-check-icon"
 import { GripIcon } from "@/components/icons/grip-icon"
@@ -64,6 +65,13 @@ const data = {
       title: "Onboarding & Offboarding",
       url: "/onboarding",
       icon: LaptopMinimalCheckIcon,
+    },
+  ],
+  navRecords: [
+    {
+      title: "Past Tickets",
+      url: "/past-tickets",
+      icon: HistoryIcon,
     },
   ],
   navClouds: [
@@ -162,7 +170,34 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <SidebarMenuButton 
                     asChild 
                     tooltip={item.title}
-                    className={isActive ? "bg-gray-200 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-800 focus:bg-gray-200 dark:focus:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-800 text-sidebar-accent-foreground" : "text-sidebar-accent-foreground hover:text-sidebar-accent-foreground"}
+                    className={isActive ? "bg-gray-200 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-200 focus:bg-gray-200 dark:focus:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-800 text-sidebar-accent-foreground" : "text-sidebar-accent-foreground hover:text-sidebar-accent-foreground"}
+                    onMouseEnter={() => iconRef.current?.startAnimation?.()}
+                    onMouseLeave={() => iconRef.current?.stopAnimation?.()}
+                  >
+                    <a href={item.url}>
+                      {item.icon && <item.icon ref={iconRef} className="h-5 w-5" />}
+                      <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )
+            })}
+          </SidebarMenu>
+        </SidebarGroup>
+        
+        <SidebarGroup>
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden font-bold">RECORDS</SidebarGroupLabel>
+          <SidebarMenu>
+            {data.navRecords.map((item) => {
+              const isActive = pathname === item.url || pathname === item.url + "/"
+              const iconRef = useRef<any>(null)
+              
+              return (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton 
+                    asChild 
+                    tooltip={item.title}
+                    className={isActive ? "bg-gray-200 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-200 focus:bg-gray-200 dark:focus:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-800 text-sidebar-accent-foreground" : "text-sidebar-accent-foreground hover:text-sidebar-accent-foreground"}
                     onMouseEnter={() => iconRef.current?.startAnimation?.()}
                     onMouseLeave={() => iconRef.current?.stopAnimation?.()}
                   >

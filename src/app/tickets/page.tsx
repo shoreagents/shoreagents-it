@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useState, useEffect, useMemo, useCallback } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import {
@@ -11,7 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { IconSearch, IconFilter, IconGripVertical } from "@tabler/icons-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { IconSearch, IconFilter, IconGripVertical, IconRefresh } from "@tabler/icons-react"
 import {
   DndContext,
   closestCorners,
@@ -61,6 +63,7 @@ interface Ticket {
 
 interface SortableTicketProps {
   ticket: Ticket
+  isLast?: boolean
 }
 
 const getCategoryBadge = (ticket: Ticket) => {
@@ -81,7 +84,7 @@ const getCategoryBadge = (ticket: Ticket) => {
   }
 }
 
-const SortableTicket = React.memo(function SortableTicket({ ticket }: SortableTicketProps) {
+const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = false }: SortableTicketProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const {
@@ -114,15 +117,47 @@ const SortableTicket = React.memo(function SortableTicket({ ticket }: SortableTi
   const handleMouseEnter = useCallback(() => setIsHovered(true), [])
   const handleMouseLeave = useCallback(() => setIsHovered(false), [])
 
+  const handleChatClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Check if we're in Electron environment
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      (window as any).electronAPI.openChatWindow(ticket.id, ticket)
+        .then((result: any) => {
+          if (result.success) {
+            console.log('Chat window opened successfully')
+          } else {
+            console.error('Failed to open chat window:', result.error)
+          }
+        })
+        .catch((error: any) => {
+          console.error('Error opening chat window:', error)
+        })
+    } else {
+      // Fallback for web environment - could open in new tab or modal
+      console.log('Opening chat for ticket:', ticket.id)
+      // You could implement a web fallback here
+    }
+  }, [ticket])
+
+  // Cleanup effect for animations
+  useEffect(() => {
+    return () => {
+      // Ensure animations are properly cleaned up when component unmounts
+      setIsExpanded(false)
+    }
+  }, [])
+
   const categoryBadge = useMemo(() => getCategoryBadge(ticket), [ticket.category])
 
   const cardClassName = useMemo(() => {
-    return `mb-3 p-4 transition-all duration-200 cursor-pointer ${
+    return `${isLast ? '' : 'mb-3'} p-4 transition-colors duration-150 cursor-pointer ${
       isDragging ? 'opacity-50' : ''
     } ${
       isHovered ? 'border-primary' : 'hover:border-primary/50'
     }`
-  }, [isDragging, isHovered])
+  }, [isDragging, isHovered, isLast])
 
   return (
     <Card
@@ -139,20 +174,24 @@ const SortableTicket = React.memo(function SortableTicket({ ticket }: SortableTi
             <div className="text-xs font-mono text-primary bg-primary/10 px-2 py-1 rounded-md">
               {ticket.ticket_id}
             </div>
-            <div className="flex flex-col text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded-md">
-              <span className="font-medium">
-                {new Date(ticket.created_at).toLocaleDateString('en-US', { 
-                  month: 'short', 
-                  day: 'numeric'
-                })}
-              </span>
-              <span className="font-mono text-muted-foreground/70">
-                {new Date(ticket.created_at).toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: true
-                })}
-              </span>
+            <div className="flex flex-col text-xs text-muted-foreground px-2 py-1 rounded-md">
+              <span className="text-xs font-medium text-muted-foreground/70">Filed at</span>
+              <div className="flex items-center gap-1">
+                <span className="font-medium">
+                  {new Date(ticket.created_at).toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric'
+                  })}
+                </span>
+                <span className="text-muted-foreground/50">•</span>
+                <span className="font-mono text-muted-foreground/70">
+                  {new Date(ticket.created_at).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  })}
+                </span>
+              </div>
             </div>
           </div>
           <h4 className="font-semibold text-sm mb-2 line-clamp-2 leading-tight">{ticket.concern}</h4>
@@ -171,23 +210,37 @@ const SortableTicket = React.memo(function SortableTicket({ ticket }: SortableTi
           <IconGripVertical className="h-5 w-5 text-muted-foreground" />
         </div>
       </div>
-      {isExpanded && (
-        <div className="mt-3 pt-3 border-t border-border/50">
-          <div className="space-y-3">
-            <div>
-              <h5 className="text-xs font-semibold text-foreground mb-2">Description</h5>
-              <p className="text-xs text-muted-foreground leading-relaxed">{ticket.details}</p>
-            </div>
-            <div>
-              <h5 className="text-xs font-semibold text-foreground mb-2">Details</h5>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {ticket.details || 'No additional details provided.'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-      <div className="flex items-center justify-between pt-3 border-t border-border/50">
+                    <AnimatePresence>
+         {isExpanded && (
+           <motion.div
+             initial={{ height: 0 }}
+             animate={{ height: "auto" }}
+             exit={{ height: 0 }}
+             transition={{ duration: 0.1, ease: "easeOut" }}
+             className="mt-3 pt-3 border-t border-border/50 overflow-hidden"
+           >
+             <div className="space-y-3">
+               <div>
+                 <p className="text-sm text-muted-foreground leading-relaxed">{ticket.details}</p>
+               </div>
+               <div className="flex items-center gap-2 mb-3">
+                 <Button 
+                   size="sm" 
+                   variant="outline" 
+                   className="text-sm h-8 flex-1 rounded-xl shadow-none"
+                   onClick={handleChatClick}
+                 >
+                   Chat
+                 </Button>
+                 <Button size="sm" variant="outline" className="text-sm h-8 flex-1 rounded-xl shadow-none">
+                   Documents
+                 </Button>
+               </div>
+             </div>
+           </motion.div>
+         )}
+       </AnimatePresence>
+      <div className="flex items-center justify-between pt-3 mt-3 border-t border-border/50">
         <div className="flex items-center gap-2">
           <Avatar className="h-6 w-6">
             <AvatarImage src={ticket.profile_picture || ''} alt={`User ${ticket.user_id}`} />
@@ -209,6 +262,23 @@ const SortableTicket = React.memo(function SortableTicket({ ticket }: SortableTi
     </Card>
   )
 })
+
+const getStatusColor = (status: TicketStatus) => {
+  switch (status) {
+    case "For Approval":
+      return "text-yellow-600"
+    case "On Hold":
+      return "text-gray-600"
+    case "In Progress":
+      return "text-purple-600"
+    case "Approved":
+      return "text-blue-600"
+    case "Completed":
+      return "text-green-600"
+    default:
+      return "text-gray-600"
+  }
+}
 
 function DraggingTicket({ ticket }: { ticket: Ticket }) {
   const categoryBadge = getCategoryBadge(ticket)
@@ -271,6 +341,64 @@ function DraggingTicket({ ticket }: { ticket: Ticket }) {
   )
 }
 
+function TicketSkeleton() {
+  return (
+    <Card className="mb-3 p-4">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2">
+            <Skeleton className="h-5 w-16" />
+            <div className="flex flex-col gap-1">
+              <Skeleton className="h-3 w-12" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+          </div>
+          <Skeleton className="h-4 w-full mb-2" />
+          <Skeleton className="h-3 w-20 mb-2" />
+        </div>
+        <Skeleton className="h-5 w-5 flex-shrink-0" />
+      </div>
+      <div className="flex items-center justify-between pt-3 border-t border-border/50">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-6 w-6 rounded-full" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+        <Skeleton className="h-3 w-12" />
+      </div>
+    </Card>
+  )
+}
+
+function TicketsSkeleton() {
+  return (
+    <div className="w-full overflow-x-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+        {["On Hold", "For Approval", "In Progress", "Approved", "Completed"].map((status) => (
+          <div key={status}>
+            <div className="bg-gradient-to-br from-background to-muted/20 border border-border/50 rounded-xl p-4 shadow-sm transition-all duration-200 min-h-[500px] flex flex-col">
+              <div className="flex-shrink-0 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className={`${getStatusColor(status as TicketStatus)} border-current/20 bg-current/5 px-3 py-1 font-medium`}>
+                      {status}
+                    </Badge>
+                    <Skeleton className="h-6 w-8" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <TicketSkeleton key={index} />
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 interface DroppableContainerProps {
   status: string
   children: React.ReactNode
@@ -291,6 +419,8 @@ function DroppableContainer({ status, children }: DroppableContainerProps) {
   )
 }
 
+
+
 export default function TicketsPage() {
   const [mounted, setMounted] = useState(false)
   const [expandedTickets, setExpandedTickets] = useState<Set<string>>(new Set())
@@ -303,6 +433,8 @@ export default function TicketsPage() {
     setMounted(true)
     fetchTickets()
   }, [])
+
+
 
   const fetchTickets = async () => {
     try {
@@ -337,11 +469,11 @@ export default function TicketsPage() {
       
       if (response.ok) {
         const result = await response.json()
-        // Update local state instead of refetching
+        // Update local state with the complete updated ticket data
         setTickets(prevTickets => {
           return prevTickets.map((item) => 
             item.id === ticketId 
-              ? { ...item, status: newStatus as TicketStatus }
+              ? { ...item, ...result }
               : item
           )
         })
@@ -555,27 +687,35 @@ export default function TicketsPage() {
   }
 
   const getTicketsByStatus = (status: TicketStatus) => {
-    const filteredTickets = tickets.filter(ticket => ticket.status === status)
+    let filteredTickets = tickets.filter(ticket => ticket.status === status)
+    
+    // For Completed status, only show tickets resolved today (not past tickets)
+    if (status === 'Completed') {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      
+      filteredTickets = filteredTickets.filter(ticket => {
+        // Check if resolved_at date is today
+        if (ticket.resolved_at) {
+          const resolvedDate = new Date(ticket.resolved_at)
+          resolvedDate.setHours(0, 0, 0, 0)
+          return resolvedDate.getTime() === today.getTime()
+        }
+        
+        // Fallback to created_at if resolved_at is null
+        const createdDate = new Date(ticket.created_at)
+        createdDate.setHours(0, 0, 0, 0)
+        return createdDate.getTime() === today.getTime()
+      })
+    }
+    
     // Sort by position within the status
     return filteredTickets.sort((a, b) => a.position - b.position)
   }
 
-  const getStatusColor = (status: TicketStatus) => {
-    switch (status) {
-      case "For Approval":
-        return "text-yellow-600"
-      case "On Hold":
-        return "text-gray-600"
-      case "In Progress":
-        return "text-purple-600"
-      case "Approved":
-        return "text-blue-600"
-      case "Completed":
-        return "text-green-600"
-      default:
-        return "text-gray-600"
-    }
-  }
+
+
+
 
   const statuses = ["On Hold", "For Approval", "In Progress", "Approved", "Completed"]
 
@@ -590,12 +730,12 @@ export default function TicketsPage() {
               <div className="px-4 lg:px-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h1 className="text-2xl font-bold mb-2">Tickets</h1>
-                    <p className="text-muted-foreground">Drag and drop tickets to manage their status</p>
+                    <h1 className="text-3xl font-bold mb-2">Tickets</h1>
+                    <p className="text-base text-muted-foreground">Drag and drop tickets to manage their status</p>
                   </div>
                 </div>
 
-                <div className="flex items-center py-3 gap-4 mb-4">
+                <div className="flex items-center gap-4">
                   <div className="relative flex-1">
                     <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -603,21 +743,21 @@ export default function TicketsPage() {
                       className="pl-8"
                     />
                   </div>
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <IconFilter className="h-4 w-4" />
-                    Filter
+                  <Button 
+                    variant="outline" 
+                    className="text-sm h-8 rounded-xl shadow-none"
+                    onClick={fetchTickets}
+                    disabled={loading}
+                  >
+                    <IconRefresh className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                    Reload
                   </Button>
                 </div>
               </div>
 
               <div className="px-4 lg:px-6">
                 {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                      <p className="text-muted-foreground">Loading...</p>
-                    </div>
-                  </div>
+                  <TicketsSkeleton />
                 ) : error ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="text-center">
@@ -636,10 +776,10 @@ export default function TicketsPage() {
                     onDragEnd={handleDragEnd}
                   >
                     <div className="w-full overflow-x-auto">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                      <div className="flex gap-3">
                         {statuses.map((status) => (
                           <div key={status}>
-                            <div className="bg-gradient-to-br from-background to-muted/20 border border-border/50 rounded-xl p-4 shadow-sm transition-all duration-200 min-h-[500px] flex flex-col">
+                            <div className="bg-gradient-to-br from-background to-muted/20 border border-border/50 rounded-xl p-4 shadow-sm transition-all duration-200 h-[calc(100vh-260px)] w-[350px] flex flex-col">
                               <div className="flex-shrink-0 mb-4">
                                 <div className="flex items-center justify-between mb-3">
                                   <div className="flex items-center gap-3">
@@ -653,15 +793,16 @@ export default function TicketsPage() {
                                 </div>
                               </div>
                               <DroppableContainer status={status}>
-                                <div className="flex-1 overflow-hidden">
+                                <div className="flex-1 overflow-y-auto">
                                   <SortableContext
                                     items={getTicketsByStatus(status as TicketStatus).map(ticket => ticket.id.toString())}
                                     strategy={verticalListSortingStrategy}
                                   >
-                                    {getTicketsByStatus(status as TicketStatus).map((ticket) => (
+                                    {getTicketsByStatus(status as TicketStatus).map((ticket, index, array) => (
                                       <SortableTicket 
                                         key={ticket.id} 
-                                        ticket={ticket} 
+                                        ticket={ticket}
+                                        isLast={index === array.length - 1}
                                       />
                                     ))}
                                   </SortableContext>
@@ -669,7 +810,6 @@ export default function TicketsPage() {
                                   {getTicketsByStatus(status as TicketStatus).length === 0 && (
                                     <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-lg bg-muted/20">
                                       <p className="text-sm font-medium">No tickets</p>
-                                      <p className="text-xs text-muted-foreground/70 mt-1">Drop tickets here</p>
                                     </div>
                                   )}
                                 </div>

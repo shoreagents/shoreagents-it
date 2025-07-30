@@ -8,11 +8,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DatePicker } from "@/components/ui/date-picker"
 
 import { Badge } from "@/components/ui/badge"
 import { IconUserPlus, IconUserMinus, IconBuilding, IconMail, IconPhone, IconCalendar } from "@tabler/icons-react"
 
 export default function OnboardingPage() {
+  const [startDate, setStartDate] = React.useState<Date>()
+  const [offboardingDate, setOffboardingDate] = React.useState<Date>()
+
   return (
     <>
       <AppSidebar variant="inset" />
@@ -90,7 +94,11 @@ export default function OnboardingPage() {
                       
                       <div className="space-y-2">
                         <Label htmlFor="startDate">Start Date</Label>
-                        <Input id="startDate" type="date" />
+                        <DatePicker
+                          date={startDate}
+                          onDateChange={setStartDate}
+                          placeholder="Select start date"
+                        />
                       </div>
                       
                                              <div className="space-y-2">
@@ -131,7 +139,11 @@ export default function OnboardingPage() {
                       
                       <div className="space-y-2">
                         <Label htmlFor="offboardingDate">Last Working Day</Label>
-                        <Input id="offboardingDate" type="date" />
+                        <DatePicker
+                          date={offboardingDate}
+                          onDateChange={setOffboardingDate}
+                          placeholder="Select last working day"
+                        />
                       </div>
                       
                       <div className="space-y-2">

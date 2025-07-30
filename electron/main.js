@@ -1,8 +1,11 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 
 // Check if we're in development mode
 const isDev = !app.isPackaged;
+
+// Store references to chat windows
+const chatWindows = new Map();
 
 function createWindow() {
   // Create the browser window.
@@ -16,6 +19,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
+      preload: path.join(__dirname, 'preload.js'), // Add preload script
     },
     icon: path.join(__dirname, '../public/icon.png'), // Optional: add an icon
   });
@@ -47,6 +51,91 @@ function createWindow() {
     mainWindow = null;
   });
 }
+
+function createChatWindow(ticketId, ticketData) {
+  // Check if chat window already exists for this ticket
+  if (chatWindows.has(ticketId)) {
+    const existingWindow = chatWindows.get(ticketId);
+    if (!existingWindow.isDestroyed()) {
+      existingWindow.focus();
+      return;
+    }
+  }
+
+  // Create new chat window
+  const chatWindow = new BrowserWindow({
+    width: 400,
+    height: 600,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    frame: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+    icon: path.join(__dirname, '../public/icon.png'),
+    title: `Chat - Ticket ${ticketData.ticket_id}`,
+  });
+
+  // Load chat page
+  if (isDev) {
+    chatWindow.loadURL(`http://localhost:3001/chat/${ticketId}`);
+    chatWindow.webContents.openDevTools();
+  } else {
+    chatWindow.loadFile(path.join(__dirname, `../out/chat/${ticketId}/index.html`));
+  }
+
+  // Store reference to chat window
+  chatWindows.set(ticketId, chatWindow);
+
+  // Handle chat window closed
+  chatWindow.on('closed', () => {
+    chatWindows.delete(ticketId);
+  });
+
+  return chatWindow;
+}
+
+// Handle IPC messages
+ipcMain.handle('open-chat-window', async (event, ticketId, ticketData) => {
+  try {
+    const chatWindow = createChatWindow(ticketId, ticketData);
+    return { success: true, windowId: chatWindow.id };
+  } catch (error) {
+    console.error('Error creating chat window:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('close-chat-window', async (event, ticketId) => {
+  try {
+    const chatWindow = chatWindows.get(ticketId);
+    if (chatWindow && !chatWindow.isDestroyed()) {
+      chatWindow.close();
+      chatWindows.delete(ticketId);
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error closing chat window:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('close-current-window', async (event) => {
+  try {
+    const currentWindow = BrowserWindow.fromWebContents(event.sender);
+    if (currentWindow && !currentWindow.isDestroyed()) {
+      currentWindow.close();
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error closing current window:', error);
+    return { success: false, error: error.message };
+  }
+});
 
 // This method will be called when Electron has finished initialization
 app.whenReady().then(createWindow);
