@@ -246,7 +246,10 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
           <Avatar className="h-6 w-6">
             <AvatarImage src={ticket.profile_picture || ''} alt={`User ${ticket.user_id}`} />
             <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
-              {String(ticket.user_id).split(' ').map(n => n[0]).join('')}
+              {ticket.first_name && ticket.last_name 
+                ? `${ticket.first_name[0]}${ticket.last_name[0]}`
+                : String(ticket.user_id).split(' ').map(n => n[0]).join('')
+              }
             </AvatarFallback>
           </Avatar>
           <span className="text-xs font-medium text-foreground">
@@ -267,17 +270,17 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
 const getStatusColor = (status: TicketStatus) => {
   switch (status) {
     case "For Approval":
-      return "text-yellow-600"
+      return "text-yellow-600 border-yellow-600/20 bg-yellow-600/5"
     case "On Hold":
-      return "text-gray-600"
+      return "text-gray-600 border-gray-600/20 bg-gray-600/5"
     case "In Progress":
-      return "text-purple-600"
+      return "text-purple-600 border-purple-600/20 bg-purple-600/5"
     case "Approved":
-      return "text-blue-600"
+      return "text-blue-600 border-blue-600/20 bg-blue-600/5"
     case "Completed":
-      return "text-green-600"
+      return "text-green-600 border-green-600/20 bg-green-600/5"
     default:
-      return "text-gray-600"
+      return "text-gray-600 border-gray-600/20 bg-gray-600/5"
   }
 }
 
@@ -324,7 +327,10 @@ function DraggingTicket({ ticket }: { ticket: Ticket }) {
           <Avatar className="h-6 w-6">
             <AvatarImage src={ticket.profile_picture || ''} alt={`User ${ticket.user_id}`} />
             <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
-              {String(ticket.user_id).split(' ').map(n => n[0]).join('')}
+              {ticket.first_name && ticket.last_name 
+                ? `${ticket.first_name[0]}${ticket.last_name[0]}`
+                : String(ticket.user_id).split(' ').map(n => n[0]).join('')
+              }
             </AvatarFallback>
           </Avatar>
           <span className="text-xs font-medium text-foreground">
@@ -374,14 +380,21 @@ function TicketsSkeleton() {
   return (
     <div className="w-full overflow-x-auto">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-        {["On Hold", "For Approval", "In Progress", "Approved", "Completed"].map((status) => (
+        {["On Hold", "For Approval", "Approved", "In Progress", "Completed"].map((status) => (
           <div key={status}>
             <div className="bg-gradient-to-br from-background to-muted/20 border border-border/50 rounded-xl p-4 shadow-sm transition-all duration-200 min-h-[500px] flex flex-col">
               <div className="flex-shrink-0 mb-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={`${getStatusColor(status as TicketStatus)} border-current/20 bg-current/5 px-3 py-1 font-medium`}>
-                      {status}
+                    <Badge variant="outline" className={`px-3 py-1 font-medium ${
+                      status === 'On Hold' ? 'text-gray-600 border-gray-600/20 bg-gray-600/5' :
+                      status === 'For Approval' ? 'text-yellow-600 border-yellow-600/20 bg-yellow-600/5' :
+                      status === 'Approved' ? 'text-blue-600 border-blue-600/20 bg-blue-600/5' :
+                      status === 'In Progress' ? 'text-purple-600 border-purple-600/20 bg-purple-600/5' :
+                      status === 'Completed' ? 'text-green-600 border-green-600/20 bg-green-600/5' :
+                      'text-gray-600 border-gray-600/20 bg-gray-600/5'
+                    }`}>
+                      {status === 'Completed' ? 'Closed' : status}
                     </Badge>
                     <Skeleton className="h-6 w-8" />
                   </div>
@@ -732,11 +745,12 @@ export default function TicketsPage() {
     return filteredTickets.sort((a, b) => a.position - b.position)
   }
 
+  const getStatusDisplayLabel = (status: string) => {
+    if (status === 'Completed') return 'Closed'
+    return status
+  }
 
-
-
-
-  const statuses = ["On Hold", "For Approval", "In Progress", "Approved", "Completed"]
+  const statuses = ["On Hold", "For Approval", "Approved", "In Progress", "Completed"]
 
   return (
     <>
@@ -762,12 +776,7 @@ export default function TicketsPage() {
                       className="pl-8"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-                    <span className="text-xs text-muted-foreground">
-                      {isRealtimeConnected ? 'Live' : 'Offline'}
-                    </span>
-                  </div>
+
                   <Button 
                     variant="outline" 
                     className="text-sm h-8 rounded-xl shadow-none"
@@ -808,8 +817,8 @@ export default function TicketsPage() {
                               <div className="flex-shrink-0 mb-4">
                                 <div className="flex items-center justify-between mb-3">
                                   <div className="flex items-center gap-3">
-                                    <Badge variant="outline" className={`${getStatusColor(status as TicketStatus)} border-current/20 bg-current/5 px-3 py-1 font-medium`}>
-                                      {status}
+                                    <Badge variant="outline" className={`${getStatusColor(status as TicketStatus)} px-3 py-1 font-medium`}>
+                                      {getStatusDisplayLabel(status)}
                                     </Badge>
                                     <span className="text-sm font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
                                       {getTicketsByStatus(status as TicketStatus).length}

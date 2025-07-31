@@ -51,6 +51,11 @@ function PastTicketsTable({ tickets }: { tickets: Ticket[] }) {
     return `${dateStr} • ${timeStr}`
   }
 
+  const getStatusDisplayLabel = (status: string) => {
+    if (status === 'Completed') return 'Closed'
+    return status
+  }
+
   const getCategoryBadge = (category: TicketCategory) => {
     const categoryColors: Record<TicketCategory, string> = {
       'Computer & Equipment': 'bg-blue-100 text-blue-800 hover:bg-blue-200',
@@ -125,7 +130,7 @@ function PastTicketsTable({ tickets }: { tickets: Ticket[] }) {
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                  Completed
+                  {getStatusDisplayLabel('Completed')}
                 </Badge>
               </TableCell>
             </TableRow>
@@ -172,7 +177,7 @@ export default function PastTicketsPage() {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetch('/api/tickets')
+      const response = await fetch('/api/tickets?status=Completed&past=true')
       if (response.ok) {
         const data = await response.json()
         setTickets(data)
@@ -190,25 +195,7 @@ export default function PastTicketsPage() {
   }
 
   const getPastTickets = () => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    let filteredTickets = tickets.filter(ticket => {
-      // Only completed tickets
-      if (ticket.status !== 'Completed') return false
-      
-      // Check if resolved_at date is not today
-      if (ticket.resolved_at) {
-        const resolvedDate = new Date(ticket.resolved_at)
-        resolvedDate.setHours(0, 0, 0, 0)
-        return resolvedDate < today
-      }
-      
-      // Fallback to created_at if resolved_at is null
-      const createdDate = new Date(ticket.created_at)
-      createdDate.setHours(0, 0, 0, 0)
-      return createdDate < today
-    })
+    let filteredTickets = tickets
 
     // Apply search filter
     if (searchTerm) {

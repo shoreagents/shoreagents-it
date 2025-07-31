@@ -33,15 +33,53 @@ export async function getAllTickets(): Promise<Ticket[]> {
 }
 
 // Get tickets by status
-export async function getTicketsByStatus(status: string): Promise<Ticket[]> {
-  const result = await query(`
-    SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
-    FROM public.tickets t
-    LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
-    WHERE t.status = $1 
-    ORDER BY t.position ASC, t.created_at DESC
-  `, [status])
-  return result.rows
+export async function getTicketsByStatus(status: string, past: boolean = false): Promise<Ticket[]> {
+  if (status === 'Completed') {
+    if (past) {
+      // Return completed tickets from past dates (not today)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const result = await query(`
+        SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
+        FROM public.tickets t
+        LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+        WHERE t.status = $1
+          AND (
+            (t.resolved_at < $2)
+            OR (t.resolved_at IS NULL AND t.created_at < $2)
+          )
+        ORDER BY t.position ASC, t.created_at DESC
+      `, [status, today.toISOString()]);
+      return result.rows;
+    } else {
+      // Only return tickets resolved today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      const result = await query(`
+        SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
+        FROM public.tickets t
+        LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+        WHERE t.status = $1
+          AND (
+            (t.resolved_at >= $2 AND t.resolved_at < $3)
+            OR (t.resolved_at IS NULL AND t.created_at >= $2 AND t.created_at < $3)
+          )
+        ORDER BY t.position ASC, t.created_at DESC
+      `, [status, today.toISOString(), tomorrow.toISOString()]);
+      return result.rows;
+    }
+  } else {
+    const result = await query(`
+      SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
+      FROM public.tickets t
+      LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+      WHERE t.status = $1
+      ORDER BY t.position ASC, t.created_at DESC
+    `, [status]);
+    return result.rows;
+  }
 }
 
 // Create new ticket
@@ -154,11 +192,11 @@ export async function getTicketsByUser(userId: number): Promise<Ticket[]> {
   return result.rows
 }
 
-// Generate unique ticket ID
+// Generate unique ticket ID using existing database sequence
 export async function generateTicketId(): Promise<string> {
-  const result = await query('SELECT COUNT(*) as count FROM public.tickets')
-  const count = parseInt(result.rows[0].count) + 1
-  return `TKT-${count.toString().padStart(6, '0')}`
+  const result = await query('SELECT nextval(\'ticket_id_seq\') as next_id')
+  const nextId = result.rows[0].next_id
+  return `TKT-${nextId.toString().padStart(6, '0')}`
 }
 
 // Update ticket position (for reordering within same status)
