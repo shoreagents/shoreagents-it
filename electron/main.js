@@ -26,9 +26,9 @@ function createWindow() {
 
   // Load the app
   if (isDev) {
-    // In development, load from the Next.js dev server
-    console.log('Loading from development server: http://localhost:3001');
-    mainWindow.loadURL('http://localhost:3001');
+    // In development, load from the custom server
+    console.log('Loading from development server: http://localhost:3000');
+    mainWindow.loadURL('http://localhost:3000');
     // Open DevTools in development
     mainWindow.webContents.openDevTools();
     
@@ -37,7 +37,7 @@ function createWindow() {
       console.error('Failed to load:', errorCode, errorDescription);
       // Retry after a short delay
       setTimeout(() => {
-        mainWindow.loadURL('http://localhost:3001');
+        mainWindow.loadURL('http://localhost:3000');
       }, 2000);
     });
   } else {
@@ -82,7 +82,7 @@ function createChatWindow(ticketId, ticketData) {
 
   // Load chat page
   if (isDev) {
-    chatWindow.loadURL(`http://localhost:3001/chat/${ticketId}`);
+    chatWindow.loadURL(`http://localhost:3000/chat/${ticketId}`);
     chatWindow.webContents.openDevTools();
   } else {
     chatWindow.loadFile(path.join(__dirname, `../out/chat/${ticketId}/index.html`));

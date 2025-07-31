@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { IconSearch, IconFilter, IconGripVertical, IconRefresh } from "@tabler/icons-react"
+import { useRealtimeTickets } from "@/hooks/use-realtime-tickets"
 import {
   DndContext,
   closestCorners,
@@ -429,6 +430,24 @@ export default function TicketsPage() {
   const [error, setError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
 
+  // Real-time updates
+  const { isConnected: isRealtimeConnected } = useRealtimeTickets({
+    onTicketCreated: (newTicket) => {
+      console.log('🆕 New ticket created:', newTicket)
+      setTickets(prev => [...prev, newTicket])
+    },
+    onTicketUpdated: (updatedTicket, oldTicket) => {
+      console.log('🔄 Ticket updated:', updatedTicket, 'Old:', oldTicket)
+      setTickets(prev => prev.map(ticket => 
+        ticket.id === updatedTicket.id ? updatedTicket : ticket
+      ))
+    },
+    onTicketDeleted: (deletedTicket) => {
+      console.log('🗑️ Ticket deleted:', deletedTicket)
+      setTickets(prev => prev.filter(ticket => ticket.id !== deletedTicket.id))
+    }
+  })
+
   useEffect(() => {
     setMounted(true)
     fetchTickets()
@@ -742,6 +761,12 @@ export default function TicketsPage() {
                       placeholder="Search tickets..."
                       className="pl-8"
                     />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                    <span className="text-xs text-muted-foreground">
+                      {isRealtimeConnected ? 'Live' : 'Offline'}
+                    </span>
                   </div>
                   <Button 
                     variant="outline" 

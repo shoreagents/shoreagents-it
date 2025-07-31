@@ -70,3 +70,43 @@ CREATE TRIGGER update_tickets_updated_at
     BEFORE UPDATE ON public.tickets 
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Create notification functions for real-time updates
+CREATE OR REPLACE FUNCTION notify_ticket_change()
+RETURNS TRIGGER AS $$
+DECLARE
+    notification JSON;
+BEGIN
+    -- Create notification payload
+    notification = json_build_object(
+        'table', TG_TABLE_NAME,
+        'action', TG_OP,
+        'record', row_to_json(NEW),
+        'old_record', CASE WHEN TG_OP = 'UPDATE' THEN row_to_json(OLD) ELSE NULL END,
+        'timestamp', now()
+    );
+    
+    -- Send notification
+    PERFORM pg_notify('ticket_changes', notification::text);
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger for INSERT operations
+CREATE TRIGGER notify_ticket_insert
+    AFTER INSERT ON public.tickets
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_ticket_change();
+
+-- Create trigger for UPDATE operations
+CREATE TRIGGER notify_ticket_update
+    AFTER UPDATE ON public.tickets
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_ticket_change();
+
+-- Create trigger for DELETE operations
+CREATE TRIGGER notify_ticket_delete
+    AFTER DELETE ON public.tickets
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_ticket_change();
