@@ -40,8 +40,11 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
-type TicketStatus = 'For Approval' | 'On Hold' | 'In Progress' | 'Approved' | 'Completed'
-type TicketCategory = 'Computer & Equipment' | 'Station' | 'Surroundings' | 'Schedule' | 'Compensation' | 'Transport' | 'Suggestion' | 'Check-in'
+type TicketStatus = 'For Approval' | 'On Hold' | 'In Progress' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
+interface TicketCategory {
+  id: number
+  name: string
+}
 
 interface Ticket {
   id: number
@@ -49,13 +52,16 @@ interface Ticket {
   user_id: number
   concern: string
   details: string | null
-  category: TicketCategory
+  category: string
+  category_id: number | null
+  category_name?: string
   status: TicketStatus
   position: number
   resolved_by: number | null
   resolved_at: string | null
   created_at: string
   updated_at: string
+  sector: string
   station_id: string | null
   profile_picture: string | null
   first_name: string | null
@@ -65,11 +71,14 @@ interface Ticket {
 interface SortableTicketProps {
   ticket: Ticket
   isLast?: boolean
+  isExpanded: boolean
+  onToggleExpanded: (ticketId: string) => void
 }
 
 const getCategoryBadge = (ticket: Ticket) => {
-  const categoryColors: Record<TicketCategory, string> = {
+  const categoryColors: Record<string, string> = {
     'Computer & Equipment': 'bg-blue-100 text-blue-800 hover:bg-blue-200',
+    'Network & Internet': 'bg-cyan-100 text-cyan-800 hover:bg-cyan-200',
     'Station': 'bg-purple-100 text-purple-800 hover:bg-purple-200',
     'Surroundings': 'bg-green-100 text-green-800 hover:bg-green-200',
     'Schedule': 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
@@ -80,14 +89,13 @@ const getCategoryBadge = (ticket: Ticket) => {
   }
   
   return {
-    name: ticket.category,
-    color: categoryColors[ticket.category] || 'bg-gray-100 text-gray-800'
+    name: ticket.category_name || ticket.category,
+    color: categoryColors[ticket.category_name || ticket.category] || 'bg-gray-100 text-gray-800'
   }
 }
 
-const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = false }: SortableTicketProps) {
+const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = false, isExpanded, onToggleExpanded }: SortableTicketProps) {
   const [isHovered, setIsHovered] = useState(false)
-  const [isExpanded, setIsExpanded] = useState(false)
   const {
     attributes,
     listeners,
@@ -112,8 +120,8 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
       e.stopPropagation()
       return
     }
-    setIsExpanded(prev => !prev)
-  }, [])
+    onToggleExpanded(ticket.id.toString())
+  }, [onToggleExpanded, ticket.id])
 
   const handleMouseEnter = useCallback(() => setIsHovered(true), [])
   const handleMouseLeave = useCallback(() => setIsHovered(false), [])
@@ -146,14 +154,14 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
   useEffect(() => {
     return () => {
       // Ensure animations are properly cleaned up when component unmounts
-      setIsExpanded(false)
+      // No need to clean up expanded state as it's managed globally
     }
   }, [])
 
-  const categoryBadge = useMemo(() => getCategoryBadge(ticket), [ticket.category])
+  const categoryBadge = useMemo(() => getCategoryBadge(ticket), [ticket.category, ticket.category_name])
 
   const cardClassName = useMemo(() => {
-    return `${isLast ? '' : 'mb-3'} p-4 transition-colors duration-150 cursor-pointer ${
+    return `${isLast ? '' : 'mb-3'} p-4 transition-colors duration-150 cursor-pointer overflow-hidden ${
       isDragging ? 'opacity-50' : ''
     } ${
       isHovered ? 'border-primary' : 'hover:border-primary/50'
@@ -177,22 +185,19 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
             </div>
             <div className="flex flex-col text-xs text-muted-foreground px-2 py-1 rounded-md">
               <span className="text-xs font-medium text-muted-foreground/70">Filed at</span>
-              <div className="flex items-center gap-1">
-                <span className="font-medium">
-                  {new Date(ticket.created_at).toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric'
-                  })}
-                </span>
-                <span className="text-muted-foreground/50">•</span>
-                <span className="font-mono text-muted-foreground/70">
-                  {new Date(ticket.created_at).toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                  })}
-                </span>
-              </div>
+              <span className="font-medium">
+                {new Date(ticket.created_at).toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric'
+                })}
+              </span>
+              <span className="font-mono text-muted-foreground/70">
+                {new Date(ticket.created_at).toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true
+                })}
+              </span>
             </div>
           </div>
           <h4 className="font-semibold text-sm mb-2 line-clamp-2 leading-tight">{ticket.concern}</h4>
@@ -274,28 +279,33 @@ const getStatusColor = (status: TicketStatus) => {
     case "On Hold":
       return "text-gray-600 border-gray-600/20 bg-gray-600/5"
     case "In Progress":
-      return "text-purple-600 border-purple-600/20 bg-purple-600/5"
+      return "text-orange-600 border-orange-600/20 bg-orange-600/5"
     case "Approved":
       return "text-blue-600 border-blue-600/20 bg-blue-600/5"
-    case "Completed":
+    case "Stuck":
+      return "text-red-600 border-red-600/20 bg-red-600/5"
+    case "Actioned":
+      return "text-purple-600 border-purple-600/20 bg-purple-600/5"
+    case "Closed":
       return "text-green-600 border-green-600/20 bg-green-600/5"
     default:
       return "text-gray-600 border-gray-600/20 bg-gray-600/5"
   }
 }
 
-function DraggingTicket({ ticket }: { ticket: Ticket }) {
+function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: boolean }) {
   const categoryBadge = getCategoryBadge(ticket)
   
   return (
-    <Card className="mb-3 p-4 cursor-grabbing">
+    <Card className="mb-3 p-4 cursor-grabbing overflow-hidden">
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
             <div className="text-xs font-mono text-primary bg-primary/10 px-2 py-1 rounded-md">
               {ticket.ticket_id}
             </div>
-            <div className="flex flex-col text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded-md">
+            <div className="flex flex-col text-xs text-muted-foreground px-2 py-1 rounded-md">
+              <span className="text-xs font-medium text-muted-foreground/70">Filed at</span>
               <span className="font-medium">
                 {new Date(ticket.created_at).toLocaleDateString('en-US', { 
                   month: 'short', 
@@ -318,11 +328,39 @@ function DraggingTicket({ ticket }: { ticket: Ticket }) {
             </Badge>
           </div>
         </div>
-        <div className="p-2 rounded-md flex-shrink-0">
+        <div 
+          className="cursor-grab active:cursor-grabbing p-2 rounded-md transition-colors duration-200 flex-shrink-0"
+          data-drag-handle
+        >
           <IconGripVertical className="h-5 w-5 text-muted-foreground" />
         </div>
-      </div>
-      <div className="flex items-center justify-between pt-3 border-t border-border/50">
+              </div>
+        
+        {/* Expanded content - show based on isExpanded prop */}
+        {isExpanded && ticket.details && (
+          <div className="mt-3 pt-3 border-t border-border/50 overflow-hidden">
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-muted-foreground leading-relaxed">{ticket.details}</p>
+              </div>
+              <div className="flex items-center gap-2 mb-3">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="text-sm h-8 flex-1 rounded-xl shadow-none"
+                  disabled
+                >
+                  Chat
+                </Button>
+                <Button size="sm" variant="outline" className="text-sm h-8 flex-1 rounded-xl shadow-none" disabled>
+                  Documents
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div className="flex items-center justify-between pt-3 mt-3 border-t border-border/50">
         <div className="flex items-center gap-2">
           <Avatar className="h-6 w-6">
             <AvatarImage src={ticket.profile_picture || ''} alt={`User ${ticket.user_id}`} />
@@ -350,7 +388,7 @@ function DraggingTicket({ ticket }: { ticket: Ticket }) {
 
 function TicketSkeleton() {
   return (
-    <Card className="mb-3 p-4">
+    <Card className="mb-3 p-4 overflow-hidden">
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
@@ -378,23 +416,24 @@ function TicketSkeleton() {
 
 function TicketsSkeleton() {
   return (
-    <div className="w-full overflow-x-auto">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-        {["On Hold", "For Approval", "Approved", "In Progress", "Completed"].map((status) => (
+    <div className="w-full h-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
+        {["Approved", "In Progress", "Stuck", "Actioned", "Closed", "On Hold"].map((status) => (
           <div key={status}>
-            <div className="bg-gradient-to-br from-background to-muted/20 border border-border/50 rounded-xl p-4 shadow-sm transition-all duration-200 min-h-[500px] flex flex-col">
+            <div className="bg-gradient-to-br from-background to-muted/20 border border-border/50 rounded-xl p-4 shadow-sm transition-all duration-200 flex flex-col">
               <div className="flex-shrink-0 mb-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <Badge variant="outline" className={`px-3 py-1 font-medium ${
-                      status === 'On Hold' ? 'text-gray-600 border-gray-600/20 bg-gray-600/5' :
-                      status === 'For Approval' ? 'text-yellow-600 border-yellow-600/20 bg-yellow-600/5' :
                       status === 'Approved' ? 'text-blue-600 border-blue-600/20 bg-blue-600/5' :
-                      status === 'In Progress' ? 'text-purple-600 border-purple-600/20 bg-purple-600/5' :
-                      status === 'Completed' ? 'text-green-600 border-green-600/20 bg-green-600/5' :
+                      status === 'In Progress' ? 'text-orange-600 border-orange-600/20 bg-orange-600/5' :
+                      status === 'Stuck' ? 'text-red-600 border-red-600/20 bg-red-600/5' :
+                      status === 'Actioned' ? 'text-purple-600 border-purple-600/20 bg-purple-600/5' :
+                      status === 'Closed' ? 'text-green-600 border-green-600/20 bg-green-600/5' :
+                      status === 'On Hold' ? 'text-gray-600 border-gray-600/20 bg-gray-600/5' :
                       'text-gray-600 border-gray-600/20 bg-gray-600/5'
                     }`}>
-                      {status === 'Completed' ? 'Closed' : status}
+                      {status === 'Approved' ? 'New' : status}
                     </Badge>
                     <Skeleton className="h-6 w-8" />
                   </div>
@@ -721,8 +760,8 @@ export default function TicketsPage() {
   const getTicketsByStatus = (status: TicketStatus) => {
     let filteredTickets = tickets.filter(ticket => ticket.status === status)
     
-    // For Completed status, only show tickets resolved today (not past tickets)
-    if (status === 'Completed') {
+    // For Closed status, only show tickets resolved today (not past tickets)
+    if (status === 'Closed') {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       
@@ -746,11 +785,11 @@ export default function TicketsPage() {
   }
 
   const getStatusDisplayLabel = (status: string) => {
-    if (status === 'Completed') return 'Closed'
+    if (status === 'Approved') return 'New'
     return status
   }
 
-  const statuses = ["On Hold", "For Approval", "Approved", "In Progress", "Completed"]
+  const statuses = ["Approved", "In Progress", "Stuck", "Actioned", "Closed", "On Hold"]
 
   return (
     <>
@@ -758,7 +797,7 @@ export default function TicketsPage() {
       <SidebarInset>
         <SiteHeader />
         <div className="flex flex-1 flex-col">
-          <div className="@container/main flex flex-1 flex-col gap-2">
+          <div className="flex-1 flex-col gap-2 @container/main">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
               <div className="px-4 lg:px-6">
                 <div className="flex items-center justify-between mb-4">
@@ -773,7 +812,7 @@ export default function TicketsPage() {
                     <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search tickets..."
-                      className="pl-8"
+                      className="pl-8 h-8"
                     />
                   </div>
 
@@ -789,7 +828,7 @@ export default function TicketsPage() {
                 </div>
               </div>
 
-              <div className="px-4 lg:px-6">
+              <div className="w-full h-full">
                 {loading ? (
                   <TicketsSkeleton />
                 ) : error ? (
@@ -809,11 +848,10 @@ export default function TicketsPage() {
                     onDragOver={handleDragOver}
                     onDragEnd={handleDragEnd}
                   >
-                    <div className="w-full overflow-x-auto">
-                      <div className="flex gap-3">
-                        {statuses.map((status) => (
-                          <div key={status}>
-                            <div className="bg-gradient-to-br from-background to-muted/20 border border-border/50 rounded-xl p-4 shadow-sm transition-all duration-200 h-[calc(100vh-260px)] w-[350px] flex flex-col">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
+                      {statuses.map((status) => (
+                        <div key={status}>
+                          <div className="bg-gradient-to-br from-background to-muted/20 border border-border/50 rounded-xl p-4 shadow-sm transition-all duration-200 flex flex-col">
                               <div className="flex-shrink-0 mb-4">
                                 <div className="flex items-center justify-between mb-3">
                                   <div className="flex items-center gap-3">
@@ -837,6 +875,18 @@ export default function TicketsPage() {
                                         key={ticket.id} 
                                         ticket={ticket}
                                         isLast={index === array.length - 1}
+                                        isExpanded={expandedTickets.has(ticket.id.toString())}
+                                        onToggleExpanded={(ticketId) => {
+                                          setExpandedTickets(prev => {
+                                            const newSet = new Set(prev)
+                                            if (newSet.has(ticketId)) {
+                                              newSet.delete(ticketId)
+                                            } else {
+                                              newSet.add(ticketId)
+                                            }
+                                            return newSet
+                                          })
+                                        }}
                                       />
                                     ))}
                                   </SortableContext>
@@ -852,12 +902,12 @@ export default function TicketsPage() {
                           </div>
                         ))}
                       </div>
-                    </div>
                     
                     <DragOverlay>
                       {activeId ? (
                         <DraggingTicket 
-                          ticket={tickets.find(ticket => ticket.id.toString() === activeId)!} 
+                          ticket={tickets.find(ticket => ticket.id.toString() === activeId)!}
+                          isExpanded={expandedTickets.has(activeId)}
                         />
                       ) : null}
                     </DragOverlay>

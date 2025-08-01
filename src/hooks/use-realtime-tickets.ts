@@ -120,7 +120,40 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
           onTicketCreated?.(record)
           break
         case 'UPDATE':
-          onTicketUpdated?.(record, old_record)
+          // For updates, we need to refetch the complete data to get profile info
+          // The real-time notification only has ticket data, not joined profile data
+          if (onTicketUpdated) {
+            // Refetch the specific ticket to get complete data with profile info
+            fetch(`/api/tickets/${record.id}`)
+              .then(res => {
+                if (!res.ok) {
+                  throw new Error(`HTTP error! status: ${res.status}`)
+                }
+                return res.json()
+              })
+              .then(completeTicket => {
+                console.log('Refetched ticket data:', completeTicket)
+                console.log('Profile data check:', {
+                  profile_picture: completeTicket?.profile_picture,
+                  first_name: completeTicket?.first_name,
+                  last_name: completeTicket?.last_name,
+                  user_id: completeTicket?.user_id
+                })
+                // Ensure we have the complete data with profile info
+                if (completeTicket && (completeTicket.profile_picture || completeTicket.first_name || completeTicket.last_name)) {
+                  console.log('✅ Using complete ticket data with profile info')
+                  onTicketUpdated(completeTicket, old_record)
+                } else {
+                  console.warn('❌ Refetched ticket missing profile data, using original data')
+                  onTicketUpdated(record, old_record)
+                }
+              })
+              .catch(error => {
+                console.error('Error refetching ticket data:', error)
+                // Fallback to using the partial data
+                onTicketUpdated(record, old_record)
+              })
+          }
           break
         case 'DELETE':
           onTicketDeleted?.(record)

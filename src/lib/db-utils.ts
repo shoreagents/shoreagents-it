@@ -1,7 +1,11 @@
 import { query } from './database'
 
-export type TicketCategory = 'Computer & Equipment' | 'Station' | 'Surroundings' | 'Schedule' | 'Compensation' | 'Transport' | 'Suggestion' | 'Check-in'
-export type TicketStatus = 'For Approval' | 'On Hold' | 'In Progress' | 'Approved' | 'Completed'
+export type TicketStatus = 'For Approval' | 'On Hold' | 'In Progress' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
+
+export interface TicketCategory {
+  id: number
+  name: string
+}
 
 export interface Ticket {
   id: number
@@ -9,13 +13,16 @@ export interface Ticket {
   user_id: number
   concern: string
   details: string | null
-  category: TicketCategory
+  category: string
+  category_id: number | null
   status: TicketStatus
   position: number
   resolved_by: number | null
   resolved_at: string | null
   created_at: string
   updated_at: string
+  sector: string
+  station_id: string | null
   profile_picture: string | null
   first_name: string | null
   last_name: string | null
@@ -24,9 +31,12 @@ export interface Ticket {
 // Get all tickets
 export async function getAllTickets(): Promise<Ticket[]> {
   const result = await query(`
-    SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
+    SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, 
+           pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+    LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
     ORDER BY t.status, t.position ASC, t.created_at DESC
   `)
   return result.rows
@@ -34,15 +44,18 @@ export async function getAllTickets(): Promise<Ticket[]> {
 
 // Get tickets by status
 export async function getTicketsByStatus(status: string, past: boolean = false): Promise<Ticket[]> {
-  if (status === 'Completed') {
+  if (status === 'Closed') {
     if (past) {
-      // Return completed tickets from past dates (not today)
+      // Return closed tickets from past dates (not today)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const result = await query(`
-        SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
+        SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at,
+               pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name
         FROM public.tickets t
         LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+        LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+        LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
         WHERE t.status = $1
           AND (
             (t.resolved_at < $2)
@@ -58,9 +71,12 @@ export async function getTicketsByStatus(status: string, past: boolean = false):
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate() + 1);
       const result = await query(`
-        SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
+        SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at,
+               pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name
         FROM public.tickets t
         LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+        LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+        LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
         WHERE t.status = $1
           AND (
             (t.resolved_at >= $2 AND t.resolved_at < $3)
@@ -72,9 +88,12 @@ export async function getTicketsByStatus(status: string, past: boolean = false):
     }
   } else {
     const result = await query(`
-      SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
+      SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at,
+             pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name
       FROM public.tickets t
       LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+      LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+      LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
       WHERE t.status = $1
       ORDER BY t.position ASC, t.created_at DESC
     `, [status]);
@@ -85,8 +104,8 @@ export async function getTicketsByStatus(status: string, past: boolean = false):
 // Create new ticket
 export async function createTicket(ticket: Omit<Ticket, 'id' | 'created_at' | 'updated_at' | 'resolved_by' | 'resolved_at'>): Promise<Ticket> {
   const result = await query(
-    'INSERT INTO public.tickets (ticket_id, user_id, concern, details, category, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-    [ticket.ticket_id, ticket.user_id, ticket.concern, ticket.details, ticket.category, ticket.status]
+    'INSERT INTO public.tickets (ticket_id, user_id, concern, details, category, category_id, status, sector) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+    [ticket.ticket_id, ticket.user_id, ticket.concern, ticket.details, ticket.category, ticket.category_id, ticket.status, ticket.sector || 'General']
   )
   return result.rows[0]
 }
@@ -146,9 +165,12 @@ export async function deleteTicket(id: number): Promise<void> {
 // Get ticket by ID
 export async function getTicketById(id: number): Promise<Ticket | null> {
   const result = await query(`
-    SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
+    SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
+           pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+    LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
     WHERE t.id = $1
   `, [id])
   return result.rows[0] || null
@@ -157,9 +179,12 @@ export async function getTicketById(id: number): Promise<Ticket | null> {
 // Get ticket by ticket_id
 export async function getTicketByTicketId(ticketId: string): Promise<Ticket | null> {
   const result = await query(`
-    SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
+    SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
+           pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+    LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
     WHERE t.ticket_id = $1
   `, [ticketId])
   return result.rows[0] || null
@@ -168,9 +193,12 @@ export async function getTicketByTicketId(ticketId: string): Promise<Ticket | nu
 // Search tickets
 export async function searchTickets(searchTerm: string): Promise<Ticket[]> {
   const result = await query(`
-    SELECT t.*, pi.profile_picture, pi.first_name, pi.last_name
+    SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at,
+           pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+    LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
     WHERE t.concern ILIKE $1 OR t.details ILIKE $1 OR t.ticket_id ILIKE $1 
     ORDER BY t.created_at DESC
   `, [`%${searchTerm}%`])
@@ -226,4 +254,90 @@ export async function updateTicketPositions(tickets: { id: number, position: num
     console.error('Database positions update failed:', error)
     throw error
   }
+}
+
+// Get user's assigned station
+export async function getUserStation(userId: number): Promise<string | null> {
+  const result = await query(`
+    SELECT station_id
+    FROM public.stations
+    WHERE assigned_user_id = $1
+  `, [userId])
+  return result.rows[0]?.station_id || null
+}
+
+// Assign user to station
+export async function assignUserToStation(userId: number, stationId: string): Promise<void> {
+  // First, remove any existing assignment for this user
+  await query(`
+    UPDATE public.stations
+    SET assigned_user_id = NULL
+    WHERE assigned_user_id = $1
+  `, [userId])
+  
+  // Then assign to the new station
+  await query(`
+    UPDATE public.stations
+    SET assigned_user_id = $1
+    WHERE station_id = $2
+  `, [userId, stationId])
+}
+
+// Get all stations
+export async function getAllStations(): Promise<{ id: number, station_id: string, assigned_user_id: number | null }[]> {
+  const result = await query(`
+    SELECT id, station_id, assigned_user_id
+    FROM public.stations
+    ORDER BY station_id
+  `)
+  return result.rows
+}
+
+// Get all ticket categories
+export async function getAllTicketCategories(): Promise<TicketCategory[]> {
+  const result = await query(`
+    SELECT id, name
+    FROM public.ticket_categories
+    ORDER BY name
+  `)
+  return result.rows
+}
+
+// Get ticket category by ID
+export async function getTicketCategoryById(id: number): Promise<TicketCategory | null> {
+  const result = await query(`
+    SELECT id, name
+    FROM public.ticket_categories
+    WHERE id = $1
+  `, [id])
+  return result.rows[0] || null
+}
+
+// Create ticket category
+export async function createTicketCategory(name: string): Promise<TicketCategory> {
+  const result = await query(`
+    INSERT INTO public.ticket_categories (name)
+    VALUES ($1)
+    RETURNING id, name
+  `, [name])
+  return result.rows[0]
+}
+
+// Update ticket category
+export async function updateTicketCategory(id: number, name: string): Promise<TicketCategory> {
+  const result = await query(`
+    UPDATE public.ticket_categories
+    SET name = $1
+    WHERE id = $2
+    RETURNING id, name
+  `, [name, id])
+  return result.rows[0]
+}
+
+// Delete ticket category
+export async function deleteTicketCategory(id: number): Promise<void> {
+  await query(`
+    DELETE FROM public.ticket_categories
+    WHERE id = $1
+  `, [id])
 }

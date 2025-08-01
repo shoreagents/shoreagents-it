@@ -14,8 +14,11 @@ import { IconSearch, IconRefresh, IconHistory } from "@tabler/icons-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
-type TicketStatus = 'For Approval' | 'On Hold' | 'In Progress' | 'Approved' | 'Completed'
-type TicketCategory = 'Computer & Equipment' | 'Station' | 'Surroundings' | 'Schedule' | 'Compensation' | 'Transport' | 'Suggestion' | 'Check-in'
+type TicketStatus = 'For Approval' | 'On Hold' | 'In Progress' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
+interface TicketCategory {
+  id: number
+  name: string
+}
 
 interface Ticket {
   id: number
@@ -23,13 +26,16 @@ interface Ticket {
   user_id: number
   concern: string
   details: string | null
-  category: TicketCategory
+  category: string
+  category_id: number | null
+  category_name?: string
   status: TicketStatus
   position: number
   resolved_by: number | null
   resolved_at: string | null
   created_at: string
   updated_at: string
+  sector: string
   station_id: string | null
   profile_picture: string | null
   first_name: string | null
@@ -52,13 +58,13 @@ function PastTicketsTable({ tickets }: { tickets: Ticket[] }) {
   }
 
   const getStatusDisplayLabel = (status: string) => {
-    if (status === 'Completed') return 'Closed'
     return status
   }
 
-  const getCategoryBadge = (category: TicketCategory) => {
-    const categoryColors: Record<TicketCategory, string> = {
+  const getCategoryBadge = (category: string) => {
+    const categoryColors: Record<string, string> = {
       'Computer & Equipment': 'bg-blue-100 text-blue-800 hover:bg-blue-200',
+      'Network & Internet': 'bg-cyan-100 text-cyan-800 hover:bg-cyan-200',
       'Station': 'bg-purple-100 text-purple-800 hover:bg-purple-200',
       'Surroundings': 'bg-green-100 text-green-800 hover:bg-green-200',
       'Schedule': 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
@@ -69,7 +75,7 @@ function PastTicketsTable({ tickets }: { tickets: Ticket[] }) {
     }
     
     return (
-      <Badge variant="secondary" className={`text-xs ${categoryColors[category]}`}>
+      <Badge variant="secondary" className={`text-xs ${categoryColors[category] || 'bg-gray-100 text-gray-800'}`}>
         {category}
       </Badge>
     )
@@ -101,7 +107,7 @@ function PastTicketsTable({ tickets }: { tickets: Ticket[] }) {
                 </div>
               </TableCell>
               <TableCell>
-                {getCategoryBadge(ticket.category)}
+                {getCategoryBadge(ticket.category_name || ticket.category)}
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
@@ -130,7 +136,7 @@ function PastTicketsTable({ tickets }: { tickets: Ticket[] }) {
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                  {getStatusDisplayLabel('Completed')}
+                  {getStatusDisplayLabel('Closed')}
                 </Badge>
               </TableCell>
             </TableRow>
