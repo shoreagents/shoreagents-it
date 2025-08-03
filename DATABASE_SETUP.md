@@ -31,7 +31,7 @@ DATABASE_URL="postgresql://username:password@host:port/database"
 
 # Next.js Environment Variables
 NEXTAUTH_SECRET="your-secret-key-here"
-NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_URL="http://localhost:3001"
 ```
 
 Replace the `DATABASE_URL` with your actual Railway connection string.

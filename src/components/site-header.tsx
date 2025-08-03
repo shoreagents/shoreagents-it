@@ -4,6 +4,7 @@ import {
   LogOutIcon,
 } from "lucide-react"
 import { usePathname } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 
 
 import {
@@ -23,14 +24,9 @@ import { Button } from "@/components/ui/button"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 
 
-const user = {
-  name: "shadcn",
-  email: "m@example.com",
-  avatar: "/avatars/shadcn.svg",
-}
-
 export function SiteHeader() {
   const pathname = usePathname()
+  const { user, logout } = useAuth()
   
   const getPageTitle = () => {
     // Handle SSR where pathname might be undefined
@@ -43,8 +39,8 @@ export function SiteHeader() {
         return "Dashboard"
       case "/tickets/":
         return "Tickets"
-      case "/onboarding/":
-        return "Onboarding & Offboarding"
+      case "/past-tickets/":
+        return "Records"
       default:
         return "Dashboard"
     }
@@ -65,22 +61,29 @@ export function SiteHeader() {
               className="relative h-8 w-8 rounded-full"
             >
               <Avatar className="h-8 w-8">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback>CN</AvatarFallback>
+                <AvatarImage src={user?.profilePicture} alt={`${user?.firstName} ${user?.lastName}`} />
+                <AvatarFallback>
+                  {user ? `${user.firstName?.[0]}${user.lastName?.[0]}` : 'U'}
+                </AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56" align="end" forceMount>
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">{user.name}</p>
+                <p className="text-sm font-medium leading-none">
+                  {user ? `${user.firstName} ${user.lastName}` : 'User'}
+                </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {user.email}
+                  {user?.email || 'user@example.com'}
                 </p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={logout} 
+              className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+            >
               <LogOutIcon className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>

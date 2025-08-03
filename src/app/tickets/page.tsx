@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -5,6 +6,7 @@ import { useState, useEffect, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
+import { TicketDetailModal } from "@/components/ticket-detail-modal"
 import {
   SidebarInset,
 } from "@/components/ui/sidebar"
@@ -12,8 +14,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ReloadButton } from "@/components/ui/reload-button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { IconSearch, IconFilter, IconGripVertical, IconRefresh } from "@tabler/icons-react"
+
+import { IconSearch, IconFilter, IconGripVertical, IconCalendar, IconClock } from "@tabler/icons-react"
 import { useRealtimeTickets } from "@/hooks/use-realtime-tickets"
 import {
   DndContext,
@@ -39,8 +43,9 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useAuth } from "@/contexts/auth-context"
 
-type TicketStatus = 'For Approval' | 'On Hold' | 'In Progress' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
+type TicketStatus = 'On Hold' | 'In Progress' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
 interface TicketCategory {
   id: number
   name: string
@@ -61,11 +66,17 @@ interface Ticket {
   resolved_at: string | null
   created_at: string
   updated_at: string
-  sector: string
+  role_id: number | null
   station_id: string | null
   profile_picture: string | null
   first_name: string | null
   last_name: string | null
+  employee_id: string | null
+  resolver_first_name?: string | null
+  resolver_last_name?: string | null
+  user_type?: string | null
+  member_name?: string | null
+  member_color?: string | null
 }
 
 interface SortableTicketProps {
@@ -73,19 +84,20 @@ interface SortableTicketProps {
   isLast?: boolean
   isExpanded: boolean
   onToggleExpanded: (ticketId: string) => void
+  onViewAll: (ticket: Ticket) => void
 }
 
 const getCategoryBadge = (ticket: Ticket) => {
   const categoryColors: Record<string, string> = {
-    'Computer & Equipment': 'bg-blue-100 text-blue-800 hover:bg-blue-200',
-    'Network & Internet': 'bg-cyan-100 text-cyan-800 hover:bg-cyan-200',
-    'Station': 'bg-purple-100 text-purple-800 hover:bg-purple-200',
-    'Surroundings': 'bg-green-100 text-green-800 hover:bg-green-200',
-    'Schedule': 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
-    'Compensation': 'bg-orange-100 text-orange-800 hover:bg-orange-200',
-    'Transport': 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200',
-    'Suggestion': 'bg-pink-100 text-pink-800 hover:bg-pink-200',
-    'Check-in': 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+    'Computer & Equipment': 'bg-blue-100 text-blue-800',
+    'Network & Internet': 'bg-cyan-100 text-cyan-800',
+    'Station': 'bg-purple-100 text-purple-800',
+    'Surroundings': 'bg-green-100 text-green-800',
+    'Schedule': 'bg-yellow-100 text-yellow-800',
+    'Compensation': 'bg-orange-100 text-orange-800',
+    'Transport': 'bg-indigo-100 text-indigo-800',
+    'Suggestion': 'bg-pink-100 text-pink-800',
+    'Check-in': 'bg-gray-100 text-gray-800'
   }
   
   return {
@@ -94,7 +106,7 @@ const getCategoryBadge = (ticket: Ticket) => {
   }
 }
 
-const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = false, isExpanded, onToggleExpanded }: SortableTicketProps) {
+const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = false, isExpanded, onToggleExpanded, onViewAll }: SortableTicketProps) {
   const [isHovered, setIsHovered] = useState(false)
   const {
     attributes,
@@ -150,6 +162,8 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
     }
   }, [ticket])
 
+
+
   // Cleanup effect for animations
   useEffect(() => {
     return () => {
@@ -161,7 +175,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
   const categoryBadge = useMemo(() => getCategoryBadge(ticket), [ticket.category, ticket.category_name])
 
   const cardClassName = useMemo(() => {
-    return `${isLast ? '' : 'mb-3'} p-4 transition-colors duration-150 cursor-pointer overflow-hidden ${
+    return `${isLast ? '' : 'mb-3'} p-4 transition-colors duration-150 cursor-pointer overflow-hidden bg-card dark:bg-[#252525] ${
       isDragging ? 'opacity-50' : ''
     } ${
       isHovered ? 'border-primary' : 'hover:border-primary/50'
@@ -177,43 +191,86 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
       onMouseLeave={handleMouseLeave}
       onClick={handleCardClick}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="text-xs font-mono text-primary bg-primary/10 px-2 py-1 rounded-md">
-              {ticket.ticket_id}
-            </div>
-            <div className="flex flex-col text-xs text-muted-foreground px-2 py-1 rounded-md">
-              <span className="text-xs font-medium text-muted-foreground/70">Filed at</span>
-              <span className="font-medium">
-                {new Date(ticket.created_at).toLocaleDateString('en-US', { 
-                  month: 'short', 
-                  day: 'numeric'
-                })}
-              </span>
-              <span className="font-mono text-muted-foreground/70">
-                {new Date(ticket.created_at).toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: true
-                })}
-              </span>
+      <div className="flex flex-col mb-3">
+        <div className="flex-1 min-w-0 relative">
+          <div 
+            className="cursor-grab active:cursor-grabbing transition-colors duration-200 absolute top-0 right-0"
+            data-drag-handle
+            {...attributes}
+            {...listeners}
+          >
+            <IconGripVertical className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col text-xs text-muted-foreground py-1 rounded-none mb-3">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-[6px] h-6 flex items-center">
+                  {ticket.ticket_id}
+                </span>
+                <Badge variant="secondary" className={`text-xs h-6 flex items-center ${categoryBadge?.color || 'bg-gray-100 text-gray-800'}`}>
+                  {categoryBadge?.name || 'General'}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-medium text-muted-foreground/70 mr-2">Filed at:</span>
+                <IconCalendar className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-muted-foreground">
+                  {new Date(ticket.created_at).toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric'
+                  })}
+                </span>
+                <span className="text-muted-foreground/70">•</span>
+                <IconClock className="h-4 w-4 text-muted-foreground" />
+                <span className="font-mono text-muted-foreground">
+                  {new Date(ticket.created_at).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  })}
+                </span>
+              </div>
             </div>
           </div>
-          <h4 className="font-semibold text-sm mb-2 line-clamp-2 leading-tight">{ticket.concern}</h4>
-          <div className="mb-2">
-            <Badge variant="secondary" className={`text-xs ${categoryBadge?.color || 'bg-gray-100 text-gray-800'}`}>
-              {categoryBadge?.name || 'General'}
-            </Badge>
+                      <div className="flex items-center gap-2 mb-3">
+              <Avatar className="h-8 w-8 flex-shrink-0">
+                <AvatarImage src={ticket.profile_picture || ''} alt={`User ${ticket.user_id}`} />
+                <AvatarFallback className="text-sm bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
+                  {ticket.first_name && ticket.last_name 
+                    ? `${ticket.first_name[0]}${ticket.last_name[0]}`
+                    : String(ticket.user_id).split(' ').map(n => n[0]).join('')
+                  }
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-sm font-semibold text-foreground truncate">
+                  {ticket.first_name && ticket.last_name 
+                    ? `${ticket.first_name} ${ticket.last_name}`
+                    : `User ${ticket.user_id}`
+                  }
+                </span>
+                {ticket.user_type === 'Internal' ? (
+                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400 truncate">
+                    Internal
+                  </span>
+                ) : ticket.member_name && (
+                  <span 
+                    className="text-xs font-medium truncate"
+                    style={{ color: ticket.member_color || undefined }}
+                  >
+                    {ticket.member_name}
+                  </span>
+                )}
+              </div>
+                          <div className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-center">
+              <span className="font-medium text-muted-foreground/70">Station</span>
+              <span className="text-sm font-medium text-primary">{ticket.station_id || 'Unassigned'}</span>
+            </div>
+            </div>
+          <div className="border border-gray-300 dark:border-[#84848440] rounded-lg p-3 text-left flex flex-col justify-center mt-6">
+            <span className="text-xs font-medium text-muted-foreground/70">Concern:</span>
+            <h4 className="font-normal text-sm text-primary leading-tight break-words mt-1">{ticket.concern}</h4>
           </div>
-        </div>
-        <div 
-          className="cursor-grab active:cursor-grabbing p-2 rounded-md transition-colors duration-200 flex-shrink-0"
-          data-drag-handle
-          {...attributes}
-          {...listeners}
-        >
-          <IconGripVertical className="h-5 w-5 text-muted-foreground" />
         </div>
       </div>
                     <AnimatePresence>
@@ -223,193 +280,260 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
              animate={{ height: "auto" }}
              exit={{ height: 0 }}
              transition={{ duration: 0.1, ease: "easeOut" }}
-             className="mt-3 pt-3 border-t border-border/50 overflow-hidden"
+             className="mt-3 overflow-hidden"
            >
-             <div className="space-y-3">
-               <div>
-                 <p className="text-sm text-muted-foreground leading-relaxed">{ticket.details}</p>
-               </div>
-               <div className="flex items-center gap-2 mb-3">
+                           <div className="space-y-3">
+                                {ticket.details && (
+                  <div className="border border-gray-300 dark:border-[#84848440] rounded-lg p-3 text-left flex flex-col justify-center mb-6">
+                    <span className="text-xs font-medium text-muted-foreground/70">Additional Details:</span>
+                    <p className="text-sm text-primary leading-relaxed break-words mt-1">{ticket.details}</p>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 mb-3">
                  <Button 
                    size="sm" 
                    variant="outline" 
-                   className="text-sm h-8 flex-1 rounded-xl shadow-none"
+                   className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-gray-300 dark:border-gray-600 hover:bg-[#e8e8e8] dark:hover:bg-[#404040]"
                    onClick={handleChatClick}
                  >
                    Chat
                  </Button>
-                 <Button size="sm" variant="outline" className="text-sm h-8 flex-1 rounded-xl shadow-none">
-                   Documents
+                 <Button 
+                   size="sm" 
+                   variant="outline" 
+                   className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-gray-300 dark:border-gray-600 hover:bg-[#e8e8e8] dark:hover:bg-[#404040]"
+                   onClick={(e) => {
+                     e.preventDefault()
+                     e.stopPropagation()
+                     onViewAll(ticket)
+                   }}
+                 >
+                   View All
                  </Button>
                </div>
              </div>
            </motion.div>
-         )}
+                  )}
        </AnimatePresence>
-      <div className="flex items-center justify-between pt-3 mt-3 border-t border-border/50">
-        <div className="flex items-center gap-2">
-          <Avatar className="h-6 w-6">
-            <AvatarImage src={ticket.profile_picture || ''} alt={`User ${ticket.user_id}`} />
-            <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
-              {ticket.first_name && ticket.last_name 
-                ? `${ticket.first_name[0]}${ticket.last_name[0]}`
-                : String(ticket.user_id).split(' ').map(n => n[0]).join('')
-              }
-            </AvatarFallback>
-          </Avatar>
-          <span className="text-xs font-medium text-foreground">
-            {ticket.first_name && ticket.last_name 
-              ? `${ticket.first_name} ${ticket.last_name}`
-              : `User ${ticket.user_id}`
-            }
-          </span>
+      {ticket.status === 'Closed' && ticket.resolved_at && ticket.resolver_first_name && ticket.resolver_last_name && (
+        <div className="pt-3 mt-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground/70 truncate">
+              Resolved by: <span className="text-foreground font-medium">{ticket.resolver_first_name}</span>
+            </span>
+            <span className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+              <IconClock className="h-4 w-4 text-muted-foreground" />
+              {new Date(ticket.resolved_at).toLocaleTimeString('en-US', { 
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </span>
+          </div>
         </div>
-        <div className="text-xs text-muted-foreground">
-          {ticket.station_id || 'No Station'}
+      )}
+      </Card>
+  )
+})
+
+  const getStatusColor = (status: TicketStatus) => {
+    switch (status) {
+      case "On Hold":
+        return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
+      case "In Progress":
+        return "text-orange-700 dark:text-white border-orange-600/20 bg-orange-50 dark:bg-orange-600/20"
+      case "Approved":
+        return "text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20"
+      case "Stuck":
+        return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
+      case "Actioned":
+        return "text-purple-700 dark:text-white border-purple-600/20 bg-purple-50 dark:bg-purple-600/20"
+      case "Closed":
+        return "text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20"
+      default:
+        return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
+    }
+  }
+
+  const getCircleColor = (status: TicketStatus) => {
+    switch (status) {
+      case "On Hold":
+        return "bg-gray-600/20 dark:bg-gray-600/40 text-gray-700 dark:text-white"
+      case "In Progress":
+        return "bg-orange-600/20 dark:bg-orange-600/40 text-orange-700 dark:text-white"
+      case "Approved":
+        return "bg-blue-600/20 dark:bg-blue-600/40 text-blue-700 dark:text-white"
+      case "Stuck":
+        return "bg-red-600/20 dark:bg-red-600/40 text-red-700 dark:text-white"
+      case "Actioned":
+        return "bg-purple-600/20 dark:bg-purple-600/40 text-purple-700 dark:text-white"
+      case "Closed":
+        return "bg-green-600/20 dark:bg-green-600/40 text-green-700 dark:text-white"
+      default:
+        return "bg-gray-600/20 dark:bg-gray-600/40 text-gray-700 dark:text-white"
+    }
+  }
+
+function TicketSkeleton() {
+  return (
+    <Card className="mb-3 p-4 overflow-hidden bg-card dark:bg-[#252525] rounded-xl">
+      <div className="flex flex-col mb-3">
+        <div className="flex-1 min-w-0 relative">
+          <div className="cursor-grab active:cursor-grabbing transition-colors duration-200 absolute top-0 right-0">
+            <Skeleton className="h-5 w-5" />
+          </div>
+          <div className="flex items-center gap-2 mb-3">
+            <Skeleton className="h-6 w-16 rounded-[6px]" />
+            <Skeleton className="h-6 w-20 rounded-[6px]" />
+          </div>
+          <div className="flex items-center gap-2 mb-3">
+            <Skeleton className="h-8 w-8 rounded-full" />
+            <div className="flex flex-col min-w-0 flex-1">
+              <Skeleton className="h-4 w-24" />
+            </div>
+            <div className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-center">
+              <Skeleton className="h-4 w-12" />
+            </div>
+          </div>
+          <div className="border border-gray-300 dark:border-[#84848440] rounded-lg p-3 text-left flex flex-col justify-center mt-6">
+            <Skeleton className="h-4 w-full" />
+          </div>
         </div>
       </div>
     </Card>
   )
-})
-
-const getStatusColor = (status: TicketStatus) => {
-  switch (status) {
-    case "For Approval":
-      return "text-yellow-600 border-yellow-600/20 bg-yellow-600/5"
-    case "On Hold":
-      return "text-gray-600 border-gray-600/20 bg-gray-600/5"
-    case "In Progress":
-      return "text-orange-600 border-orange-600/20 bg-orange-600/5"
-    case "Approved":
-      return "text-blue-600 border-blue-600/20 bg-blue-600/5"
-    case "Stuck":
-      return "text-red-600 border-red-600/20 bg-red-600/5"
-    case "Actioned":
-      return "text-purple-600 border-purple-600/20 bg-purple-600/5"
-    case "Closed":
-      return "text-green-600 border-green-600/20 bg-green-600/5"
-    default:
-      return "text-gray-600 border-gray-600/20 bg-gray-600/5"
-  }
 }
 
 function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: boolean }) {
   const categoryBadge = getCategoryBadge(ticket)
   
   return (
-    <Card className="mb-3 p-4 cursor-grabbing overflow-hidden">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="text-xs font-mono text-primary bg-primary/10 px-2 py-1 rounded-md">
-              {ticket.ticket_id}
-            </div>
-            <div className="flex flex-col text-xs text-muted-foreground px-2 py-1 rounded-md">
-              <span className="text-xs font-medium text-muted-foreground/70">Filed at</span>
-              <span className="font-medium">
-                {new Date(ticket.created_at).toLocaleDateString('en-US', { 
-                  month: 'short', 
-                  day: 'numeric'
-                })}
-              </span>
-              <span className="font-mono text-muted-foreground/70">
-                {new Date(ticket.created_at).toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: true
-                })}
-              </span>
-            </div>
+    <Card className="mb-3 p-4 cursor-grabbing overflow-hidden bg-card dark:bg-[#252525] border-primary">
+      <div className="flex flex-col mb-3">
+        <div className="flex-1 min-w-0 relative">
+          <div 
+            className="cursor-grab active:cursor-grabbing transition-colors duration-200 absolute top-0 right-0"
+            data-drag-handle
+          >
+            <IconGripVertical className="h-5 w-5 text-muted-foreground" />
           </div>
-          <h4 className="font-semibold text-sm mb-2 line-clamp-2 leading-tight">{ticket.concern}</h4>
-          <div className="mb-2">
-            <Badge variant="secondary" className={`text-xs ${categoryBadge?.color || 'bg-gray-100 text-gray-800'}`}>
-              {categoryBadge?.name || 'General'}
-            </Badge>
-          </div>
-        </div>
-        <div 
-          className="cursor-grab active:cursor-grabbing p-2 rounded-md transition-colors duration-200 flex-shrink-0"
-          data-drag-handle
-        >
-          <IconGripVertical className="h-5 w-5 text-muted-foreground" />
-        </div>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col text-xs text-muted-foreground py-1 rounded-none mb-3">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-[6px] h-6 flex items-center">
+                  {ticket.ticket_id}
+                </span>
+                <Badge variant="secondary" className={`text-xs h-6 flex items-center ${categoryBadge?.color || 'bg-gray-100 text-gray-800'}`}>
+                  {categoryBadge?.name || 'General'}
+                </Badge>
               </div>
-        
-        {/* Expanded content - show based on isExpanded prop */}
-        {isExpanded && ticket.details && (
-          <div className="mt-3 pt-3 border-t border-border/50 overflow-hidden">
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-medium text-muted-foreground/70 mr-2">Filed at:</span>
+                <IconCalendar className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-muted-foreground">
+                  {new Date(ticket.created_at).toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric'
+                  })}
+                </span>
+                <span className="text-muted-foreground/70">•</span>
+                <IconClock className="h-4 w-4 text-muted-foreground" />
+                <span className="font-mono text-muted-foreground">
+                  {new Date(ticket.created_at).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  })}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mb-3">
+            <Avatar className="h-8 w-8 flex-shrink-0">
+              <AvatarImage src={ticket.profile_picture || ''} alt={`User ${ticket.user_id}`} />
+              <AvatarFallback className="text-sm bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
+                {ticket.first_name && ticket.last_name 
+                  ? `${ticket.first_name[0]}${ticket.last_name[0]}`
+                  : String(ticket.user_id).split(' ').map(n => n[0]).join('')
+                }
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-sm font-semibold text-foreground truncate">
+                {ticket.first_name && ticket.last_name 
+                  ? `${ticket.first_name} ${ticket.last_name}`
+                  : `User ${ticket.user_id}`
+                }
+              </span>
+              {ticket.user_type === 'Internal' ? (
+                <span className="text-xs font-medium text-blue-600 dark:text-blue-400 truncate">
+                  Internal
+                </span>
+              ) : ticket.member_name && (
+                <span 
+                  className="text-xs font-medium truncate"
+                  style={{ color: ticket.member_color || undefined }}
+                >
+                  {ticket.member_name}
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-center">
+              <span className="font-medium text-muted-foreground/70">Station</span>
+              <span className="text-sm font-medium text-primary">{ticket.station_id || 'Unassigned'}</span>
+            </div>
+          </div>
+          <div className="border border-gray-300 dark:border-[#84848440] rounded-lg p-3 text-left flex flex-col justify-center mt-6">
+            <span className="text-xs font-medium text-muted-foreground/70">Concern:</span>
+            <h4 className="font-normal text-sm text-primary leading-tight break-words mt-1">{ticket.concern}</h4>
+          </div>
+        </div>
+      </div>
+      
+        {isExpanded && (
+          <div className="mt-3 overflow-hidden">
             <div className="space-y-3">
-              <div>
-                <p className="text-sm text-muted-foreground leading-relaxed">{ticket.details}</p>
-              </div>
+              {ticket.details && (
+                <div className="border border-gray-300 dark:border-[#84848440] rounded-lg p-3 text-left flex flex-col justify-center mb-6">
+                  <span className="text-xs font-medium text-muted-foreground/70">Additional Details:</span>
+                  <p className="text-sm text-primary leading-relaxed break-words mt-1">{ticket.details}</p>
+                </div>
+              )}
               <div className="flex items-center gap-2 mb-3">
                 <Button 
                   size="sm" 
                   variant="outline" 
-                  className="text-sm h-8 flex-1 rounded-xl shadow-none"
-                  disabled
+                  className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-gray-300 dark:border-gray-600 hover:bg-[#e8e8e8] dark:hover:bg-[#404040]"
                 >
                   Chat
                 </Button>
-                <Button size="sm" variant="outline" className="text-sm h-8 flex-1 rounded-xl shadow-none" disabled>
-                  Documents
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-gray-300 dark:border-gray-600 hover:bg-[#e8e8e8] dark:hover:bg-[#404040]"
+                >
+                  View All
                 </Button>
               </div>
             </div>
           </div>
         )}
-        
-        <div className="flex items-center justify-between pt-3 mt-3 border-t border-border/50">
-        <div className="flex items-center gap-2">
-          <Avatar className="h-6 w-6">
-            <AvatarImage src={ticket.profile_picture || ''} alt={`User ${ticket.user_id}`} />
-            <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
-              {ticket.first_name && ticket.last_name 
-                ? `${ticket.first_name[0]}${ticket.last_name[0]}`
-                : String(ticket.user_id).split(' ').map(n => n[0]).join('')
-              }
-            </AvatarFallback>
-          </Avatar>
-          <span className="text-xs font-medium text-foreground">
-            {ticket.first_name && ticket.last_name 
-              ? `${ticket.first_name} ${ticket.last_name}`
-              : `User ${ticket.user_id}`
-            }
-          </span>
-        </div>
-        <div className="text-xs text-muted-foreground">
-          {ticket.station_id || 'No Station'}
-        </div>
-      </div>
-    </Card>
-  )
-}
-
-function TicketSkeleton() {
-  return (
-    <Card className="mb-3 p-4 overflow-hidden">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <Skeleton className="h-5 w-16" />
-            <div className="flex flex-col gap-1">
-              <Skeleton className="h-3 w-12" />
-              <Skeleton className="h-3 w-10" />
-            </div>
+      
+      {ticket.status === 'Closed' && ticket.resolved_at && ticket.resolver_first_name && ticket.resolver_last_name && (
+        <div className="pt-3 mt-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground/70 truncate">
+              Resolved by: <span className="text-foreground font-medium">{ticket.resolver_first_name}</span>
+            </span>
+            <span className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+              <IconClock className="h-4 w-4 text-muted-foreground" />
+              {new Date(ticket.resolved_at).toLocaleTimeString('en-US', { 
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </span>
           </div>
-          <Skeleton className="h-4 w-full mb-2" />
-          <Skeleton className="h-3 w-20 mb-2" />
         </div>
-        <Skeleton className="h-5 w-5 flex-shrink-0" />
-      </div>
-      <div className="flex items-center justify-between pt-3 border-t border-border/50">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-6 w-6 rounded-full" />
-          <Skeleton className="h-3 w-16" />
-        </div>
-        <Skeleton className="h-3 w-12" />
-      </div>
+      )}
     </Card>
   )
 }
@@ -420,22 +544,31 @@ function TicketsSkeleton() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
         {["Approved", "In Progress", "Stuck", "Actioned", "Closed", "On Hold"].map((status) => (
           <div key={status}>
-            <div className="bg-gradient-to-br from-background to-muted/20 border border-border/50 rounded-xl p-4 shadow-sm transition-all duration-200 flex flex-col">
+            <div className="bg-card border border-border rounded-xl p-4 transition-all duration-200 flex flex-col shadow-sm">
               <div className="flex-shrink-0 mb-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={`px-3 py-1 font-medium ${
-                      status === 'Approved' ? 'text-blue-600 border-blue-600/20 bg-blue-600/5' :
-                      status === 'In Progress' ? 'text-orange-600 border-orange-600/20 bg-orange-600/5' :
-                      status === 'Stuck' ? 'text-red-600 border-red-600/20 bg-red-600/5' :
-                      status === 'Actioned' ? 'text-purple-600 border-purple-600/20 bg-purple-600/5' :
-                      status === 'Closed' ? 'text-green-600 border-green-600/20 bg-green-600/5' :
-                      status === 'On Hold' ? 'text-gray-600 border-gray-600/20 bg-gray-600/5' :
-                      'text-gray-600 border-gray-600/20 bg-gray-600/5'
+                    <Badge variant="outline" className={`px-3 py-1 font-medium rounded-xl ${
+                      status === 'Approved' ? 'text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20' :
+                      status === 'In Progress' ? 'text-orange-700 dark:text-white border-orange-600/20 bg-orange-50 dark:bg-orange-600/20' :
+                      status === 'Stuck' ? 'text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20' :
+                      status === 'Actioned' ? 'text-purple-700 dark:text-white border-purple-600/20 bg-purple-50 dark:bg-purple-600/20' :
+                      status === 'Closed' ? 'text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20' :
+                      status === 'On Hold' ? 'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20' :
+                      'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20'
                     }`}>
-                      {status === 'Approved' ? 'New' : status}
+                                             {status === 'Approved' ? 'New' : status} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${
+                        status === 'Approved' ? 'bg-blue-600/20 dark:bg-blue-600/40 text-blue-700 dark:text-white' :
+                        status === 'In Progress' ? 'bg-orange-600/20 dark:bg-orange-600/40 text-orange-700 dark:text-white' :
+                        status === 'Stuck' ? 'bg-red-600/20 dark:bg-red-600/40 text-red-700 dark:text-white' :
+                        status === 'Actioned' ? 'bg-purple-600/20 dark:bg-purple-600/40 text-purple-700 dark:text-white' :
+                        status === 'Closed' ? 'bg-green-600/20 dark:bg-green-600/40 text-green-700 dark:text-white' :
+                        status === 'On Hold' ? 'bg-gray-600/20 dark:bg-gray-600/40 text-gray-700 dark:text-white' :
+                        'bg-gray-600/20 dark:bg-gray-600/40 text-gray-700 dark:text-white'
+                                             }`}>
+                         <Skeleton className="h-3 w-3 rounded-xl" />
+                       </span>
                     </Badge>
-                    <Skeleton className="h-6 w-8" />
                   </div>
                 </div>
               </div>
@@ -481,21 +614,21 @@ export default function TicketsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const { user } = useAuth()
 
   // Real-time updates
   const { isConnected: isRealtimeConnected } = useRealtimeTickets({
     onTicketCreated: (newTicket) => {
-      console.log('🆕 New ticket created:', newTicket)
       setTickets(prev => [...prev, newTicket])
     },
     onTicketUpdated: (updatedTicket, oldTicket) => {
-      console.log('🔄 Ticket updated:', updatedTicket, 'Old:', oldTicket)
       setTickets(prev => prev.map(ticket => 
         ticket.id === updatedTicket.id ? updatedTicket : ticket
       ))
     },
     onTicketDeleted: (deletedTicket) => {
-      console.log('🗑️ Ticket deleted:', deletedTicket)
       setTickets(prev => prev.filter(ticket => ticket.id !== deletedTicket.id))
     }
   })
@@ -504,6 +637,7 @@ export default function TicketsPage() {
     setMounted(true)
     fetchTickets()
   }, [])
+
 
 
 
@@ -530,12 +664,20 @@ export default function TicketsPage() {
 
   const updateTicketStatus = async (ticketId: number, newStatus: string) => {
     try {
+      const requestBody: any = { status: newStatus }
+      
+      // If the status is being changed to 'Closed', include the current user as resolvedBy
+      if (newStatus === 'Closed' && user?.id) {
+        // Convert string ID to number for the database
+        requestBody.resolvedBy = parseInt(user.id)
+      }
+      
       const response = await fetch(`/api/tickets/${ticketId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(requestBody),
       })
       
       if (response.ok) {
@@ -758,27 +900,7 @@ export default function TicketsPage() {
   }
 
   const getTicketsByStatus = (status: TicketStatus) => {
-    let filteredTickets = tickets.filter(ticket => ticket.status === status)
-    
-    // For Closed status, only show tickets resolved today (not past tickets)
-    if (status === 'Closed') {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      
-      filteredTickets = filteredTickets.filter(ticket => {
-        // Check if resolved_at date is today
-        if (ticket.resolved_at) {
-          const resolvedDate = new Date(ticket.resolved_at)
-          resolvedDate.setHours(0, 0, 0, 0)
-          return resolvedDate.getTime() === today.getTime()
-        }
-        
-        // Fallback to created_at if resolved_at is null
-        const createdDate = new Date(ticket.created_at)
-        createdDate.setHours(0, 0, 0, 0)
-        return createdDate.getTime() === today.getTime()
-      })
-    }
+    let filteredTickets = tickets.filter(ticket => ticket.status === status && ticket.role_id === 1)
     
     // Sort by position within the status
     return filteredTickets.sort((a, b) => a.position - b.position)
@@ -788,6 +910,16 @@ export default function TicketsPage() {
     if (status === 'Approved') return 'New'
     return status
   }
+
+  const handleViewAllClick = useCallback((ticket: Ticket) => {
+    setSelectedTicket(ticket)
+    setIsModalOpen(true)
+  }, [])
+
+  const handleModalClose = useCallback(() => {
+    setIsModalOpen(false)
+    setSelectedTicket(null)
+  }, [])
 
   const statuses = ["Approved", "In Progress", "Stuck", "Actioned", "Closed", "On Hold"]
 
@@ -802,8 +934,8 @@ export default function TicketsPage() {
               <div className="px-4 lg:px-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">Tickets</h1>
-                    <p className="text-base text-muted-foreground">Drag and drop tickets to manage their status</p>
+                    <h1 className="text-2xl font-bold">Tickets</h1>
+                    <p className="text-sm text-muted-foreground">Drag and drop tickets to manage their status.</p>
                   </div>
                 </div>
 
@@ -812,19 +944,14 @@ export default function TicketsPage() {
                     <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search tickets..."
-                      className="pl-8 h-8"
+                      className="pl-8"
                     />
                   </div>
 
-                  <Button 
-                    variant="outline" 
-                    className="text-sm h-8 rounded-xl shadow-none"
-                    onClick={fetchTickets}
-                    disabled={loading}
-                  >
-                    <IconRefresh className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                    Reload
-                  </Button>
+                  <ReloadButton 
+                    onReload={fetchTickets}
+                    loading={loading}
+                  />
                 </div>
               </div>
 
@@ -851,16 +978,13 @@ export default function TicketsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
                       {statuses.map((status) => (
                         <div key={status}>
-                          <div className="bg-gradient-to-br from-background to-muted/20 border border-border/50 rounded-xl p-4 shadow-sm transition-all duration-200 flex flex-col">
+                          <div className="bg-card border border-border rounded-xl p-4 transition-all duration-200 flex flex-col shadow-sm">
                               <div className="flex-shrink-0 mb-4">
                                 <div className="flex items-center justify-between mb-3">
                                   <div className="flex items-center gap-3">
-                                    <Badge variant="outline" className={`${getStatusColor(status as TicketStatus)} px-3 py-1 font-medium`}>
-                                      {getStatusDisplayLabel(status)}
+                                    <Badge variant="outline" className={`${getStatusColor(status as TicketStatus)} px-3 py-1 font-medium rounded-xl`}>
+                                                                             {getStatusDisplayLabel(status)} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${getCircleColor(status as TicketStatus)}`}>{getTicketsByStatus(status as TicketStatus).length}</span>
                                     </Badge>
-                                    <span className="text-sm font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
-                                      {getTicketsByStatus(status as TicketStatus).length}
-                                    </span>
                                   </div>
                                 </div>
                               </div>
@@ -870,32 +994,35 @@ export default function TicketsPage() {
                                     items={getTicketsByStatus(status as TicketStatus).map(ticket => ticket.id.toString())}
                                     strategy={verticalListSortingStrategy}
                                   >
-                                    {getTicketsByStatus(status as TicketStatus).map((ticket, index, array) => (
-                                      <SortableTicket 
-                                        key={ticket.id} 
-                                        ticket={ticket}
-                                        isLast={index === array.length - 1}
-                                        isExpanded={expandedTickets.has(ticket.id.toString())}
-                                        onToggleExpanded={(ticketId) => {
-                                          setExpandedTickets(prev => {
-                                            const newSet = new Set(prev)
-                                            if (newSet.has(ticketId)) {
-                                              newSet.delete(ticketId)
-                                            } else {
-                                              newSet.add(ticketId)
-                                            }
-                                            return newSet
-                                          })
-                                        }}
-                                      />
-                                    ))}
-                                  </SortableContext>
-                                  
-                                  {getTicketsByStatus(status as TicketStatus).length === 0 && (
-                                    <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-lg bg-muted/20">
-                                      <p className="text-sm font-medium">No tickets</p>
-                                    </div>
-                                  )}
+                                                                              {getTicketsByStatus(status as TicketStatus).map((ticket, index, array) => (
+                                            <SortableTicket 
+                                              key={ticket.id} 
+                                              ticket={ticket}
+                                              isLast={index === array.length - 1}
+                                              isExpanded={expandedTickets.has(ticket.id.toString())}
+                                              onToggleExpanded={(ticketId) => {
+                                                setExpandedTickets(prev => {
+                                                  const newSet = new Set(prev)
+                                                  if (newSet.has(ticketId)) {
+                                                    newSet.delete(ticketId)
+                                                  } else {
+                                                    newSet.add(ticketId)
+                                                  }
+                                                  return newSet
+                                                })
+                                              }}
+                                              onViewAll={handleViewAllClick}
+                                            />
+                                          ))}
+                                          
+                                          {getTicketsByStatus(status as TicketStatus).length === 0 && (
+                                            <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-xl bg-muted/20">
+                                              <p className="text-sm font-medium">No Tickets</p>
+                                            </div>
+                                          )}
+                                          
+
+                                        </SortableContext>
                                 </div>
                               </DroppableContainer>
                             </div>
@@ -913,18 +1040,20 @@ export default function TicketsPage() {
                     </DragOverlay>
                   </DndContext>
                 ) : (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                      <p className="text-muted-foreground">Loading...</p>
-                    </div>
-                  </div>
+                  <TicketsSkeleton />
                 )}
               </div>
             </div>
           </div>
         </div>
       </SidebarInset>
+      
+      <TicketDetailModal 
+        ticket={selectedTicket as any}
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+      />
     </>
   )
 } 
+

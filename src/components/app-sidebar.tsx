@@ -21,11 +21,11 @@ import {
   UsersIcon,
   TicketIcon,
   UserCheckIcon,
-  HistoryIcon,
 } from "lucide-react"
-import { LaptopMinimalCheckIcon } from "@/components/icons/laptop-minimal-check-icon"
-import { GripIcon } from "@/components/icons/grip-icon"
 import { ScanTextIcon } from "@/components/icons/scan-text-icon"
+import { HistoryIcon } from "@/components/ui/history"
+import { Badge } from "@/components/ui/badge"
+
 
 import { NavDocuments } from "@/components/nav-documents"
 import { NavMain } from "@/components/nav-main"
@@ -48,13 +48,6 @@ const data = {
     email: "m@example.com",
     avatar: "/avatars/shadcn.svg",
   },
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/",
-      icon: GripIcon,
-    },
-  ],
   navITRequest: [
     {
       title: "Tickets",
@@ -62,14 +55,7 @@ const data = {
       icon: ScanTextIcon,
     },
     {
-      title: "Onboarding & Offboarding",
-      url: "/onboarding",
-      icon: LaptopMinimalCheckIcon,
-    },
-  ],
-  navRecords: [
-    {
-      title: "Past Tickets",
+      title: "Records",
       url: "/past-tickets",
       icon: HistoryIcon,
     },
@@ -143,23 +129,39 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
-            >
-              <a href="/">
-                <ArrowUpCircleIcon className="h-5 w-5" />
-                <span className="text-base font-semibold group-data-[collapsible=icon]:hidden">Acme Inc.</span>
-              </a>
-            </SidebarMenuButton>
+                        <div className="data-[slot=sidebar-menu-button]:!p-1.5 flex items-center group-data-[collapsible=icon]:justify-center">
+              <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
+                <span className="text-base font-semibold">ShoreAgents</span>
+                <Badge className="text-xs px-1.5 py-0.5 bg-teal-100 text-teal-800 border-teal-200 shadow-none">IT</Badge>
+              </div>
+              <div className="hidden group-data-[collapsible=icon]:block">
+                <Badge className="text-xs px-1.5 py-0.5 bg-teal-100 text-teal-800 border-teal-200 shadow-none">IT</Badge>
+              </div>
+            </div>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
-        <NavMain items={data.navMain} />
-        
-        <SidebarGroup>
-          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden font-bold">SUPPORT</SidebarGroupLabel>
+              <SidebarContent className="group-data-[collapsible=icon]:mt-8">
+          <SidebarGroup className="group-data-[collapsible=icon]:p-0">
+            <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden font-bold">DASHBOARD</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  asChild 
+                  tooltip="Dashboard"
+                  className={`${pathname === "/" ? "bg-gray-200 dark:bg-teal-600/30 focus:bg-gray-200 dark:focus:bg-teal-600/30 active:bg-gray-200 dark:active:bg-teal-600/30 text-sidebar-accent-foreground dark:text-white hover:!bg-gray-200 dark:hover:!bg-teal-600/30" : "text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"} group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:hover:bg-gray-100 dark:group-data-[collapsible=icon]:hover:bg-gray-700 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center`}
+                >
+                  <a href="/">
+                    <LayoutDashboardIcon className="h-5 w-5" />
+                    <span className="group-data-[collapsible=icon]:hidden">Dashboard</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+          
+          <SidebarGroup className="group-data-[collapsible=icon]:p-0">
+            <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden font-bold">SUPPORT</SidebarGroupLabel>
           <SidebarMenu>
             {data.navITRequest.map((item) => {
               const isActive = pathname === item.url || pathname === item.url + "/"
@@ -170,34 +172,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <SidebarMenuButton 
                     asChild 
                     tooltip={item.title}
-                    className={isActive ? "bg-gray-200 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-200 focus:bg-gray-200 dark:focus:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-800 text-sidebar-accent-foreground" : "text-sidebar-accent-foreground hover:text-sidebar-accent-foreground"}
-                    onMouseEnter={() => iconRef.current?.startAnimation?.()}
-                    onMouseLeave={() => iconRef.current?.stopAnimation?.()}
-                  >
-                    <a href={item.url}>
-                      {item.icon && <item.icon ref={iconRef} className="h-5 w-5" />}
-                      <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )
-            })}
-          </SidebarMenu>
-        </SidebarGroup>
-        
-        <SidebarGroup>
-          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden font-bold">RECORDS</SidebarGroupLabel>
-          <SidebarMenu>
-            {data.navRecords.map((item) => {
-              const isActive = pathname === item.url || pathname === item.url + "/"
-              const iconRef = useRef<any>(null)
-              
-              return (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
-                    tooltip={item.title}
-                    className={isActive ? "bg-gray-200 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-200 focus:bg-gray-200 dark:focus:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-800 text-sidebar-accent-foreground" : "text-sidebar-accent-foreground hover:text-sidebar-accent-foreground"}
+                    className={`${isActive ? "bg-gray-200 dark:bg-teal-600/30 focus:bg-gray-200 dark:focus:bg-teal-600/30 active:bg-gray-200 dark:active:bg-teal-600/30 text-sidebar-accent-foreground dark:text-white hover:!bg-gray-200 dark:hover:!bg-teal-600/30" : "text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"} group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:hover:bg-gray-100 dark:group-data-[collapsible=icon]:hover:bg-gray-700 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center`}
                     onMouseEnter={() => iconRef.current?.startAnimation?.()}
                     onMouseLeave={() => iconRef.current?.stopAnimation?.()}
                   >

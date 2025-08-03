@@ -120,40 +120,55 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
           onTicketCreated?.(record)
           break
         case 'UPDATE':
-          // For updates, we need to refetch the complete data to get profile info
-          // The real-time notification only has ticket data, not joined profile data
-          if (onTicketUpdated) {
-            // Refetch the specific ticket to get complete data with profile info
-            fetch(`/api/tickets/${record.id}`)
-              .then(res => {
-                if (!res.ok) {
-                  throw new Error(`HTTP error! status: ${res.status}`)
-                }
-                return res.json()
+          // Refetch the specific ticket to get complete data with profile info
+          fetch(`/api/tickets/${record.id}`)
+            .then(res => {
+              if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`)
+              }
+              return res.json()
+            })
+            .then(completeTicket => {
+              console.log('Refetched ticket data:', completeTicket)
+              console.log('Profile data check:', {
+                profile_picture: completeTicket?.profile_picture,
+                first_name: completeTicket?.first_name,
+                last_name: completeTicket?.last_name,
+                user_id: completeTicket?.user_id,
+                role_id: completeTicket?.role_id,
+                employee_id: completeTicket?.employee_id
               })
-              .then(completeTicket => {
-                console.log('Refetched ticket data:', completeTicket)
-                console.log('Profile data check:', {
-                  profile_picture: completeTicket?.profile_picture,
-                  first_name: completeTicket?.first_name,
-                  last_name: completeTicket?.last_name,
-                  user_id: completeTicket?.user_id
-                })
-                // Ensure we have the complete data with profile info
-                if (completeTicket && (completeTicket.profile_picture || completeTicket.first_name || completeTicket.last_name)) {
-                  console.log('✅ Using complete ticket data with profile info')
-                  onTicketUpdated(completeTicket, old_record)
+              
+              // Check if ticket is now IT role (role_id = 1)
+              if (completeTicket && completeTicket.role_id === 1) {
+                // Ensure we have the complete data with profile info and IT role
+                if (completeTicket.profile_picture || completeTicket.first_name || completeTicket.last_name) {
+                  console.log('✅ Using complete ticket data with profile info and IT role')
+                  
+                  // Check if this is a new IT ticket (role_id changed from non-IT to IT)
+                  const oldRoleId = old_record?.role_id
+                  if (oldRoleId !== 1) {
+                    console.log('🆕 Ticket became IT role, adding to UI')
+                    onTicketCreated?.(completeTicket)
+                  } else {
+                    console.log('🔄 Ticket updated (still IT role)')
+                    onTicketUpdated?.(completeTicket, old_record)
+                  }
                 } else {
                   console.warn('❌ Refetched ticket missing profile data, using original data')
-                  onTicketUpdated(record, old_record)
+                  onTicketUpdated?.(record, old_record)
                 }
-              })
-              .catch(error => {
-                console.error('Error refetching ticket data:', error)
-                // Fallback to using the partial data
-                onTicketUpdated(record, old_record)
-              })
-          }
+              } else {
+                // Ticket is no longer IT role, should be removed from UI
+                console.log('❌ Ticket is no longer IT role (role_id != 1), removing from UI')
+                onTicketDeleted?.(record)
+              }
+            })
+            .catch(error => {
+              console.error('Error refetching ticket data:', error)
+              // Fallback to using the partial data
+              onTicketUpdated?.(record, old_record)
+            })
           break
         case 'DELETE':
           onTicketDeleted?.(record)

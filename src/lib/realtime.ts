@@ -44,7 +44,7 @@ export async function startListening() {
     // Listen for ticket changes
     await notificationClient.query('LISTEN ticket_changes')
     
-    notificationClient.on('notification', (msg) => {
+    notificationClient.on('notification', (msg: any) => {
       try {
         const payload = JSON.parse(msg.payload)
         console.log('Received notification:', payload)

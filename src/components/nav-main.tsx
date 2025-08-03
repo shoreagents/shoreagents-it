@@ -36,7 +36,7 @@ export function NavMain({
                 <SidebarMenuButton 
                   asChild 
                   tooltip={item.title}
-                  className={isActive ? "bg-gray-200 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-800 focus:bg-gray-200 dark:focus:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-800 text-sidebar-accent-foreground" : "text-sidebar-accent-foreground hover:text-sidebar-accent-foreground"}
+                  className={`${isActive ? "bg-gray-200 dark:bg-teal-600/30 focus:bg-gray-200 dark:focus:bg-teal-600/30 active:bg-gray-200 dark:active:bg-teal-600/30 text-sidebar-accent-foreground dark:text-white hover:!bg-gray-200 dark:hover:!bg-teal-600/30" : "text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"} group-data-[collapsible=icon]:!p-0`}
                   onMouseEnter={() => iconRef.current?.startAnimation?.()}
                   onMouseLeave={() => iconRef.current?.stopAnimation?.()}
                 >

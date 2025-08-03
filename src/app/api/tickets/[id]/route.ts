@@ -32,11 +32,11 @@ export async function PATCH(
   try {
     const body = await request.json()
     
-    const { status, ...updates } = body
+    const { status, resolvedBy, ...updates } = body
     
     let updatedTicket
     if (status) {
-      updatedTicket = await updateTicketStatus(parseInt(params.id), status)
+      updatedTicket = await updateTicketStatus(parseInt(params.id), status, resolvedBy)
     } else {
       updatedTicket = await updateTicket(parseInt(params.id), updates)
     }

@@ -10,11 +10,16 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { IconSearch, IconRefresh, IconHistory } from "@tabler/icons-react"
+import { ReloadButton } from "@/components/ui/reload-button"
+import { IconSearch, IconHistory, IconChevronLeft, IconChevronRight, IconArrowUp, IconArrowDown, IconArrowsSort, IconFilter, IconCalendar, IconClock } from "@tabler/icons-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
+import { useAuth } from "@/contexts/auth-context"
 
-type TicketStatus = 'For Approval' | 'On Hold' | 'In Progress' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
+
+type TicketStatus = 'On Hold' | 'In Progress' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
 interface TicketCategory {
   id: number
   name: string
@@ -35,14 +40,22 @@ interface Ticket {
   resolved_at: string | null
   created_at: string
   updated_at: string
-  sector: string
+  role_id: number | null
   station_id: string | null
   profile_picture: string | null
   first_name: string | null
   last_name: string | null
+  resolver_first_name?: string
+  resolver_last_name?: string
 }
 
-function PastTicketsTable({ tickets }: { tickets: Ticket[] }) {
+function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUser }: { 
+  tickets: Ticket[]
+  onSort: (field: string) => void
+  sortField: string
+  sortDirection: 'asc' | 'desc'
+  currentUser: any
+}) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const dateStr = date.toLocaleDateString('en-US', {
@@ -54,7 +67,15 @@ function PastTicketsTable({ tickets }: { tickets: Ticket[] }) {
       minute: '2-digit',
       hour12: true
     })
-    return `${dateStr} • ${timeStr}`
+    return (
+      <div className="flex items-center gap-1">
+        <IconCalendar className="h-4 w-4" />
+        <span>{dateStr}</span>
+        <span className="text-muted-foreground/70">•</span>
+        <IconClock className="h-4 w-4" />
+        <span>{timeStr}</span>
+      </div>
+    )
   }
 
   const getStatusDisplayLabel = (status: string) => {
@@ -63,15 +84,15 @@ function PastTicketsTable({ tickets }: { tickets: Ticket[] }) {
 
   const getCategoryBadge = (category: string) => {
     const categoryColors: Record<string, string> = {
-      'Computer & Equipment': 'bg-blue-100 text-blue-800 hover:bg-blue-200',
-      'Network & Internet': 'bg-cyan-100 text-cyan-800 hover:bg-cyan-200',
-      'Station': 'bg-purple-100 text-purple-800 hover:bg-purple-200',
-      'Surroundings': 'bg-green-100 text-green-800 hover:bg-green-200',
-      'Schedule': 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
-      'Compensation': 'bg-orange-100 text-orange-800 hover:bg-orange-200',
-      'Transport': 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200',
-      'Suggestion': 'bg-pink-100 text-pink-800 hover:bg-pink-200',
-      'Check-in': 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+      'Computer & Equipment': 'bg-blue-100 text-blue-800',
+      'Network & Internet': 'bg-cyan-100 text-cyan-800',
+      'Station': 'bg-purple-100 text-purple-800',
+      'Surroundings': 'bg-green-100 text-green-800',
+      'Schedule': 'bg-yellow-100 text-yellow-800',
+      'Compensation': 'bg-orange-100 text-orange-800',
+      'Transport': 'bg-indigo-100 text-indigo-800',
+      'Suggestion': 'bg-pink-100 text-pink-800',
+      'Check-in': 'bg-gray-100 text-gray-800'
     }
     
     return (
@@ -82,29 +103,97 @@ function PastTicketsTable({ tickets }: { tickets: Ticket[] }) {
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-md border overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Ticket ID</TableHead>
-            <TableHead>Concern</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>User</TableHead>
-            <TableHead>Filed at</TableHead>
-            <TableHead>Resolved at</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead onClick={() => onSort('ticket_id')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'ticket_id' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+              <div className="flex items-center gap-1">
+                Ticket ID
+                {sortField === 'ticket_id' && (
+                  sortDirection === 'asc' ? 
+                    <IconArrowUp className="h-4 w-4 text-primary" /> : 
+                    <IconArrowDown className="h-4 w-4 text-primary" />
+                )}
+              </div>
+            </TableHead>
+            <TableHead onClick={() => onSort('category_name')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'category_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+              <div className="flex items-center gap-1">
+                Category
+                {sortField === 'category_name' && (
+                  sortDirection === 'asc' ? 
+                    <IconArrowUp className="h-4 w-4 text-primary" /> : 
+                    <IconArrowDown className="h-4 w-4 text-primary" />
+                )}
+              </div>
+            </TableHead>
+            <TableHead onClick={() => onSort('first_name')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'first_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+              <div className="flex items-center gap-1">
+                User
+                {sortField === 'first_name' && (
+                  sortDirection === 'asc' ? 
+                    <IconArrowUp className="h-4 w-4 text-primary" /> : 
+                    <IconArrowDown className="h-4 w-4 text-primary" />
+                )}
+              </div>
+            </TableHead>
+            <TableHead onClick={() => onSort('concern')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'concern' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+              <div className="flex items-center gap-1">
+                Concern
+                {sortField === 'concern' && (
+                  sortDirection === 'asc' ? 
+                    <IconArrowUp className="h-4 w-4 text-primary" /> : 
+                    <IconArrowDown className="h-4 w-4 text-primary" />
+                )}
+              </div>
+            </TableHead>
+            <TableHead onClick={() => onSort('details')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'details' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+              <div className="flex items-center gap-1">
+                Additional Details
+                {sortField === 'details' && (
+                  sortDirection === 'asc' ? 
+                    <IconArrowUp className="h-4 w-4 text-primary" /> : 
+                    <IconArrowDown className="h-4 w-4 text-primary" />
+                )}
+              </div>
+            </TableHead>
+            <TableHead onClick={() => onSort('created_at')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'created_at' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+              <div className="flex items-center gap-1">
+                Filed at
+                {sortField === 'created_at' && (
+                  sortDirection === 'asc' ? 
+                    <IconArrowUp className="h-4 w-4 text-primary" /> : 
+                    <IconArrowDown className="h-4 w-4 text-primary" />
+                )}
+              </div>
+            </TableHead>
+            <TableHead onClick={() => onSort('resolved_at')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'resolved_at' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+              <div className="flex items-center gap-1">
+                Resolved at
+                {sortField === 'resolved_at' && (
+                  sortDirection === 'asc' ? 
+                    <IconArrowUp className="h-4 w-4 text-primary" /> : 
+                    <IconArrowDown className="h-4 w-4 text-primary" />
+                )}
+              </div>
+            </TableHead>
+            <TableHead onClick={() => onSort('resolver_first_name')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'resolver_first_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+              <div className="flex items-center gap-1">
+                Resolved By
+                {sortField === 'resolver_first_name' && (
+                  sortDirection === 'asc' ? 
+                    <IconArrowUp className="h-4 w-4 text-primary" /> : 
+                    <IconArrowDown className="h-4 w-4 text-primary" />
+                )}
+              </div>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {tickets.map((ticket) => (
             <TableRow key={ticket.id}>
-              <TableCell className="font-mono text-sm">
+              <TableCell className="font-mono text-sm text-muted-foreground">
                 {ticket.ticket_id}
-              </TableCell>
-              <TableCell className="max-w-[200px]">
-                <div className="truncate" title={ticket.concern}>
-                  {ticket.concern}
-                </div>
               </TableCell>
               <TableCell>
                 {getCategoryBadge(ticket.category_name || ticket.category)}
@@ -120,7 +209,7 @@ function PastTicketsTable({ tickets }: { tickets: Ticket[] }) {
                       }
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-sm">
+                  <span className="text-sm text-foreground">
                     {ticket.first_name && ticket.last_name 
                       ? `${ticket.first_name} ${ticket.last_name}`
                       : `User ${ticket.user_id}`
@@ -128,16 +217,63 @@ function PastTicketsTable({ tickets }: { tickets: Ticket[] }) {
                   </span>
                 </div>
               </TableCell>
+              <TableCell className="max-w-[300px] min-w-[250px] text-muted-foreground">
+                <div className="truncate" title={ticket.concern}>
+                  {ticket.concern}
+                </div>
+              </TableCell>
+              <TableCell className="max-w-[300px] min-w-[250px]">
+                {ticket.details ? (
+                  <div className="truncate text-sm text-muted-foreground" title={ticket.details}>
+                    {ticket.details}
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground/50">-</span>
+                )}
+              </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {formatDate(ticket.created_at)}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {ticket.resolved_at ? formatDate(ticket.resolved_at) : '-'}
               </TableCell>
-              <TableCell>
-                <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                  {getStatusDisplayLabel('Closed')}
-                </Badge>
+              <TableCell className="text-sm text-muted-foreground">
+                {ticket.resolver_first_name && ticket.resolver_last_name 
+                  ? (
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={ticket.profile_picture || ''} alt={`Resolved by ${ticket.resolver_first_name}`} />
+                        <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
+                          {`${ticket.resolver_first_name[0]}${ticket.resolver_last_name[0]}`}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm text-foreground">
+                        {currentUser && ticket.resolved_by === parseInt(currentUser.id) 
+                          ? 'You'
+                          : `${ticket.resolver_first_name} ${ticket.resolver_last_name}`
+                        }
+                      </span>
+                    </div>
+                  )
+                  : ticket.resolved_by 
+                    ? (
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src="" alt={`Resolved by User ${ticket.resolved_by}`} />
+                          <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
+                            {String(ticket.resolved_by).split('').map(n => n[0]).join('')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm text-foreground">
+                          {currentUser && ticket.resolved_by === parseInt(currentUser.id) 
+                            ? 'You'
+                            : `User ${ticket.resolved_by}`
+                          }
+                        </span>
+                      </div>
+                    )
+                    : '-'
+                }
               </TableCell>
             </TableRow>
           ))}
@@ -149,79 +285,174 @@ function PastTicketsTable({ tickets }: { tickets: Ticket[] }) {
 
 function PastTicketsSkeleton() {
   return (
-    <div className="space-y-4">
-      {Array.from({ length: 5 }).map((_, index) => (
-        <div key={index} className="border rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-6 w-16" />
-          </div>
-          <Skeleton className="h-4 w-full mb-2" />
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-6 w-6 rounded-full" />
-            <Skeleton className="h-4 w-32" />
-          </div>
+    <div className="rounded-md border">
+      <div className="border-b">
+        <div className="grid grid-cols-8 gap-4 p-4 font-medium text-sm">
+          <div>Ticket ID</div>
+          <div>Category</div>
+          <div>User</div>
+          <div>Concern</div>
+          <div>Additional Details</div>
+          <div>Filed at</div>
+          <div>Resolved at</div>
+          <div>Resolved By</div>
         </div>
-      ))}
+      </div>
+      <div className="divide-y">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={index} className="grid grid-cols-8 gap-4 p-4">
+            <Skeleton className="h-4 w-20 font-mono" />
+            <Skeleton className="h-6 w-16 rounded-[6px]" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-6 w-6 rounded-full" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+            <Skeleton className="h-4 w-[300px]" />
+            <Skeleton className="h-4 w-[300px]" />
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-4 w-16" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-6 w-6 rounded-full" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
 export default function PastTicketsPage() {
-  const [mounted, setMounted] = useState(false)
+  const { user } = useAuth()
+
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 20
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [sortField, setSortField] = useState<string>('resolved_at')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([])
+  const [resolvedByUserCount, setResolvedByUserCount] = useState<number>(0)
 
+  // Initial fetch
   useEffect(() => {
-    setMounted(true)
     fetchTickets()
+    fetchCategories()
   }, [])
+
+  // Fetch categories from API
+  const fetchCategories = async () => {
+    try {
+      console.log('Fetching categories...')
+      const response = await fetch('/api/ticket-categories')
+      console.log('Categories response status:', response.status)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Categories data:', data)
+        setCategories(data)
+      } else {
+        console.error('Failed to fetch categories:', response.status)
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Categories error data:', errorData)
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+    }
+  }
 
   const fetchTickets = async () => {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetch('/api/tickets?status=Completed&past=true')
+      
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        sortField: sortField,
+        sortDirection: sortDirection,
+        userId: user?.id || ''
+      })
+      
+      // If there's a search term, fetch all tickets, otherwise fetch only closed tickets
+      if (searchTerm) {
+        // Search across all tickets
+        params.append('search', searchTerm)
+      } else {
+        // Default to closed tickets only
+        params.append('status', 'Closed')
+        params.append('past', 'true')
+      }
+      
+      if (selectedCategory !== 'all') {
+        params.append('categoryId', selectedCategory)
+      }
+      
+      console.log('Fetching tickets with params:', params.toString())
+      const response = await fetch(`/api/tickets?${params.toString()}`)
+      console.log('Response status:', response.status)
+      
       if (response.ok) {
         const data = await response.json()
-        setTickets(data)
+        console.log('Response data:', data)
+        
+        // Handle paginated response
+        if (data.tickets && data.pagination) {
+          setTickets(data.tickets)
+          setTotalCount(data.pagination.totalCount)
+          setTotalPages(data.pagination.totalPages)
+          setResolvedByUserCount(data.resolvedByUserCount || 0)
+        } else {
+          // Fallback for non-paginated response
+          setTickets(data)
+          setTotalCount(data.length)
+          setTotalPages(Math.ceil(data.length / itemsPerPage))
+        }
       } else {
         const errorData = await response.json().catch(() => ({}))
+        console.error('API Error:', response.status, errorData)
         setError(errorData.error || 'Failed to fetch tickets')
-        console.error('Failed to fetch tickets:', response.status, errorData)
       }
     } catch (error) {
+      console.error('Network error:', error)
       setError('Network error - please check your connection')
-      console.error('Error fetching tickets:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const getPastTickets = () => {
-    let filteredTickets = tickets
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
 
-    // Apply search filter
-    if (searchTerm) {
-      filteredTickets = filteredTickets.filter(ticket =>
-        ticket.concern.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ticket.ticket_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (ticket.first_name && ticket.first_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (ticket.last_name && ticket.last_name.toLowerCase().includes(searchTerm.toLowerCase()))
-      )
+  // Debounced search and pagination effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchTickets()
+    }, 500) // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timer)
+  }, [searchTerm, currentPage, sortField, sortDirection, selectedCategory])
+
+  // Handle sorting
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
     }
-
-    // Sort by resolved_at or created_at in descending order (most recent first)
-    return filteredTickets.sort((a, b) => {
-      const dateA = a.resolved_at ? new Date(a.resolved_at) : new Date(a.created_at)
-      const dateB = b.resolved_at ? new Date(b.resolved_at) : new Date(b.created_at)
-      return dateB.getTime() - dateA.getTime()
-    })
+    setCurrentPage(1) // Reset to first page when sorting
   }
 
-  const pastTickets = getPastTickets()
+  // Remove client-side filtering since it's now server-side
+  const pastTickets = tickets
 
   return (
     <>
@@ -234,19 +465,15 @@ export default function PastTicketsPage() {
               <div className="px-4 lg:px-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h1 className="text-2xl font-bold mb-2">Past Tickets</h1>
-                    <p className="text-muted-foreground">View completed tickets from previous dates</p>
+                    <h1 className="text-2xl font-bold">Records</h1>
+                    <p className="text-sm text-muted-foreground">View all completed tickets and resolution history.</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      className="text-sm h-8 flex-1 rounded-xl shadow-none"
-                      onClick={fetchTickets}
-                      disabled={loading}
-                    >
-                      <IconRefresh className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                      Reload
-                    </Button>
+                    <ReloadButton 
+                      onReload={fetchTickets}
+                      loading={loading}
+                      className="flex-1"
+                    />
                   </div>
                 </div>
 
@@ -254,16 +481,40 @@ export default function PastTicketsPage() {
                   <div className="relative flex-1">
                     <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search past tickets..."
+                      placeholder="Search tickets, users, categories, employee IDs, stations, details, or type 'you' for your resolved tickets..."
                       className="pl-8"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="h-10 px-3 flex items-center">
-                      {pastTickets.length} tickets
-                    </Badge>
+                  <div className="w-40">
+                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Filter by category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {categories
+                          .sort((a, b) => {
+                            // Put "Others" at the end
+                            if (a.name === "Others") return 1
+                            if (b.name === "Others") return -1
+                            // Sort alphabetically
+                            return a.name.localeCompare(b.name)
+                          })
+                          .map((category) => (
+                            <SelectItem key={category.id} value={category.id.toString()}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-2 bg-sidebar/20 rounded-lg border">
+                    <div className="text-sm font-medium text-sidebar-foreground">Resolved By You:</div>
+                    <div className="text-sm font-semibold text-sidebar-accent-foreground">
+                      {resolvedByUserCount}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -280,27 +531,71 @@ export default function PastTicketsPage() {
                       </Button>
                     </div>
                   </div>
-                ) : mounted ? (
+                ) : (
                   <>
                     {pastTickets.length > 0 ? (
-                      <PastTicketsTable tickets={pastTickets} />
+                      <>
+                        <PastTicketsTable tickets={pastTickets} onSort={handleSort} sortField={sortField} sortDirection={sortDirection} currentUser={user} />
+                        
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-between mt-6">
+                            <div className="text-sm text-muted-foreground">
+                              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} tickets
+                            </div>
+                            <Pagination>
+                              <PaginationContent>
+                                <PaginationItem>
+                                  <PaginationPrevious 
+                                    href="#"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      setCurrentPage(prev => Math.max(prev - 1, 1))
+                                    }}
+                                    className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                                  />
+                                </PaginationItem>
+                                
+                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                  <PaginationItem key={page}>
+                                    <PaginationLink
+                                      href="#"
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        setCurrentPage(page)
+                                      }}
+                                      isActive={currentPage === page}
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                ))}
+                                
+                                <PaginationItem>
+                                  <PaginationNext 
+                                    href="#"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      setCurrentPage(prev => Math.min(prev + 1, totalPages))
+                                    }}
+                                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                                  />
+                                </PaginationItem>
+                              </PaginationContent>
+                            </Pagination>
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-lg bg-muted/20">
                         <IconHistory className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-                        <p className="text-sm font-medium">No past tickets found</p>
+                        <p className="text-sm font-medium">No Past Tickets</p>
                         <p className="text-xs text-muted-foreground/70">
-                          {searchTerm ? 'No tickets match your search criteria' : 'Completed tickets from previous dates will appear here'}
+                          {searchTerm ? 'No tickets match your search criteria' : ''}
                         </p>
                       </div>
                     )}
                   </>
-                ) : (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                      <p className="text-muted-foreground">Loading...</p>
-                    </div>
-                  </div>
                 )}
               </div>
             </div>
