@@ -285,39 +285,45 @@ function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUs
 
 function PastTicketsSkeleton() {
   return (
-    <div className="rounded-md border">
-      <div className="border-b">
-        <div className="grid grid-cols-8 gap-4 p-4 font-medium text-sm">
-          <div>Ticket ID</div>
-          <div>Category</div>
-          <div>User</div>
-          <div>Concern</div>
-          <div>Additional Details</div>
-          <div>Filed at</div>
-          <div>Resolved at</div>
-          <div>Resolved By</div>
-        </div>
-      </div>
-      <div className="divide-y">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="grid grid-cols-8 gap-4 p-4">
-            <Skeleton className="h-4 w-20 font-mono" />
-            <Skeleton className="h-6 w-16 rounded-[6px]" />
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-6 w-6 rounded-full" />
-              <Skeleton className="h-4 w-20" />
-            </div>
-            <Skeleton className="h-4 w-[300px]" />
-            <Skeleton className="h-4 w-[300px]" />
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-4 w-16" />
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-6 w-6 rounded-full" />
-              <Skeleton className="h-4 w-20" />
-            </div>
-          </div>
-        ))}
-      </div>
+    <div className="rounded-md border overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead><Skeleton className="h-4 w-16" /></TableHead>
+            <TableHead><Skeleton className="h-4 w-20" /></TableHead>
+            <TableHead><Skeleton className="h-4 w-12" /></TableHead>
+            <TableHead><Skeleton className="h-4 w-24" /></TableHead>
+            <TableHead><Skeleton className="h-4 w-32" /></TableHead>
+            <TableHead><Skeleton className="h-4 w-16" /></TableHead>
+            <TableHead><Skeleton className="h-4 w-20" /></TableHead>
+            <TableHead><Skeleton className="h-4 w-24" /></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Array.from({ length: 8 }).map((_, index) => (
+            <TableRow key={index}>
+              <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+              <TableCell><Skeleton className="h-5 w-16 rounded-md" /></TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-6 w-6 rounded-full" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              </TableCell>
+              <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-6 w-6 rounded-full" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   )
 }
@@ -481,7 +487,7 @@ export default function PastTicketsPage() {
                   <div className="relative flex-1">
                     <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search tickets, users, categories, employee IDs, stations, details, or type 'you' for your resolved tickets..."
+                      placeholder="Search tickets, users, categories, or details..."
                       className="pl-8"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
@@ -510,10 +516,10 @@ export default function PastTicketsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-sidebar/20 rounded-lg border">
-                    <div className="text-sm font-medium text-sidebar-foreground">Resolved By You:</div>
+                  <div className="flex items-center gap-2 px-3 py-2 bg-[hsl(var(--sidebar-background))] rounded-lg border">
+                    <div className="text-sm font-medium text-muted-foreground">Resolved By You:</div>
                     <div className="text-sm font-semibold text-sidebar-accent-foreground">
-                      {resolvedByUserCount}
+                      {resolvedByUserCount} Tickets
                     </div>
                   </div>
                 </div>

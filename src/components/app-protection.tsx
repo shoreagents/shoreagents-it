@@ -33,22 +33,7 @@ export function AppProtection({ children }: AppProtectionProps) {
     return <>{children}</>
   }
 
-  // Show loading state while checking authentication (except for public routes)
-  if (loading && !publicRoutes.includes(pathname)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // For protected routes, only render if user is authenticated
-  if (!user) {
-    return null // Will redirect to login
-  }
-
+  // For protected routes, render children immediately
+  // Authentication will be handled in the background
   return <>{children}</>
 } 

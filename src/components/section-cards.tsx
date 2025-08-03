@@ -1,5 +1,7 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { TrendingDownIcon, TrendingUpIcon, TicketIcon, CheckCircleIcon, CalendarIcon } from "lucide-react"
+import NumberFlow, { NumberFlowGroup } from '@number-flow/react'
+import { motion, AnimatePresence } from "framer-motion"
 
 import { Badge } from "@/components/ui/badge"
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
@@ -45,6 +47,7 @@ interface SectionCardsProps {
 
 export function SectionCards({ tickets = [], currentUserId, stats }: SectionCardsProps) {
   const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly'>('daily')
+  const [prevDirection, setPrevDirection] = useState<'positive' | 'negative' | null>(null)
   
   // Calculate active tickets (all tickets except closed ones and For Approval)
   const activeTickets = tickets.filter(ticket => ticket.status !== 'Closed' && ticket.status !== 'For Approval')
@@ -54,7 +57,47 @@ export function SectionCards({ tickets = [], currentUserId, stats }: SectionCard
   const closedTickets = tickets.filter(ticket => ticket.status === 'Closed')
   const closedTicketsCount = closedTickets.length
   
+  // Get the current closed tickets value based on viewMode
+  const getCurrentClosedTicketsValue = () => {
+    if (stats) {
+      switch (viewMode) {
+        case 'daily':
+          return stats.daily.current
+        case 'weekly':
+          return stats.weekly.current
+        case 'monthly':
+          return stats.monthly.current
+        default:
+          return stats.daily.current
+      }
+    }
+    return closedTicketsCount
+  }
 
+  // Get current direction and check if it changed
+  const getCurrentDirection = () => {
+    if (!stats) return 'positive'
+    switch (viewMode) {
+      case 'daily':
+        return stats.daily.change >= 0 ? 'positive' : 'negative'
+      case 'weekly':
+        return stats.weekly.change >= 0 ? 'positive' : 'negative'
+      case 'monthly':
+        return stats.monthly.change >= 0 ? 'positive' : 'negative'
+      default:
+        return 'positive'
+    }
+  }
+
+  const currentDirection = getCurrentDirection()
+  const directionChanged = prevDirection !== null && prevDirection !== currentDirection
+
+  // Update previous direction when it changes
+  useEffect(() => {
+    if (prevDirection !== currentDirection) {
+      setPrevDirection(currentDirection)
+    }
+  }, [currentDirection, prevDirection])
   
   // Calculate tickets by status (excluding For Approval)
   const getTicketsByStatus = (status: string) => {
@@ -136,86 +179,277 @@ export function SectionCards({ tickets = [], currentUserId, stats }: SectionCard
         )}
       </Card>
       <Card className="@container/card">
-        <CardHeader className="relative">
-          <CardDescription>Closed Tickets</CardDescription>
-          <CardTitle className="@[250px]/card:text-3xl text-2xl font-semibold tabular-nums">
-            <div className="flex items-center gap-2">
-              <TicketIcon className="h-6 w-6 text-primary" />
-              {stats ? (
-                viewMode === 'daily' ? stats.daily.current :
-                viewMode === 'weekly' ? stats.weekly.current :
-                stats.monthly.current
-              ) : closedTicketsCount}
+        <NumberFlowGroup>
+          <CardHeader className="relative">
+            <CardDescription>Closed Tickets</CardDescription>
+            <CardTitle className="@[250px]/card:text-3xl text-2xl font-semibold tabular-nums">
+              <div className="flex items-center gap-2">
+                <TicketIcon className="h-6 w-6 text-primary" />
+                <NumberFlow 
+                  value={getCurrentClosedTicketsValue()}
+                  transformTiming={{ duration: 750, easing: 'ease-out' }}
+                  spinTiming={{ duration: 750, easing: 'ease-out' }}
+                  opacityTiming={{ duration: 350, easing: 'ease-out' }}
+                  className="tabular-nums"
+                  style={{ '--number-flow-mask-height': '0.1em' } as React.CSSProperties}
+                />
+              </div>
+            </CardTitle>
+                      <div className="absolute right-4 top-4">
+              <motion.div
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className={`grid grid-cols-[40%_60%] rounded-lg text-xs bg-sidebar dark:bg-[#252525] transition-all duration-500 ease-out px-1.5 py-0.5 border w-20 h-6 items-center ${
+                  stats ? (
+                    viewMode === 'daily' ? (stats.daily.change >= 0 ? 'text-green-700 dark:text-green-400 border-green-200 dark:border-green-600/30' : 'text-red-700 dark:text-red-400 border-red-200 dark:border-red-600/30') :
+                    viewMode === 'weekly' ? (stats.weekly.change >= 0 ? 'text-green-700 dark:text-green-400 border-green-200 dark:border-green-600/30' : 'text-red-700 dark:text-red-400 border-red-200 dark:border-red-600/30') :
+                    (stats.monthly.change >= 0 ? 'text-green-700 dark:text-green-400 border-green-200 dark:border-green-600/30' : 'text-red-700 dark:text-red-400 border-red-200 dark:border-red-600/30')
+                  ) : 'text-green-700 dark:text-green-400 border-green-200 dark:border-green-600/30'
+                }`}
+              >
+                {stats ? (
+                  <>
+                    {viewMode === 'daily' ? (
+                      <>
+                                                                          <motion.div
+                          key="daily-icon"
+                          layoutId="daily-icon"
+                          className="flex items-center justify-center"
+                        >
+                                                      {stats.daily.change >= 0 ? (
+                              <motion.div
+                                key="up"
+                                initial={directionChanged ? { opacity: 0, rotate: -90 } : { opacity: 1, rotate: 0 }}
+                                animate={{ opacity: 1, rotate: 0 }}
+                                transition={{ duration: directionChanged ? 0.3 : 0, ease: "easeOut" }}
+                              >
+                                <TrendingUpIcon className="size-3" />
+                              </motion.div>
+                            ) : (
+                              <motion.div
+                                key="down"
+                                initial={directionChanged ? { opacity: 0, rotate: 90 } : { opacity: 1, rotate: 0 }}
+                                animate={{ opacity: 1, rotate: 0 }}
+                                transition={{ duration: directionChanged ? 0.3 : 0, ease: "easeOut" }}
+                              >
+                                <TrendingDownIcon className="size-3" />
+                              </motion.div>
+                            )}
+                        </motion.div>
+                                                  <div className="flex items-center justify-center">
+                            <AnimatePresence mode="wait">
+                              {stats.daily.change >= 0 ? (
+                                <motion.span
+                                  key="plus"
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.8 }}
+                                  transition={{ duration: 0.2, ease: "easeOut" }}
+                                >
+                                  +
+                                </motion.span>
+                              ) : (
+                                <motion.span
+                                  key="minus"
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.8 }}
+                                  transition={{ duration: 0.2, ease: "easeOut" }}
+                                >
+                                  -
+                                </motion.span>
+                              )}
+                            </AnimatePresence>
+                            <NumberFlow 
+                              value={Math.abs(stats.daily.change)}
+                              transformTiming={{ duration: 500, easing: 'ease-out' }}
+                              spinTiming={{ duration: 500, easing: 'ease-out' }}
+                              opacityTiming={{ duration: 250, easing: 'ease-out' }}
+                              className="tabular-nums"
+                              style={{ '--number-flow-mask-height': '0.05em' } as React.CSSProperties}
+                            />%
+                          </div>
+                      </>
+                                          ) : viewMode === 'weekly' ? (
+                        <>
+                          <motion.div
+                            key="weekly-icon"
+                            layoutId="weekly-icon"
+                            className="flex items-center justify-center"
+                          >
+                            {stats.weekly.change >= 0 ? (
+                              <motion.div
+                                key="up"
+                                initial={directionChanged ? { opacity: 0, rotate: -90 } : { opacity: 1, rotate: 0 }}
+                                animate={{ opacity: 1, rotate: 0 }}
+                                transition={{ duration: directionChanged ? 0.3 : 0, ease: "easeOut" }}
+                              >
+                                <TrendingUpIcon className="size-3" />
+                              </motion.div>
+                            ) : (
+                              <motion.div
+                                key="down"
+                                initial={directionChanged ? { opacity: 0, rotate: 90 } : { opacity: 1, rotate: 0 }}
+                                animate={{ opacity: 1, rotate: 0 }}
+                                transition={{ duration: directionChanged ? 0.3 : 0, ease: "easeOut" }}
+                              >
+                                <TrendingDownIcon className="size-3" />
+                              </motion.div>
+                            )}
+                          </motion.div>
+                          <div className="flex items-center justify-center">
+                            <AnimatePresence mode="wait">
+                              {stats.weekly.change >= 0 ? (
+                                <motion.span
+                                  key="plus"
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.8 }}
+                                  transition={{ duration: 0.2, ease: "easeOut" }}
+                                >
+                                  +
+                                </motion.span>
+                              ) : (
+                                <motion.span
+                                  key="minus"
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.8 }}
+                                  transition={{ duration: 0.2, ease: "easeOut" }}
+                                >
+                                  -
+                                </motion.span>
+                              )}
+                            </AnimatePresence>
+                            <NumberFlow 
+                              value={Math.abs(stats.weekly.change)}
+                              transformTiming={{ duration: 500, easing: 'ease-out' }}
+                              spinTiming={{ duration: 500, easing: 'ease-out' }}
+                              opacityTiming={{ duration: 250, easing: 'ease-out' }}
+                              className="tabular-nums"
+                              style={{ '--number-flow-mask-height': '0.05em' } as React.CSSProperties}
+                            />%
+                          </div>
+                        </>
+                                          ) : (
+                        <>
+                          <motion.div
+                            key="monthly-icon"
+                            layoutId="monthly-icon"
+                            className="flex items-center justify-center"
+                          >
+                            {stats.monthly.change >= 0 ? (
+                              <motion.div
+                                key="up"
+                                initial={directionChanged ? { opacity: 0, rotate: -90 } : { opacity: 1, rotate: 0 }}
+                                animate={{ opacity: 1, rotate: 0 }}
+                                transition={{ duration: directionChanged ? 0.3 : 0, ease: "easeOut" }}
+                              >
+                                <TrendingUpIcon className="size-3" />
+                              </motion.div>
+                            ) : (
+                              <motion.div
+                                key="down"
+                                initial={directionChanged ? { opacity: 0, rotate: 90 } : { opacity: 1, rotate: 0 }}
+                                animate={{ opacity: 1, rotate: 0 }}
+                                transition={{ duration: directionChanged ? 0.3 : 0, ease: "easeOut" }}
+                              >
+                                <TrendingDownIcon className="size-3" />
+                              </motion.div>
+                            )}
+                          </motion.div>
+                          <div className="flex items-center justify-center">
+                            <AnimatePresence mode="wait">
+                              {stats.monthly.change >= 0 ? (
+                                <motion.span
+                                  key="plus"
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.8 }}
+                                  transition={{ duration: 0.2, ease: "easeOut" }}
+                                >
+                                  +
+                                </motion.span>
+                              ) : (
+                                <motion.span
+                                  key="minus"
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.8 }}
+                                  transition={{ duration: 0.2, ease: "easeOut" }}
+                                >
+                                  -
+                                </motion.span>
+                              )}
+                            </AnimatePresence>
+                            <NumberFlow 
+                              value={Math.abs(stats.monthly.change)}
+                              transformTiming={{ duration: 500, easing: 'ease-out' }}
+                              spinTiming={{ duration: 500, easing: 'ease-out' }}
+                              opacityTiming={{ duration: 250, easing: 'ease-out' }}
+                              className="tabular-nums"
+                              style={{ '--number-flow-mask-height': '0.05em' } as React.CSSProperties}
+                            />%
+                          </div>
+                        </>
+                    )}
+                  </>
+                                ) : (
+                  <>
+                    <motion.div
+                      key="fallback-icon"
+                      animate={{ rotate: 0 }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                      className="flex items-center justify-center"
+                    >
+                      <TrendingUpIcon className="size-3" />
+                    </motion.div>
+                    <div className="flex items-center justify-center">
+                      <motion.span
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                      >
+                        +
+                      </motion.span>
+                      <NumberFlow 
+                        value={Math.round((closedTicketsCount / Math.max(activeTicketsCount, 1)) * 100)}
+                        transformTiming={{ duration: 500, easing: 'ease-out' }}
+                        spinTiming={{ duration: 500, easing: 'ease-out' }}
+                        opacityTiming={{ duration: 250, easing: 'ease-out' }}
+                        className="tabular-nums"
+                        style={{ '--number-flow-mask-height': '0.05em' } as React.CSSProperties}
+                      />%
+                    </div>
+                  </>
+                )}
+                </motion.div>
             </div>
-          </CardTitle>
-                    <div className="absolute right-4 top-4">
-            <Badge variant="outline" className={`flex gap-1 rounded-lg text-xs bg-sidebar dark:bg-[#252525] ${
-              stats ? (
-                viewMode === 'daily' ? (stats.daily.change >= 0 ? 'text-green-700 dark:text-green-400 border-green-200 dark:border-green-600/30' : 'text-red-700 dark:text-red-400 border-red-200 dark:border-red-600/30') :
-                viewMode === 'weekly' ? (stats.weekly.change >= 0 ? 'text-green-700 dark:text-green-400 border-green-200 dark:border-green-600/30' : 'text-red-700 dark:text-red-400 border-red-200 dark:border-red-600/30') :
-                (stats.monthly.change >= 0 ? 'text-green-700 dark:text-green-400 border-green-200 dark:border-green-600/30' : 'text-red-700 dark:text-red-400 border-red-200 dark:border-red-600/30')
-              ) : 'text-green-700 dark:text-green-400 border-green-200 dark:border-green-600/30'
-            }`}>
+          </CardHeader>
+                  </NumberFlowGroup>
+          <CardFooter className="flex-col items-start gap-1 text-sm">
+            <div className="line-clamp-1 flex gap-2 font-medium">
               {stats ? (
-                <>
-                  {viewMode === 'daily' ? (
-                    <>
-                      {stats.daily.change >= 0 ? (
-                        <TrendingUpIcon className="size-3" />
-                      ) : (
-                        <TrendingDownIcon className="size-3" />
-                      )}
-                      {stats.daily.change >= 0 ? '+' : ''}{stats.daily.change}%
-                    </>
-                  ) : viewMode === 'weekly' ? (
-                    <>
-                      {stats.weekly.change >= 0 ? (
-                        <TrendingUpIcon className="size-3" />
-                      ) : (
-                        <TrendingDownIcon className="size-3" />
-                      )}
-                      {stats.weekly.change >= 0 ? '+' : ''}{stats.weekly.change}%
-                    </>
-                  ) : (
-                    <>
-                      {stats.monthly.change >= 0 ? (
-                        <TrendingUpIcon className="size-3" />
-                      ) : (
-                        <TrendingDownIcon className="size-3" />
-                      )}
-                      {stats.monthly.change >= 0 ? '+' : ''}{stats.monthly.change}%
-                    </>
-                  )}
-                </>
-              ) : (
-                <>
-                  <TrendingUpIcon className="size-3" />
-                  +{Math.round((closedTicketsCount / Math.max(activeTicketsCount, 1)) * 100)}%
-                </>
-              )}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            All Closed Tickets
-          </div>
-          <div className="text-muted-foreground">Total tickets that have been resolved.</div>
-          <div className="mt-2">
-            <AnimatedTabs
-              tabs={[
-                { title: "Today", value: "daily" },
-                { title: "This Week", value: "weekly" },
-                { title: "This Month", value: "monthly" }
-              ]}
-              containerClassName="bg-sidebar/20 rounded-lg"
-              activeTabClassName="bg-sidebar-accent"
-              tabClassName="text-xs text-muted-foreground hover:text-foreground"
-              onTabChange={(tab) => setViewMode(tab.value as 'daily' | 'weekly' | 'monthly')}
-            />
-          </div>
-        </CardFooter>
-      </Card>
+                viewMode === 'daily' ? (stats.daily.change >= 0 ? 'Uptrend Today' : 'Downtrend Today') :
+                viewMode === 'weekly' ? (stats.weekly.change >= 0 ? 'Uptrend This Week' : 'Downtrend This Week') :
+                (stats.monthly.change >= 0 ? 'Uptrend This Month' : 'Downtrend This Month')
+              ) : 'Resolved Requests'}
+            </div>
+            <div className="text-muted-foreground text-xs">Total tickets that have been resolved.</div>
+            <div className="mt-2">
+              <AnimatedTabs
+                tabs={[
+                  { title: "Today", value: "daily" },
+                  { title: "This Week", value: "weekly" },
+                  { title: "This Month", value: "monthly" }
+                ]}
+                containerClassName="bg-sidebar/20 rounded-lg"
+                activeTabClassName="bg-sidebar-accent"
+                tabClassName="text-xs text-muted-foreground hover:text-foreground"
+                onTabChange={(tab) => setViewMode(tab.value as 'daily' | 'weekly' | 'monthly')}
+              />
+            </div>
+          </CardFooter>
+        </Card>
       <Card className="@container/card">
         <CardHeader className="relative">
           <CardDescription>Active Accounts</CardDescription>
