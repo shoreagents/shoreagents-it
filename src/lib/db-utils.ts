@@ -1,4 +1,4 @@
-import { query } from './database'
+import pool from './database'
 
 export type TicketStatus = 'On Hold' | 'In Progress' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
 
@@ -32,16 +32,19 @@ export interface Ticket {
   user_type?: string | null
   member_name?: string | null
   member_color?: string | null
+  supporting_files?: string[]
+  file_count?: number
 }
 
 // Get all tickets (filtered by IT role, excluding For Approval)
 export async function getAllTickets(): Promise<Ticket[]> {
-  const result = await query(`
+  const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
            resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
            u.user_type,
+           t.supporting_files, t.file_count,
            CASE 
              WHEN u.user_type = 'Internal' THEN 'Internal'
              WHEN a.member_id IS NOT NULL THEN m.company
@@ -72,12 +75,13 @@ export async function getAllTickets(): Promise<Ticket[]> {
 
 // Get tickets by status (filtered by IT role, excluding For Approval)
 export async function getTicketsByStatus(status: string, past: boolean = false): Promise<Ticket[]> {
-  const result = await query(`
+  const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
            resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
            u.user_type,
+           t.supporting_files, t.file_count,
            CASE 
              WHEN u.user_type = 'Internal' THEN 'Internal'
              WHEN a.member_id IS NOT NULL THEN m.company
@@ -108,7 +112,7 @@ export async function getTicketsByStatus(status: string, past: boolean = false):
 
 // Create new ticket
 export async function createTicket(ticket: Omit<Ticket, 'id' | 'created_at' | 'updated_at' | 'resolved_by' | 'resolved_at'>): Promise<Ticket> {
-  const result = await query(
+  const result = await pool.query(
     'INSERT INTO public.tickets (ticket_id, user_id, concern, details, category_id, status, role_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
     [ticket.ticket_id, ticket.user_id, ticket.concern, ticket.details, ticket.category_id, ticket.status, 1] // role_id = 1 for IT
   )
@@ -120,25 +124,22 @@ export async function updateTicketStatus(id: number, status: string, resolvedBy?
   try {
     let result
     if (status === 'Completed' || status === 'Closed') {
-      // Get current Manila time
-      const manilaTime = new Date().toLocaleString("en-US", {timeZone: "Asia/Manila"})
-      const manilaDate = new Date(manilaTime)
-      
       // When marking as completed or closed, set resolved_at timestamp and resolved_by
+      // Use NOW() AT TIME ZONE 'Asia/Manila' to match the database default
       if (resolvedBy) {
-        result = await query(
-          'UPDATE public.tickets SET status = $1, resolved_at = $4, resolved_by = $3 WHERE id = $2 RETURNING *',
-          [status, id, resolvedBy, manilaDate.toISOString()]
+        result = await pool.query(
+          'UPDATE public.tickets SET status = $1, resolved_at = (NOW() AT TIME ZONE \'Asia/Manila\'), resolved_by = $3 WHERE id = $2 RETURNING *',
+          [status, id, resolvedBy]
         )
       } else {
-        result = await query(
-          'UPDATE public.tickets SET status = $1, resolved_at = $3 WHERE id = $2 RETURNING *',
-          [status, id, manilaDate.toISOString()]
+        result = await pool.query(
+          'UPDATE public.tickets SET status = $1, resolved_at = (NOW() AT TIME ZONE \'Asia/Manila\') WHERE id = $2 RETURNING *',
+          [status, id]
         )
       }
     } else {
       // For other status changes, clear resolved_at and resolved_by fields
-      result = await query(
+      result = await pool.query(
         'UPDATE public.tickets SET status = $1, resolved_at = NULL, resolved_by = NULL WHERE id = $2 RETURNING *',
         [status, id]
       )
@@ -166,7 +167,7 @@ export async function updateTicket(id: number, updates: Partial<Ticket>): Promis
   )
   
   const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ')
-  const result = await query(
+  const result = await pool.query(
     `UPDATE public.tickets SET ${setClause} WHERE id = $1 RETURNING *`,
     [id, ...values]
   )
@@ -175,16 +176,17 @@ export async function updateTicket(id: number, updates: Partial<Ticket>): Promis
 
 // Delete ticket
 export async function deleteTicket(id: number): Promise<void> {
-  await query('DELETE FROM public.tickets WHERE id = $1', [id])
+  await pool.query('DELETE FROM public.tickets WHERE id = $1', [id])
 }
 
 // Get ticket by ID
 export async function getTicketById(id: number): Promise<Ticket | null> {
-  const result = await query(`
+  const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           t.supporting_files, t.file_count
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
@@ -198,11 +200,12 @@ export async function getTicketById(id: number): Promise<Ticket | null> {
 
 // Get ticket by ticket_id
 export async function getTicketByTicketId(ticketId: string): Promise<Ticket | null> {
-  const result = await query(`
+  const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           t.supporting_files, t.file_count
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
@@ -216,7 +219,7 @@ export async function getTicketByTicketId(ticketId: string): Promise<Ticket | nu
 
 // Search tickets
 export async function searchTickets(searchTerm: string): Promise<Ticket[]> {
-  const result = await query(`
+  const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
@@ -235,20 +238,16 @@ export async function searchTickets(searchTerm: string): Promise<Ticket[]> {
 
 // Resolve ticket
 export async function resolveTicket(id: number, resolvedBy: number): Promise<Ticket> {
-  // Get current Manila time
-  const manilaTime = new Date().toLocaleString("en-US", {timeZone: "Asia/Manila"})
-  const manilaDate = new Date(manilaTime)
-  
-  const result = await query(
-    'UPDATE public.tickets SET status = $1, resolved_by = $2, resolved_at = $4 WHERE id = $3 RETURNING *',
-    ['Completed', resolvedBy, id, manilaDate.toISOString()]
+  const result = await pool.query(
+    'UPDATE public.tickets SET status = $1, resolved_by = $2, resolved_at = (NOW() AT TIME ZONE \'Asia/Manila\') WHERE id = $3 RETURNING *',
+    ['Completed', resolvedBy, id]
   )
   return result.rows[0]
 }
 
 // Get tickets by user
 export async function getTicketsByUser(userId: number): Promise<Ticket[]> {
-  const result = await query(`
+  const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
@@ -267,7 +266,7 @@ export async function getTicketsByUser(userId: number): Promise<Ticket[]> {
 
 // Generate unique ticket ID using existing database sequence
 export async function generateTicketId(): Promise<string> {
-  const result = await query('SELECT nextval(\'ticket_id_seq\') as next_id')
+  const result = await pool.query('SELECT nextval(\'ticket_id_seq\') as next_id')
   const nextId = result.rows[0].next_id
   return `TKT-${nextId.toString().padStart(6, '0')}`
 }
@@ -275,7 +274,7 @@ export async function generateTicketId(): Promise<string> {
 // Update ticket position (for reordering within same status)
 export async function updateTicketPosition(id: number, position: number): Promise<Ticket> {
   try {
-    const result = await query(
+    const result = await pool.query(
       'UPDATE public.tickets SET position = $1 WHERE id = $2 RETURNING *',
       [position, id]
     )
@@ -290,7 +289,7 @@ export async function updateTicketPosition(id: number, position: number): Promis
 export async function updateTicketPositions(tickets: { id: number, position: number }[]): Promise<void> {
   try {
     for (const ticket of tickets) {
-      await query(
+      await pool.query(
         'UPDATE public.tickets SET position = $1 WHERE id = $2',
         [ticket.position, ticket.id]
       )
@@ -303,7 +302,7 @@ export async function updateTicketPositions(tickets: { id: number, position: num
 
 // Get user's assigned station
 export async function getUserStation(userId: number): Promise<string | null> {
-  const result = await query(`
+  const result = await pool.query(`
     SELECT station_id
     FROM public.stations
     WHERE assigned_user_id = $1
@@ -314,14 +313,14 @@ export async function getUserStation(userId: number): Promise<string | null> {
 // Assign user to station
 export async function assignUserToStation(userId: number, stationId: string): Promise<void> {
   // First, remove any existing assignment for this user
-  await query(`
+  await pool.query(`
     UPDATE public.stations
     SET assigned_user_id = NULL
     WHERE assigned_user_id = $1
   `, [userId])
   
   // Then assign to the new station
-  await query(`
+  await pool.query(`
     UPDATE public.stations
     SET assigned_user_id = $1
     WHERE station_id = $2
@@ -330,7 +329,7 @@ export async function assignUserToStation(userId: number, stationId: string): Pr
 
 // Get all stations
 export async function getAllStations(): Promise<{ id: number, station_id: string, assigned_user_id: number | null }[]> {
-  const result = await query(`
+  const result = await pool.query(`
     SELECT id, station_id, assigned_user_id
     FROM public.stations
     ORDER BY station_id
@@ -340,7 +339,7 @@ export async function getAllStations(): Promise<{ id: number, station_id: string
 
 // Get all ticket categories
 export async function getAllTicketCategories(): Promise<TicketCategory[]> {
-  const result = await query(`
+  const result = await pool.query(`
     SELECT id, name
     FROM public.ticket_categories
     ORDER BY name
@@ -350,7 +349,7 @@ export async function getAllTicketCategories(): Promise<TicketCategory[]> {
 
 // Get ticket category by ID
 export async function getTicketCategoryById(id: number): Promise<TicketCategory | null> {
-  const result = await query(`
+  const result = await pool.query(`
     SELECT id, name
     FROM public.ticket_categories
     WHERE id = $1
@@ -360,7 +359,7 @@ export async function getTicketCategoryById(id: number): Promise<TicketCategory 
 
 // Create ticket category
 export async function createTicketCategory(name: string): Promise<TicketCategory> {
-  const result = await query(`
+  const result = await pool.query(`
     INSERT INTO public.ticket_categories (name)
     VALUES ($1)
     RETURNING id, name
@@ -370,7 +369,7 @@ export async function createTicketCategory(name: string): Promise<TicketCategory
 
 // Update ticket category
 export async function updateTicketCategory(id: number, name: string): Promise<TicketCategory> {
-  const result = await query(`
+  const result = await pool.query(`
     UPDATE public.ticket_categories
     SET name = $1
     WHERE id = $2
@@ -381,7 +380,7 @@ export async function updateTicketCategory(id: number, name: string): Promise<Ti
 
 // Delete ticket category
 export async function deleteTicketCategory(id: number): Promise<void> {
-  await query(`
+  await pool.query(`
     DELETE FROM public.ticket_categories
     WHERE id = $1
   `, [id])
@@ -389,7 +388,7 @@ export async function deleteTicketCategory(id: number): Promise<void> {
 
 // Get count of tickets resolved by a specific user
 export async function getTicketsResolvedByUserCount(userId: number, status: string = 'Closed'): Promise<number> {
-  const result = await query(`
+  const result = await pool.query(`
     SELECT COUNT(*) as total
     FROM public.tickets t
     WHERE t.status = $1 AND t.role_id = 1 AND t.status != 'For Approval'
@@ -487,7 +486,7 @@ export async function getTicketsByStatusWithPagination(
     WHERE ${whereClause}
   `
   
-  const countResult = await query(countQuery, queryParams)
+  const countResult = await pool.query(countQuery, queryParams)
   const totalCount = parseInt(countResult.rows[0]?.total || '0')
   
   // Get paginated results
@@ -496,6 +495,7 @@ export async function getTicketsByStatusWithPagination(
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
            resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           t.supporting_files, t.file_count,
            CASE
              WHEN u.user_type = 'Internal' THEN 'Internal'
              WHEN a.member_id IS NOT NULL THEN m.company
@@ -525,7 +525,7 @@ export async function getTicketsByStatusWithPagination(
   `
   
   const dataParams = [...queryParams, limit, offset]
-  const dataResult = await query(dataQuery, dataParams)
+  const dataResult = await pool.query(dataQuery, dataParams)
   
   return {
     tickets: dataResult.rows,

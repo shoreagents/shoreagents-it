@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query } from '@/lib/database'
+import pool from '@/lib/database'
 
 export async function GET(request: NextRequest) {
   try {
@@ -107,12 +107,12 @@ export async function GET(request: NextRequest) {
       previousWeekResult,
       previousMonthResult
     ] = await Promise.all([
-      query(currentDayQuery, [userId, today.toISOString(), new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString()]),
-      query(currentWeekQuery, [userId, weekAgo.toISOString(), new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString()]),
-      query(currentMonthQuery, [userId, firstDayOfCurrentMonth.toISOString(), new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString()]),
-      query(previousDayQuery, [userId, yesterday.toISOString(), today.toISOString()]),
-      query(previousWeekQuery, [userId, twoWeeksAgo.toISOString(), weekAgo.toISOString()]),
-      query(previousMonthQuery, [userId, firstDayOfPreviousMonth.toISOString(), firstDayOfCurrentMonth.toISOString()])
+      pool.query(currentDayQuery, [userId, today.toISOString(), new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString()]),
+      pool.query(currentWeekQuery, [userId, weekAgo.toISOString(), new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString()]),
+      pool.query(currentMonthQuery, [userId, firstDayOfCurrentMonth.toISOString(), new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString()]),
+      pool.query(previousDayQuery, [userId, yesterday.toISOString(), today.toISOString()]),
+      pool.query(previousWeekQuery, [userId, twoWeeksAgo.toISOString(), weekAgo.toISOString()]),
+      pool.query(previousMonthQuery, [userId, firstDayOfPreviousMonth.toISOString(), firstDayOfCurrentMonth.toISOString()])
     ])
 
 

@@ -10,12 +10,12 @@ import { IconMail, IconLock, IconEye, IconEyeOff } from "@tabler/icons-react"
 import { Boxes } from "@/components/ui/background-boxes"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
+import { toast } from "sonner"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = React.useState(false)
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
-  const [error, setError] = React.useState("")
   const [isLoading, setIsLoading] = React.useState(false)
 
   const router = useRouter()
@@ -33,14 +33,15 @@ export default function LoginPage() {
     e.preventDefault()
     
     setIsLoading(true)
-    setError("")
 
     const result = await login(email, password)
     
     if (result.success) {
-      router.push('/')
+      toast.success("Successfully signed in!")
+      router.push('/dashboard')
     } else {
-      setError(result.error || 'Login failed')
+      const errorMessage = result.error || 'Login failed'
+      toast.error(errorMessage)
     }
     
     setIsLoading(false)
@@ -80,12 +81,6 @@ export default function LoginPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4" name="login-form">
-                {error && (
-                  <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-                    {error}
-                  </div>
-                )}
-                
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <div className="relative">
@@ -143,7 +138,7 @@ export default function LoginPage() {
 
                 <Button
                   type="submit"
-                  className="w-full"
+                  className="w-full rounded-lg"
                   disabled={isLoading}
                 >
                   {isLoading ? "Signing In..." : "Sign In"}

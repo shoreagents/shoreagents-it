@@ -6,6 +6,10 @@ const isDev = !app.isPackaged;
 
 // Store references to chat windows
 const chatWindows = new Map();
+// Store references to ticket detail windows
+const ticketDetailWindows = new Map();
+// Store references to file windows
+const fileWindows = new Map();
 
 function createWindow() {
   // Create the browser window.
@@ -99,6 +103,106 @@ function createChatWindow(ticketId, ticketData) {
   return chatWindow;
 }
 
+function createTicketDetailWindow(ticketId, ticketData) {
+  // Check if ticket detail window already exists for this ticket
+  if (ticketDetailWindows.has(ticketId)) {
+    const existingWindow = ticketDetailWindows.get(ticketId);
+    if (!existingWindow.isDestroyed()) {
+      existingWindow.focus();
+      return;
+    }
+  }
+
+  // Create new ticket detail window
+  const ticketDetailWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    resizable: true,
+    maximizable: true,
+    fullscreenable: false,
+    frame: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+    icon: path.join(__dirname, '../public/icon.png'),
+    title: `Ticket Detail - ${ticketData.ticket_id}`,
+  });
+
+  // Load ticket detail page
+  if (isDev) {
+    ticketDetailWindow.loadURL(`http://localhost:3001/ticket-detail/${ticketId}`);
+    ticketDetailWindow.webContents.openDevTools();
+  } else {
+    ticketDetailWindow.loadFile(path.join(__dirname, `../out/ticket-detail/${ticketId}/index.html`));
+  }
+
+  // Store reference to ticket detail window
+  ticketDetailWindows.set(ticketId, ticketDetailWindow);
+
+  // Handle ticket detail window closed
+  ticketDetailWindow.on('closed', () => {
+    ticketDetailWindows.delete(ticketId);
+  });
+
+  return ticketDetailWindow;
+}
+
+function createFileWindow(fileUrl, fileName) {
+  // Create a stable key for the file window based on URL and filename
+  const fileKey = `${fileUrl}-${fileName}`;
+  
+  // Check if file window already exists for this file
+  if (fileWindows.has(fileKey)) {
+    const existingWindow = fileWindows.get(fileKey);
+    if (!existingWindow.isDestroyed()) {
+      existingWindow.focus();
+      return existingWindow;
+    }
+  }
+
+  // Create new file window
+  const fileWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    resizable: true,
+    maximizable: true,
+    fullscreenable: false,
+    frame: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+    icon: path.join(__dirname, '../public/icon.png'),
+    title: `File Viewer - ${fileName}`,
+  });
+
+  // Load the file viewer page with file URL and filename as search params
+  const encodedUrl = encodeURIComponent(fileUrl);
+  const encodedFileName = encodeURIComponent(fileName);
+  
+  if (isDev) {
+    fileWindow.loadURL(`http://localhost:3001/file-viewer?url=${encodedUrl}&filename=${encodedFileName}`);
+    fileWindow.webContents.openDevTools();
+  } else {
+    fileWindow.loadFile(path.join(__dirname, `../out/file-viewer/index.html?url=${encodedUrl}&filename=${encodedFileName}`));
+  }
+
+  // Store reference to file window
+  fileWindows.set(fileKey, fileWindow);
+
+  // Handle file window closed
+  fileWindow.on('closed', () => {
+    fileWindows.delete(fileKey);
+  });
+
+  return fileWindow;
+}
+
 // Handle IPC messages
 ipcMain.handle('open-chat-window', async (event, ticketId, ticketData) => {
   try {
@@ -106,6 +210,26 @@ ipcMain.handle('open-chat-window', async (event, ticketId, ticketData) => {
     return { success: true, windowId: chatWindow.id };
   } catch (error) {
     console.error('Error creating chat window:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('open-ticket-detail-window', async (event, ticketId, ticketData) => {
+  try {
+    const ticketDetailWindow = createTicketDetailWindow(ticketId, ticketData);
+    return { success: true, windowId: ticketDetailWindow.id };
+  } catch (error) {
+    console.error('Error creating ticket detail window:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('open-file-window', async (event, fileUrl, fileName) => {
+  try {
+    const fileWindow = createFileWindow(fileUrl, fileName);
+    return { success: true, windowId: fileWindow.id };
+  } catch (error) {
+    console.error('Error creating file window:', error);
     return { success: false, error: error.message };
   }
 });
@@ -133,6 +257,23 @@ ipcMain.handle('close-current-window', async (event) => {
     return { success: true };
   } catch (error) {
     console.error('Error closing current window:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('maximize-window', async (event) => {
+  try {
+    const currentWindow = BrowserWindow.fromWebContents(event.sender);
+    if (currentWindow && !currentWindow.isDestroyed()) {
+      if (currentWindow.isMaximized()) {
+        currentWindow.unmaximize();
+      } else {
+        currentWindow.maximize();
+      }
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error maximizing window:', error);
     return { success: false, error: error.message };
   }
 });

@@ -175,7 +175,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
   const categoryBadge = useMemo(() => getCategoryBadge(ticket), [ticket.category, ticket.category_name])
 
   const cardClassName = useMemo(() => {
-    return `${isLast ? '' : 'mb-3'} p-4 transition-colors duration-150 cursor-pointer overflow-hidden bg-card dark:bg-[#252525] ${
+    return `${isLast ? '' : 'mb-3'} p-4 transition-colors duration-150 cursor-pointer overflow-hidden bg-sidebar dark:bg-[#252525] ${
       isDragging ? 'opacity-50' : ''
     } ${
       isHovered ? 'border-primary' : 'hover:border-primary/50'
@@ -375,7 +375,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
 
 function TicketSkeleton() {
   return (
-    <Card className="mb-3 p-4 overflow-hidden bg-card dark:bg-[#252525] rounded-xl">
+    <Card className="mb-3 p-4 overflow-hidden bg-sidebar dark:bg-[#252525] rounded-xl">
       <div className="flex flex-col mb-3">
         <div className="flex-1 min-w-0 relative">
           <div className="cursor-grab active:cursor-grabbing transition-colors duration-200 absolute top-0 right-0">
@@ -407,7 +407,7 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
   const categoryBadge = getCategoryBadge(ticket)
   
   return (
-    <Card className="mb-3 p-4 cursor-grabbing overflow-hidden bg-card dark:bg-[#252525] border-primary">
+    <Card className="mb-3 p-4 cursor-grabbing overflow-hidden bg-sidebar dark:bg-[#252525] border-primary">
       <div className="flex flex-col mb-3">
         <div className="flex-1 min-w-0 relative">
           <div 

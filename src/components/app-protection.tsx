@@ -14,7 +14,7 @@ export function AppProtection({ children }: AppProtectionProps) {
   const pathname = usePathname()
 
   // List of public routes that don't require authentication
-  const publicRoutes = ['/login', '/login/']
+  const publicRoutes = ['/login', '/login/', '/']
 
   useEffect(() => {
     // Skip protection for public routes

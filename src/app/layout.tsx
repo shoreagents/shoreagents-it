@@ -6,6 +6,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/contexts/auth-context";
 import { AppProtection } from "@/components/app-protection";
+import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -47,6 +48,7 @@ export default async function RootLayout({
             <AppProtection>
               <SidebarProvider defaultOpen={defaultOpen}>
                 {children}
+                <Toaster />
               </SidebarProvider>
             </AppProtection>
           </AuthProvider>

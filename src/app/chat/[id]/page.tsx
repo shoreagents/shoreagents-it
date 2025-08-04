@@ -124,14 +124,14 @@ export default function ChatPage({ params }: ChatPageProps) {
                </h1>
              </div>
          </div>
-                 <Button
-           variant="ghost"
-           size="sm"
-           onClick={handleCloseWindow}
-           className="h-6 w-6 p-0"
-           style={{ WebkitAppRegion: 'no-drag' }}
-         >
-          <IconX className="h-3 w-3" />
+                         <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleCloseWindow}
+          className="h-6 w-6 p-0 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
+          style={{ WebkitAppRegion: 'no-drag' }}
+        >
+          <IconX className="h-6 w-6" />
         </Button>
       </div>
 

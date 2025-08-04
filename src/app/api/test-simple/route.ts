@@ -3,20 +3,24 @@ import pool from '@/lib/database'
 
 export async function GET() {
   try {
-    // Test database connection
-    const { rows } = await pool.query('SELECT NOW() as current_time')
+    console.log('Testing simple database connection...')
+    
+    // Simple test query
+    const result = await pool.query('SELECT 1 as test')
+    
+    console.log('Database test successful:', result.rows[0])
     
     return NextResponse.json({ 
       success: true, 
-      message: 'Database connection successful',
-      currentTime: rows[0].current_time 
+      message: 'Database connection working',
+      test: result.rows[0].test
     })
   } catch (error) {
-    console.error('Database connection error:', error)
+    console.error('Simple database test failed:', error)
     return NextResponse.json({ 
       success: false, 
       error: 'Database connection failed',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+} 
