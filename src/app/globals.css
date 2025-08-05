@@ -79,7 +79,7 @@
     @apply border-border;
   }
   html, body {
-    overflow-x: hidden;
+    /* overflow-x: hidden; - removed to allow horizontal scrolling */
   }
   body {
     @apply bg-background text-foreground;

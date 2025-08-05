@@ -175,7 +175,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
   const categoryBadge = useMemo(() => getCategoryBadge(ticket), [ticket.category, ticket.category_name])
 
   const cardClassName = useMemo(() => {
-    return `${isLast ? '' : 'mb-3'} p-4 transition-colors duration-150 cursor-pointer overflow-hidden bg-sidebar dark:bg-[#252525] ${
+    return `${isLast ? '' : 'mb-3'} p-4 transition-colors duration-150 cursor-pointer overflow-hidden bg-sidebar dark:bg-[#252525] ticket-card w-full ${
       isDragging ? 'opacity-50' : ''
     } ${
       isHovered ? 'border-primary' : 'hover:border-primary/50'
@@ -375,29 +375,18 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
 
 function TicketSkeleton() {
   return (
-    <Card className="mb-3 p-4 overflow-hidden bg-sidebar dark:bg-[#252525] rounded-xl">
-      <div className="flex flex-col mb-3">
-        <div className="flex-1 min-w-0 relative">
-          <div className="cursor-grab active:cursor-grabbing transition-colors duration-200 absolute top-0 right-0">
-            <Skeleton className="h-5 w-5" />
-          </div>
-          <div className="flex items-center gap-2 mb-3">
-            <Skeleton className="h-6 w-16 rounded-[6px]" />
-            <Skeleton className="h-6 w-20 rounded-[6px]" />
-          </div>
-          <div className="flex items-center gap-2 mb-3">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <div className="flex flex-col min-w-0 flex-1">
-              <Skeleton className="h-4 w-24" />
-            </div>
-            <div className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-center">
-              <Skeleton className="h-4 w-12" />
-            </div>
-          </div>
-          <div className="border border-gray-300 dark:border-[#84848440] rounded-lg p-3 text-left flex flex-col justify-center mt-6">
-            <Skeleton className="h-4 w-full" />
-          </div>
+    <Card className="mb-3 p-4 overflow-hidden bg-sidebar dark:bg-[#252525] ticket-card w-full rounded-xl">
+      <div className="flex items-center gap-3 mb-3">
+        <Skeleton className="h-8 w-8 rounded-full" />
+        <div className="flex flex-col flex-1">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-3 w-12 mt-1" />
         </div>
+        <Skeleton className="h-6 w-14 rounded-md" />
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-2/3" />
       </div>
     </Card>
   )
@@ -540,12 +529,19 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
 
 function TicketsSkeleton() {
   return (
-    <div className="w-full h-full">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
+    <div className="w-full h-[calc(100vh-240px)] px-4 lg:px-6">
+      <div 
+        className="flex gap-4 pb-4 overflow-x-auto overflow-y-auto w-full h-full scroll-container" 
+        style={{ 
+          scrollBehavior: 'smooth',
+          scrollbarWidth: 'thin',
+          msOverflowStyle: 'none'
+        }}
+      >
         {["Approved", "In Progress", "Stuck", "Actioned", "Closed", "On Hold"].map((status) => (
-          <div key={status}>
-            <div className="bg-card border border-border rounded-xl p-4 transition-all duration-200 flex flex-col shadow-sm">
-              <div className="flex-shrink-0 mb-4">
+          <div key={status} className="flex-shrink-0 min-w-[400px]">
+            <div className="bg-card border border-border rounded-xl transition-all duration-200 flex flex-col shadow-sm min-h-[200px] max-h-[calc(94vh-200px)] status-cell">
+              <div className="flex-shrink-0 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <Badge variant="outline" className={`px-3 py-1 font-medium rounded-xl ${
@@ -557,7 +553,7 @@ function TicketsSkeleton() {
                       status === 'On Hold' ? 'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20' :
                       'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20'
                     }`}>
-                                             {status === 'Approved' ? 'New' : status} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${
+                      {status === 'Approved' ? 'New' : status} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${
                         status === 'Approved' ? 'bg-blue-600/20 dark:bg-blue-600/40 text-blue-700 dark:text-white' :
                         status === 'In Progress' ? 'bg-orange-600/20 dark:bg-orange-600/40 text-orange-700 dark:text-white' :
                         status === 'Stuck' ? 'bg-red-600/20 dark:bg-red-600/40 text-red-700 dark:text-white' :
@@ -565,14 +561,14 @@ function TicketsSkeleton() {
                         status === 'Closed' ? 'bg-green-600/20 dark:bg-green-600/40 text-green-700 dark:text-white' :
                         status === 'On Hold' ? 'bg-gray-600/20 dark:bg-gray-600/40 text-gray-700 dark:text-white' :
                         'bg-gray-600/20 dark:bg-gray-600/40 text-gray-700 dark:text-white'
-                                             }`}>
-                         <Skeleton className="h-3 w-3 rounded-xl" />
-                       </span>
+                      }`}>
+                        <Skeleton className="h-3 w-3 rounded-xl" />
+                      </span>
                     </Badge>
                   </div>
                 </div>
               </div>
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 px-4 pb-4 cards-container">
                 {Array.from({ length: 3 }).map((_, index) => (
                   <TicketSkeleton key={index} />
                 ))}
@@ -745,6 +741,21 @@ export default function TicketsPage() {
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string)
+    
+    // Add global wheel listener for horizontal scroll during drag
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const container = document.querySelector('.scroll-container') as HTMLElement;
+      if (container) {
+        const scrollAmount = e.deltaY * 3; // Increased sensitivity for smoother scroll
+        container.scrollLeft -= scrollAmount; // Reversed direction
+      }
+    };
+    
+    document.addEventListener('wheel', handleWheel, { passive: false });
+    
+    // Store the handler to remove it later
+    (window as any).dragWheelHandler = handleWheel;
   }
 
   const handleDragOver = async (event: DragOverEvent) => {
@@ -754,6 +765,8 @@ export default function TicketsPage() {
 
     const activeTicket = tickets.find((item) => item.id.toString() === active.id)
     if (!activeTicket) return
+
+
 
     // Handle dropping on a droppable zone (status column)
     if (over.id.toString().startsWith('droppable-')) {
@@ -800,6 +813,12 @@ export default function TicketsPage() {
     const { active, over } = event
 
     setActiveId(null)
+    
+    // Remove wheel listener that was added during drag
+    if ((window as any).dragWheelHandler) {
+      document.removeEventListener('wheel', (window as any).dragWheelHandler);
+      (window as any).dragWheelHandler = null;
+    }
 
     if (!active || !over) return
 
@@ -926,7 +945,7 @@ export default function TicketsPage() {
   return (
     <>
       <AppSidebar variant="inset" />
-      <SidebarInset>
+      <SidebarInset className="overflow-x-auto">
         <SiteHeader />
         <div className="flex flex-1 flex-col">
           <div className="flex-1 flex-col gap-2 @container/main">
@@ -955,94 +974,121 @@ export default function TicketsPage() {
                 </div>
               </div>
 
-              <div className="w-full h-full">
-                {loading ? (
-                  <TicketsSkeleton />
-                ) : error ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <p className="text-red-600 mb-2">{error}</p>
-                      <Button onClick={fetchTickets} variant="outline">
-                        Retry
-                      </Button>
-                    </div>
+              {loading ? (
+                <TicketsSkeleton />
+              ) : error ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <p className="text-red-600 mb-2">{error}</p>
+                    <Button onClick={fetchTickets} variant="outline">
+                      Retry
+                    </Button>
                   </div>
-                ) : mounted ? (
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCorners}
-                    onDragStart={handleDragStart}
-                    onDragOver={handleDragOver}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
+                </div>
+              ) : mounted ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCorners}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDragEnd={handleDragEnd}
+                >
+                                                        <div className="w-full h-[calc(100vh-240px)] px-4 lg:px-6">
+                    <div 
+                      className="flex gap-4 pb-4 overflow-x-auto overflow-y-auto w-full h-full scroll-container" 
+                      style={{ 
+                        scrollBehavior: 'smooth',
+                        scrollbarWidth: 'thin',
+                        msOverflowStyle: 'none'
+                      }}
+                      onWheel={(e) => {
+                        // Check if cursor is over the cards container
+                        const target = e.target as HTMLElement;
+                        const isOverCardsContainer = target.closest('.cards-container');
+                        
+                        // Check if cursor is near edges (100px from left or right)
+                        const container = e.currentTarget as HTMLElement;
+                        const rect = container.getBoundingClientRect();
+                        const mouseX = e.clientX;
+                        const isNearLeftEdge = mouseX < rect.left + 100;
+                        const isNearRightEdge = mouseX > rect.right - 100;
+                        
+                        // Allow horizontal scroll if not over cards container, dragging, or near edges
+                        if (!isOverCardsContainer || activeId || isNearLeftEdge || isNearRightEdge) {
+                          e.preventDefault();
+                          const scrollAmount = e.deltaY * 3; // Increased sensitivity for smoother scroll
+                          container.scrollLeft -= scrollAmount; // Reversed direction
+                        }
+                      }}
+
+                    >
                       {statuses.map((status) => (
-                        <div key={status}>
-                          <div className="bg-card border border-border rounded-xl p-4 transition-all duration-200 flex flex-col shadow-sm">
-                              <div className="flex-shrink-0 mb-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center gap-3">
-                                    <Badge variant="outline" className={`${getStatusColor(status as TicketStatus)} px-3 py-1 font-medium rounded-xl`}>
-                                                                             {getStatusDisplayLabel(status)} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${getCircleColor(status as TicketStatus)}`}>{getTicketsByStatus(status as TicketStatus).length}</span>
-                                    </Badge>
-                                  </div>
+                        <div key={status} className="flex-shrink-0 min-w-[400px]">
+                          <div className="bg-card border border-border rounded-xl transition-all duration-200 flex flex-col shadow-sm min-h-[200px] max-h-[calc(94vh-200px)] status-cell">
+                            <div className="flex-shrink-0 p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                  <Badge variant="outline" className={`${getStatusColor(status as TicketStatus)} px-3 py-1 font-medium rounded-xl`}>
+                                                                       {getStatusDisplayLabel(status)} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${getCircleColor(status as TicketStatus)}`}>{getTicketsByStatus(status as TicketStatus).length}</span>
+                                  </Badge>
                                 </div>
                               </div>
-                              <DroppableContainer status={status}>
-                                <div className="flex-1 overflow-y-auto">
-                                  <SortableContext
-                                    items={getTicketsByStatus(status as TicketStatus).map(ticket => ticket.id.toString())}
-                                    strategy={verticalListSortingStrategy}
-                                  >
-                                                                              {getTicketsByStatus(status as TicketStatus).map((ticket, index, array) => (
-                                            <SortableTicket 
-                                              key={ticket.id} 
-                                              ticket={ticket}
-                                              isLast={index === array.length - 1}
-                                              isExpanded={expandedTickets.has(ticket.id.toString())}
-                                              onToggleExpanded={(ticketId) => {
-                                                setExpandedTickets(prev => {
-                                                  const newSet = new Set(prev)
-                                                  if (newSet.has(ticketId)) {
-                                                    newSet.delete(ticketId)
-                                                  } else {
-                                                    newSet.add(ticketId)
-                                                  }
-                                                  return newSet
-                                                })
-                                              }}
-                                              onViewAll={handleViewAllClick}
-                                            />
-                                          ))}
-                                          
-                                          {getTicketsByStatus(status as TicketStatus).length === 0 && (
-                                            <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-xl bg-muted/20">
-                                              <p className="text-sm font-medium">No Tickets</p>
-                                            </div>
-                                          )}
-                                          
-
-                                        </SortableContext>
-                                </div>
-                              </DroppableContainer>
                             </div>
+                            <DroppableContainer status={status}>
+                              <div className="flex-1 px-4 pb-4 cards-container">
+                                <SortableContext
+                                  items={getTicketsByStatus(status as TicketStatus).map(ticket => ticket.id.toString())}
+                                  strategy={verticalListSortingStrategy}
+                                >
+                                                                  {getTicketsByStatus(status as TicketStatus).map((ticket, index, array) => (
+                                    <SortableTicket 
+                                      key={ticket.id} 
+                                      ticket={ticket}
+                                      isLast={index === array.length - 1}
+                                      isExpanded={expandedTickets.has(ticket.id.toString())}
+                                      onToggleExpanded={(ticketId) => {
+                                        setExpandedTickets(prev => {
+                                          const newSet = new Set(prev)
+                                          if (newSet.has(ticketId)) {
+                                            newSet.delete(ticketId)
+                                          } else {
+                                            newSet.add(ticketId)
+                                          }
+                                          return newSet
+                                        })
+                                      }}
+                                      onViewAll={handleViewAllClick}
+                                    />
+                                  ))}
+                                  
+                                  {getTicketsByStatus(status as TicketStatus).length === 0 && (
+                                    <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-xl bg-muted/20">
+                                      <p className="text-sm font-medium">No Tickets</p>
+                                    </div>
+                                  )}
+                                  
+
+                                </SortableContext>
+                              </div>
+                            </DroppableContainer>
                           </div>
-                        ))}
-                      </div>
-                    
-                    <DragOverlay>
-                      {activeId ? (
-                        <DraggingTicket 
-                          ticket={tickets.find(ticket => ticket.id.toString() === activeId)!}
-                          isExpanded={expandedTickets.has(activeId)}
-                        />
-                      ) : null}
-                    </DragOverlay>
-                  </DndContext>
-                ) : (
-                  <TicketsSkeleton />
-                )}
-              </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <DragOverlay>
+                    {activeId ? (
+                      <DraggingTicket 
+                        ticket={tickets.find(ticket => ticket.id.toString() === activeId)!}
+                        isExpanded={expandedTickets.has(activeId)}
+                      />
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
+              ) : (
+                <TicketsSkeleton />
+              )}
             </div>
           </div>
         </div>
@@ -1056,4 +1102,3 @@ export default function TicketsPage() {
     </>
   )
 } 
-

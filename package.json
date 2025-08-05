@@ -1,5 +1,5 @@
 {
-  "name": "shoreagents-it",
+  "name": "shoreagents-ai",
   "version": "0.1.0",
   "private": true,
   "main": "electron/main.js",
@@ -63,8 +63,10 @@
     "recharts": "^2.15.4",
     "shadcn-ui": "^0.9.5",
     "sonner": "^2.0.6",
+    "styled-components": "^6.1.19",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
+    "usehooks-ts": "^3.1.1",
     "vaul": "^1.1.2",
     "ws": "^8.18.3",
     "zod": "^4.0.10"
@@ -87,8 +89,8 @@
     "wait-on": "^8.0.4"
   },
   "build": {
-    "appId": "com.shoreagents.it",
-    "productName": "ShoreAgents IT",
+    "appId": "com.shoreagents.ai",
+    "productName": "ShoreAgents AI",
     "directories": {
       "output": "dist"
     },
