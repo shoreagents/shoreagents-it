@@ -1,4 +1,4 @@
-# ShoreAgents IT - Electron App
+# ShoreAgents AI - Electron App
 
 A modern Electron desktop application built with Next.js and Shadcn/ui.
 
