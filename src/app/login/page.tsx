@@ -7,12 +7,12 @@ import { IconMail, IconLock, IconEye, IconEyeOff } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
-import { NormalButton, LoaderButton } from "@/components/glowing-login"
+import { NormalButton, LoaderButton } from "@/components/glowing"
 import { AnimatePresence, motion } from "framer-motion"
 import styled from "styled-components"
-import Stars from "@/components/glowing-login/ui/Stars"
-import Intro from "@/components/glowing-login/ui/Intro"
-import Browser from "@/components/glowing-login/ui/Browser"
+import Stars from "@/components/glowing/ui/Stars"
+import Intro from "@/components/glowing/ui/Intro"
+import Browser from "@/components/glowing/ui/Browser"
 
 const BACKGROUNDS = [
   "#0B020D",
@@ -131,7 +131,7 @@ export default function LoginPage() {
     
     if (result.success) {
       toast.success("Successfully signed in!")
-      router.push('/dashboard')
+      router.push('/it/dashboard')
     } else {
       const errorMessage = result.error || 'Login failed'
       toast.error(errorMessage)

@@ -86,10 +86,10 @@ function createChatWindow(ticketId, ticketData) {
 
   // Load chat page
   if (isDev) {
-    chatWindow.loadURL(`http://localhost:3001/chat/${ticketId}`);
+    chatWindow.loadURL(`http://localhost:3001/global/chat/${ticketId}`);
     chatWindow.webContents.openDevTools();
   } else {
-    chatWindow.loadFile(path.join(__dirname, `../out/chat/${ticketId}/index.html`));
+    chatWindow.loadFile(path.join(__dirname, `../out/global/chat/${ticketId}/index.html`));
   }
 
   // Store reference to chat window
@@ -186,10 +186,10 @@ function createFileWindow(fileUrl, fileName) {
   const encodedFileName = encodeURIComponent(fileName);
   
   if (isDev) {
-    fileWindow.loadURL(`http://localhost:3001/file-viewer?url=${encodedUrl}&filename=${encodedFileName}`);
+    fileWindow.loadURL(`http://localhost:3001/global/file-viewer?url=${encodedUrl}&filename=${encodedFileName}`);
     fileWindow.webContents.openDevTools();
   } else {
-    fileWindow.loadFile(path.join(__dirname, `../out/file-viewer/index.html?url=${encodedUrl}&filename=${encodedFileName}`));
+    fileWindow.loadFile(path.join(__dirname, `../out/global/file-viewer/index.html?url=${encodedUrl}&filename=${encodedFileName}`));
   }
 
   // Store reference to file window

@@ -3,7 +3,7 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { cookies } from "next/headers";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { ThemeProvider } from "@/components/theme-provider";
+import { AppThemeProvider } from "@/components/app-theme";
 import { AuthProvider } from "@/contexts/auth-context";
 import { AppProtection } from "@/components/app-protection";
 import { Toaster } from "@/components/ui/sonner";
@@ -43,7 +43,7 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} antialiased`}
       >
-        <ThemeProvider
+        <AppThemeProvider
           attribute="class"
           defaultTheme="dark"
           enableSystem
@@ -57,7 +57,7 @@ export default async function RootLayout({
               </SidebarProvider>
             </AppProtection>
           </AuthProvider>
-        </ThemeProvider>
+        </AppThemeProvider>
       </body>
     </html>
   );
