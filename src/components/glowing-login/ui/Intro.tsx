@@ -47,9 +47,9 @@ const Wrapper = styled.div`
 export default function Intro() {
   return (
     <Wrapper>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
         <H1>ShoreAgents</H1>
-        <Badge className="text-5xl px-2 py-0.5 bg-teal-100 text-teal-800 border-teal-200 shadow-none font-bold">
+        <Badge className="text-4xl w-16 h-16 bg-teal-100 text-teal-800 border-teal-200 shadow-none font-bold flex items-center justify-center rounded-lg p-0 leading-none">
           AI
         </Badge>
       </div>

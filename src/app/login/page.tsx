@@ -15,9 +15,9 @@ import Intro from "@/components/glowing-login/ui/Intro"
 import Browser from "@/components/glowing-login/ui/Browser"
 
 const BACKGROUNDS = [
-  "#020308",
-  "#010609", 
   "#0B020D",
+  "#010609", 
+  "#020308",
   "#090401",
   "#010902"
 ]
@@ -88,7 +88,9 @@ const variants = {
 }
 
 enum ActiveTab {
-  'Login' = 1
+  'Login' = 1,
+  'Admin' = 2,
+  'Finance' = 3
 }
 
 export default function LoginPage() {
@@ -215,6 +217,46 @@ export default function LoginPage() {
                   <NormalButton type="submit" onClick={handleSubmit}>
                     Sign In
                   </NormalButton>
+                </div>
+              </div>
+            </Content>
+          }
+
+          {activeTab === 2 && 
+            <Content 
+              as={motion.div}
+              key="admin"
+              variants={variants}
+              initial="hidden"
+              animate="open"
+              exit="out"
+            >
+              <div className="w-80 text-center">
+                <div className="text-white text-2xl font-semibold mb-4">
+                  Admin Portal
+                </div>
+                <div className="text-white/70 text-lg">
+                  Coming Soon...
+                </div>
+              </div>
+            </Content>
+          }
+
+          {activeTab === 3 && 
+            <Content 
+              as={motion.div}
+              key="finance"
+              variants={variants}
+              initial="hidden"
+              animate="open"
+              exit="out"
+            >
+              <div className="w-80 text-center">
+                <div className="text-white text-2xl font-semibold mb-4">
+                  Finance Portal
+                </div>
+                <div className="text-white/70 text-lg">
+                  Coming Soon...
                 </div>
               </div>
             </Content>
