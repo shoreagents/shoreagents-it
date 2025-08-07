@@ -8,6 +8,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -128,11 +129,11 @@ const chartConfig = {
   },
   desktop: {
     label: "Desktop",
-    color: "hsl(var(--chart-1))",
+    color: "#f97316",
   },
   mobile: {
     label: "Mobile",
-    color: "hsl(var(--chart-2))",
+    color: "#10b981",
   },
 } satisfies ChartConfig
 
@@ -140,19 +141,18 @@ export function ChartAreaInteractive() {
   const isMobile = useIsMobile()
   const [timeRange, setTimeRange] = React.useState("30d")
 
-  React.useEffect(() => {
-    if (isMobile) {
-      setTimeRange("7d")
-    }
-  }, [isMobile])
+  // Remove the mobile override to always show 30 days
+  // React.useEffect(() => {
+  //   if (isMobile) {
+  //     setTimeRange("7d")
+  //   }
+  // }, [isMobile])
 
   const filteredData = chartData.filter((item) => {
     const date = new Date(item.date)
     const referenceDate = new Date("2024-06-30")
-    let daysToSubtract = 90
-    if (timeRange === "30d") {
-      daysToSubtract = 30
-    } else if (timeRange === "7d") {
+    let daysToSubtract = 30
+    if (timeRange === "7d") {
       daysToSubtract = 7
     }
     const startDate = new Date(referenceDate)
@@ -161,15 +161,12 @@ export function ChartAreaInteractive() {
   })
 
   return (
-    <Card className="@container/card">
+    <div className="@container/card">
       <CardHeader className="relative">
-        <CardTitle>Total Visitors</CardTitle>
-        <CardDescription>
-          <span className="@[540px]/card:block hidden">
-            Total for the last 3 months
-          </span>
-          <span className="@[540px]/card:hidden">Last 3 months</span>
-        </CardDescription>
+        <CardDescription>Tickets Overview</CardDescription>
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          
+        </CardTitle>
         <div className="absolute right-4 top-4">
           <ToggleGroup
             type="single"
@@ -178,14 +175,11 @@ export function ChartAreaInteractive() {
             variant="outline"
             className="@[767px]/card:flex hidden"
           >
-            <ToggleGroupItem value="90d" className="h-8 px-2.5">
-              Last 3 months
-            </ToggleGroupItem>
             <ToggleGroupItem value="30d" className="h-8 px-2.5">
-              Last 30 days
+              Last 30 Days
             </ToggleGroupItem>
             <ToggleGroupItem value="7d" className="h-8 px-2.5">
-              Last 7 days
+              Last 7 Days
             </ToggleGroupItem>
           </ToggleGroup>
           <Select value={timeRange} onValueChange={setTimeRange}>
@@ -193,28 +187,25 @@ export function ChartAreaInteractive() {
               className="@[767px]/card:hidden flex w-40"
               aria-label="Select a value"
             >
-              <SelectValue placeholder="Last 3 months" />
+              <SelectValue placeholder="Last 30 Days" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
-              <SelectItem value="90d" className="rounded-lg">
-                Last 3 months
-              </SelectItem>
               <SelectItem value="30d" className="rounded-lg">
-                Last 30 days
+                Last 30 Days
               </SelectItem>
               <SelectItem value="7d" className="rounded-lg">
-                Last 7 days
+                Last 7 Days
               </SelectItem>
             </SelectContent>
           </Select>
         </div>
       </CardHeader>
-      <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
+      <CardContent className="p-0">
         <ChartContainer
           config={chartConfig}
-          className="aspect-auto h-[250px] w-full"
+          className="h-[200px] w-full max-w-none overflow-visible"
         >
-          <AreaChart data={filteredData}>
+          <AreaChart data={filteredData} width={800} height={250} margin={{ right: 0, left: 0 }}>
             <defs>
               <linearGradient id="fillDesktop" x1="0" y1="0" x2="0" y2="1">
                 <stop
@@ -246,15 +237,7 @@ export function ChartAreaInteractive() {
               dataKey="date"
               tickLine={false}
               axisLine={false}
-              tickMargin={8}
-              minTickGap={32}
-              tickFormatter={(value) => {
-                const date = new Date(value)
-                return date.toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })
-              }}
+              tick={false}
             />
             <ChartTooltip
               cursor={false}
@@ -287,6 +270,6 @@ export function ChartAreaInteractive() {
           </AreaChart>
         </ChartContainer>
       </CardContent>
-    </Card>
+    </div>
   )
 }

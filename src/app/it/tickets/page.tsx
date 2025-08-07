@@ -325,7 +325,8 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
               <IconClock className="h-4 w-4 text-muted-foreground" />
               {new Date(ticket.resolved_at).toLocaleTimeString('en-US', { 
                 hour: '2-digit',
-                minute: '2-digit'
+                minute: '2-digit',
+                timeZone: 'Asia/Manila'
               })}
             </span>
           </div>
@@ -517,7 +518,8 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
               <IconClock className="h-4 w-4 text-muted-foreground" />
               {new Date(ticket.resolved_at).toLocaleTimeString('en-US', { 
                 hour: '2-digit',
-                minute: '2-digit'
+                minute: '2-digit',
+                timeZone: 'Asia/Manila'
               })}
             </span>
           </div>

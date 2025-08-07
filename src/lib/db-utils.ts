@@ -125,18 +125,19 @@ export async function updateTicketStatus(id: number, status: string, resolvedBy?
     let result
     if (status === 'Completed' || status === 'Closed') {
       // When marking as completed or closed, set resolved_at timestamp and resolved_by
-      // Use NOW() AT TIME ZONE 'Asia/Manila' to match the database default
+      // Store the time in Asia/Manila timezone without converting to UTC
       if (resolvedBy) {
         result = await pool.query(
-          'UPDATE public.tickets SET status = $1, resolved_at = (NOW() AT TIME ZONE \'Asia/Manila\'), resolved_by = $3 WHERE id = $2 RETURNING *',
+          'UPDATE public.tickets SET status = $1, resolved_at = NOW(), resolved_by = $3 WHERE id = $2 RETURNING *',
           [status, id, resolvedBy]
         )
       } else {
         result = await pool.query(
-          'UPDATE public.tickets SET status = $1, resolved_at = (NOW() AT TIME ZONE \'Asia/Manila\') WHERE id = $2 RETURNING *',
+          'UPDATE public.tickets SET status = $1, resolved_at = NOW() WHERE id = $2 RETURNING *',
           [status, id]
         )
       }
+      console.log('Database returned resolved_at:', result.rows[0].resolved_at, 'type:', typeof result.rows[0].resolved_at)
     } else {
       // For other status changes, clear resolved_at and resolved_by fields
       result = await pool.query(

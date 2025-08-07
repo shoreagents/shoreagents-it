@@ -2,6 +2,7 @@
 
 import { type LucideIcon } from "lucide-react"
 import { usePathname } from "next/navigation"
+import Link from "next/link"
 
 import {
   SidebarGroup,
@@ -59,10 +60,10 @@ export function NavSecondary({
                   tooltip={item.title}
                   className={`${isActive ? "bg-gray-200 dark:bg-teal-600/30 focus:bg-gray-200 dark:focus:bg-teal-600/30 active:bg-gray-200 dark:active:bg-teal-600/30 text-sidebar-accent-foreground dark:text-white hover:!bg-gray-200 dark:hover:!bg-teal-600/30" : "text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"} group-data-[collapsible=icon]:hover:bg-sidebar-accent dark:group-data-[collapsible=icon]:hover:bg-sidebar-accent group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center`}
                 >
-                  <a href={item.url} className="flex items-center justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-full">
+                  <Link href={item.url} className="flex items-center justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-full">
                     {item.icon && <item.icon className="h-4 w-4" />}
                     <span className="ml-2 group-data-[collapsible=icon]:hidden">{item.title}</span>
-                  </a>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )

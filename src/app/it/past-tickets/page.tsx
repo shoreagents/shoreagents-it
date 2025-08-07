@@ -57,23 +57,26 @@ function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUs
   currentUser: any
 }) {
   const formatDate = (dateString: string) => {
+    // Parse the UTC timestamp and convert to Asia/Manila timezone
     const date = new Date(dateString)
     const dateStr = date.toLocaleDateString('en-US', {
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
+      timeZone: 'Asia/Manila'
     })
     const timeStr = date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
+      timeZone: 'Asia/Manila'
     })
     return (
       <div className="flex items-center gap-1">
-        <IconCalendar className="h-4 w-4" />
-        <span>{dateStr}</span>
+        <IconCalendar className="h-4 w-4 text-muted-foreground" />
+        <span className="font-medium text-muted-foreground">{dateStr}</span>
         <span className="text-muted-foreground/70">•</span>
-        <IconClock className="h-4 w-4" />
-        <span>{timeStr}</span>
+        <IconClock className="h-4 w-4 text-muted-foreground" />
+        <span className="font-mono text-muted-foreground">{timeStr}</span>
       </div>
     )
   }
@@ -465,9 +468,9 @@ export default function PastTicketsPage() {
       <AppSidebar variant="inset" />
       <SidebarInset>
         <AppHeader />
-        <div className="flex flex-1 flex-col">
-          <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+        <div className="flex flex-1 flex-col justify-between">
+          <div className="@container/main flex flex-1 flex-col gap-2 justify-between">
+            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 justify-between h-full">
               <div className="px-4 lg:px-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -525,7 +528,7 @@ export default function PastTicketsPage() {
                 </div>
               </div>
 
-              <div className="px-4 lg:px-6">
+              <div className="px-4 lg:px-6 flex-1 flex flex-col justify-between">
                 {loading ? (
                   <PastTicketsSkeleton />
                 ) : error ? (
@@ -540,8 +543,10 @@ export default function PastTicketsPage() {
                 ) : (
                   <>
                     {pastTickets.length > 0 ? (
-                      <>
-                        <PastTicketsTable tickets={pastTickets} onSort={handleSort} sortField={sortField} sortDirection={sortDirection} currentUser={user} />
+                      <div className="flex flex-col justify-between h-full">
+                        <div className="flex-1">
+                          <PastTicketsTable tickets={pastTickets} onSort={handleSort} sortField={sortField} sortDirection={sortDirection} currentUser={user} />
+                        </div>
                         
                         {/* Pagination Controls */}
                         {totalPages > 1 && (
@@ -591,14 +596,16 @@ export default function PastTicketsPage() {
                             </Pagination>
                           </div>
                         )}
-                      </>
+                      </div>
                     ) : (
-                      <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-lg bg-muted/20">
-                        <IconHistory className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-                        <p className="text-sm font-medium">No Past Tickets</p>
-                        <p className="text-xs text-muted-foreground/70">
-                          {searchTerm ? 'No tickets match your search criteria' : ''}
-                        </p>
+                      <div className="flex flex-col justify-center h-full">
+                        <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-lg bg-muted/20">
+                          <IconHistory className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                          <p className="text-sm font-medium">No Past Tickets</p>
+                          <p className="text-xs text-muted-foreground/70">
+                            {searchTerm ? 'No tickets match your search criteria' : ''}
+                          </p>
+                        </div>
                       </div>
                     )}
                   </>

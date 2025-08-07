@@ -140,17 +140,20 @@ const getCategoryBadge = (ticket: Ticket) => {
 }
 
 const formatDate = (dateString: string) => {
+  // Parse the UTC timestamp and convert to Asia/Manila timezone
   const date = new Date(dateString)
   return {
     date: date.toLocaleDateString('en-US', { 
       year: 'numeric',
       month: 'long', 
-      day: 'numeric'
+      day: 'numeric',
+      timeZone: 'Asia/Manila'
     }),
     time: date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
+      timeZone: 'Asia/Manila'
     }),
     full: date.toLocaleDateString('en-US', { 
       year: 'numeric',
@@ -158,7 +161,8 @@ const formatDate = (dateString: string) => {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
+      timeZone: 'Asia/Manila'
     })
   }
 }

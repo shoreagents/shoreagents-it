@@ -3,6 +3,7 @@
 import { type LucideIcon } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { useRef } from "react"
+import Link from "next/link"
 
 import {
   SidebarGroup,
@@ -24,7 +25,7 @@ export function NavMain({
   const pathname = usePathname()
   
   return (
-    <SidebarGroup className="p-0">
+    <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
         <SidebarMenu>
           {items.map((item) => {
@@ -40,10 +41,10 @@ export function NavMain({
                   onMouseEnter={() => iconRef.current?.startAnimation?.()}
                   onMouseLeave={() => iconRef.current?.stopAnimation?.()}
                 >
-                  <a href={item.url} className="flex items-center justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-full">
+                  <Link href={item.url} className="flex items-center justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-full">
                     {item.icon && <item.icon ref={iconRef} className="h-5 w-5" />}
                     <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
-                  </a>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )

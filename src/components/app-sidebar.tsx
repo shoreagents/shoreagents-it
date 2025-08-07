@@ -84,8 +84,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
               <SidebarContent className="group-data-[collapsible=icon]:mt-8">
-        <NavMain items={data.navMain} />
-        <SidebarGroup>
+        <SidebarGroup className="p-0">
+          <SidebarGroupLabel>MAIN</SidebarGroupLabel>
+          <NavMain items={data.navMain} />
+        </SidebarGroup>
+        <SidebarGroup className="p-0">
           <SidebarGroupLabel>SUPPORT</SidebarGroupLabel>
           <NavMain items={data.navSupport} />
         </SidebarGroup>
