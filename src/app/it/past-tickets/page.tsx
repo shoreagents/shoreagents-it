@@ -106,7 +106,7 @@ function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUs
   }
 
   return (
-    <div className="rounded-md border overflow-x-auto">
+    <div className="rounded-xl border overflow-x-auto bg-card">
       <Table>
         <TableHeader>
           <TableRow>

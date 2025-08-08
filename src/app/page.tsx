@@ -11,19 +11,21 @@ export default function Home() {
   useEffect(() => {
     if (!loading) {
       if (user) {
-        // If user is authenticated, redirect to IT dashboard
-        router.push('/it/dashboard')
+        // Route based on role if available
+        // Admin to admin dashboard; otherwise IT dashboard
+        const roleName = (user as any).roleName as string | undefined
+        if (roleName && roleName.toLowerCase() === 'admin') {
+          router.push('/admin/dashboard')
+        } else {
+          router.push('/it/dashboard')
+        }
       } else {
-        // If user is not authenticated, redirect to global login
         router.push('/login')
       }
     }
   }, [user, loading, router])
 
-  // Show loading while determining redirect
   return (
-    <div className="min-h-screen">
-      {/* Loading state - no visual indicator */}
-    </div>
+    <div className="min-h-screen"></div>
   )
 }

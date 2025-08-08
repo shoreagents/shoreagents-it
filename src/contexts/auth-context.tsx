@@ -10,13 +10,14 @@ interface User {
   firstName: string
   lastName: string
   profilePicture?: string
+  roleName?: string
   isAuthenticated: boolean
 }
 
 interface AuthContextType {
   user: User | null
   loading: boolean
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  login: (email: string, password: string, role?: 'it' | 'admin') => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
   checkAuth: () => Promise<void>
 }
@@ -60,9 +61,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, role: 'it' | 'admin' = 'it') => {
     try {
-      console.log('🔐 Starting login process for:', email)
+      console.log('🔐 Starting login process for:', email, 'role:', role)
       
       // First, authenticate with Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -82,12 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log('✅ Supabase authentication successful')
 
-      // Check if user exists in our Railway PostgreSQL database via API
-      const response = await fetch(`/api/auth/user?email=${encodeURIComponent(email)}`)
+      // Check if user exists in our Railway PostgreSQL database via API with role requirement
+      const response = await fetch(`/api/auth/user?email=${encodeURIComponent(email)}&role=${encodeURIComponent(role)}`)
       
       if (!response.ok) {
-        console.log('❌ User not found in Railway database')
-        // Logout from Supabase if user doesn't exist in our database
+        console.log('❌ User not found in Railway database or role not authorized')
+        // Logout from Supabase if user doesn't exist or role not authorized in our database
         await supabase.auth.signOut()
         return { success: false, error: 'User not found or not authorized' }
       }

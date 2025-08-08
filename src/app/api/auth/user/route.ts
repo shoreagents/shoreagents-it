@@ -4,6 +4,7 @@ import pool from '@/lib/database'
 export async function GET(request: NextRequest) {
   try {
     const email = request.nextUrl.searchParams.get('email')
+    const role = request.nextUrl.searchParams.get('role') || ''
     
     if (!email) {
       return NextResponse.json(
@@ -11,6 +12,13 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Build role condition only when provided; otherwise, allow any internal role
+    const roleCondition = role === 'admin'
+      ? `AND ir.role_id = (SELECT id FROM roles WHERE name = 'Admin')`
+      : role === 'it'
+        ? `AND (ir.role_id = 1 OR ir.role_id = (SELECT id FROM roles WHERE name = 'IT'))`
+        : ''
 
     // Query to get user data from Railway PostgreSQL
     const userQuery = `
@@ -21,14 +29,17 @@ export async function GET(request: NextRequest) {
         pi.first_name,
         pi.last_name,
         pi.profile_picture,
-        ir.role_id
+        ir.role_id,
+        r.name as role_name
       FROM users u
       LEFT JOIN personal_info pi ON u.id = pi.user_id
       LEFT JOIN internal i ON u.id = i.user_id
       LEFT JOIN internal_roles ir ON i.user_id = ir.internal_user_id
+      LEFT JOIN roles r ON ir.role_id = r.id
       WHERE u.email = $1 
         AND i.user_id IS NOT NULL 
-        AND (ir.role_id = 1 OR ir.role_id = (SELECT id FROM roles WHERE name = 'IT'))
+        ${roleCondition}
+      LIMIT 1
     `
 
     const userResult = await pool.query(userQuery, [email])
@@ -50,6 +61,7 @@ export async function GET(request: NextRequest) {
         firstName: dbUser.first_name,
         lastName: dbUser.last_name,
         profilePicture: dbUser.profile_picture,
+        roleName: dbUser.role_name,
         isAuthenticated: true
       }
     })

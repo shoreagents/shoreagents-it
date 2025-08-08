@@ -31,8 +31,8 @@ function createWindow() {
   // Load the app
   if (isDev) {
     // In development, load from the custom server
-    console.log('Loading from development server: http://localhost:3001');
-    mainWindow.loadURL('http://localhost:3001');
+    console.log('Loading from development server: http://localhost:3002');
+    mainWindow.loadURL('http://localhost:3002');
     // Open DevTools in development
     mainWindow.webContents.openDevTools();
     
@@ -40,8 +40,8 @@ function createWindow() {
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
       console.error('Failed to load:', errorCode, errorDescription);
       // Retry after a short delay
-      setTimeout(() => {
-        mainWindow.loadURL('http://localhost:3001');
+        setTimeout(() => {
+          mainWindow.loadURL('http://localhost:3002');
       }, 2000);
     });
   } else {
@@ -86,7 +86,7 @@ function createChatWindow(ticketId, ticketData) {
 
   // Load chat page
   if (isDev) {
-    chatWindow.loadURL(`http://localhost:3001/global/chat/${ticketId}`);
+    chatWindow.loadURL(`http://localhost:3002/global/chat/${ticketId}`);
     chatWindow.webContents.openDevTools();
   } else {
     chatWindow.loadFile(path.join(__dirname, `../out/global/chat/${ticketId}/index.html`));
@@ -133,7 +133,7 @@ function createTicketDetailWindow(ticketId, ticketData) {
 
   // Load ticket detail page
   if (isDev) {
-    ticketDetailWindow.loadURL(`http://localhost:3001/ticket-detail/${ticketId}`);
+    ticketDetailWindow.loadURL(`http://localhost:3002/ticket-detail/${ticketId}`);
     ticketDetailWindow.webContents.openDevTools();
   } else {
     ticketDetailWindow.loadFile(path.join(__dirname, `../out/ticket-detail/${ticketId}/index.html`));
@@ -186,7 +186,7 @@ function createFileWindow(fileUrl, fileName) {
   const encodedFileName = encodeURIComponent(fileName);
   
   if (isDev) {
-    fileWindow.loadURL(`http://localhost:3001/global/file-viewer?url=${encodedUrl}&filename=${encodedFileName}`);
+    fileWindow.loadURL(`http://localhost:3002/global/file-viewer?url=${encodedUrl}&filename=${encodedFileName}`);
     fileWindow.webContents.openDevTools();
   } else {
     fileWindow.loadFile(path.join(__dirname, `../out/global/file-viewer/index.html?url=${encodedUrl}&filename=${encodedFileName}`));

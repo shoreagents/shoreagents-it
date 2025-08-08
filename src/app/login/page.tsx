@@ -101,6 +101,9 @@ export default function LoginPage() {
   const [activeTab, setActiveTab] = React.useState(ActiveTab.Login)
   const [bg, setBg] = React.useState(0)
   const [isLoaded, setIsLoaded] = React.useState(false)
+  const [adminEmail, setAdminEmail] = React.useState("")
+  const [adminPassword, setAdminPassword] = React.useState("")
+  const [adminShowPassword, setAdminShowPassword] = React.useState(false)
 
   const router = useRouter()
   const { login, user } = useAuth()
@@ -140,6 +143,20 @@ export default function LoginPage() {
     setIsLoading(false)
   }
 
+  const handleAdminSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    const result = await login(adminEmail, adminPassword, 'admin')
+    if (result.success) {
+      toast.success("Successfully signed in as admin!")
+      router.push('/admin/dashboard')
+    } else {
+      const errorMessage = result.error || 'Login failed'
+      toast.error(errorMessage)
+    }
+    setIsLoading(false)
+  }
+
   return (
     <Container bg={BACKGROUNDS[bg]}>
       <Stars />
@@ -150,10 +167,10 @@ export default function LoginPage() {
         setBg(activeIndex - 1) // Change background based on tab index (0-based)
       }}>
         <AnimatePresence mode="wait">
-          {activeTab === 1 && 
+          {activeTab === 2 && 
             <Content 
               as={motion.div}
-              key={ActiveTab.Login}
+              key={ActiveTab.Admin}
               variants={variants}
               initial="hidden"
               animate="open"
@@ -222,7 +239,7 @@ export default function LoginPage() {
             </Content>
           }
 
-          {activeTab === 2 && 
+          {activeTab === 1 && 
             <Content 
               as={motion.div}
               key="admin"
@@ -232,12 +249,64 @@ export default function LoginPage() {
               exit="out"
             >
               <div className="w-80 text-center">
-                <div className="text-white text-2xl font-semibold mb-4">
-                  Admin Portal
-                </div>
-                <div className="text-white/70 text-lg">
-                  Coming Soon...
-                </div>
+                <form onSubmit={handleAdminSubmit} className="space-y-4" name="admin-login-form">
+                  <div className="space-y-2">
+                    <Label htmlFor="admin-email" className="text-white text-left block font-sans">Email</Label>
+                    <div className="relative">
+                      <IconMail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
+                      <CustomInput
+                        id="admin-email"
+                        type="email"
+                        placeholder="Enter admin email"
+                        value={adminEmail}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAdminEmail(e.target.value)}
+                        autoComplete="username"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="admin-password" className="text-white text-left block font-sans">Password</Label>
+                    <div className="relative">
+                      <IconLock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
+                      <CustomInput
+                        id="admin-password"
+                        type={adminShowPassword ? "text" : "password"}
+                        placeholder="Enter admin password"
+                        value={adminPassword}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAdminPassword(e.target.value)}
+                        autoComplete="current-password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setAdminShowPassword(!adminShowPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white transition-colors"
+                      >
+                        {adminShowPassword ? (
+                          <IconEyeOff className="h-4 w-4" />
+                        ) : (
+                          <IconEye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end">
+                    <span
+                      className="text-sm text-white/70 hover:text-white transition-colors cursor-pointer"
+                    >
+                      Forgot Password?
+                    </span>
+                  </div>
+
+                  <div className="w-full flex justify-center mt-6">
+                    <NormalButton type="submit" onClick={handleAdminSubmit}>
+                      Sign In
+                    </NormalButton>
+                  </div>
+                </form>
               </div>
             </Content>
           }

@@ -18,22 +18,43 @@ export function AppProtection({ children }: AppProtectionProps) {
 
   useEffect(() => {
     // Skip protection for public routes
-    if (publicRoutes.includes(pathname)) {
+    if (publicRoutes.includes(pathname)) return
+    if (loading) return
+
+    // If no user, redirect to login
+    if (!user) {
+      router.push('/login')
       return
     }
 
-    // If not loading and no user, redirect to login
-    if (!loading && !user) {
+    const roleName = (user as any).roleName as string | undefined
+    const role = roleName?.toLowerCase()
+    const isAdminRoute = pathname.startsWith('/admin')
+    const isItRoute = pathname.startsWith('/it')
+
+    // Enforce strict separation: Admin cannot access IT, IT cannot access Admin
+    if (isAdminRoute && role !== 'admin') {
+      // Non-admin trying to access admin → send to IT dashboard by default
+      router.push('/it/dashboard')
+      return
+    }
+
+    if (isItRoute && role === 'admin') {
+      // Admin trying to access IT → send to Admin dashboard
+      router.push('/admin/dashboard')
+      return
+    }
+
+    // Optionally: if you want to require explicit IT role for /it
+    if (isItRoute && role !== 'it') {
       router.push('/login')
+      return
     }
   }, [user, loading, router, pathname])
 
   // For public routes, always render children
-  if (publicRoutes.includes(pathname)) {
-    return <>{children}</>
-  }
+  if (publicRoutes.includes(pathname)) return <>{children}</>
 
-  // For protected routes, render children immediately
-  // Authentication will be handled in the background
+  // Render protected content
   return <>{children}</>
 } 
