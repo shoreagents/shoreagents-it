@@ -300,13 +300,13 @@ export default function LoginPage() {
                       Forgot Password?
                     </span>
                   </div>
-
-                  <div className="w-full flex justify-center mt-6">
-                    <NormalButton type="submit" onClick={handleAdminSubmit}>
-                      Sign In
-                    </NormalButton>
-                  </div>
                 </form>
+                
+                <div className="w-full flex justify-center mt-6">
+                  <NormalButton type="submit" onClick={handleAdminSubmit}>
+                    Sign In
+                  </NormalButton>
+                </div>
               </div>
             </Content>
           }
