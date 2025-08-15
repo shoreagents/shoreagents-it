@@ -16,6 +16,9 @@ interface UseRealtimeTicketsOptions {
   onTicketUpdated?: (ticket: any, oldTicket?: any) => void
   onTicketDeleted?: (ticket: any) => void
   autoConnect?: boolean
+  // If set (e.g., 1 for IT board), role transitions will be treated specially (create/delete when entering/leaving scope)
+  // If null/undefined, updates won't be converted into create/delete on role changes
+  roleFilter?: number | null
 }
 
 // Singleton WebSocket connection
@@ -103,7 +106,8 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
     onTicketCreated,
     onTicketUpdated,
     onTicketDeleted,
-    autoConnect = true
+    autoConnect = true,
+    roleFilter = 1,
   } = options
 
   const [isConnected, setIsConnected] = useState(globalConnectionState.isConnected)
@@ -129,44 +133,26 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
               return res.json()
             })
             .then(completeTicket => {
-              console.log('Refetched ticket data:', completeTicket)
-              console.log('Profile data check:', {
-                profile_picture: completeTicket?.profile_picture,
-                first_name: completeTicket?.first_name,
-                last_name: completeTicket?.last_name,
-                user_id: completeTicket?.user_id,
-                role_id: completeTicket?.role_id,
-                employee_id: completeTicket?.employee_id
-              })
-              
-              // Check if ticket is now IT role (role_id = 1)
-              if (completeTicket && completeTicket.role_id === 1) {
-                // Ensure we have the complete data with profile info and IT role
-                if (completeTicket.profile_picture || completeTicket.first_name || completeTicket.last_name) {
-                  console.log('✅ Using complete ticket data with profile info and IT role')
-                  
-                  // Check if this is a new IT ticket (role_id changed from non-IT to IT)
-                  const oldRoleId = old_record?.role_id
-                  if (oldRoleId !== 1) {
-                    console.log('🆕 Ticket became IT role, adding to UI')
-                    onTicketCreated?.(completeTicket)
-                  } else {
-                    console.log('🔄 Ticket updated (still IT role)')
-                    onTicketUpdated?.(completeTicket, old_record)
-                  }
+              // If no role filter specified (e.g., Admin board), treat as a plain update
+              if (roleFilter == null) {
+                onTicketUpdated?.(completeTicket || record, old_record)
+                return
+              }
+
+              // Role-scoped behavior (default IT): add/remove when crossing role boundary
+              if (completeTicket && completeTicket.role_id === roleFilter) {
+                const oldRoleId = old_record?.role_id
+                if (oldRoleId !== roleFilter) {
+                  onTicketCreated?.(completeTicket)
                 } else {
-                  console.warn('❌ Refetched ticket missing profile data, using original data')
-                  onTicketUpdated?.(record, old_record)
+                  onTicketUpdated?.(completeTicket, old_record)
                 }
               } else {
-                // Ticket is no longer IT role, should be removed from UI
-                console.log('❌ Ticket is no longer IT role (role_id != 1), removing from UI')
                 onTicketDeleted?.(record)
               }
             })
             .catch(error => {
               console.error('Error refetching ticket data:', error)
-              // Fallback to using the partial data
               onTicketUpdated?.(record, old_record)
             })
           break
@@ -175,7 +161,7 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
           break
       }
     }
-  }, [onTicketCreated, onTicketUpdated, onTicketDeleted])
+  }, [onTicketCreated, onTicketUpdated, onTicketDeleted, roleFilter])
 
   // Register callback
   useEffect(() => {

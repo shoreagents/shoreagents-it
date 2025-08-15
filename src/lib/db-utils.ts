@@ -7,6 +7,34 @@ export interface TicketCategory {
   name: string
 }
 
+export interface Role {
+  id: number
+  name: string
+  description: string | null
+}
+
+export interface AgentRecord {
+  user_id: number
+  email: string
+  user_type: string
+  first_name: string | null
+  last_name: string | null
+  profile_picture: string | null
+  phone: string | null
+  employee_id: string | null
+  job_title: string | null
+  work_email: string | null
+  start_date: string | null
+  exit_date: string | null
+  exp_points: number
+  member_id: number | null
+  member_company: string | null
+  member_badge_color: string | null
+  department_id: number | null
+  department_name: string | null
+  station_id: string | null
+}
+
 export interface Ticket {
   id: number
   ticket_id: string
@@ -67,14 +95,14 @@ export async function getAllTickets(): Promise<Ticket[]> {
     LEFT JOIN public.agents a ON t.user_id = a.user_id
     LEFT JOIN public.clients c ON t.user_id = c.user_id
     LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
-    WHERE t.role_id = 1 AND t.status != 'For Approval'
+    WHERE t.role_id = 1 AND t.status != 'For Approval' AND (t.status != 'Closed' OR t.resolved_at >= NOW() - INTERVAL '7 days')
     ORDER BY t.status, t.position ASC, t.created_at DESC
   `)
   return result.rows
 }
 
-// Get tickets by status (filtered by IT role, excluding For Approval)
-export async function getTicketsByStatus(status: string, past: boolean = false): Promise<Ticket[]> {
+// Get all tickets for Admin (no role filter, includes 'For Approval')
+export async function getAllTicketsAdmin(): Promise<Ticket[]> {
   const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
@@ -104,10 +132,136 @@ export async function getTicketsByStatus(status: string, past: boolean = false):
     LEFT JOIN public.agents a ON t.user_id = a.user_id
     LEFT JOIN public.clients c ON t.user_id = c.user_id
     LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
-    WHERE t.status = $1 AND t.role_id = 1 AND t.status != 'For Approval'
-    ORDER BY t.position ASC, t.created_at DESC
-  `, [status])
+    WHERE (t.status != 'Closed' OR t.resolved_at >= NOW() - INTERVAL '7 days')
+    ORDER BY t.status, t.position ASC, t.created_at DESC
+  `)
   return result.rows
+}
+
+// Get tickets by status (filtered by IT role, excluding For Approval)
+export async function getTicketsByStatus(status: string, past: boolean = false): Promise<Ticket[]> {
+  let whereConditions = ['t.status = $1', 't.role_id = 1', 't.status != \'For Approval\'']
+  let queryParams = [status]
+  let paramIndex = 2
+  
+  // Add 7-day filter for closed/completed tickets based on resolved_at
+  if (status === 'Closed' || status === 'Completed') {
+    whereConditions.push(`t.resolved_at >= NOW() - INTERVAL '7 days'`)
+  }
+  
+  const whereClause = whereConditions.join(' AND ')
+  
+  const result = await pool.query(`
+    SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
+           t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
+           ji.employee_id,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           u.user_type,
+           t.supporting_files, t.file_count,
+           CASE 
+             WHEN u.user_type = 'Internal' THEN 'Internal'
+             WHEN a.member_id IS NOT NULL THEN m.company
+             WHEN c.member_id IS NOT NULL THEN m.company
+             ELSE NULL
+           END as member_name,
+           CASE 
+             WHEN u.user_type = 'Internal' THEN NULL
+             WHEN a.member_id IS NOT NULL THEN m.badge_color
+             WHEN c.member_id IS NOT NULL THEN m.badge_color
+             ELSE NULL
+           END as member_color
+    FROM public.tickets t
+    LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+    LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
+    LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
+    LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
+    LEFT JOIN public.users u ON t.user_id = u.id
+    LEFT JOIN public.agents a ON t.user_id = a.user_id
+    LEFT JOIN public.clients c ON t.user_id = c.user_id
+    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+    WHERE ${whereClause}
+    ORDER BY t.position ASC, t.created_at DESC
+  `, queryParams)
+  return result.rows
+}
+
+// Get tickets by status for Admin (no role filter, includes 'For Approval')
+export async function getTicketsByStatusAdmin(status: string): Promise<Ticket[]> {
+  let whereConditions = ['t.status = $1']
+  let queryParams = [status]
+  
+  // Add 7-day filter for closed/completed tickets based on resolved_at
+  if (status === 'Closed' || status === 'Completed') {
+    whereConditions.push(`t.resolved_at >= NOW() - INTERVAL '7 days'`)
+  }
+  
+  const whereClause = whereConditions.join(' AND ')
+  
+  const result = await pool.query(`
+    SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
+           t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
+           ji.employee_id,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           u.user_type,
+           t.supporting_files, t.file_count,
+           CASE 
+             WHEN u.user_type = 'Internal' THEN 'Internal'
+             WHEN a.member_id IS NOT NULL THEN m.company
+             WHEN c.member_id IS NOT NULL THEN m.company
+             ELSE NULL
+           END as member_name,
+           CASE 
+             WHEN u.user_type = 'Internal' THEN NULL
+             WHEN a.member_id IS NOT NULL THEN m.badge_color
+             WHEN c.member_id IS NOT NULL THEN m.badge_color
+             ELSE NULL
+           END as member_color
+    FROM public.tickets t
+    LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+    LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
+    LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
+    LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
+    LEFT JOIN public.users u ON t.user_id = u.id
+    LEFT JOIN public.agents a ON t.user_id = a.user_id
+    LEFT JOIN public.clients c ON t.user_id = c.user_id
+    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+    WHERE ${whereClause}
+    ORDER BY t.position ASC, t.created_at DESC
+  `, queryParams)
+  return result.rows
+}
+
+// Roles
+export async function getAllRoles(): Promise<Role[]> {
+  const result = await pool.query(`
+    SELECT id, name, description
+    FROM public.roles
+    ORDER BY name
+  `)
+  return result.rows
+}
+
+export async function ensureInternalUser(userId: number): Promise<void> {
+  await pool.query(
+    `INSERT INTO public.internal (user_id)
+     VALUES ($1)
+     ON CONFLICT (user_id) DO NOTHING`,
+    [userId]
+  )
+}
+
+export async function assignRoleToInternalUser(userId: number, roleId: number): Promise<void> {
+  // Ensure internal record exists
+  await ensureInternalUser(userId)
+  // Assign role (idempotent)
+  await pool.query(
+    `INSERT INTO public.internal_roles (internal_user_id, role_id)
+     VALUES ($1, $2)
+     ON CONFLICT (internal_user_id, role_id) DO NOTHING`,
+    [userId, roleId]
+  )
 }
 
 // Create new ticket
@@ -187,13 +341,30 @@ export async function getTicketById(id: number): Promise<Ticket | null> {
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
            resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
-           t.supporting_files, t.file_count
+           t.supporting_files, t.file_count,
+           u.user_type,
+           CASE 
+             WHEN u.user_type = 'Internal' THEN 'Internal'
+             WHEN a.member_id IS NOT NULL THEN m.company
+             WHEN c.member_id IS NOT NULL THEN m.company
+             ELSE NULL
+           END as member_name,
+           CASE 
+             WHEN u.user_type = 'Internal' THEN NULL
+             WHEN a.member_id IS NOT NULL THEN m.badge_color
+             WHEN c.member_id IS NOT NULL THEN m.badge_color
+             ELSE NULL
+           END as member_color
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
     LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
     LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
     LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
+    LEFT JOIN public.users u ON t.user_id = u.id
+    LEFT JOIN public.agents a ON t.user_id = a.user_id
+    LEFT JOIN public.clients c ON t.user_id = c.user_id
+    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
     WHERE t.id = $1 AND t.role_id = 1
   `, [id])
   return result.rows[0] || null
@@ -231,7 +402,7 @@ export async function searchTickets(searchTerm: string): Promise<Ticket[]> {
     LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
     LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
     LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
-    WHERE (t.concern ILIKE $1 OR t.details ILIKE $1 OR t.ticket_id ILIKE $1) AND t.role_id = 1 AND t.status != 'For Approval'
+    WHERE (t.concern ILIKE $1 OR t.details ILIKE $1 OR t.ticket_id ILIKE $1) AND t.role_id = 1 AND t.status != 'For Approval' AND (t.status != 'Closed' OR t.resolved_at >= NOW() - INTERVAL '7 days')
     ORDER BY t.created_at DESC
   `, [`%${searchTerm}%`])
   return result.rows
@@ -259,7 +430,7 @@ export async function getTicketsByUser(userId: number): Promise<Ticket[]> {
     LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
     LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
     LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
-    WHERE t.user_id = $1 AND t.role_id = 1 AND t.status != 'For Approval'
+    WHERE t.user_id = $1 AND t.role_id = 1 AND t.status != 'For Approval' AND (t.status != 'Closed' OR t.resolved_at >= NOW() - INTERVAL '7 days')
     ORDER BY t.created_at DESC
   `, [userId])
   return result.rows
@@ -388,13 +559,27 @@ export async function deleteTicketCategory(id: number): Promise<void> {
 }
 
 // Get count of tickets resolved by a specific user
-export async function getTicketsResolvedByUserCount(userId: number, status: string = 'Closed'): Promise<number> {
-  const result = await pool.query(`
-    SELECT COUNT(*) as total
-    FROM public.tickets t
-    WHERE t.status = $1 AND t.role_id = 1 AND t.status != 'For Approval'
-      AND t.resolved_by = $2
-  `, [status, userId])
+export async function getTicketsResolvedByUserCount(userId: number, status: string = 'Closed', isAdmin: boolean = false, past: boolean = false): Promise<number> {
+  const whereParts: string[] = [
+    't.status = $1',
+    "t.status != 'For Approval'",
+    't.resolved_by = $2'
+  ]
+  
+  // Add 7-day filter for closed/completed tickets based on resolved_at
+  // BUT only when NOT fetching past tickets (past=false)
+  if ((status === 'Closed' || status === 'Completed') && !past) {
+    whereParts.push(`t.resolved_at >= NOW() - INTERVAL '7 days'`)
+  }
+  
+  if (!isAdmin) {
+    whereParts.push('t.role_id = 1')
+  }
+  const whereClause = whereParts.join(' AND ')
+  const result = await pool.query(
+    `SELECT COUNT(*) as total FROM public.tickets t WHERE ${whereClause}`,
+    [status, userId]
+  )
   
   return parseInt(result.rows[0]?.total || '0')
 }
@@ -424,11 +609,15 @@ export async function getTicketsByStatusWithPagination(
   sortField: string = 'resolved_at', 
   sortDirection: string = 'desc', 
   categoryId: string = '',
-  userId: string = ''
+  userId: string = '',
+  isAdmin: boolean = false
 ): Promise<{ tickets: Ticket[], totalCount: number }> {
   const offset = (page - 1) * limit
   
-  let whereConditions = ['t.role_id = 1']
+  let whereConditions: string[] = []
+  if (!isAdmin) {
+    whereConditions.push('t.role_id = 1')
+  }
   let queryParams: any[] = []
   let paramIndex = 1
   
@@ -437,6 +626,12 @@ export async function getTicketsByStatusWithPagination(
     whereConditions.push('t.status = $1')
     queryParams.push(status)
     paramIndex = 2
+    
+    // Add 7-day filter for closed/completed tickets based on resolved_at
+    // BUT only when NOT fetching past tickets (past=false)
+    if ((status === 'Closed' || status === 'Completed') && !past) {
+      whereConditions.push(`t.resolved_at >= NOW() - INTERVAL '7 days'`)
+    }
   }
   
   if (search) {
@@ -532,4 +727,544 @@ export async function getTicketsByStatusWithPagination(
     tickets: dataResult.rows,
     totalCount
   }
+}
+
+// Get all agents with joined profile/job/member/department/station info
+export async function getAllAgents(): Promise<AgentRecord[]> {
+  const result = await pool.query(
+    `SELECT 
+        u.id AS user_id,
+        u.email,
+        u.user_type,
+        pi.first_name,
+        pi.last_name,
+        pi.profile_picture,
+        pi.phone,
+        ji.employee_id,
+        ji.job_title,
+        ji.work_email,
+        ji.start_date,
+        ji.exit_date,
+        a.exp_points,
+        m.id AS member_id,
+        m.company AS member_company,
+        m.badge_color AS member_badge_color,
+        d.id AS department_id,
+        d.name AS department_name,
+        s.station_id
+     FROM public.users u
+     INNER JOIN public.agents a ON u.id = a.user_id
+     LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+     LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
+     LEFT JOIN public.members m ON a.member_id = m.id
+     LEFT JOIN public.departments d ON a.department_id = d.id
+     LEFT JOIN public.stations s ON u.id = s.assigned_user_id
+     WHERE u.user_type = 'Agent'
+     ORDER BY COALESCE(pi.first_name, '') ASC, COALESCE(pi.last_name, '') ASC`
+  )
+  return result.rows
+}
+
+// Get agents with pagination and optional search
+export async function getAgentsPaginated({
+  search = "",
+  page = 1,
+  limit = 40,
+  member,
+  memberId,
+  sortField = 'first_name',
+  sortDirection = 'asc',
+}: {
+  search?: string
+  page?: number
+  limit?: number
+  member?: 'with' | 'without'
+  memberId?: number | 'none'
+  sortField?: string
+  sortDirection?: 'asc' | 'desc'
+}): Promise<{ agents: AgentRecord[]; totalCount: number }> {
+  const offset = (Math.max(1, page) - 1) * Math.max(1, limit)
+
+  const params: any[] = []
+  let paramIndex = 1
+
+  const whereParts: string[] = ["u.user_type = 'Agent'"]
+
+  if (search && search.trim()) {
+    const term = `%${search.trim()}%`
+    params.push(term)
+    const t = `$${paramIndex++}`
+    whereParts.push(
+      `(
+        COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
+        OR u.email ILIKE ${t}
+        OR COALESCE(ji.employee_id,'') ILIKE ${t}
+        OR COALESCE(ji.job_title,'') ILIKE ${t}
+        OR COALESCE(m.company,'') ILIKE ${t}
+        OR COALESCE(d.name,'') ILIKE ${t}
+        OR COALESCE(s.station_id,'') ILIKE ${t}
+      )`
+    )
+  }
+
+  if (memberId === 'none') {
+    whereParts.push('a.member_id IS NULL')
+  } else if (typeof memberId === 'number' && !Number.isNaN(memberId)) {
+    params.push(memberId)
+    const t = `$${paramIndex++}`
+    whereParts.push(`a.member_id = ${t}`)
+  } else {
+    if (member === 'with') {
+      whereParts.push('a.member_id IS NOT NULL')
+    } else if (member === 'without') {
+      whereParts.push('a.member_id IS NULL')
+    }
+  }
+
+  const whereClause = whereParts.join(' AND ')
+
+  const getSortField = (field: string): string => {
+    switch (field) {
+      case 'first_name':
+        return 'COALESCE(pi.first_name, \'\') ASC, COALESCE(pi.last_name, \'\')'
+      case 'job_title':
+        return 'COALESCE(ji.job_title, \'\')'
+      case 'member_company':
+        return 'COALESCE(m.company, \'\')'
+      case 'work_email':
+        return 'COALESCE(ji.work_email, u.email, \'\')'
+      default:
+        return 'COALESCE(pi.first_name, \'\') ASC, COALESCE(pi.last_name, \'\')'
+    }
+  }
+
+  // Count query
+  const countQuery = `
+    SELECT COUNT(*) AS count
+    FROM public.users u
+    INNER JOIN public.agents a ON u.id = a.user_id
+    LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+    LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
+    LEFT JOIN public.members m ON a.member_id = m.id
+    LEFT JOIN public.departments d ON a.department_id = d.id
+    LEFT JOIN public.stations s ON u.id = s.assigned_user_id
+    WHERE ${whereClause}
+  `
+  const countResult = await pool.query(countQuery, params)
+  const totalCount = parseInt(countResult.rows?.[0]?.count || '0', 10)
+
+  // Data query
+  const dataQuery = `
+    SELECT 
+        u.id AS user_id,
+        u.email,
+        u.user_type,
+        pi.first_name,
+        pi.last_name,
+        pi.profile_picture,
+        pi.phone,
+        ji.employee_id,
+        ji.job_title,
+        ji.work_email,
+        ji.start_date,
+        ji.exit_date,
+        a.exp_points,
+        m.id AS member_id,
+        m.company AS member_company,
+        m.badge_color AS member_badge_color,
+        d.id AS department_id,
+        d.name AS department_name,
+        s.station_id
+     FROM public.users u
+     INNER JOIN public.agents a ON u.id = a.user_id
+     LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+     LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
+     LEFT JOIN public.members m ON a.member_id = m.id
+     LEFT JOIN public.departments d ON a.department_id = d.id
+     LEFT JOIN public.stations s ON u.id = s.assigned_user_id
+     WHERE ${whereClause}
+     ORDER BY ${getSortField(sortField)} ${sortDirection.toUpperCase()}
+     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `
+  const dataParams = [...params, Math.max(1, limit), offset]
+  const dataResult = await pool.query(dataQuery, dataParams)
+
+  return { agents: dataResult.rows, totalCount }
+}
+
+export async function getAgentMembers(): Promise<{ id: number; company: string }[]> {
+  const query = `
+    SELECT DISTINCT m.id, m.company
+    FROM public.members m
+    INNER JOIN public.agents a ON a.member_id = m.id
+    WHERE m.company IS NOT NULL AND m.company <> ''
+    ORDER BY m.company ASC
+  `
+  const result = await pool.query(query)
+  return result.rows
+}
+
+// Get clients with pagination and optional search
+export async function getClientsPaginated({
+  search = "",
+  page = 1,
+  limit = 40,
+  member,
+  memberId,
+  sortField = 'first_name',
+  sortDirection = 'asc',
+}: {
+  search?: string
+  page?: number
+  limit?: number
+  member?: 'with' | 'without'
+  memberId?: number | 'none'
+  sortField?: string
+  sortDirection?: 'asc' | 'desc'
+}): Promise<{ agents: AgentRecord[]; totalCount: number }> {
+  const offset = (Math.max(1, page) - 1) * Math.max(1, limit)
+
+  const params: any[] = []
+  let paramIndex = 1
+
+  const whereParts: string[] = ["u.user_type = 'Client'"]
+
+  if (search && search.trim()) {
+    const term = `%${search.trim()}%`
+    params.push(term)
+    const t = `$${paramIndex++}`
+    whereParts.push(
+      `(
+        COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
+        OR u.email ILIKE ${t}
+        OR COALESCE(m.company,'') ILIKE ${t}
+        OR COALESCE(s.station_id,'') ILIKE ${t}
+      )`
+    )
+  }
+
+  if (memberId === 'none') {
+    whereParts.push('c.member_id IS NULL')
+  } else if (typeof memberId === 'number' && !Number.isNaN(memberId)) {
+    params.push(memberId)
+    const t = `$${paramIndex++}`
+    whereParts.push(`c.member_id = ${t}`)
+  } else {
+    if (member === 'with') {
+      whereParts.push('c.member_id IS NOT NULL')
+    } else if (member === 'without') {
+      whereParts.push('c.member_id IS NULL')
+    }
+  }
+
+  const whereClause = whereParts.join(' AND ')
+
+  const getSortField = (field: string): string => {
+    switch (field) {
+      case 'first_name':
+        return "COALESCE(pi.first_name, '') ASC, COALESCE(pi.last_name, '')"
+      case 'job_title':
+        return "COALESCE(ji.job_title, '')"
+      case 'member_company':
+        return "COALESCE(m.company, '')"
+      case 'work_email':
+        return "COALESCE(ji.work_email, u.email, '')"
+      default:
+        return "COALESCE(pi.first_name, '') ASC, COALESCE(pi.last_name, '')"
+    }
+  }
+
+  const countQuery = `
+    SELECT COUNT(*) AS count
+    FROM public.users u
+    INNER JOIN public.clients c ON u.id = c.user_id
+    LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+    LEFT JOIN public.members m ON c.member_id = m.id
+    LEFT JOIN public.stations s ON u.id = s.assigned_user_id
+    LEFT JOIN public.job_info ji ON c.user_id = ji.agent_user_id -- may be null for clients
+    WHERE ${whereClause}
+  `
+  const countResult = await pool.query(countQuery, params)
+  const totalCount = parseInt(countResult.rows?.[0]?.count || '0', 10)
+
+  const dataQuery = `
+    SELECT 
+        u.id AS user_id,
+        u.email,
+        u.user_type,
+        pi.first_name,
+        pi.last_name,
+        pi.profile_picture,
+        pi.phone,
+        ji.employee_id,
+        ji.job_title,
+        ji.work_email,
+        NULL::date AS start_date,
+        NULL::date AS exit_date,
+        NULL::int AS exp_points,
+        m.id AS member_id,
+        m.company AS member_company,
+        m.badge_color AS member_badge_color,
+        NULL::int AS department_id,
+        NULL::text AS department_name,
+        s.station_id
+     FROM public.users u
+     INNER JOIN public.clients c ON u.id = c.user_id
+     LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+     LEFT JOIN public.members m ON c.member_id = m.id
+     LEFT JOIN public.stations s ON u.id = s.assigned_user_id
+     LEFT JOIN public.job_info ji ON c.user_id = ji.agent_user_id -- may be null for clients
+     WHERE ${whereClause}
+     ORDER BY ${getSortField(sortField)} ${sortDirection.toUpperCase()}
+     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `
+  const dataParams = [...params, Math.max(1, limit), offset]
+  const dataResult = await pool.query(dataQuery, dataParams)
+
+  return { agents: dataResult.rows, totalCount }
+}
+
+export async function getClientMembers(): Promise<{ id: number; company: string }[]> {
+  const query = `
+    SELECT DISTINCT m.id, m.company
+    FROM public.members m
+    INNER JOIN public.clients c ON c.member_id = m.id
+    WHERE m.company IS NOT NULL AND m.company <> ''
+    ORDER BY m.company ASC
+  `
+  const result = await pool.query(query)
+  return result.rows
+}
+
+// Members (Companies) pagination
+export async function getMembersPaginated({
+  search = "",
+  page = 1,
+  limit = 40,
+  sortField = 'company',
+  sortDirection = 'asc',
+}: {
+  search?: string
+  page?: number
+  limit?: number
+  sortField?: string
+  sortDirection?: 'asc' | 'desc'
+}): Promise<{ members: any[]; totalCount: number }> {
+  const offset = (Math.max(1, page) - 1) * Math.max(1, limit)
+
+  const params: any[] = []
+  let paramIndex = 1
+
+  const whereParts: string[] = ["COALESCE(m.status::text, '') <> 'Lost Client'"]
+  if (search && search.trim()) {
+    const term = `%${search.trim()}%`
+    params.push(term)
+    const t = `$${paramIndex++}`
+    whereParts.push(
+      `(
+        m.company ILIKE ${t} OR
+        COALESCE(m.service,'') ILIKE ${t} OR
+        COALESCE(m.country,'') ILIKE ${t} OR
+        COALESCE(m.phone,'') ILIKE ${t}
+      )`
+    )
+  }
+  const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : ''
+
+  const mapSort = (field: string): string => {
+    switch (field) {
+      case 'company':
+        return 'm.company'
+      case 'service':
+        return 'm.service'
+      case 'status':
+        return 'm.status'
+      case 'country':
+        return 'm.country'
+      case 'created_at':
+        return 'm.created_at'
+      default:
+        return 'm.company'
+    }
+  }
+
+  const countQuery = `
+    SELECT COUNT(*) AS count
+    FROM public.members m
+    ${whereClause}
+  `
+  const countResult = await pool.query(countQuery, params)
+  const totalCount = parseInt(countResult.rows?.[0]?.count || '0', 10)
+
+  const dataQuery = `
+    SELECT 
+      m.id,
+      m.company,
+      m.address,
+      m.phone,
+      m.logo,
+      m.service,
+      m.status,
+      m.badge_color,
+      m.country,
+      m.website,
+      m.company_id,
+      m.created_at,
+      m.updated_at,
+      COALESCE(ag.agent_count, 0)::int AS employee_count,
+      COALESCE(cl.client_count, 0)::int AS client_count
+    FROM public.members m
+    LEFT JOIN (
+      SELECT a.member_id, COUNT(*) AS agent_count
+      FROM public.agents a
+      WHERE a.member_id IS NOT NULL
+      GROUP BY a.member_id
+    ) ag ON ag.member_id = m.id
+    LEFT JOIN (
+      SELECT c.member_id, COUNT(*) AS client_count
+      FROM public.clients c
+      WHERE c.member_id IS NOT NULL
+      GROUP BY c.member_id
+    ) cl ON cl.member_id = m.id
+    ${whereClause}
+    ORDER BY ${mapSort(sortField)} ${sortDirection.toUpperCase()}
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `
+  const dataParams = [...params, Math.max(1, limit), offset]
+  const dataResult = await pool.query(dataQuery, dataParams)
+
+  return { members: dataResult.rows, totalCount }
+}
+// Get internal users with pagination and optional search (mirrors agents but for user_type = 'Internal')
+export async function getInternalPaginated({
+  search = "",
+  page = 1,
+  limit = 40,
+  sortField = 'first_name',
+  sortDirection = 'asc',
+}: {
+  search?: string
+  page?: number
+  limit?: number
+  sortField?: string
+  sortDirection?: 'asc' | 'desc'
+}): Promise<{ agents: AgentRecord[]; totalCount: number }> {
+  const offset = (Math.max(1, page) - 1) * Math.max(1, limit)
+
+  const params: any[] = []
+  let paramIndex = 1
+
+  const whereParts: string[] = ["u.user_type = 'Internal'"]
+
+  if (search && search.trim()) {
+    const term = `%${search.trim()}%`
+    params.push(term)
+    const t = `$${paramIndex++}`
+    whereParts.push(
+      `(
+        COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
+        OR u.email ILIKE ${t}
+        OR COALESCE(ji.employee_id,'') ILIKE ${t}
+        OR COALESCE(ji.job_title,'') ILIKE ${t}
+      )`
+    )
+  }
+
+  const whereClause = whereParts.join(' AND ')
+
+  const getSortField = (field: string): string => {
+    switch (field) {
+      case 'first_name':
+        return "COALESCE(pi.first_name, '') ASC, COALESCE(pi.last_name, '')"
+      case 'job_title':
+        return "COALESCE(ji.job_title, '')"
+      case 'work_email':
+        return "COALESCE(ji.work_email, u.email, '')"
+      default:
+        return "COALESCE(pi.first_name, '') ASC, COALESCE(pi.last_name, '')"
+    }
+  }
+
+  // Count query
+  const countQuery = `
+    SELECT COUNT(*) AS count
+    FROM public.users u
+    INNER JOIN public.internal i ON u.id = i.user_id
+    LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+    LEFT JOIN public.job_info ji ON i.user_id = ji.internal_user_id
+    LEFT JOIN public.stations s ON u.id = s.assigned_user_id
+    WHERE ${whereClause}
+  `
+  const countResult = await pool.query(countQuery, params)
+  const totalCount = parseInt(countResult.rows?.[0]?.count || '0', 10)
+
+  // Data query
+  const dataQuery = `
+    SELECT 
+        u.id AS user_id,
+        u.email,
+        u.user_type,
+        pi.first_name,
+        pi.last_name,
+        pi.profile_picture,
+        pi.phone,
+        ji.employee_id,
+        ji.job_title,
+        ji.work_email,
+        ji.start_date,
+        ji.exit_date,
+        NULL::int AS member_id,
+        NULL::text AS member_company,
+        NULL::text AS member_badge_color,
+        s.station_id
+     FROM public.users u
+     INNER JOIN public.internal i ON u.id = i.user_id
+     LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+     LEFT JOIN public.job_info ji ON i.user_id = ji.internal_user_id
+     LEFT JOIN public.stations s ON u.id = s.assigned_user_id
+     WHERE ${whereClause}
+     ORDER BY ${getSortField(sortField)} ${sortDirection.toUpperCase()}
+     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `
+  const dataParams = [...params, Math.max(1, limit), offset]
+  const dataResult = await pool.query(dataQuery, dataParams)
+
+  return { agents: dataResult.rows, totalCount }
+}
+
+// Fetch agents assigned to a specific member (for avatar popovers)
+export async function getAgentsByMember(memberId: number): Promise<{ user_id: number; first_name: string | null; last_name: string | null; profile_picture: string | null; employee_id: string | null }[]> {
+  const query = `
+    SELECT 
+      a.user_id,
+      pi.first_name,
+      pi.last_name,
+      pi.profile_picture,
+      ji.employee_id
+    FROM public.agents a
+    LEFT JOIN public.personal_info pi ON pi.user_id = a.user_id
+    LEFT JOIN public.job_info ji ON ji.agent_user_id = a.user_id
+    WHERE a.member_id = $1
+    ORDER BY COALESCE(pi.first_name, ''), COALESCE(pi.last_name, '')
+  `
+  const result = await pool.query(query, [memberId])
+  return result.rows
+}
+
+// Fetch clients for a specific member (for avatar popovers)
+export async function getClientsByMember(memberId: number): Promise<{ user_id: number; first_name: string | null; last_name: string | null; profile_picture: string | null; employee_id: string | null }[]> {
+  const query = `
+    SELECT 
+      c.user_id,
+      pi.first_name,
+      pi.last_name,
+      pi.profile_picture,
+      NULL::text AS employee_id
+    FROM public.clients c
+    LEFT JOIN public.personal_info pi ON pi.user_id = c.user_id
+    WHERE c.member_id = $1
+    ORDER BY COALESCE(pi.first_name, ''), COALESCE(pi.last_name, '')
+  `
+  const result = await pool.query(query, [memberId])
+  return result.rows
 }

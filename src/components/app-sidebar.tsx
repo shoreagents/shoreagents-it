@@ -6,11 +6,18 @@ import { useRef } from "react"
 import {
   LayoutDashboardIcon,
   SettingsIcon,
+  UsersIcon,
+  UserCircleIcon,
+  Building2Icon,
+  HandshakeIcon,
+  UserPlusIcon,
+  StarIcon,
 } from "lucide-react"
 import { ScanTextIcon } from "@/components/icons/scan-text-icon"
 import { HistoryIcon } from "@/components/ui/history"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
+import { Skeleton } from "@/components/ui/skeleton"
 
 import { NavMain } from "@/components/nav/nav-main"
 import { NavSecondary } from "@/components/nav/nav-secondary"
@@ -28,7 +35,7 @@ import {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
 
   const role = (user as any)?.roleName?.toLowerCase() || "it"
   const isAdmin = role === "admin"
@@ -50,7 +57,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       ]
 
   const navSupport = isAdmin
-    ? []
+    ? [
+        {
+          title: "Tickets",
+          url: "/admin/tickets",
+          icon: ScanTextIcon,
+        },
+        {
+          title: "Records",
+          url: "/admin/past-tickets",
+          icon: HistoryIcon,
+        },
+      ]
     : [
         {
           title: "Tickets",
@@ -71,6 +89,45 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       icon: SettingsIcon,
     },
   ]
+
+  // Loading skeleton to avoid role flicker
+  if (loading) {
+    return (
+      <Sidebar collapsible="icon" {...props}>
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <div className="data-[slot=sidebar-menu-button]:!p-1.5 flex items-center group-data-[collapsible=icon]:justify-center">
+                <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
+                  <span className="text-base font-semibold">ShoreAgents</span>
+                  <Badge className="text-xs px-1.5 py-0.5 bg-teal-100 text-teal-800 border-teal-200 shadow-none">&nbsp;</Badge>
+                </div>
+                <div className="hidden group-data-[collapsible=icon]:block">
+                  <Badge className="text-xs px-1.5 py-0.5 bg-teal-100 text-teal-800 border-teal-200 shadow-none">&nbsp;</Badge>
+                </div>
+              </div>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+        <SidebarContent className="group-data-[collapsible=icon]:mt-8">
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel>MAIN</SidebarGroupLabel>
+            <div className="flex flex-col gap-2 px-2 py-2">
+              <Skeleton className="h-8 w-full rounded-lg" />
+              <Skeleton className="h-8 w-4/5 rounded-lg" />
+            </div>
+          </SidebarGroup>
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel>SUPPORT</SidebarGroupLabel>
+            <div className="flex flex-col gap-2 px-2 py-2">
+              <Skeleton className="h-8 w-full rounded-lg" />
+              <Skeleton className="h-8 w-3/5 rounded-lg" />
+            </div>
+          </SidebarGroup>
+        </SidebarContent>
+      </Sidebar>
+    )
+  }
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -102,6 +159,39 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroup className="p-0">
             <SidebarGroupLabel>SUPPORT</SidebarGroupLabel>
             <NavMain items={navSupport as any} />
+          </SidebarGroup>
+        )}
+        {isAdmin && (
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel>EMPLOYEES</SidebarGroupLabel>
+            <NavMain
+              items={[
+                { title: "Agents", url: "/admin/agents", icon: UsersIcon },
+                { title: "Internal", url: "/admin/internal", icon: UserCircleIcon },
+              ] as any}
+            />
+          </SidebarGroup>
+        )}
+        {isAdmin && (
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel>MEMBERS</SidebarGroupLabel>
+            <NavMain
+              items={[
+                { title: "Companies", url: "/admin/company", icon: Building2Icon },
+                { title: "Clients", url: "/admin/clients", icon: HandshakeIcon },
+              ] as any}
+            />
+          </SidebarGroup>
+        )}
+        {isAdmin && (
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel>RECRUITMENT</SidebarGroupLabel>
+            <NavMain
+              items={[
+                { title: "Applicants", url: "/admin/applicants", icon: UserPlusIcon },
+                { title: "Talent Pool", url: "/admin/talent-pool", icon: StarIcon },
+              ] as any}
+            />
           </SidebarGroup>
         )}
         <NavSecondary items={navSecondary as any} className="mt-auto" />

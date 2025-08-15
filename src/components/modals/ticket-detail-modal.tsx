@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { getStorageUrl } from "@/lib/supabase"
 import { useTheme } from "next-themes"
+import { useAuth } from "@/contexts/auth-context"
 
 interface TicketDetailModalProps {
   ticket: Ticket | null
@@ -145,7 +146,7 @@ const formatDate = (dateString: string) => {
   return {
     date: date.toLocaleDateString('en-US', { 
       year: 'numeric',
-      month: 'long', 
+      month: 'short', 
       day: 'numeric',
       timeZone: 'Asia/Manila'
     }),
@@ -167,8 +168,10 @@ const formatDate = (dateString: string) => {
   }
 }
 
-const getDisplayStatus = (status: string) => {
-  if (status === 'Approved') return 'New'
+const getDisplayStatus = (status: string, isAdmin?: boolean) => {
+  // For IT, display "New" for DB status "Approved".
+  // For Admin, display the actual DB status "Approved".
+  if (status === 'Approved') return isAdmin ? 'Approved' : 'New'
   return status
 }
 
@@ -180,16 +183,25 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
   const [comments, setComments] = React.useState<any[]>([])
   const [isLoadingComments, setIsLoadingComments] = React.useState(false)
   const [isSubmittingComment, setIsSubmittingComment] = React.useState(false)
+  const { user } = useAuth()
+  const isAdmin = ((user as any)?.roleName || '').toLowerCase() === 'admin'
 
   // Define status options based on application usage
-  const getStatusOptions = (): StatusOption[] => [
-    { value: 'New', label: 'New', icon: 'blue', color: 'blue' },
-    { value: 'In Progress', label: 'In Progress', icon: 'orange', color: 'orange' },
-    { value: 'Stuck', label: 'Stuck', icon: 'red', color: 'red' },
-    { value: 'Actioned', label: 'Actioned', icon: 'purple', color: 'purple' },
-    { value: 'Closed', label: 'Closed', icon: 'green', color: 'green' },
-    { value: 'On Hold', label: 'On Hold', icon: 'gray', color: 'gray' }
-  ]
+  const getStatusOptions = (): StatusOption[] => {
+    const options: StatusOption[] = [
+      { value: 'New', label: isAdmin ? 'Approved' : 'New', icon: 'blue', color: 'blue' },
+      { value: 'In Progress', label: 'In Progress', icon: 'orange', color: 'orange' },
+      { value: 'Stuck', label: 'Stuck', icon: 'red', color: 'red' },
+      { value: 'Actioned', label: 'Actioned', icon: 'purple', color: 'purple' },
+      { value: 'Closed', label: 'Closed', icon: 'green', color: 'green' },
+      { value: 'On Hold', label: 'On Hold', icon: 'gray', color: 'gray' },
+    ]
+    // Include For Approval only for Admin
+    if (isAdmin) {
+      options.unshift({ value: 'For Approval', label: 'For Approval', icon: 'yellow', color: 'yellow' })
+    }
+    return options
+  }
 
   React.useEffect(() => {
     if (ticket) {
@@ -204,7 +216,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
     
     setIsLoadingComments(true)
     try {
-      const response = await fetch(`/api/tickets/${ticket.id}/comments`)
+      const response = await fetch(`/api/tickets/${ticket.ticket_id}/comments`)
       if (response.ok) {
         const data = await response.json()
         setComments(data.comments || [])
@@ -225,6 +237,8 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
   const updatedDate = ticket.updated_at && ticket.updated_at !== ticket.created_at ? formatDate(ticket.updated_at) : null
   const resolvedDate = ticket.resolved_at ? formatDate(ticket.resolved_at) : null
 
+  const hasAttachments = ticket.supporting_files && Array.isArray(ticket.supporting_files) && ticket.supporting_files.length > 0
+
   const copyTicketId = () => {
     navigator.clipboard.writeText(ticket.ticket_id)
   }
@@ -235,12 +249,12 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
     
     setIsSubmittingComment(true)
     try {
-      const response = await fetch(`/api/tickets/${ticket.id}/comments`, {
+      const response = await fetch(`/api/tickets/${ticket.ticket_id}/comments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ comment: comment.trim() })
+        body: JSON.stringify({ comment: comment.trim(), userId: user ? parseInt(user.id) : undefined })
       })
       
       if (response.ok) {
@@ -259,10 +273,36 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
     }
   }
 
-  const handleStatusChange = (newStatus: string) => {
+  const handleStatusChange = async (newStatus: string) => {
     setCurrentStatus(newStatus as TicketStatus)
-    // TODO: Implement API call to update ticket status
-    console.log('Status changed to:', newStatus)
+    if (!ticket) return
+    try {
+      // Map display status to database status
+      let dbStatus = newStatus === 'New' ? 'Approved' : newStatus
+      // Admin can set For Approval explicitly
+      if (isAdmin && newStatus === 'For Approval') {
+        dbStatus = 'For Approval'
+      }
+      const requestBody: any = { status: dbStatus }
+      if (newStatus === 'Closed' && user?.id) {
+        requestBody.resolvedBy = parseInt(user.id)
+      }
+      const response = await fetch(`/api/tickets/${ticket.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Failed to update ticket status from modal:', errorData)
+        // Revert local status on failure
+        setCurrentStatus(ticket.status)
+      }
+    } catch (error) {
+      console.error('Error updating ticket status from modal:', error)
+      // Revert local status on error
+      setCurrentStatus(ticket.status)
+    }
   }
 
   return (
@@ -275,8 +315,11 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
             {/* Left Panel - Task Details */}
             <div className="flex-1 flex flex-col">
                                                            {/* Top Navigation Bar */}
-               <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b">
+                <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border">
                                                      <div className="flex items-center gap-3">
+                    <Badge variant="secondary" className="text-xs h-6 flex items-center bg-primary/10 text-primary rounded-[6px]">
+                      Ticket
+                    </Badge>
                     <span className="text-lg font-mono text-primary">
                       {ticket.ticket_id}
                     </span>
@@ -295,7 +338,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                                             {/* User */}
                       <div className="flex items-center gap-2">
                         <IconUser className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">User:</span>
+                        <span className="text-muted-foreground">Employee:</span>
                         <div className="flex items-center gap-2">
                           <Avatar className="h-6 w-6">
                             <AvatarImage src={ticket.profile_picture || ''} alt="User" />
@@ -323,7 +366,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                           <PopoverTrigger asChild>
                             <Button variant="ghost" className="h-auto p-0 hover:bg-muted/50 active:bg-muted/70 transition-colors">
                               <Badge variant="outline" className={`${getStatusColor(currentStatus || ticket.status)} px-2 py-1 text-xs cursor-pointer hover:opacity-80 transition-opacity`}>
-                                {getDisplayStatus(currentStatus || ticket.status)}
+                                {getDisplayStatus(currentStatus || ticket.status, isAdmin)}
                               </Badge>
                             </Button>
                           </PopoverTrigger>
@@ -407,62 +450,25 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                 </div>
 
               {/* Task Description */}
-              <div className="flex-1 px-6 py-5 overflow-y-auto">
-                <div className="space-y-6">
+              <div className="flex-1 px-6 py-5 overflow-y-auto min-h-0">
+                  <div className="space-y-6 flex flex-col min-h-full">
                   {/* Additional Details Section */}
-                  <div>
+                  <div className="flex-1 flex flex-col min-h-0">
                     <h3 className="text-lg font-medium mb-2 text-muted-foreground">Additional Details</h3>
-                    <div className="rounded-lg p-6 text-sm leading-relaxed min-h-[120px] border">
+                    <div className="rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border flex-1 min-h-0">
                       {ticket.details || "No additional details provided."}
                     </div>
                   </div>
 
-                  {/* Subtasks Section */}
-                  <div>
-                    <h3 className="text-lg font-medium mb-2 text-muted-foreground">Subtasks</h3>
-                    <div className="rounded-lg p-6 text-sm leading-relaxed min-h-[120px] border">
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 rounded border-2 border-muted-foreground/30 flex items-center justify-center">
-                            <div className="w-2 h-2 rounded-full bg-primary hidden"></div>
-                          </div>
-                          <span className="text-sm">Investigate network connectivity issues</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 rounded border-2 border-muted-foreground/30 flex items-center justify-center">
-                            <div className="w-2 h-2 rounded-full bg-primary"></div>
-                          </div>
-                          <span className="text-sm line-through text-muted-foreground">Contact user for additional information</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 rounded border-2 border-muted-foreground/30 flex items-center justify-center">
-                            <div className="w-2 h-2 rounded-full bg-primary hidden"></div>
-                          </div>
-                          <span className="text-sm">Update DNS configuration</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 rounded border-2 border-muted-foreground/30 flex items-center justify-center">
-                            <div className="w-2 h-2 rounded-full bg-primary hidden"></div>
-                          </div>
-                          <span className="text-sm">Test network connectivity</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 rounded border-2 border-muted-foreground/30 flex items-center justify-center">
-                            <div className="w-2 h-2 rounded-full bg-primary hidden"></div>
-                          </div>
-                          <span className="text-sm">Document resolution steps</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  
 
                   {/* Attachments Section */}
-                  <div>
+                  <div className="flex-1 flex flex-col min-h-0">
                     <h3 className="text-lg font-medium mb-2 text-muted-foreground">Attachments</h3>
-                    <div className="rounded-lg p-6 text-sm leading-relaxed min-h-[120px] border">
-                      {ticket.supporting_files && Array.isArray(ticket.supporting_files) && ticket.supporting_files.length > 0 ? (
+                    <div className={`rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border flex-1 min-h-0 ${!hasAttachments ? 'flex items-center justify-center' : ''}`}> 
+                      {hasAttachments ? (
                         <div className="grid grid-cols-4 gap-3">
-                          {ticket.supporting_files.map((file, index) => {
+                          {(ticket.supporting_files || []).map((file, index) => {
                             // Get proper Supabase Storage URL for full quality
                             const fileUrl = getStorageUrl(file);
                             // Get optimized URL for preview
@@ -564,9 +570,9 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                           })}
                         </div>
                       ) : (
-                        <div className="text-center py-8 text-muted-foreground">
+                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-center">
                           <IconFile className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">No attachments</p>
+                          <p className="text-sm">No Attachments</p>
                         </div>
                       )}
                     </div>
@@ -576,14 +582,14 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
             </div>
 
             {/* Right Panel - Activity Log */}
-            <div className="w-96 flex flex-col border-l h-full">
+            <div className="w-96 flex flex-col border-l border-[#cecece99] dark:border-border h-full bg-[#ebebeb] dark:bg-[#0a0a0a]">
                              {/* Activity Header */}
-               <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b flex-shrink-0">
+               <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border flex-shrink-0">
                  <h3 className="font-medium">Activity</h3>
                </div>
 
               {/* Activity Content */}
-                              <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-card">
+              <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-[#ebebeb] dark:bg-[#0a0a0a]">
                   <div className="space-y-4">
                     {isLoadingComments ? (
                       <div className="flex items-center justify-center py-8">
@@ -603,31 +609,28 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                         
                         return (
                           <div key={comment.id} className="rounded-lg p-4 bg-sidebar border">
-                            <div className="flex items-start gap-3">
-                              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
-                                {comment.profile_picture ? (
-                                  <img 
-                                    src={comment.profile_picture} 
-                                    alt={userName}
-                                    className="w-8 h-8 rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                                    {userInitials}
-                                  </span>
-                                )}
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-8 h-8 rounded-full bg-primary/10 dark:bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                    {comment.profile_picture ? (
+                                      <img 
+                                        src={comment.profile_picture} 
+                                        alt={userName}
+                                        className="w-8 h-8 rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      <span className="text-xs font-medium text-primary">
+                                        {userInitials}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-sm font-medium truncate">{userName}</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground whitespace-nowrap ml-3">{commentDate.date} • {commentDate.time}</span>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-sm font-medium">{userName}</span>
-                                  <IconMessage className="h-3 w-3 text-muted-foreground" />
-                                </div>
-                                <div className="text-xs text-muted-foreground mb-2">
-                                  {commentDate.full}
-                                </div>
-                                <div className="text-xs text-muted-foreground leading-relaxed">
-                                  {comment.comment}
-                                </div>
+                              <div className="text-sm text-foreground leading-relaxed mt-1 whitespace-pre-wrap break-words">
+                                {comment.comment}
                               </div>
                             </div>
                           </div>
@@ -636,7 +639,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
                         <IconMessage className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">No comments yet</p>
+                        <p className="text-sm">No Comments Yet</p>
                         <p className="text-xs">Be the first to add a comment!</p>
                       </div>
                     )}
@@ -644,8 +647,8 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                 </div>
 
               {/* Comment Input */}
-              <div className="px-3 pb-3 bg-card">
-                <div className="flex gap-3 bg-sidebar rounded-lg p-4 border">
+              <div className="px-3 pb-3 bg-[#ebebeb] dark:bg-[#0a0a0a]">
+                <div className="flex gap-3 bg-sidebar rounded-lg p-4 border border-[#cecece99] dark:border-border">
                   <Avatar className="h-8 w-8 flex-shrink-0">
                     <AvatarImage src="" alt="Current User" />
                     <AvatarFallback className="text-xs">CU</AvatarFallback>

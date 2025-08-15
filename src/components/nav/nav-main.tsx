@@ -23,6 +23,7 @@ export function NavMain({
   }[]
 }) {
   const pathname = usePathname()
+  const iconRefs = useRef<Record<string, any>>({})
   
   return (
     <SidebarGroup>
@@ -30,19 +31,26 @@ export function NavMain({
         <SidebarMenu>
           {items.map((item) => {
             const isActive = pathname === item.url || pathname === item.url + "/" || (item.url === "/" && (pathname === "/" || pathname === "//"))
-            const iconRef = useRef<any>(null)
-            
+            const key = item.title
+
             return (
-              <SidebarMenuItem key={item.title}>
+              <SidebarMenuItem key={key}>
                 <SidebarMenuButton 
                   asChild 
                   tooltip={item.title}
                   className={`${isActive ? "bg-gray-200 dark:bg-teal-600/30 focus:bg-gray-200 dark:focus:bg-teal-600/30 active:bg-gray-200 dark:active:bg-teal-600/30 text-sidebar-accent-foreground dark:text-white hover:!bg-gray-200 dark:hover:!bg-teal-600/30" : "text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"} group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center`}
-                  onMouseEnter={() => iconRef.current?.startAnimation?.()}
-                  onMouseLeave={() => iconRef.current?.stopAnimation?.()}
+                  onMouseEnter={() => iconRefs.current[key]?.startAnimation?.()}
+                  onMouseLeave={() => iconRefs.current[key]?.stopAnimation?.()}
                 >
                   <Link href={item.url} className="flex items-center justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-full">
-                    {item.icon && <item.icon ref={iconRef} className="h-5 w-5" />}
+                    {item.icon && (
+                      <item.icon
+                        ref={(el: any) => {
+                          if (el) iconRefs.current[key] = el
+                        }}
+                        className="h-5 w-5"
+                      />
+                    )}
                     <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                   </Link>
                 </SidebarMenuButton>

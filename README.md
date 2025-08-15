@@ -60,6 +60,8 @@ This will:
 - `npm run electron-dev` - Run in development mode
 - `npm run electron-build` - Build for production
 - `npm run lint` - Run ESLint
+- `npm run test-db` - Test primary database connection
+- `npm run test-bpoc-db` - Test BPOC database connection (for applicants)
 
 ## Project Structure
 
@@ -87,6 +89,21 @@ The app includes a comprehensive dashboard with:
 - 🎨 Modern, responsive design
 - 🌙 Dark/light theme support
 - 📱 Mobile-responsive layout
+
+## BPOC Database Integration
+
+The app includes integration with a BPOC database for managing job applicants:
+
+- 👥 **Applicants Management** - Drag and drop interface for application status tracking
+- 📊 **Status Columns** - Submitted, Screened, Verify, Verified, Interview, Failed, Passed, Rejected
+- 🔄 **Real-time Updates** - Status changes are automatically saved to the database
+- 📝 **Application Details** - View applicant information, job details, and company information
+
+### Setup
+
+1. Add `BPOC_DATABASE_URL` to your `.env.local` file
+2. Run `npm run test-bpoc-db` to verify the connection
+3. See `documents/BPOC_SETUP.md` for detailed setup instructions
 
 ## Technologies Used
 

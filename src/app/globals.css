@@ -156,3 +156,45 @@ body[data-scroll-locked] {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
 }
+
+/* Global styles for popover interactive items to match dropdown hover/active */
+.popover-surface button:hover,
+.popover-surface a:hover,
+.popover-surface [role="menuitem"]:hover,
+.popover-surface button:focus-visible,
+.popover-surface a:focus-visible,
+.popover-surface [role="menuitem"]:focus-visible {
+  background-color: hsl(var(--sidebar-accent));
+  color: hsl(var(--sidebar-accent-foreground));
+}
+
+.popover-surface button:active,
+.popover-surface a:active,
+.popover-surface [role="menuitem"]:active,
+.popover-surface button[data-state="checked"],
+.popover-surface [role="menuitem"][data-state="checked"] {
+  background-color: color-mix(in oklab, hsl(var(--sidebar-accent)) 90%, transparent);
+  color: hsl(var(--sidebar-accent-foreground));
+}
+
+/* Ensure checked stays distinct from hover */
+.popover-surface button[data-state="checked"],
+.popover-surface [role="menuitem"][data-state="checked"] {
+  background-color: rgb(229 231 235); /* gray-200 */
+  color: hsl(var(--sidebar-accent-foreground));
+}
+.popover-surface button[data-state="checked"]:hover,
+.popover-surface [role="menuitem"][data-state="checked"]:hover {
+  background-color: rgb(229 231 235) !important;
+  color: hsl(var(--sidebar-accent-foreground));
+}
+.dark .popover-surface button[data-state="checked"],
+.dark .popover-surface [role="menuitem"][data-state="checked"] {
+  background-color: rgb(13 148 136 / 0.3); /* teal-600/30 */
+  color: #ffffff;
+}
+.dark .popover-surface button[data-state="checked"]:hover,
+.dark .popover-surface [role="menuitem"][data-state="checked"]:hover {
+  background-color: rgb(13 148 136 / 0.3) !important;
+  color: #ffffff;
+}

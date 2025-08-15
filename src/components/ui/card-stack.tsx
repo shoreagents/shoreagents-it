@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { IconEye } from "@tabler/icons-react";
 
 type Card = {
   id: number;
@@ -40,7 +41,7 @@ export const CardStack = ({
         return (
           <motion.div
             key={card.id}
-            className="absolute w-full h-full rounded-xl p-3 shadow-sm border border-border dark:border-[#343434] bg-sidebar dark:bg-[#252525] text-card-foreground flex flex-col justify-between cursor-pointer hover:shadow-md transition-shadow"
+            className="absolute w-full h-full rounded-xl p-3 shadow-sm border border-[#cecece99] dark:border-[#343434] bg-sidebar dark:bg-[#252525] text-card-foreground flex flex-col justify-between cursor-pointer hover:shadow-md transition-shadow"
             style={{
               transformOrigin: "top center",
             }}
@@ -76,7 +77,7 @@ export const CardStack = ({
                   </div>
                 </div>
               </div>
-              <div className="w-full h-px bg-border/50 dark:bg-[#8989894d]"></div>
+              <div className="w-full h-px bg-[#cecece99] dark:bg-[#8989894d]"></div>
               <div className="font-normal text-sm text-muted-foreground flex-1 line-clamp-2">
                 {card.content}
               </div>
@@ -97,9 +98,12 @@ export const CardStack = ({
                       e.stopPropagation();
                       onViewTicket(card.ticket);
                     }}
-                    className="text-xs h-6 px-2 rounded-md shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 hover:bg-[#e8e8e8] dark:hover:bg-[#404040] transition-colors"
+                    className="text-xs h-6 px-2 rounded-md shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] transition-colors"
                   >
-                    View Info
+                    <span className="inline-flex items-center">
+                      <IconEye className="h-3.5 w-3.5 mr-1" />
+                      <span>View Info</span>
+                    </span>
                   </button>
                 )}
               </div>

@@ -65,75 +65,64 @@ export async function POST(
     console.log('POST /api/tickets/[id]/comments - Starting...')
     
     const supabase = createClient()
+    const body = await request.json()
+    const { comment, userId } = body as { comment?: string; userId?: number }
+
+    // Resolve authenticated user id:
+    let dbUserId: number | null = null
     
-    // Get the current user from Supabase auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      console.log('Auth error:', authError)
+    // Prefer explicit userId from client (app auth)
+    if (typeof userId === 'number' && Number.isFinite(userId)) {
+      dbUserId = userId
+    } else {
+      // Fallback to Supabase auth cookie if present, then map by email -> users.id
+      const { data: { user: sbUser }, error: authError } = await supabase.auth.getUser()
+      if (sbUser && !authError) {
+        const userLookup = await pool.query('SELECT id FROM users WHERE email = $1', [sbUser.email])
+        if (userLookup.rows.length > 0) {
+          dbUserId = userLookup.rows[0].id
+        }
+      }
+    }
+
+    if (!dbUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('User authenticated:', user.id)
-
-    // Get the ticket's numeric ID from the Railway database
-    const ticketQuery = `
-      SELECT id FROM tickets WHERE ticket_id = $1
-    `
-    const ticketResult = await pool.query(ticketQuery, [params.id])
-    
-    if (ticketResult.rows.length === 0) {
-      console.log('Ticket not found for ticket_id:', params.id)
-      return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
-    }
-
-    const ticket = ticketResult.rows[0]
-    console.log('Ticket found:', ticket.id)
-
-    const body = await request.json()
-    const { comment } = body
-
+    // Validate comment
     if (!comment || typeof comment !== 'string' || comment.trim().length === 0) {
       return NextResponse.json({ error: 'Comment is required' }, { status: 400 })
     }
 
-    console.log('Comment validated, attempting database insert...')
+    // Get the ticket's numeric ID from the Railway database
+    const ticketQuery = 'SELECT id FROM tickets WHERE ticket_id = $1'
+    const ticketResult = await pool.query(ticketQuery, [params.id])
+    if (ticketResult.rows.length === 0) {
+      return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+    }
+    const ticket = ticketResult.rows[0]
 
-    // Insert the comment using Railway database
+    console.log('Inserting comment for ticket', ticket.id, 'by user', dbUserId)
+
+    // Insert comment
     const insertQuery = `
       INSERT INTO ticket_comments (ticket_id, user_id, comment)
       VALUES ($1, $2, $3)
       RETURNING id, ticket_id, user_id, comment, created_at, updated_at
     `
-    
-    console.log('Executing insert query with params:', [ticket.id, user.id, comment.trim()])
-    
-    const result = await pool.query(insertQuery, [
-      ticket.id,
-      user.id,
-      comment.trim()
-    ])
-
+    const result = await pool.query(insertQuery, [ticket.id, dbUserId, comment.trim()])
     const newComment = result.rows[0]
-    console.log('Comment inserted successfully:', newComment)
 
-    // Get the user information for the response
+    // Fetch user info for response
     const userQuery = `
-      SELECT 
-        u.id,
-        u.email,
-        pi.first_name,
-        pi.last_name,
-        pi.profile_picture
+      SELECT u.id, u.email, pi.first_name, pi.last_name, pi.profile_picture
       FROM users u
       LEFT JOIN personal_info pi ON u.id = pi.user_id
       WHERE u.id = $1
     `
-    
-    const userResult = await pool.query(userQuery, [user.id])
+    const userResult = await pool.query(userQuery, [dbUserId])
     const userInfo = userResult.rows[0]
 
-    // Create a simple response object
     const responseComment = {
       id: newComment.id,
       ticket_id: newComment.ticket_id,
@@ -144,10 +133,9 @@ export async function POST(
       first_name: userInfo?.first_name || null,
       last_name: userInfo?.last_name || null,
       email: userInfo?.email || null,
-      profile_picture: userInfo?.profile_picture || null
+      profile_picture: userInfo?.profile_picture || null,
     }
 
-    console.log('Returning response comment:', responseComment)
     return NextResponse.json({ comment: responseComment })
   } catch (error) {
     console.error('Error in POST /api/tickets/[id]/comments:', error)
@@ -156,4 +144,4 @@ export async function POST(
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-} 
+}
