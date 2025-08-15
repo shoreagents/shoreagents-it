@@ -99,6 +99,15 @@ html body[data-scroll-locked] {
   margin-right: 0 !important;
 }
 
+/* Disable body scroll for tickets page */
+body.no-scroll {
+  overflow: hidden !important;
+}
+
+html body.no-scroll {
+  overflow: hidden !important;
+}
+
 /* Even stronger override */
 html body[data-scroll-locked],
 body[data-scroll-locked] {
@@ -197,4 +206,61 @@ body[data-scroll-locked] {
 .dark .popover-surface [role="menuitem"][data-state="checked"]:hover {
   background-color: rgb(13 148 136 / 0.3) !important;
   color: #ffffff;
+}
+
+/* Color picker hex input styling */
+.color-picker-popover input[id^="rc-editable-input"] {
+  width: 100% !important;
+  padding: 4px 8px !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  box-shadow: none !important;
+  background-color: hsl(var(--sidebar)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Dark mode specific color picker styling */
+.dark .color-picker-popover input[id^="rc-editable-input"] {
+  background-color: #0a0a0a !important;
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Fix dark mode text for color picker labels */
+.dark .color-picker-popover label,
+.dark .color-picker-popover span,
+.dark .color-picker-popover div[style*="color"] {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Target specific react-color labels */
+.dark .color-picker-popover .sketch-picker label,
+.dark .color-picker-popover .sketch-picker span {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Force all text elements in dark mode to be visible */
+.dark .color-picker-popover * {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Override the react-color border-top to use theme border color */
+.color-picker-popover .flexbox-fix {
+  border-top-color: hsl(var(--border)) !important;
+}
+
+/* Dark mode specific border override */
+.dark .color-picker-popover .flexbox-fix {
+  border-top-color: hsl(var(--border)) !important;
+}
+
+
+
+.color-picker-popover input[id^="rc-editable-input"][style*="width: 80%"] {
+  width: 100% !important;
+}
+
+.color-picker-popover input[id^="rc-editable-input"][style*="padding: 4px 10% 3px"] {
+  padding: 4px 8px !important;
 }

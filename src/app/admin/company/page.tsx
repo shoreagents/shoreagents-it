@@ -4,13 +4,14 @@ import { useEffect, useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
 import { AppSidebar } from "@/components/app-sidebar"
 import { AppHeader } from "@/components/app-header"
 import { SidebarInset } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { IconSearch, IconChevronUp, IconChevronDown, IconLink, IconPhone, IconMapPin } from "@tabler/icons-react"
+import { IconSearch, IconChevronUp, IconChevronDown, IconLink, IconPhone, IconMapPin, IconPlus } from "@tabler/icons-react"
 import { LinkPreview } from "@/components/ui/link-preview"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -23,6 +24,7 @@ import {
   PaginationNext,
 } from "@/components/ui/pagination"
 import { useTheme } from "next-themes"
+import { AddCompanyModal } from "@/components/modals/add-company-modal"
 
 interface MemberRecord {
   id: number
@@ -69,6 +71,7 @@ export default function CompaniesPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [loadingUsersKey, setLoadingUsersKey] = useState<string | null>(null)
   const [memberUsersCache, setMemberUsersCache] = useState<Record<string, { type: 'agents' | 'clients', users: { user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, employee_id: string | null }[] }>>({})
+  const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false)
 
   const fetchUsersForMember = async (memberId: number, type: 'agents' | 'clients') => {
     const key = `${type}:${memberId}`
@@ -147,6 +150,14 @@ export default function CompaniesPage() {
                     <h1 className="text-2xl font-bold">Companies</h1>
                     <p className="text-sm text-muted-foreground">Directory of member companies</p>
                   </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsAddCompanyModalOpen(true)} 
+                    className="text-sm h-9 rounded-lg shadow-none flex items-center gap-2"
+                  >
+                    <IconPlus className="h-4 w-4" />
+                    Add Company
+                  </Button>
                 </div>
               </div>
 
@@ -239,7 +250,7 @@ export default function CompaniesPage() {
                                         )}
                                         {(memberUsersCache[`agents:${m.id}`]?.users || []).map(u => (
                                           <TooltipProvider key={u.user_id}>
-                                            <Tooltip>
+                                            <Tooltip delayDuration={100}>
                                               <TooltipTrigger asChild>
                                                 <div className="flex items-center justify-center gap-2 cursor-pointer">
                                                   <Avatar className="h-7 w-7">
@@ -293,7 +304,7 @@ export default function CompaniesPage() {
                                         )}
                                         {(memberUsersCache[`clients:${m.id}`]?.users || []).map(u => (
                                           <TooltipProvider key={u.user_id}>
-                                            <Tooltip>
+                                            <Tooltip delayDuration={100}>
                                               <TooltipTrigger asChild>
                                                 <div className="flex items-center justify-center gap-2 cursor-pointer">
                                                   <Avatar className="h-7 w-7">
@@ -377,6 +388,17 @@ export default function CompaniesPage() {
           </div>
         </div>
       </SidebarInset>
+
+      {/* Add Company Modal */}
+      <AddCompanyModal 
+        isOpen={isAddCompanyModalOpen}
+        onClose={() => setIsAddCompanyModalOpen(false)}
+        onCompanyAdded={(company) => {
+          console.log('New company added:', company)
+          // Refresh the companies list
+          fetchMembers()
+        }}
+      />
     </>
   )
 }

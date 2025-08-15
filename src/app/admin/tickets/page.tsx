@@ -460,7 +460,7 @@ function TicketSkeleton() {
   )
 }
 
-function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: boolean }) {
+function DraggingTicket({ ticket, isExpanded, roleNameById }: { ticket: Ticket; isExpanded: boolean; roleNameById?: Record<number, string> }) {
   const categoryBadge = getCategoryBadge(ticket)
   
   return (
@@ -555,9 +555,17 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
               <Button 
                 size="sm" 
                 variant="outline" 
-                className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040]"
+                className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] inline-flex items-center"
               >
-                <IconEye className="h-4 w-4 mr-1" />
+                <IconUserCheck className="h-4 w-4 mr-px" />
+                <span>{roleNameById && ticket.role_id ? (roleNameById[ticket.role_id] || 'Assign Role') : 'Assign Role'}</span>
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] inline-flex items-center"
+              >
+                <IconEye className="h-4 w-4 mr-px" />
                 <span>View All</span>
               </Button>
             </div>
@@ -683,7 +691,16 @@ export default function TicketsPage() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [roleNameById, setRoleNameById] = useState<Record<number, string>>({})
+  const [zoomLevel, setZoomLevel] = useState(1)
   const { user } = useAuth()
+
+  // Disable body scroll when on tickets page
+  useEffect(() => {
+    document.body.classList.add('no-scroll')
+    return () => {
+      document.body.classList.remove('no-scroll')
+    }
+  }, [])
 
   // Real-time updates
   const { isConnected: isRealtimeConnected } = useRealtimeTickets({
@@ -714,6 +731,32 @@ export default function TicketsPage() {
         setRoleNameById(map)
       })
       .catch(() => {})
+  }, [])
+
+  // Keyboard shortcuts for zooming
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case '=':
+          case '+':
+            e.preventDefault()
+            setZoomLevel(prev => Math.min(1, prev + 0.1))
+            break
+          case '-':
+            e.preventDefault()
+            setZoomLevel(prev => Math.max(0.5, prev - 0.1))
+            break
+          case '0':
+            e.preventDefault()
+            setZoomLevel(1)
+            break
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   const fetchTickets = async () => {
@@ -1046,6 +1089,45 @@ export default function TicketsPage() {
                     />
                   </div>
 
+                  {/* Zoom Controls */}
+                  <div className="flex items-center bg-muted/50 rounded-lg border border-border overflow-hidden">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setZoomLevel(prev => Math.max(0.5, prev - 0.1))}
+                      disabled={zoomLevel <= 0.5}
+                      className="h-9 w-9 p-0 rounded-none hover:bg-muted/80"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                      </svg>
+                    </Button>
+                    <div className="px-3 py-1 border-x border-border">
+                      <span className="text-sm font-medium text-foreground min-w-[50px] text-center block">
+                        {Math.round(zoomLevel * 100)}%
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setZoomLevel(prev => Math.min(1, prev + 0.1))}
+                      disabled={zoomLevel >= 1}
+                      className="h-9 w-9 p-0 rounded-none hover:bg-muted/80"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setZoomLevel(1)}
+                      className="h-9 px-2 text-xs border-l border-border rounded-none hover:bg-muted/80"
+                    >
+                      Reset
+                    </Button>
+                  </div>
+
                   <ReloadButton 
                     onReload={fetchTickets}
                     loading={loading}
@@ -1078,7 +1160,11 @@ export default function TicketsPage() {
                       style={{ 
                         scrollBehavior: 'smooth',
                         scrollbarWidth: 'thin',
-                        msOverflowStyle: 'none'
+                        msOverflowStyle: 'none',
+                        transform: `scale(${zoomLevel})`,
+                        transformOrigin: 'top left',
+                        width: `${100 / zoomLevel}%`,
+                        height: `${100 / zoomLevel}%`
                       }}
                       onWheel={(e) => {
                         // Check if cursor is over the cards container
@@ -1095,15 +1181,18 @@ export default function TicketsPage() {
                         // Allow horizontal scroll if not over cards container, dragging, or near edges
                         if (!isOverCardsContainer || activeId || isNearLeftEdge || isNearRightEdge) {
                           e.preventDefault();
-                          const scrollAmount = e.deltaY * 3; // Increased sensitivity for smoother scroll
+                          const scrollAmount = e.deltaY * 3; // Use deltaY for proper wheel scrolling
                           container.scrollLeft -= scrollAmount; // Reversed direction
                         }
                       }}
 
                     >
                       {statuses.map((status) => (
-                        <div key={status} className="flex-shrink-0 w-[400px]">
-                          <div className="bg-card border border-border rounded-xl transition-all duration-200 flex flex-col shadow-sm min-h-[200px] max-h-[calc(94vh-200px)] status-cell">
+                        <div key={status} className="flex-shrink-0 w-[400px]" style={{ width: '400px' }}>
+                          <div className="bg-card border border-border rounded-xl transition-all duration-200 flex flex-col shadow-sm status-cell" style={{
+                            minHeight: `${200 / zoomLevel}px`,
+                            maxHeight: `calc(${94 / zoomLevel}vh - ${200 / zoomLevel}px)`
+                          }}>
                             <div className="flex-shrink-0 p-4">
                               <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
@@ -1166,10 +1255,17 @@ export default function TicketsPage() {
                   
                   <DragOverlay>
                     {activeId ? (
-                      <DraggingTicket 
-                        ticket={tickets.find(ticket => ticket.id.toString() === activeId)!}
-                        isExpanded={expandedTickets.has(activeId)}
-                      />
+                      <div style={{
+                        transform: `scale(${zoomLevel})`,
+                        transformOrigin: 'top left',
+                        width: '366px'
+                      }}>
+                        <DraggingTicket 
+                          ticket={tickets.find(ticket => ticket.id.toString() === activeId)!}
+                          isExpanded={expandedTickets.has(activeId)}
+                          roleNameById={roleNameById}
+                        />
+                      </div>
                     ) : null}
                   </DragOverlay>
                 </DndContext>

@@ -45,7 +45,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 type ApplicantStatus = 'submitted' | 'screened' | 'for verification' | 'verified' | 'initial interview' | 'final interview' | 'failed' | 'passed'
 
-interface Ticket {
+interface Applicant {
   id: string
   ticket_id: string
   user_id: string
@@ -77,17 +77,17 @@ interface Ticket {
   company_name?: string | null
 }
 
-interface SortableTicketProps {
-  ticket: Ticket
+interface SortableApplicantProps {
+  applicant: Applicant
   isLast?: boolean
   isExpanded: boolean
-  onToggleExpanded: (ticketId: string) => void
-  onViewAll: (ticket: Ticket) => void
+  onToggleExpanded: (applicantId: string) => void
+  onViewAll: (applicant: Applicant) => void
 }
 
 // Category badge removed for Applicants
 
-const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = false, isExpanded, onToggleExpanded, onViewAll }: SortableTicketProps) {
+const SortableApplicant = React.memo(function SortableApplicant({ applicant, isLast = false, isExpanded, onToggleExpanded, onViewAll }: SortableApplicantProps) {
   const [isHovered, setIsHovered] = useState(false)
   const {
     attributes,
@@ -96,7 +96,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: ticket.id.toString() })
+  } = useSortable({ id: applicant.id.toString() })
 
   const style = useMemo(() => {
     return {
@@ -113,8 +113,8 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
       e.stopPropagation()
       return
     }
-    onToggleExpanded(ticket.id.toString())
-  }, [onToggleExpanded, ticket.id])
+    onToggleExpanded(applicant.id.toString())
+  }, [onToggleExpanded, applicant.id])
 
   const handleMouseEnter = useCallback(() => setIsHovered(true), [])
   const handleMouseLeave = useCallback(() => setIsHovered(false), [])
@@ -122,7 +122,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
   const categoryBadge = null
 
   const cardClassName = useMemo(() => {
-    return `${isLast ? '' : 'mb-3'} p-4 transition-colors duration-150 cursor-pointer overflow-hidden bg-sidebar dark:bg-[#252525] ticket-card w-full ${
+    return `${isLast ? '' : 'mb-3'} p-4 transition-colors duration-150 cursor-pointer overflow-hidden bg-sidebar dark:bg-[#252525] applicant-card w-full ${
       isDragging ? 'opacity-50' : ''
     } ${
       isHovered ? 'border-primary' : 'hover:border-primary/50'
@@ -154,7 +154,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
                 <span className="text-xs font-medium text-muted-foreground/70 mr-2">Submitted at:</span>
                 <IconCalendar className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium text-muted-foreground">
-                  {new Date(ticket.created_at).toLocaleDateString('en-US', { 
+                  {new Date(applicant.created_at).toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric'
                   })}
@@ -162,7 +162,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
                 <span className="text-muted-foreground/70">•</span>
                 <IconClock className="h-4 w-4 text-muted-foreground" />
                 <span className="font-mono text-muted-foreground">
-                  {new Date(ticket.created_at).toLocaleTimeString('en-US', {
+                  {new Date(applicant.created_at).toLocaleTimeString('en-US', {
                     hour: '2-digit',
                     minute: '2-digit',
                     hour12: true
@@ -173,30 +173,30 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
           </div>
           <div className="flex items-center gap-2 mb-3">
             <Avatar className="h-8 w-8 flex-shrink-0">
-              <AvatarImage src={ticket.profile_picture || ''} alt={`User ${ticket.user_id}`} />
+              <AvatarImage src={applicant.profile_picture || ''} alt={`User ${applicant.user_id}`} />
               <AvatarFallback className="text-sm bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
-                {ticket.first_name && ticket.last_name 
-                  ? `${ticket.first_name[0]}${ticket.last_name[0]}`
-                  : String(ticket.user_id).split(' ').map(n => n[0]).join('')
+                {applicant.first_name && applicant.last_name 
+                  ? `${applicant.first_name[0]}${applicant.last_name[0]}`
+                  : String(applicant.user_id).split(' ').map(n => n[0]).join('')
                 }
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col min-w-0 flex-1">
               <span className="text-sm font-semibold text-foreground truncate">
-                {ticket.full_name || (ticket.first_name && ticket.last_name 
-                  ? `${ticket.first_name} ${ticket.last_name}`
-                  : `User ${ticket.user_id}`)}
+                {applicant.full_name || (applicant.first_name && applicant.last_name 
+                  ? `${applicant.first_name} ${applicant.last_name}`
+                  : `User ${applicant.user_id}`)}
               </span>
-              {ticket.user_type === 'Internal' ? (
+              {applicant.user_type === 'Internal' ? (
                 <span className="text-xs font-medium text-blue-600 dark:text-blue-400 truncate">
                   Internal
                 </span>
-              ) : ticket.member_name && (
+              ) : applicant.member_name && (
                 <span 
                   className="text-xs font-medium truncate"
-                  style={{ color: ticket.member_color || undefined }}
+                  style={{ color: applicant.member_color || undefined }}
                 >
-                  {ticket.member_name}
+                  {applicant.member_name}
                 </span>
               )}
             </div>
@@ -205,13 +205,13 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
           <div className="border border-gray-300 dark:border-[#84848440] rounded-lg p-3 text-left flex flex-col justify-center mt-6">
             <span className="text-xs font-medium text-muted-foreground/70">Position:</span>
             <h4 className="font-normal text-sm text-primary leading-tight break-words mt-1">
-              {ticket.job_title || ticket.concern}
+              {applicant.job_title || applicant.concern}
             </h4>
-            {ticket.company_name ? (
+            {applicant.company_name ? (
               <>
                 <span className="text-xs font-medium text-muted-foreground/70 mt-3">Member:</span>
                 <h4 className="font-normal text-sm text-primary leading-tight break-words mt-1">
-                  {ticket.company_name}
+                  {applicant.company_name}
                 </h4>
               </>
             ) : null}
@@ -228,10 +228,10 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
             className="mt-3 overflow-hidden"
           >
             <div className="space-y-3">
-              {ticket.details && (
+              {applicant.details && (
                 <div className="border border-gray-300 dark:border-[#84848440] rounded-lg p-3 text-left flex flex-col justify-center mb-6">
                   <span className="text-xs font-medium text-muted-foreground/70">Additional Details:</span>
-                  <p className="text-sm text-primary leading-relaxed break-words mt-1">{ticket.details}</p>
+                  <p className="text-sm text-primary leading-relaxed break-words mt-1">{applicant.details}</p>
                 </div>
               )}
               <div className="flex items-center gap-2 mb-3">
@@ -239,7 +239,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
                   size="sm" 
                   variant="outline" 
                   className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040]"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onViewAll(ticket) }}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onViewAll(applicant) }}
                 >
                   <IconEye className="h-4 w-4 mr-px" />
                   <span>View All</span>
@@ -251,7 +251,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
                   asChild
                 >
                   <a
-                    href={`https://www.bpoc.io/${ticket.resume_slug || ticket.ticket_id}`}
+                    href={`https://www.bpoc.io/${applicant.resume_slug || applicant.ticket_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => { e.stopPropagation() }}
@@ -316,7 +316,7 @@ const getCircleColor = (status: ApplicantStatus) => {
   }
 }
 
-function TicketSkeleton() {
+function ApplicantSkeleton() {
   return (
     <Card className="mb-3 p-4 overflow-hidden bg-sidebar dark:bg-[#252525] ticket-card w-full rounded-xl">
       <div className="flex items-center gap-3 mb-3">
@@ -335,7 +335,7 @@ function TicketSkeleton() {
   )
 }
 
-function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: boolean }) {
+function DraggingApplicant({ applicant, isExpanded }: { applicant: Applicant; isExpanded: boolean }) {
   
   return (
     <Card className="mb-3 p-4 cursor-grabbing overflow-hidden bg-sidebar dark:bg-[#252525] border-primary">
@@ -350,7 +350,7 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
                 <span className="text-xs font-medium text-muted-foreground/70 mr-2">Submitted at:</span>
                 <IconCalendar className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium text-muted-foreground">
-                  {new Date(ticket.created_at).toLocaleDateString('en-US', { 
+                  {new Date(applicant.created_at).toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric'
                   })}
@@ -358,7 +358,7 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
                 <span className="text-muted-foreground/70">•</span>
                 <IconClock className="h-4 w-4 text-muted-foreground" />
                 <span className="font-mono text-muted-foreground">
-                  {new Date(ticket.created_at).toLocaleTimeString('en-US', {
+                  {new Date(applicant.created_at).toLocaleTimeString('en-US', {
                     hour: '2-digit',
                     minute: '2-digit',
                     hour12: true
@@ -369,30 +369,30 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
           </div>
           <div className="flex items-center gap-2 mb-3">
             <Avatar className="h-8 w-8 flex-shrink-0">
-              <AvatarImage src={ticket.profile_picture || ''} alt={`User ${ticket.user_id}`} />
+              <AvatarImage src={applicant.profile_picture || ''} alt={`User ${applicant.user_id}`} />
               <AvatarFallback className="text-sm bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
-                {ticket.first_name && ticket.last_name 
-                  ? `${ticket.first_name[0]}${ticket.last_name[0]}`
-                  : String(ticket.user_id).split(' ').map(n => n[0]).join('')
+                {applicant.first_name && applicant.last_name 
+                  ? `${applicant.first_name[0]}${applicant.last_name[0]}`
+                  : String(applicant.user_id).split(' ').map(n => n[0]).join('')
                 }
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col min-w-0 flex-1">
               <span className="text-sm font-semibold text-foreground truncate">
-                {ticket.full_name || (ticket.first_name && ticket.last_name 
-                  ? `${ticket.first_name} ${ticket.last_name}`
-                  : `User ${ticket.user_id}`)}
+                {applicant.full_name || (applicant.first_name && applicant.last_name 
+                  ? `${applicant.first_name} ${applicant.last_name}`
+                  : `User ${applicant.user_id}`)}
               </span>
-              {ticket.user_type === 'Internal' ? (
+              {applicant.user_type === 'Internal' ? (
                 <span className="text-xs font-medium text-blue-600 dark:text-blue-400 truncate">
                   Internal
                 </span>
-              ) : ticket.member_name && (
+              ) : applicant.member_name && (
                 <span 
                   className="text-xs font-medium truncate"
-                  style={{ color: ticket.member_color || undefined }}
+                  style={{ color: applicant.member_color || undefined }}
                 >
-                  {ticket.member_name}
+                  {applicant.member_name}
                 </span>
               )}
             </div>
@@ -401,13 +401,13 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
           <div className="border border-gray-300 dark:border-[#84848440] rounded-lg p-3 text-left flex flex-col justify-center mt-6">
             <span className="text-xs font-medium text-muted-foreground/70">Position:</span>
             <h4 className="font-normal text-sm text-primary leading-tight break-words mt-1">
-              {ticket.job_title || ticket.concern}
+              {applicant.job_title || applicant.concern}
             </h4>
-            {ticket.company_name ? (
+            {applicant.company_name ? (
               <>
                 <span className="text-xs font-medium text-muted-foreground/70 mt-3">Member:</span>
                 <h4 className="font-normal text-sm text-primary leading-tight break-words mt-1">
-                  {ticket.company_name}
+                  {applicant.company_name}
                 </h4>
               </>
             ) : null}
@@ -417,20 +417,36 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
       {isExpanded && (
         <div className="mt-3 overflow-hidden">
           <div className="space-y-3">
-            {ticket.details && (
+            {applicant.details && (
               <div className="border border-gray-300 dark:border-[#84848440] rounded-lg p-3 text-left flex flex-col justify-center mb-6">
                 <span className="text-xs font-medium text-muted-foreground/70">Additional Details:</span>
-                <p className="text-sm text-primary leading-relaxed break-words mt-1">{ticket.details}</p>
+                <p className="text-sm text-primary leading-relaxed break-words mt-1">{applicant.details}</p>
               </div>
             )}
             <div className="flex items-center gap-2 mb-3">
               <Button 
                 size="sm" 
                 variant="outline" 
-                className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040]"
+                className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040]"
               >
-                <IconEye className="h-4 w-4 mr-1" />
+                <IconEye className="h-4 w-4 mr-px" />
                 <span>View All</span>
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline"
+                className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040]"
+                asChild
+              >
+                <a
+                  href={`https://www.bpoc.io/${applicant.resume_slug || applicant.ticket_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => { e.stopPropagation() }}
+                >
+                  <IconFileText className="h-4 w-4 mr-px" />
+                  <span>View Resume</span>
+                </a>
               </Button>
             </div>
           </div>
@@ -481,7 +497,7 @@ function TicketsSkeleton() {
               </div>
               <div className="flex-1 px-4 pb-4 cards-container">
                 {Array.from({ length: 3 }).map((_, index) => (
-                  <TicketSkeleton key={index} />
+                  <ApplicantSkeleton key={index} />
                 ))}
               </div>
             </div>
@@ -515,13 +531,48 @@ function DroppableContainer({ status, children }: DroppableContainerProps) {
 export default function ApplicantsPage() {
   const { user } = useAuth()
   const [expandedTickets, setExpandedTickets] = useState<Set<string>>(new Set())
-  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [applicants, setApplicants] = useState<Applicant[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [originalStatuses, setOriginalStatuses] = useState<Map<string, ApplicantStatus>>(new Map())
-  const [selectedApplicant, setSelectedApplicant] = useState<Ticket | null>(null)
+  const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [zoomLevel, setZoomLevel] = useState(1)
+
+  // Disable body scroll when on applicants page
+  useEffect(() => {
+    document.body.classList.add('no-scroll')
+    return () => {
+      document.body.classList.remove('no-scroll')
+    }
+  }, [])
+
+  // Keyboard shortcuts for zooming
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case '=':
+          case '+':
+            e.preventDefault()
+            setZoomLevel(prev => Math.min(1, prev + 0.1))
+            break
+          case '-':
+            e.preventDefault()
+            setZoomLevel(prev => Math.max(0.5, prev - 0.1))
+            break
+          case '0':
+            e.preventDefault()
+            setZoomLevel(1)
+            break
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Load applicants from BPOC applications table
   const fetchApplicants = useCallback(async () => {
@@ -535,7 +586,7 @@ export default function ApplicantsPage() {
       }
       const data: any[] = await res.json()
       // Map BPOC applications into board items with proper status mapping
-      const mapped: Ticket[] = data.map((a, index) => ({
+      const mapped: Applicant[] = data.map((a, index) => ({
         id: a.id,
         ticket_id: a.resume_slug || a.id,
         user_id: a.user_id,
@@ -566,7 +617,7 @@ export default function ApplicantsPage() {
         job_title: a.job_title || null,
         company_name: a.company_name || null,
       }))
-      setTickets(mapped)
+      setApplicants(mapped)
     } catch (e: any) {
       setError(e?.message || 'Failed to load applicants')
     } finally {
@@ -589,13 +640,13 @@ export default function ApplicantsPage() {
     const { active } = event
     setActiveId(active.id as string)
     
-    // Store the original status of the ticket being dragged
-    const activeTicket = tickets.find((item) => item.id.toString() === active.id)
-    if (activeTicket) {
-      setOriginalStatuses(prev => new Map(prev).set(active.id as string, activeTicket.status))
+    // Store the original status of the applicant being dragged
+    const activeApplicant = applicants.find((item) => item.id.toString() === active.id)
+    if (activeApplicant) {
+      setOriginalStatuses(prev => new Map(prev).set(active.id as string, activeApplicant.status))
       console.log('🎯 Drag started, storing original status:', { 
-        ticketId: active.id, 
-        originalStatus: activeTicket.status 
+        applicantId: active.id, 
+        originalStatus: activeApplicant.status 
       })
     }
     
@@ -614,30 +665,30 @@ export default function ApplicantsPage() {
   const handleDragOver = async (event: DragOverEvent) => {
     const { active, over } = event
     if (!active || !over) return
-    const activeTicket = tickets.find((item) => item.id.toString() === active.id)
-    if (!activeTicket) return
+    const activeApplicant = applicants.find((item) => item.id.toString() === active.id)
+    if (!activeApplicant) return
     
     console.log('🔄 DragOver event:', { 
       activeId: active.id, 
       overId: over.id, 
-      activeTicketStatus: activeTicket.status 
+      activeApplicantStatus: activeApplicant.status 
     })
     
     if (over.id.toString().startsWith('droppable-')) {
       const targetStatus = over.id.toString().replace('droppable-', '') as ApplicantStatus
       console.log('🎯 Target status from droppable:', targetStatus)
-      if (activeTicket.status !== targetStatus) {
+      if (activeApplicant.status !== targetStatus) {
         console.log('📝 Updating local state during drag...')
-        setTickets(prevTickets => prevTickets.map((item) => item.id.toString() === active.id ? { ...item, status: targetStatus } : item))
+        setApplicants(prevApplicants => prevApplicants.map((item) => item.id.toString() === active.id ? { ...item, status: targetStatus } : item))
       }
       return
     }
     
-    const overTicket = tickets.find((item) => item.id.toString() === over.id)
-    if (overTicket && activeTicket.id !== overTicket.id) {
-      if (activeTicket.status !== overTicket.status) {
-        console.log('📝 Updating local state during drag (over ticket):', overTicket.status)
-        setTickets(prevTickets => prevTickets.map((item) => item.id.toString() === active.id ? { ...item, status: overTicket.status as ApplicantStatus } : item))
+    const overApplicant = applicants.find((item) => item.id.toString() === over.id)
+    if (overApplicant && activeApplicant.id !== overApplicant.id) {
+      if (activeApplicant.status !== overApplicant.status) {
+        console.log('📝 Updating local state during drag (over applicant):', overApplicant.status)
+        setApplicants(prevApplicants => prevApplicants.map((item) => item.id.toString() === active.id ? { ...item, status: overApplicant.status as ApplicantStatus } : item))
       }
     }
   }
@@ -656,31 +707,31 @@ export default function ApplicantsPage() {
       return
     }
     
-    const activeTicket = tickets.find((item) => item.id.toString() === active.id)
-    if (!activeTicket) {
-      console.log('❌ Active ticket not found')
+    const activeApplicant = applicants.find((item) => item.id.toString() === active.id)
+    if (!activeApplicant) {
+      console.log('❌ Active applicant not found')
       return
     }
     
     // Get the original status that was stored when drag started
     const originalStatus = originalStatuses.get(active.id as string)
     if (!originalStatus) {
-      console.log('❌ Original status not found for ticket:', active.id)
+      console.log('❌ Original status not found for applicant:', active.id)
       return
     }
     
-    console.log('🎯 Active ticket found:', { 
-      id: activeTicket.id, 
-      currentStatus: activeTicket.status,
+    console.log('🎯 Active applicant found:', { 
+      id: activeApplicant.id, 
+      currentStatus: activeApplicant.status,
       originalStatus: originalStatus
     })
     
     // Check if the status actually changed during the drag operation
-    if (activeTicket.status !== originalStatus) {
+    if (activeApplicant.status !== originalStatus) {
       console.log('🔄 Status changed during drag:', { 
         from: originalStatus, 
-        to: activeTicket.status, 
-        applicationId: activeTicket.id 
+        to: activeApplicant.status, 
+        applicationId: activeApplicant.id 
       })
       
       // Update database
@@ -693,8 +744,8 @@ export default function ApplicantsPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            id: activeTicket.id,
-            status: activeTicket.status,
+            id: activeApplicant.id,
+            status: activeApplicant.status,
             previousStatus: originalStatus,
             recruiterId: user?.id || null
           })
@@ -704,7 +755,7 @@ export default function ApplicantsPage() {
         
         if (!response.ok) {
           // Revert local state if database update failed
-          setTickets((items) => items.map((item) => item.id.toString() === active.id ? { ...item, status: originalStatus } : item))
+          setApplicants((items) => items.map((item) => item.id.toString() === active.id ? { ...item, status: originalStatus } : item))
           const errorData = await response.json().catch(() => ({}))
           console.error('❌ Failed to update application status:', errorData.error)
         } else {
@@ -713,28 +764,28 @@ export default function ApplicantsPage() {
         }
       } catch (error) {
         // Revert local state if database update failed
-        setTickets((items) => items.map((item) => item.id.toString() === active.id ? { ...item, status: originalStatus } : item))
+        setApplicants((items) => items.map((item) => item.id.toString() === active.id ? { ...item, status: originalStatus } : item))
         console.error('❌ Error updating application status:', error)
       }
     } else {
       console.log('ℹ️ No status change detected during drag')
       
       // Handle reordering within the same status
-      const overTicket = tickets.find((item) => item.id.toString() === over.id)
-      if (overTicket && activeTicket.id !== overTicket.id && activeTicket.status === overTicket.status) {
-        const oldIndex = tickets.findIndex((item) => item.id.toString() === active.id)
-        const newIndex = tickets.findIndex((item) => item.id.toString() === over.id)
+      const overApplicant = applicants.find((item) => item.id.toString() === over.id)
+      if (overApplicant && activeApplicant.id !== overApplicant.id && activeApplicant.status === overApplicant.status) {
+        const oldIndex = applicants.findIndex((item) => item.id.toString() === active.id)
+        const newIndex = applicants.findIndex((item) => item.id.toString() === over.id)
         
         if (oldIndex !== newIndex) {
-          console.log('🔄 Reordering applicants within same status:', activeTicket.status)
+          console.log('🔄 Reordering applicants within same status:', activeApplicant.status)
           console.log('📊 Old index:', oldIndex, 'New index:', newIndex)
           
-          // Reorder the tickets and update positions
-          setTickets(prevTickets => {
-            const reorderedTickets = arrayMove(prevTickets, oldIndex, newIndex)
-            const statusTickets = reorderedTickets.filter(t => t.status === activeTicket.status)
-            const positionUpdates = statusTickets.map((ticket, index) => ({
-              id: ticket.id,
+          // Reorder the applicants and update positions
+          setApplicants(prevApplicants => {
+            const reorderedApplicants = arrayMove(prevApplicants, oldIndex, newIndex)
+            const statusApplicants = reorderedApplicants.filter(t => t.status === activeApplicant.status)
+            const positionUpdates = statusApplicants.map((applicant, index) => ({
+              id: applicant.id,
               position: index
             }))
             
@@ -764,9 +815,9 @@ export default function ApplicantsPage() {
               fetchApplicants()
             })
             
-            // Return updated tickets with new positions
-            return reorderedTickets.map((item) => {
-              const statusIndex = statusTickets.findIndex(t => t.id === item.id)
+            // Return updated applicants with new positions
+            return reorderedApplicants.map((item) => {
+              const statusIndex = statusApplicants.findIndex(t => t.id === item.id)
               if (statusIndex !== -1) {
                 return { ...item, position: statusIndex }
               }
@@ -785,15 +836,15 @@ export default function ApplicantsPage() {
     })
   }
 
-  const getTicketsByStatus = (status: ApplicantStatus) => {
-    const filteredTickets = tickets.filter(ticket => ticket.status === status)
-    return filteredTickets.sort((a, b) => a.position - b.position)
+  const getApplicantsByStatus = (status: ApplicantStatus) => {
+    const filteredApplicants = applicants.filter(applicant => applicant.status === status)
+    return filteredApplicants.sort((a, b) => a.position - b.position)
   }
 
 
 
-  const handleViewAllClick = useCallback((ticket: Ticket) => {
-    setSelectedApplicant(ticket)
+  const handleViewAllClick = useCallback((applicant: Applicant) => {
+    setSelectedApplicant(applicant)
     setIsModalOpen(true)
   }, [])
 
@@ -823,6 +874,46 @@ export default function ApplicantsPage() {
                       className="pl-8"
                     />
                   </div>
+
+                  {/* Zoom Controls */}
+                  <div className="flex items-center bg-muted/50 rounded-lg border border-border overflow-hidden">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setZoomLevel(prev => Math.max(0.5, prev - 0.1))}
+                      disabled={zoomLevel <= 0.5}
+                      className="h-9 w-9 p-0 rounded-none hover:bg-muted/80"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                      </svg>
+                    </Button>
+                    <div className="px-3 py-1 border-x border-border">
+                      <span className="text-sm font-medium text-foreground min-w-[50px] text-center block">
+                        {Math.round(zoomLevel * 100)}%
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setZoomLevel(prev => Math.min(1, prev + 0.1))}
+                      disabled={zoomLevel >= 1}
+                      className="h-9 w-9 p-0 rounded-none hover:bg-muted/80"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setZoomLevel(1)}
+                      className="h-9 px-2 text-xs border-l border-border rounded-none hover:bg-muted/80"
+                    >
+                      Reset
+                    </Button>
+                  </div>
+
                   <ReloadButton 
                     onReload={fetchApplicants}
                     loading={loading}
@@ -855,7 +946,11 @@ export default function ApplicantsPage() {
                     style={{ 
                       scrollBehavior: 'smooth',
                       scrollbarWidth: 'thin',
-                      msOverflowStyle: 'none'
+                      msOverflowStyle: 'none',
+                      transform: `scale(${zoomLevel})`,
+                      transformOrigin: 'top left',
+                      width: `${100 / zoomLevel}%`,
+                      height: `${100 / zoomLevel}%`
                     }}
                     onWheel={(e) => {
                       const target = e.target as HTMLElement;
@@ -874,12 +969,15 @@ export default function ApplicantsPage() {
                   >
                     {statuses.map((status) => (
                       <div key={status} className="flex-shrink-0 w-[400px]">
-                        <div className="bg-card border border-border rounded-xl transition-all duration-200 flex flex-col shadow-sm min-h-[200px] max-h-[calc(94vh-200px)] status-cell">
+                        <div className="bg-card border border-border rounded-xl transition-all duration-200 flex flex-col shadow-sm status-cell" style={{
+                          minHeight: `${200 / zoomLevel}px`,
+                          maxHeight: `calc(${94 / zoomLevel}vh - ${200 / zoomLevel}px)`
+                        }}>
                           <div className="flex-shrink-0 p-4">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-3">
                                 <Badge variant="outline" className={`${getStatusColor(status as ApplicantStatus)} px-3 py-1 font-medium rounded-xl`}>
-                                  {getStatusDisplayLabel(status)} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${getCircleColor(status as ApplicantStatus)}`}>{getTicketsByStatus(status as ApplicantStatus).length}</span>
+                                  {getStatusDisplayLabel(status)} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${getCircleColor(status as ApplicantStatus)}`}>{getApplicantsByStatus(status as ApplicantStatus).length}</span>
                                 </Badge>
                               </div>
                             </div>
@@ -887,22 +985,22 @@ export default function ApplicantsPage() {
                           <DroppableContainer status={status}>
                             <div className="flex-1 px-4 pb-4 cards-container">
                               <SortableContext
-                                items={getTicketsByStatus(status as ApplicantStatus).map(ticket => ticket.id.toString())}
+                                items={getApplicantsByStatus(status as ApplicantStatus).map(applicant => applicant.id.toString())}
                                 strategy={verticalListSortingStrategy}
                               >
-                                {getTicketsByStatus(status as ApplicantStatus).map((ticket, index, array) => (
-                                  <SortableTicket 
-                                    key={ticket.id} 
-                                    ticket={ticket}
+                                {getApplicantsByStatus(status as ApplicantStatus).map((applicant, index, array) => (
+                                  <SortableApplicant 
+                                    key={applicant.id} 
+                                    applicant={applicant}
                                     isLast={index === array.length - 1}
-                                    isExpanded={expandedTickets.has(ticket.id.toString())}
-                                    onToggleExpanded={(ticketId) => {
+                                    isExpanded={expandedTickets.has(applicant.id.toString())}
+                                    onToggleExpanded={(applicantId) => {
                                       setExpandedTickets(prev => {
                                         const newSet = new Set(prev)
-                                        if (newSet.has(ticketId)) {
-                                          newSet.delete(ticketId)
+                                        if (newSet.has(applicantId)) {
+                                          newSet.delete(applicantId)
                                         } else {
-                                          newSet.add(ticketId)
+                                          newSet.add(applicantId)
                                         }
                                         return newSet
                                       })
@@ -910,7 +1008,7 @@ export default function ApplicantsPage() {
                                     onViewAll={handleViewAllClick}
                                   />
                                 ))}
-                                {getTicketsByStatus(status as ApplicantStatus).length === 0 && (
+                                {getApplicantsByStatus(status as ApplicantStatus).length === 0 && (
                                   <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-xl bg-muted/20">
                                     <p className="text-sm font-medium">No Applicants</p>
                                   </div>
@@ -927,10 +1025,16 @@ export default function ApplicantsPage() {
 
                 <DragOverlay>
                   {activeId ? (
-                    <DraggingTicket 
-                      ticket={tickets.find(ticket => ticket.id.toString() === activeId)!}
-                      isExpanded={expandedTickets.has(activeId)}
-                    />
+                    <div style={{
+                      transform: `scale(${zoomLevel})`,
+                      transformOrigin: 'top left',
+                      width: '366px'
+                    }}>
+                      <DraggingApplicant 
+                        applicant={applicants.find(applicant => applicant.id.toString() === activeId)!}
+                        isExpanded={expandedTickets.has(activeId)}
+                      />
+                    </div>
                   ) : null}
                 </DragOverlay>
               </DndContext>

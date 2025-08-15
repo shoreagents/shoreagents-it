@@ -114,50 +114,63 @@ export async function PATCH(request: Request) {
     }
 
     // Now save to main database recruits table
-    try {
-      console.log('💾 Saving to main database recruits table...')
-      const recruitsQuery = `
-        INSERT INTO public.recruits (
-          bpoc_application_id, 
-          applicant_id, 
-          job_id, 
-          resume_slug, 
-          status, 
-          previous_status,
-          recruiter_id,
-          video_introduction_url,
-          current_salary,
-          expected_monthly_salary,
-          shift
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING id
-      `
-      
-      const recruitsParams = [
-        id, // bpoc_application_id
-        application.user_id, // applicant_id
-        application.job_id, // job_id
-        application.resume_slug, // resume_slug
-        status, // new status
-        previousStatus || currentStatus, // previous status
-        recruiterId, // recruiter_id (from frontend)
-        null, // video_introduction_url (can be updated later)
-        null, // current_salary (can be updated later)
-        null, // expected_monthly_salary (can be updated later)
-        null // shift (can be updated later)
-      ]
-      
-      console.log('📊 Executing recruits table insert with params:', recruitsParams)
-      console.log('👤 Recruiter ID being saved:', recruiterId)
-      console.log('📋 Recruits table insert query:', recruitsQuery)
-      
-      const recruitsResult = await pool.query(recruitsQuery, recruitsParams)
-      console.log('✅ Recruits table insert successful:', recruitsResult.rows[0])
-      
-    } catch (recruitsError) {
-      console.error('⚠️ Warning: Failed to save to main database:', recruitsError)
-      // Don't fail the entire request if main database save fails
-      // The BPOC update was successful
+    if (!pool) {
+      console.log('⚠️ Warning: Main database pool not available, skipping recruits table update')
+    } else {
+      try {
+        console.log('💾 Saving to main database recruits table...')
+        
+        // Check if a recruit record already exists for this application
+        const checkRecruitQuery = `
+          SELECT id FROM public.recruits WHERE bpoc_application_id = $1
+        `
+        const existingRecruit = await pool.query(checkRecruitQuery, [id])
+        
+        if (existingRecruit.rows.length > 0) {
+          // Update existing record
+          console.log('📝 Updating existing recruit record...')
+          const updateRecruitQuery = `
+            UPDATE public.recruits 
+            SET status = $1, updated_at = now()
+            WHERE bpoc_application_id = $2
+            RETURNING id
+          `
+          const updateResult = await pool.query(updateRecruitQuery, [status, id])
+          console.log('✅ Recruit record updated successfully:', updateResult.rows[0])
+        } else {
+          // Insert new record
+          console.log('📝 Creating new recruit record...')
+          const recruitsQuery = `
+            INSERT INTO public.recruits (
+              bpoc_application_id, 
+              applicant_id, 
+              job_id, 
+              resume_slug, 
+              status
+            ) VALUES ($1, $2, $3, $4, $5)
+            RETURNING id
+          `
+          
+          const recruitsParams = [
+            id, // bpoc_application_id
+            application.user_id, // applicant_id
+            application.job_id, // job_id
+            application.resume_slug, // resume_slug
+            status // new status
+          ]
+          
+          console.log('📊 Executing recruits table insert with params:', recruitsParams)
+          console.log('📋 Recruits table insert query:', recruitsQuery)
+          
+          const recruitsResult = await pool.query(recruitsQuery, recruitsParams)
+          console.log('✅ Recruits table insert successful:', recruitsResult.rows[0])
+        }
+        
+      } catch (recruitsError) {
+        console.error('⚠️ Warning: Failed to save to main database:', recruitsError)
+        // Don't fail the entire request if main database save fails
+        // The BPOC update was successful
+      }
     }
 
     console.log('✅ Application status updated successfully in BPOC database:', rows[0])
