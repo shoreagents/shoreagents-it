@@ -43,7 +43,7 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
-type TicketStatus = 'submitted' | 'screened' | 'for verification' | 'verified' | 'initial interview' | 'final interview' | 'failed' | 'passed'
+type ApplicantStatus = 'submitted' | 'screened' | 'for verification' | 'verified' | 'initial interview' | 'final interview' | 'failed' | 'passed'
 
 interface Ticket {
   id: string
@@ -55,7 +55,7 @@ interface Ticket {
   category: string
   category_id: number | null
   category_name?: string
-  status: TicketStatus
+  status: ApplicantStatus
   position: number
   resolved_by: string | null
   resolved_at: string | null
@@ -270,7 +270,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
   )
 })
 
-const getStatusColor = (status: TicketStatus) => {
+const getStatusColor = (status: ApplicantStatus) => {
   switch (status) {
     case "submitted":
       return "text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20"
@@ -293,7 +293,7 @@ const getStatusColor = (status: TicketStatus) => {
   }
 }
 
-const getCircleColor = (status: TicketStatus) => {
+const getCircleColor = (status: ApplicantStatus) => {
   switch (status) {
     case "submitted":
       return "bg-blue-600/20 dark:bg-blue-600/40 text-blue-700 dark:text-white"
@@ -471,8 +471,8 @@ function TicketsSkeleton() {
               <div className="flex-shrink-0 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={`${getStatusColor(status as TicketStatus)} px-3 py-1 font-medium rounded-xl`}>
-                      {getStatusDisplayLabel(status)} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${getCircleColor(status as TicketStatus)}`}>
+                    <Badge variant="outline" className={`${getStatusColor(status as ApplicantStatus)} px-3 py-1 font-medium rounded-xl`}>
+                      {getStatusDisplayLabel(status)} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${getCircleColor(status as ApplicantStatus)}`}>
                         <Skeleton className="h-3 w-3 rounded-xl" />
                       </span>
                     </Badge>
@@ -519,7 +519,7 @@ export default function ApplicantsPage() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [originalStatuses, setOriginalStatuses] = useState<Map<string, TicketStatus>>(new Map())
+  const [originalStatuses, setOriginalStatuses] = useState<Map<string, ApplicantStatus>>(new Map())
   const [selectedApplicant, setSelectedApplicant] = useState<Ticket | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -545,7 +545,7 @@ export default function ApplicantsPage() {
         category: 'Application',
         category_id: null,
         category_name: 'Application',
-        status: a.status as TicketStatus,
+        status: a.status as ApplicantStatus,
         position: a.position || index, // Use position from API or fallback to index
         resolved_by: null,
         resolved_at: null,
@@ -624,7 +624,7 @@ export default function ApplicantsPage() {
     })
     
     if (over.id.toString().startsWith('droppable-')) {
-      const targetStatus = over.id.toString().replace('droppable-', '') as TicketStatus
+      const targetStatus = over.id.toString().replace('droppable-', '') as ApplicantStatus
       console.log('🎯 Target status from droppable:', targetStatus)
       if (activeTicket.status !== targetStatus) {
         console.log('📝 Updating local state during drag...')
@@ -637,7 +637,7 @@ export default function ApplicantsPage() {
     if (overTicket && activeTicket.id !== overTicket.id) {
       if (activeTicket.status !== overTicket.status) {
         console.log('📝 Updating local state during drag (over ticket):', overTicket.status)
-        setTickets(prevTickets => prevTickets.map((item) => item.id.toString() === active.id ? { ...item, status: overTicket.status as TicketStatus } : item))
+        setTickets(prevTickets => prevTickets.map((item) => item.id.toString() === active.id ? { ...item, status: overTicket.status as ApplicantStatus } : item))
       }
     }
   }
@@ -785,7 +785,7 @@ export default function ApplicantsPage() {
     })
   }
 
-  const getTicketsByStatus = (status: TicketStatus) => {
+  const getTicketsByStatus = (status: ApplicantStatus) => {
     const filteredTickets = tickets.filter(ticket => ticket.status === status)
     return filteredTickets.sort((a, b) => a.position - b.position)
   }
@@ -797,7 +797,7 @@ export default function ApplicantsPage() {
     setIsModalOpen(true)
   }, [])
 
-  const statuses: TicketStatus[] = ["submitted", "screened", "for verification", "verified", "initial interview", "passed", "final interview", "failed"]
+  const statuses: ApplicantStatus[] = ["submitted", "screened", "for verification", "verified", "initial interview", "passed", "final interview", "failed"]
 
   return (
     <>
@@ -878,8 +878,8 @@ export default function ApplicantsPage() {
                           <div className="flex-shrink-0 p-4">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-3">
-                                <Badge variant="outline" className={`${getStatusColor(status as TicketStatus)} px-3 py-1 font-medium rounded-xl`}>
-                                  {getStatusDisplayLabel(status)} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${getCircleColor(status as TicketStatus)}`}>{getTicketsByStatus(status as TicketStatus).length}</span>
+                                <Badge variant="outline" className={`${getStatusColor(status as ApplicantStatus)} px-3 py-1 font-medium rounded-xl`}>
+                                  {getStatusDisplayLabel(status)} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${getCircleColor(status as ApplicantStatus)}`}>{getTicketsByStatus(status as ApplicantStatus).length}</span>
                                 </Badge>
                               </div>
                             </div>
@@ -887,10 +887,10 @@ export default function ApplicantsPage() {
                           <DroppableContainer status={status}>
                             <div className="flex-1 px-4 pb-4 cards-container">
                               <SortableContext
-                                items={getTicketsByStatus(status as TicketStatus).map(ticket => ticket.id.toString())}
+                                items={getTicketsByStatus(status as ApplicantStatus).map(ticket => ticket.id.toString())}
                                 strategy={verticalListSortingStrategy}
                               >
-                                {getTicketsByStatus(status as TicketStatus).map((ticket, index, array) => (
+                                {getTicketsByStatus(status as ApplicantStatus).map((ticket, index, array) => (
                                   <SortableTicket 
                                     key={ticket.id} 
                                     ticket={ticket}
@@ -910,7 +910,7 @@ export default function ApplicantsPage() {
                                     onViewAll={handleViewAllClick}
                                   />
                                 ))}
-                                {getTicketsByStatus(status as TicketStatus).length === 0 && (
+                                {getTicketsByStatus(status as ApplicantStatus).length === 0 && (
                                   <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-xl bg-muted/20">
                                     <p className="text-sm font-medium">No Applicants</p>
                                   </div>
