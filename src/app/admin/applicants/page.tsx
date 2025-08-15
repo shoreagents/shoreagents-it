@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { IconSearch, IconGripVertical, IconCalendar, IconClock, IconEye, IconFileText } from "@tabler/icons-react"
 import { ReloadButton } from "@/components/ui/reload-button"
 import { useAuth } from "@/contexts/auth-context"
+import { ApplicantsDetailModal } from "@/components/modals/applicants-detail-modal"
 import {
   DndContext,
   closestCorners,
@@ -519,6 +520,8 @@ export default function ApplicantsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [originalStatuses, setOriginalStatuses] = useState<Map<string, TicketStatus>>(new Map())
+  const [selectedApplicant, setSelectedApplicant] = useState<Ticket | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   // Load applicants from BPOC applications table
   const fetchApplicants = useCallback(async () => {
@@ -790,8 +793,8 @@ export default function ApplicantsPage() {
 
 
   const handleViewAllClick = useCallback((ticket: Ticket) => {
-    // Placeholder: No modal/details for Applicants yet
-    console.log('View applicant', ticket.id)
+    setSelectedApplicant(ticket)
+    setIsModalOpen(true)
   }, [])
 
   const statuses: TicketStatus[] = ["submitted", "screened", "for verification", "verified", "initial interview", "passed", "final interview", "failed"]
@@ -935,6 +938,16 @@ export default function ApplicantsPage() {
           </div>
         </div>
       </SidebarInset>
+
+      {/* Applicants Detail Modal */}
+      <ApplicantsDetailModal
+        applicant={selectedApplicant}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false)
+          setSelectedApplicant(null)
+        }}
+      />
     </>
   )
 }
