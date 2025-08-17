@@ -644,7 +644,7 @@ function ApplicantSkeleton() {
 function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applicant: Applicant; isExpanded: boolean; onStatusUpdate: (applicantId: string, jobIndex: number, newStatus: string) => void }) {
   
   return (
-    <Card className="mb-3 p-4 overflow-hidden bg-sidebar dark:bg-[#252525] border-primary">
+    <Card className="mb-3 p-4 cursor-grabbing overflow-hidden bg-sidebar dark:bg-[#252525] border-primary">
       <div className="flex flex-col">
         <div className="flex-1 min-w-0 relative">
           <div className="cursor-grab active:cursor-grabbing transition-colors duration-200 absolute top-0 right-0">
