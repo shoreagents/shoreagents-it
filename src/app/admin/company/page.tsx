@@ -153,7 +153,6 @@ export default function CompaniesPage() {
                   <Button 
                     variant="outline" 
                     onClick={() => setIsAddCompanyModalOpen(true)} 
-                    className="text-sm h-9 rounded-lg shadow-none flex items-center gap-2"
                   >
                     <IconPlus className="h-4 w-4" />
                     Add Company

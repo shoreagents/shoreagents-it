@@ -44,17 +44,26 @@ export async function startListening() {
     // Listen for ticket changes
     await notificationClient.query('LISTEN ticket_changes')
     
+    // Listen for applicant changes
+    await notificationClient.query('LISTEN applicant_changes')
+    
     notificationClient.on('notification', (msg: any) => {
       try {
         const payload = JSON.parse(msg.payload)
         console.log('Received notification:', payload)
+        
+        // Determine message type based on channel
+        let messageType = 'ticket_update'
+        if (msg.channel === 'applicant_changes') {
+          messageType = 'applicant_update'
+        }
         
         // Broadcast to all connected WebSocket clients
         if (wss) {
           wss.clients.forEach((client) => {
             if (client.readyState === 1) { // WebSocket.OPEN
               client.send(JSON.stringify({
-                type: 'ticket_update',
+                type: messageType,
                 data: payload
               }))
             }
@@ -66,7 +75,7 @@ export async function startListening() {
     })
     
     isListening = true
-    console.log('Started listening for PostgreSQL notifications')
+    console.log('Started listening for PostgreSQL notifications (tickets & applicants)')
   } catch (error) {
     console.error('Error starting notification listener:', error)
   }
@@ -76,9 +85,10 @@ export async function startListening() {
 export async function stopListening() {
   try {
     await notificationClient.query('UNLISTEN ticket_changes')
+    await notificationClient.query('UNLISTEN applicant_changes')
     await notificationClient.end()
     isListening = false
-    console.log('Stopped listening for PostgreSQL notifications')
+    console.log('Stopped listening for PostgreSQL notifications (tickets & applicants)')
   } catch (error) {
     console.error('Error stopping notification listener:', error)
   }

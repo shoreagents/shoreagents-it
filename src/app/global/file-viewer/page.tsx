@@ -441,8 +441,8 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
                style={{ width: `${(zoom - 0.1) / (5 - 0.1) * 100}%` }}
              ></div>
              <div 
-               className="absolute top-1/2 left-0 w-3.5 h-3.5 bg-teal-500 rounded-full transform -translate-y-1/2 cursor-pointer hover:bg-teal-400 transition-colors"
-               style={{ left: `${(zoom - 0.1) / (5 - 0.1) * 100}%` }}
+               className="absolute top-1/2 w-3.5 h-3.5 bg-teal-500 rounded-full transform -translate-y-1/2 cursor-pointer hover:bg-teal-400 transition-colors"
+               style={{ left: `calc(${(zoom - 0.1) / (5 - 0.1) * 100}% - 7px)` }}
              ></div>
            </div>
            <IconZoomIn 

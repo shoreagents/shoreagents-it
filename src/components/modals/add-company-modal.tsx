@@ -6,17 +6,18 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload } from "@tabler/icons-react"
-import { ColorPicker } from "@/components/ui/color-picker"
+
+import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink } from "@tabler/icons-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/auth-context"
+import { ColorPicker } from "@/components/ui/color-picker"
+
 
 interface AddCompanyModalProps {
   isOpen: boolean
@@ -30,16 +31,16 @@ interface CompanyData {
   phone: string
   country: string
   service: string
-  website: string[]
+  website: string
   logo?: File | null
   badge_color?: string
   status?: string
 }
 
 const serviceOptions = [
-  { value: 'workforce', label: 'Workforce', color: 'bg-blue-100 text-blue-800' },
-  { value: 'one agent', label: 'One Agent', color: 'bg-red-100 text-red-800' },
-  { value: 'team', label: 'Team', color: 'bg-yellow-100 text-yellow-800' }
+  { value: 'one agent', label: 'One Agent' },
+  { value: 'team', label: 'Team' },
+  { value: 'workforce', label: 'Workforce' }
 ]
 
 const countryOptions = [
@@ -52,13 +53,15 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded }: AddCompanyM
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [countrySearch, setCountrySearch] = React.useState('')
   const [isColorPickerOpen, setIsColorPickerOpen] = React.useState(false)
+  const [inputWidth, setInputWidth] = React.useState(0)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [formData, setFormData] = React.useState<CompanyData>({
     company: '',
     address: '',
     phone: '',
     country: '',
     service: '',
-    website: [''],
+    website: '',
     logo: null,
     badge_color: '',
     status: 'Current Client'
@@ -91,42 +94,41 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded }: AddCompanyM
     try {
       setIsSubmitting(true)
       
-                 // Here you would typically make an API call to create the company
-           // const formDataToSend = new FormData()
-           // formDataToSend.append('company', formData.company)
-           // formDataToSend.append('address', formData.address)
-           // formDataToSend.append('phone', formData.phone)
-           // formDataToSend.append('country', formData.country)
-           // formDataToSend.append('service', formData.service)
-           // formData.website.forEach((url, index) => {
-           //   if (url.trim()) {
-           //     formDataToSend.append(`website[${index}]`, url)
-           //   }
-           // })
-           // if (formData.logo) {
-           //   formDataToSend.append('logo', formData.logo)
-           // }
-           // if (formData.badge_color) {
-           //   formDataToSend.append('badge_color', formData.badge_color)
-           // }
-           // if (formData.status) {
-           //   formDataToSend.append('status', formData.status)
-           // }
+      // Create FormData for API call
+      const formDataToSend = new FormData()
+      formDataToSend.append('company', formData.company)
+      formDataToSend.append('address', formData.address)
+      formDataToSend.append('phone', formData.phone)
+      formDataToSend.append('country', formData.country)
+      formDataToSend.append('service', formData.service)
+      formDataToSend.append('website', formData.website)
+      if (formData.logo) {
+        formDataToSend.append('logo', formData.logo)
+      }
+      if (formData.badge_color) {
+        formDataToSend.append('badge_color', formData.badge_color)
+      }
+      if (formData.status) {
+        formDataToSend.append('status', formData.status)
+      }
       
-      // const response = await fetch('/api/companies', {
-      //   method: 'POST',
-      //   body: formDataToSend
-      // })
+      const response = await fetch('/api/companies', {
+        method: 'POST',
+        body: formDataToSend
+      })
       
-      // if (!response.ok) throw new Error('Failed to create company')
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create company')
+      }
       
-      // const newCompany = await response.json()
+      const result = await response.json()
       
-      console.log('Company created successfully:', formData)
+      console.log('Company created successfully:', result.company)
       
       // Call the callback if provided
       if (onCompanyAdded) {
-        onCompanyAdded(formData)
+        onCompanyAdded(result.company)
       }
       
       // Reset form and close modal
@@ -136,7 +138,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded }: AddCompanyM
         phone: '',
         country: '',
         service: '',
-        website: [''],
+        website: '',
         logo: null,
         badge_color: '',
         status: 'Current Client'
@@ -145,7 +147,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded }: AddCompanyM
       
     } catch (error) {
       console.error('Error creating company:', error)
-      alert('Failed to create company. Please try again.')
+      alert(error instanceof Error ? error.message : 'Failed to create company. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -158,279 +160,261 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded }: AddCompanyM
       phone: '',
       country: '',
       service: '',
-      website: [''],
+      website: '',
       logo: null,
       badge_color: '',
       status: 'Current Client'
     })
   }
 
-  return (
-    <TooltipProvider>
+  React.useEffect(() => {
+    if (isOpen && fileInputRef.current) {
+      setInputWidth(fileInputRef.current.offsetWidth);
+    }
+  }, [isOpen])
 
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0 rounded-xl" style={{ 
-          backgroundColor: theme === 'dark' ? '#111111' : '#f8f9fa' 
-        }}>
-          <div className="flex flex-col h-[90vh]">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border">
-              <div className="flex items-center gap-3">
-                <IconBuilding className="h-6 w-6 text-primary" />
-                <h2 className="text-xl font-semibold">Add New Company</h2>
-              </div>
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                ✕
-              </Button>
-            </div>
-
-            {/* Form Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                                     {/* Company Basic Information */}
-                     <Card>
-                       <CardHeader>
-                         <CardTitle className="text-lg flex items-center gap-2">
-                           <IconBuilding className="h-5 w-5" />
-                           Company Information
-                         </CardTitle>
-                       </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="company">Name *</Label>
-                        <Input
-                          id="company"
-                          placeholder="Enter company name"
-                          value={formData.company}
-                          onChange={(e) => handleInputChange('company', e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="service">Service *</Label>
-                        <Select value={formData.service} onValueChange={(value) => handleInputChange('service', value)}>
-                                                       <SelectTrigger>
-                               <SelectValue placeholder="Select Type" />
-                             </SelectTrigger>
-                          <SelectContent>
-                            {serviceOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className={option.color}>
-                                    {option.label}
-                                  </Badge>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                                             <div className="grid grid-cols-2 gap-4">
-                                                        <div className="space-y-2">
-                               <Label htmlFor="badge_color">Badge Color</Label>
-                                                                                             <div className="flex items-center gap-2">
-                                <div className="relative flex-1">
-                                  <ColorPicker
-                                    color={formData.badge_color}
-                                    onChange={(color) => handleInputChange('badge_color', color)}
-                                    open={isColorPickerOpen}
-                                    onOpenChange={setIsColorPickerOpen}
-                                  >
-                                    <div 
-                                      className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 rounded-full border border-border cursor-pointer" 
-                                      style={{ backgroundColor: formData.badge_color || '#3B82F6' }}
-                                      title="Click to open color picker"
-                                    />
-                                  </ColorPicker>
-                                  <Input
-                                    id="badge_color"
-                                    placeholder="e.g., #3B82F6"
-                                    value={formData.badge_color}
-                                    onChange={(e) => handleInputChange('badge_color', e.target.value)}
-                                    className="pl-10"
-                                  />
-                                </div>
-                              </div>
-                             </div>
-                           <div className="space-y-2">
-                             <Label htmlFor="status">Status</Label>
-                             <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
-                               <SelectTrigger>
-                                 <SelectValue placeholder="Select status" />
-                               </SelectTrigger>
-                                                                <SelectContent>
-                                   <SelectItem value="Current Client">Current Client</SelectItem>
-                                   <SelectItem value="Lost Client">Lost Client</SelectItem>
-                                 </SelectContent>
-                             </Select>
-                           </div>
-                         </div>
-
-                         {/* Company Logo */}
-                         <div className="space-y-2">
-                           <Label htmlFor="logo">Company Logo</Label>
-                           <div className="flex items-center gap-4">
-                             <div className="flex items-center gap-2">
-                               <Input
-                                 id="logo"
-                                 type="file"
-                                 accept="image/*"
-                                 onChange={handleLogoUpload}
-                                 className="max-w-xs"
-                               />
-                               <span className="text-sm text-muted-foreground">Upload logo (optional)</span>
-                             </div>
-                             {formData.logo && (
-                               <div className="flex items-center gap-2">
-                                 <Avatar className="h-12 w-12">
-                                   <AvatarImage src={URL.createObjectURL(formData.logo)} alt="Preview" />
-                                   <AvatarFallback>LO</AvatarFallback>
-                                 </Avatar>
-                                 <span className="text-sm text-muted-foreground">{formData.logo.name}</span>
-                               </div>
-                             )}
-                           </div>
-                         </div>
-                  </CardContent>
-                </Card>
-
-                {/* Contact Information */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <IconPhone className="h-5 w-5" />
-                      Contact Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number *</Label>
-                        <Input
-                          id="phone"
-                          placeholder="Enter phone number"
-                          value={formData.phone}
-                          onChange={(e) => handleInputChange('phone', e.target.value)}
-                          required
-                        />
-                      </div>
-                                                 <div className="space-y-2">
-                             <Label htmlFor="website">Website(s)</Label>
-                             <div className="space-y-2">
-                               {formData.website.map((url, index) => (
-                                 <div key={index} className="flex gap-2">
-                                   <Input
-                                     placeholder="Enter website URL"
-                                     value={url}
-                                     onChange={(e) => {
-                                       const newWebsites = [...formData.website]
-                                       newWebsites[index] = e.target.value
-                                       setFormData(prev => ({ ...prev, website: newWebsites }))
-                                     }}
-                                     type="url"
-                                   />
-                                   {formData.website.length > 1 && (
-                                     <Button
-                                       type="button"
-                                       variant="outline"
-                                       size="sm"
-                                       onClick={() => {
-                                         const newWebsites = formData.website.filter((_, i) => i !== index)
-                                         setFormData(prev => ({ ...prev, website: newWebsites }))
-                                       }}
-                                       className="px-2"
-                                     >
-                                       ✕
-                                     </Button>
-                                   )}
-                                 </div>
-                               ))}
-                               <Button
-                                 type="button"
-                                 variant="outline"
-                                 size="sm"
-                                 onClick={() => setFormData(prev => ({ ...prev, website: [...prev.website, ''] }))}
-                                 className="text-xs"
-                               >
-                                 + Add Another Website
-                               </Button>
-                             </div>
-                           </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Location Information */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <IconMapPin className="h-5 w-5" />
-                      Location Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="address">Address *</Label>
-                        <Input
-                          id="address"
-                          placeholder="Enter company address"
-                          value={formData.address}
-                          onChange={(e) => handleInputChange('address', e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="country">Country *</Label>
-                                                 <Select value={formData.country} onValueChange={(value) => handleInputChange('country', value)}>
-                                                        <SelectTrigger>
-                               <SelectValue placeholder="Select Country" />
-                             </SelectTrigger>
-                           <SelectContent className="p-0">
-                             <div className="sticky top-0 z-10 border-b p-1">
-                               <Input
-                                 placeholder="Search countries..."
-                                 value={countrySearch}
-                                 onChange={(e) => setCountrySearch(e.target.value)}
-                                 className="mb-2"
-                               />
-                             </div>
-                             <div className="max-h-[300px] overflow-y-auto">
-                               {filteredCountries.map((country) => (
-                                 <SelectItem key={country} value={country}>
-                                   {country}
-                                 </SelectItem>
-                               ))}
-                             </div>
-                           </SelectContent>
-                         </Select>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                
-
-                {/* Form Actions */}
-                <div className="flex items-center justify-end gap-3 pt-4 border-t">
-                  <Button type="button" variant="outline" onClick={resetForm}>
-                    Reset Form
-                  </Button>
-                  <Button type="button" variant="outline" onClick={onClose}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? 'Creating...' : 'Create Company'}
-                  </Button>
-                </div>
-              </form>
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl overflow-hidden p-0 rounded-xl bg-background dark:bg-[#111111]">
+        <DialogTitle className="sr-only">Add New Company</DialogTitle>
+        <div className="flex flex-col">
+          {/* Header */}
+          <div className="flex items-center px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border">
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold">Add New Company</h2>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-    </TooltipProvider>
+
+          {/* Form Content */}
+          <div className="p-6">
+            <form id="add-company-form" onSubmit={handleSubmit} className="space-y-6">
+              {/* Row 1: Name & Service */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="company">Name *</Label>
+                  <div className="relative">
+                    <IconBuilding className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="company"
+                      placeholder="Enter company name"
+                      value={formData.company}
+                      onChange={(e) => handleInputChange('company', e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="service">Service *</Label>
+                  <Select value={formData.service} onValueChange={(value) => handleInputChange('service', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {serviceOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Row 2: Address, Phone & Country */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address *</Label>
+                  <div className="relative">
+                    <IconMapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="address"
+                      placeholder="Enter company address"
+                      value={formData.address}
+                      onChange={(e) => handleInputChange('address', e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number *</Label>
+                  <div className="relative">
+                    <IconPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="phone"
+                      placeholder="Enter phone number"
+                      value={formData.phone}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      className="pl-10"
+                      type="tel"
+                      inputMode="numeric"
+                      onKeyDown={(e) => {
+                        // Allow: backspace, delete, tab, escape, enter, and navigation keys
+                        if ([8, 9, 27, 13, 46, 37, 38, 39, 40].includes(e.keyCode) ||
+                            // Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+                            (e.keyCode === 65 && e.ctrlKey === true) ||
+                            (e.keyCode === 67 && e.ctrlKey === true) ||
+                            (e.keyCode === 86 && e.ctrlKey === true) ||
+                            (e.keyCode === 88 && e.ctrlKey === true)) {
+                          return;
+                        }
+                        // Ensure that it is a number and stop the keypress
+                        if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) &&
+                            (e.keyCode < 96 || e.keyCode > 105)) {
+                          e.preventDefault();
+                        }
+                      }}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="country">Country *</Label>
+                  <Select value={formData.country} onValueChange={(value) => handleInputChange('country', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Country" />
+                    </SelectTrigger>
+                    <SelectContent className="p-0">
+                      <div className="sticky top-0 z-10 border-b px-0 py-0">
+                        <div className="relative">
+                          <IconSearch className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search countries..."
+                            value={countrySearch}
+                            onChange={(e) => setCountrySearch(e.target.value)}
+                            className="!bg-sidebar pl-8 border-0 focus:ring-0 shadow-none"
+                            onKeyDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-[300px] overflow-y-auto">
+                        {filteredCountries.map((country) => (
+                          <SelectItem key={country} value={country}>
+                            {country}
+                          </SelectItem>
+                        ))}
+                      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Row 3: Badge Color & Status */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="badge_color">
+                    Badge Color
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <ColorPicker
+                        color={formData.badge_color}
+                        onChange={(color) => handleInputChange('badge_color', color)}
+                        open={isColorPickerOpen}
+                        onOpenChange={setIsColorPickerOpen}
+                      >
+                        <div 
+                          className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 rounded-full border border-border cursor-pointer shadow-sm" 
+                          style={{ backgroundColor: formData.badge_color || '#3B82F6' }}
+                          title="Click to open color picker"
+                        />
+                      </ColorPicker>
+                      <Input
+                        id="badge_color"
+                        placeholder="e.g., #3B82F6"
+                        value={formData.badge_color}
+                        onChange={(e) => handleInputChange('badge_color', e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Current Client">Current Client</SelectItem>
+                      <SelectItem value="Lost Client">Lost Client</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Row 4: Website & Company Logo */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="website">Website</Label>
+                  <div className="relative">
+                    <IconLink className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="website"
+                      placeholder="Enter website URL"
+                      value={formData.website}
+                      onChange={(e) => handleInputChange('website', e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="logo">Company Logo</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="relative flex-1">
+                      <input
+                        id="logo"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                      />
+                      <div className="flex">
+                        <input
+                          ref={fileInputRef}
+                          type="text"
+                          placeholder="Choose file..."
+                          value={formData.logo ? (() => {
+                            const name = formData.logo.name;
+                            if (name.length <= 20) return name;
+                            const extension = name.split('.').pop();
+                            const nameWithoutExt = name.substring(0, name.lastIndexOf('.'));
+                            if (nameWithoutExt.length <= 12) return name;
+                            return nameWithoutExt.substring(0, 12) + '...' + extension;
+                          })() : ''}
+                          readOnly
+                          disabled
+                          className="flex-1 h-9 px-3 border border-l border-t border-b border-sidebar-border bg-sidebar text-muted-foreground rounded-l-lg text-sm shadow-sm transition-colors dark:bg-sidebar dark:text-muted-foreground dark:border-border cursor-default"
+                        />
+                                                  <label
+                            htmlFor="logo"
+                            className="flex items-center justify-center h-9 px-4 border border-l-0 border-sidebar-border bg-[#ebebeb] rounded-r-lg cursor-pointer hover:bg-[#e3e3e3] transition-colors text-sm font-medium dark:bg-[#0a0a0a] dark:hover:bg-[#121212] dark:border-border"
+                            title="Choose logo file"
+                          >
+                          Browse
+                        </label>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Form Actions Footer */}
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t bg-sidebar">
+            <Button type="button" variant="ghost" onClick={resetForm}>
+              Reset
+            </Button>
+            <Button type="submit" form="add-company-form" disabled={isSubmitting}>
+              {isSubmitting ? 'Adding...' : 'Add Company'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

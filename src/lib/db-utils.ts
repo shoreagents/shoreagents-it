@@ -95,7 +95,7 @@ export async function getAllTickets(): Promise<Ticket[]> {
     LEFT JOIN public.agents a ON t.user_id = a.user_id
     LEFT JOIN public.clients c ON t.user_id = c.user_id
     LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
-    WHERE t.role_id = 1 AND t.status != 'For Approval' AND (t.status != 'Closed' OR t.resolved_at >= NOW() - INTERVAL '7 days')
+    WHERE t.role_id = 1 AND (t.status != 'Closed' OR t.resolved_at >= NOW() - INTERVAL '7 days')
     ORDER BY t.status, t.position ASC, t.created_at DESC
   `)
   return result.rows
@@ -138,9 +138,9 @@ export async function getAllTicketsAdmin(): Promise<Ticket[]> {
   return result.rows
 }
 
-// Get tickets by status (filtered by IT role, excluding For Approval)
+// Get tickets by status (filtered by IT role)
 export async function getTicketsByStatus(status: string, past: boolean = false): Promise<Ticket[]> {
-  let whereConditions = ['t.status = $1', 't.role_id = 1', 't.status != \'For Approval\'']
+  let whereConditions = ['t.status = $1', 't.role_id = 1']
   let queryParams = [status]
   let paramIndex = 2
   
@@ -150,6 +150,8 @@ export async function getTicketsByStatus(status: string, past: boolean = false):
   }
   
   const whereClause = whereConditions.join(' AND ')
+  
+  console.log('getTicketsByStatus: Status:', status, 'Where clause:', whereClause, 'Params:', queryParams)
   
   const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
@@ -183,6 +185,8 @@ export async function getTicketsByStatus(status: string, past: boolean = false):
     WHERE ${whereClause}
     ORDER BY t.position ASC, t.created_at DESC
   `, queryParams)
+  
+  console.log('getTicketsByStatus: Query result rows:', result.rows.length)
   return result.rows
 }
 
@@ -230,6 +234,8 @@ export async function getTicketsByStatusAdmin(status: string): Promise<Ticket[]>
     WHERE ${whereClause}
     ORDER BY t.position ASC, t.created_at DESC
   `, queryParams)
+  
+  console.log('getTicketsByStatusAdmin: Query result rows:', result.rows.length)
   return result.rows
 }
 
@@ -430,7 +436,7 @@ export async function getTicketsByUser(userId: number): Promise<Ticket[]> {
     LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
     LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
     LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
-    WHERE t.user_id = $1 AND t.role_id = 1 AND t.status != 'For Approval' AND (t.status != 'Closed' OR t.resolved_at >= NOW() - INTERVAL '7 days')
+    WHERE t.user_id = $1 AND t.role_id = 1 AND (t.status != 'Closed' OR t.resolved_at >= NOW() - INTERVAL '7 days')
     ORDER BY t.created_at DESC
   `, [userId])
   return result.rows

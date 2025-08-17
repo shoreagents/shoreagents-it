@@ -128,11 +128,35 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
 
   const handleCardClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement
-    if (target.closest('[data-drag-handle]') || target.closest('.cursor-grab')) {
+    
+    // Check if the click target is an interactive element that should not trigger card expansion
+    if (target.closest('[data-drag-handle]') || 
+        target.closest('.cursor-grab') ||
+        target.closest('[data-radix-popover-trigger]') ||
+        target.closest('[role="button"]') ||
+        target.closest('button') ||
+        target.closest('input') ||
+        target.closest('select') ||
+        target.closest('textarea') ||
+        target.closest('[data-state]') ||
+        target.closest('[aria-expanded]') ||
+        target.closest('[aria-haspopup]') ||
+        target.closest('[aria-controls]') ||
+        target.closest('.popover-trigger') ||
+        target.closest('.status-badge') ||
+        target.closest('.interactive-element')) {
       e.preventDefault()
       e.stopPropagation()
       return
     }
+    
+    // Additional check: if the target has any data-* attributes, it's likely interactive
+    if (target.hasAttribute('data-') || target.closest('[data-]')) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+    
     onToggleExpanded(ticket.id.toString())
   }, [onToggleExpanded, ticket.id])
 
@@ -509,7 +533,7 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
                 <Button 
                   size="sm" 
                   variant="outline" 
-                  className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040]"
+                  className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99]"
                 >
                   <IconMessage className="h-4 w-4 mr-px" />
                   <span>Chat</span>
@@ -517,7 +541,7 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
                 <Button 
                   size="sm" 
                   variant="outline" 
-                  className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040]"
+                  className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99]"
                 >
                   <IconEye className="h-4 w-4 mr-px" />
                   <span>View All</span>

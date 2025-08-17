@@ -60,11 +60,13 @@ export async function GET(request: NextRequest) {
       // Admin flag to include For Approval and remove role filter
       const adminParam = searchParams.get('admin')
       const isAdmin = (adminParam ?? '') === 'true'
+      console.log('API: Status requested:', status, 'IsAdmin:', isAdmin)
       if (isAdmin) {
         tickets = await getTicketsByStatusAdmin(status as string)
       } else {
         tickets = await getTicketsByStatus(status as string)
       }
+      console.log('API: Tickets returned:', tickets.length)
     } else {
       // Admin flag to include all statuses including For Approval
       const adminParam2 = searchParams.get('admin')

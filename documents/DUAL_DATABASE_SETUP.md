@@ -81,7 +81,7 @@ npm run test-bpoc-db     # Test BPOC database
 
 ### **Step 3: Test Dual Updates**
 1. Start your server: `npm run dev:web`
-2. Go to `/admin/applicants`
+2. Go to `/admin/bpoc-applicants` (labeled as "BPOC" in the sidebar)
 3. Drag a card from "New" to "Screened"
 4. Check both databases for the update
 
@@ -90,7 +90,7 @@ npm run test-bpoc-db     # Test BPOC database
 ### **When You Drag & Drop:**
 
 1. **Frontend**: Card moves to new status column
-2. **API Call**: PATCH request sent to `/api/applicants`
+2. **API Call**: PATCH request sent to `/api/bpoc-applicants`
 3. **BPOC Update**: Status updated in `applications` table
 4. **Main DB Insert**: New record added to `recruits` table
 5. **Success**: Both databases updated, UI reflects changes

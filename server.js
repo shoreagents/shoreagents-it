@@ -36,17 +36,26 @@ async function startListening() {
     // Listen for ticket changes
     await notificationClient.query('LISTEN ticket_changes')
     
+    // Listen for applicant changes
+    await notificationClient.query('LISTEN applicant_changes')
+    
     notificationClient.on('notification', (msg) => {
       try {
         const payload = JSON.parse(msg.payload)
         console.log('Received notification:', payload)
+        
+        // Determine message type based on channel
+        let messageType = 'ticket_update'
+        if (msg.channel === 'applicant_changes') {
+          messageType = 'applicant_update'
+        }
         
         // Broadcast to all connected WebSocket clients
         if (wss) {
           wss.clients.forEach((client) => {
             if (client.readyState === 1) { // WebSocket.OPEN
               client.send(JSON.stringify({
-                type: 'ticket_update',
+                type: messageType,
                 data: payload
               }))
             }
@@ -58,7 +67,7 @@ async function startListening() {
     })
     
     isListening = true
-    console.log('Started listening for PostgreSQL notifications')
+    console.log('Started listening for PostgreSQL notifications (tickets & applicants)')
   } catch (error) {
     console.error('Error starting notification listener:', error)
   }
@@ -68,6 +77,8 @@ app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true)
+      
+      // Handle API routes and other Next.js routes
       await handle(req, res, parsedUrl)
     } catch (err) {
       console.error('Error occurred handling', req.url, err)

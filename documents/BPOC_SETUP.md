@@ -46,7 +46,7 @@ Testing BPOC database connection...
 
 Once the database connection works:
 1. Start your development server: `npm run dev:web`
-2. Navigate to `/admin/applicants`
+2. Navigate to `/admin/bpoc-applicants` (labeled as "BPOC" in the sidebar)
 3. The page should load applicants from the BPOC database
 4. You can drag and drop applications between status columns
 5. Status changes are automatically saved to the database

@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { useAuth } from "@/contexts/auth-context"
+import { TicketDetailModal } from "@/components/modals/ticket-detail-modal"
 
 
 type TicketStatus = 'On Hold' | 'In Progress' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
@@ -47,14 +48,40 @@ interface Ticket {
   last_name: string | null
   resolver_first_name?: string
   resolver_last_name?: string
+  sector: string
+  employee_id: string | null
+  supporting_files?: string[]
+  file_count?: number
+  user_email?: string
+  user_type?: string
+  member_company?: string
+  member_name?: string
+  member_color?: string
+  member_address?: string
+  member_phone?: string
+  department_name?: string
+  agent_exp_points?: number
+  job_title?: string
+  shift_period?: string
+  shift_schedule?: string
+  shift_time?: string
+  work_setup?: string
+  employment_status?: string
+  hire_type?: string
+  staff_source?: string
+  start_date?: string
+  exit_date?: string
+  resolved_by_name?: string
+  resolved_by_email?: string
 }
 
-function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUser }: { 
+function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUser, onRowClick }: { 
   tickets: Ticket[]
   onSort: (field: string) => void
   sortField: string
   sortDirection: 'asc' | 'desc'
   currentUser: any
+  onRowClick: (ticket: Ticket) => void
 }) {
   const formatDate = (dateString: string) => {
     // Parse the UTC timestamp and convert to Asia/Manila timezone
@@ -109,43 +136,43 @@ function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUs
     <div className="rounded-xl border overflow-x-auto bg-card">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead onClick={() => onSort('ticket_id')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'ticket_id' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+          <TableRow className="hover:bg-transparent dark:hover:bg-transparent">
+            <TableHead onClick={() => onSort('ticket_id')} className={`cursor-pointer hover:bg-accent dark:hover:bg-[#0f0f0f] transition-colors ${sortField === 'ticket_id' ? 'text-primary font-medium bg-accent/50' : ''}`}>
               <div className="flex items-center gap-1">
                 Ticket ID <span className="w-4 h-4">{sortField === 'ticket_id' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
               </div>
             </TableHead>
-            <TableHead onClick={() => onSort('category_name')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'category_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+            <TableHead onClick={() => onSort('category_name')} className={`cursor-pointer hover:bg-accent dark:hover:bg-[#0f0f0f] transition-colors ${sortField === 'category_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
               <div className="flex items-center gap-1">
                 Category <span className="w-4 h-4">{sortField === 'category_name' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
               </div>
             </TableHead>
-            <TableHead onClick={() => onSort('first_name')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'first_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+            <TableHead onClick={() => onSort('first_name')} className={`cursor-pointer hover:bg-accent dark:hover:bg-[#0f0f0f] transition-colors ${sortField === 'first_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
               <div className="flex items-center gap-1">
                 User <span className="w-4 h-4">{sortField === 'first_name' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
               </div>
             </TableHead>
-            <TableHead onClick={() => onSort('concern')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'concern' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+            <TableHead onClick={() => onSort('concern')} className={`cursor-pointer hover:bg-accent dark:hover:bg-[#0f0f0f] transition-colors ${sortField === 'concern' ? 'text-primary font-medium bg-accent/50' : ''}`}>
               <div className="flex items-center gap-1">
                 Concern <span className="w-4 h-4">{sortField === 'concern' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
               </div>
             </TableHead>
-            <TableHead onClick={() => onSort('details')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'details' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+            <TableHead onClick={() => onSort('details')} className={`cursor-pointer hover:bg-accent dark:hover:bg-[#0f0f0f] transition-colors ${sortField === 'details' ? 'text-primary font-medium bg-accent/50' : ''}`}>
               <div className="flex items-center gap-1">
                 Additional Details <span className="w-4 h-4">{sortField === 'details' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
               </div>
             </TableHead>
-            <TableHead onClick={() => onSort('created_at')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'created_at' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+            <TableHead onClick={() => onSort('created_at')} className={`cursor-pointer hover:bg-accent dark:hover:bg-[#0f0f0f] transition-colors ${sortField === 'created_at' ? 'text-primary font-medium bg-accent/50' : ''}`}>
               <div className="flex items-center gap-1">
                 Filed at <span className="w-4 h-4">{sortField === 'created_at' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
               </div>
             </TableHead>
-            <TableHead onClick={() => onSort('resolved_at')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'resolved_at' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+            <TableHead onClick={() => onSort('resolved_at')} className={`cursor-pointer hover:bg-accent dark:hover:bg-[#0f0f0f] transition-colors ${sortField === 'resolved_at' ? 'text-primary font-medium bg-accent/50' : ''}`}>
               <div className="flex items-center gap-1">
                 Resolved at <span className="w-4 h-4">{sortField === 'resolved_at' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
               </div>
             </TableHead>
-            <TableHead onClick={() => onSort('resolver_first_name')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'resolver_first_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+            <TableHead onClick={() => onSort('resolver_first_name')} className={`cursor-pointer hover:bg-accent dark:hover:bg-[#0f0f0f] transition-colors ${sortField === 'resolver_first_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
               <div className="flex items-center gap-1">
                 Resolved By <span className="w-4 h-4">{sortField === 'resolver_first_name' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
               </div>
@@ -154,7 +181,11 @@ function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUs
         </TableHeader>
         <TableBody>
           {tickets.map((ticket) => (
-            <TableRow key={ticket.id}>
+            <TableRow 
+              key={ticket.id} 
+              className="cursor-pointer"
+              onClick={() => onRowClick(ticket)}
+            >
               <TableCell className="font-mono text-sm text-muted-foreground">
                 {ticket.ticket_id}
               </TableCell>
@@ -251,7 +282,7 @@ function PastTicketsSkeleton() {
     <div className="rounded-md border overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="hover:bg-transparent dark:hover:bg-transparent">
             <TableHead><Skeleton className="h-4 w-16" /></TableHead>
             <TableHead><Skeleton className="h-4 w-20" /></TableHead>
             <TableHead><Skeleton className="h-4 w-12" /></TableHead>
@@ -307,6 +338,8 @@ export default function PastTicketsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([])
   const [resolvedByUserCount, setResolvedByUserCount] = useState<number>(0)
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   // Initial fetch
   useEffect(() => {
@@ -420,6 +453,16 @@ export default function PastTicketsPage() {
     setCurrentPage(1) // Reset to first page when sorting
   }
 
+  const handleRowClick = (ticket: Ticket) => {
+    setSelectedTicket(ticket)
+    setIsModalOpen(true)
+  }
+
+  const handleModalClose = () => {
+    setIsModalOpen(false)
+    setSelectedTicket(null)
+  }
+
   // Remove client-side filtering since it's now server-side
   const pastTickets = tickets
 
@@ -505,7 +548,7 @@ export default function PastTicketsPage() {
                     {pastTickets.length > 0 ? (
                       <div className="flex flex-col justify-between h-full">
                         <div className="flex-1">
-                          <PastTicketsTable tickets={pastTickets} onSort={handleSort} sortField={sortField} sortDirection={sortDirection} currentUser={user} />
+                          <PastTicketsTable tickets={pastTickets} onSort={handleSort} sortField={sortField} sortDirection={sortDirection} currentUser={user} onRowClick={handleRowClick} />
                         </div>
                         
                         {/* Pagination Controls */}
@@ -575,6 +618,12 @@ export default function PastTicketsPage() {
           </div>
         </div>
       </SidebarInset>
+      
+      <TicketDetailModal 
+        ticket={selectedTicket}
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+      />
     </>
   )
 } 

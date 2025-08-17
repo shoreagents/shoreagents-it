@@ -12,14 +12,19 @@ import {
   HandshakeIcon,
   UserPlusIcon,
   StarIcon,
+  FileTextIcon,
 } from "lucide-react"
 import { ScanTextIcon } from "@/components/icons/scan-text-icon"
+import { IconFileText } from "@tabler/icons-react"
 import { HistoryIcon } from "@/components/ui/history"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useNewTicketsCount } from "@/hooks/use-new-tickets-count"
+import { useNewApplicantsCount } from "@/hooks/use-new-applicants-count"
 
 import { NavMain } from "@/components/nav/nav-main"
+import { NavMainWithSubgroups } from "@/components/nav/nav-main-with-subgroups"
 import { NavSecondary } from "@/components/nav/nav-secondary"
 import {
   Sidebar,
@@ -36,11 +41,31 @@ import {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { user, loading } = useAuth()
+  const { newTicketsCount, error: ticketsError, isConnected } = useNewTicketsCount()
+  const { newApplicantsCount, error: applicantsError, isConnected: applicantsIsConnected } = useNewApplicantsCount()
 
   const role = (user as any)?.roleName?.toLowerCase() || "it"
   const isAdmin = role === "admin"
+  
+  // Debug logging
+  console.log('AppSidebar: User:', user)
+  console.log('AppSidebar: Role:', role)
+  console.log('AppSidebar: IsAdmin:', isAdmin)
+  console.log('AppSidebar: NewTicketsCount:', newTicketsCount)
+  console.log('AppSidebar: TicketsError:', ticketsError)
+  console.log('AppSidebar: WebSocket Connected:', isConnected)
+  console.log('AppSidebar: NewApplicantsCount:', newApplicantsCount)
+  console.log('AppSidebar: ApplicantsError:', applicantsError)
+  console.log('AppSidebar: ApplicantsWebSocket Connected:', applicantsIsConnected)
+  
 
-  const navMain = isAdmin
+
+  const navMain: Array<{
+    title: string
+    url: string
+    icon?: any
+    badge?: number
+  }> = isAdmin
     ? [
         {
           title: "Dashboard",
@@ -56,12 +81,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         },
       ]
 
-  const navSupport = isAdmin
+  const navSupport: Array<{
+    title: string
+    url: string
+    icon?: any
+    badge?: number
+  }> = isAdmin
     ? [
         {
           title: "Tickets",
           url: "/admin/tickets",
           icon: ScanTextIcon,
+          badge: newTicketsCount > 0 ? newTicketsCount : undefined,
         },
         {
           title: "Records",
@@ -74,6 +105,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: "Tickets",
           url: "/it/tickets",
           icon: ScanTextIcon,
+          badge: newTicketsCount > 0 ? newTicketsCount : undefined,
         },
         {
           title: "Records",
@@ -82,7 +114,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         },
       ]
 
-  const navSecondary = [
+  const navSecondary: Array<{
+    title: string
+    url: string
+    icon?: any
+    badge?: number
+  }> = [
     {
       title: "Settings",
       url: "#",
@@ -153,12 +190,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent className="group-data-[collapsible=icon]:mt-8">
         <SidebarGroup className="p-0">
           <SidebarGroupLabel>MAIN</SidebarGroupLabel>
-          <NavMain items={navMain as any} />
+          <NavMain items={navMain} />
         </SidebarGroup>
         {navSupport.length > 0 && (
           <SidebarGroup className="p-0">
             <SidebarGroupLabel>SUPPORT</SidebarGroupLabel>
-            <NavMain items={navSupport as any} />
+            <NavMain items={navSupport} />
           </SidebarGroup>
         )}
         {isAdmin && (
@@ -168,7 +205,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               items={[
                 { title: "Agents", url: "/admin/agents", icon: UsersIcon },
                 { title: "Internal", url: "/admin/internal", icon: UserCircleIcon },
-              ] as any}
+              ]}
             />
           </SidebarGroup>
         )}
@@ -179,22 +216,30 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               items={[
                 { title: "Companies", url: "/admin/company", icon: Building2Icon },
                 { title: "Clients", url: "/admin/clients", icon: HandshakeIcon },
-              ] as any}
+              ]}
             />
           </SidebarGroup>
         )}
         {isAdmin && (
           <SidebarGroup className="p-0">
             <SidebarGroupLabel>RECRUITMENT</SidebarGroupLabel>
-            <NavMain
+            <NavMainWithSubgroups
               items={[
-                { title: "Applicants", url: "/admin/applicants", icon: UserPlusIcon },
-                { title: "Talent Pool", url: "/admin/talent-pool", icon: StarIcon },
-              ] as any}
+                {
+                  title: "Applicants",
+                  icon: FileTextIcon,
+                  items: [
+                    { title: "BPOC", url: "/admin/bpoc-applicants", badge: newApplicantsCount > 0 ? newApplicantsCount : undefined },
+                    { title: "Forms", url: "/admin/forms" },
+                  ]
+                },
+                { title: "Talent Pool", url: "/admin/talent-pool", icon: StarIcon }
+              ]}
             />
           </SidebarGroup>
         )}
-        <NavSecondary items={navSecondary as any} className="mt-auto" />
+
+        <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
     </Sidebar>
   )

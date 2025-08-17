@@ -132,11 +132,35 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
 
   const handleCardClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement
-    if (target.closest('[data-drag-handle]') || target.closest('.cursor-grab')) {
+    
+    // Check if the click target is an interactive element that should not trigger card expansion
+    if (target.closest('[data-drag-handle]') || 
+        target.closest('.cursor-grab') ||
+        target.closest('[data-radix-popover-trigger]') ||
+        target.closest('[role="button"]') ||
+        target.closest('button') ||
+        target.closest('input') ||
+        target.closest('select') ||
+        target.closest('textarea') ||
+        target.closest('[data-state]') ||
+        target.closest('[aria-expanded]') ||
+        target.closest('[aria-haspopup]') ||
+        target.closest('[aria-controls]') ||
+        target.closest('.popover-trigger') ||
+        target.closest('.status-badge') ||
+        target.closest('.interactive-element')) {
       e.preventDefault()
       e.stopPropagation()
       return
     }
+    
+    // Additional check: if the target has any data-* attributes, it's likely interactive
+    if (target.hasAttribute('data-') || target.closest('[data-]')) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+    
     onToggleExpanded(ticket.id.toString())
   }, [onToggleExpanded, ticket.id])
 
@@ -318,7 +342,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
                     <Button 
                       size="sm" 
                       variant="outline" 
-                      className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] inline-flex items-center"
+                      className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99] inline-flex items-center"
                       onMouseDown={(e) => { e.stopPropagation() }}
                       onClick={(e) => { e.stopPropagation() }}
                     >
@@ -339,8 +363,10 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
                             <button
                               key={role.id}
                               data-state={isActiveRole ? 'checked' : undefined}
-                              className={`relative w-full text-left text-sm py-1.5 pl-2 pr-8 rounded-lg transition-colors flex items-center hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent/90 data-[state=checked]:bg-gray-200 data-[state=checked]:text-sidebar-accent-foreground dark:data-[state=checked]:bg-teal-600/30 dark:data-[state=checked]:text-white`}
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAssignRole(role.id) }}
+                              className={`relative w-full text-left text-sm py-1.5 pl-2 pr-8 rounded-lg transition-colors flex items-center hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent/90 ${
+                                isActiveRole ? 'cursor-default' : ''
+                              }`}
+                              onClick={isActiveRole ? undefined : (e) => { e.preventDefault(); e.stopPropagation(); handleAssignRole(role.id) }}
                             >
                               <span>{role.name}</span>
                               {isActiveRole && (
@@ -358,7 +384,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
                 <Button 
                   size="sm" 
                   variant="outline" 
-                  className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] inline-flex items-center"
+                  className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99] inline-flex items-center"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onViewAll(ticket) }}
                 >
                   <IconEye className="h-4 w-4 mr-px" />

@@ -80,44 +80,44 @@ type TicketStatus = 'For Approval' | 'On Hold' | 'In Progress' | 'New' | 'Approv
 const getStatusColor = (status: TicketStatus) => {
   switch (status) {
     case "For Approval":
-      return "text-yellow-700 dark:text-white border-yellow-600/20 bg-yellow-50 dark:bg-yellow-600/20"
+      return "text-yellow-700 dark:text-white bg-yellow-50 dark:bg-yellow-600/20"
     case "On Hold":
-      return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
+      return "text-gray-700 dark:text-white bg-gray-50 dark:bg-gray-600/20"
     case "In Progress":
-      return "text-orange-700 dark:text-white border-orange-600/20 bg-orange-50 dark:bg-orange-600/20"
+      return "text-orange-700 dark:text-white bg-orange-50 dark:bg-orange-600/20"
     case "New":
     case "Approved":
-      return "text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20"
+      return "text-blue-700 dark:text-white bg-blue-50 dark:bg-blue-600/20"
     case "Stuck":
-      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
+      return "text-red-700 dark:text-white bg-red-50 dark:bg-red-600/20"
     case "Actioned":
-      return "text-purple-700 dark:text-white border-purple-600/20 bg-purple-50 dark:bg-purple-600/20"
+      return "text-purple-700 dark:text-white bg-purple-50 dark:bg-purple-600/20"
     case "Closed":
-      return "text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20"
+      return "text-green-700 dark:text-white bg-green-50 dark:bg-green-600/20"
     default:
-      return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
+      return "text-gray-700 dark:text-white bg-gray-50 dark:bg-gray-600/20"
   }
 }
 
 const getStatusIcon = (status: TicketStatus) => {
   switch (status) {
     case "For Approval":
-      return <IconAlertCircle className="h-4 w-4" />
+      return <IconCircle className="h-4 w-4 fill-yellow-500 stroke-none" />
     case "On Hold":
-      return <IconClock className="h-4 w-4" />
+      return <IconCircle className="h-4 w-4 fill-gray-500 stroke-none" />
     case "In Progress":
-      return <IconEdit className="h-4 w-4" />
+      return <IconCircle className="h-4 w-4 fill-orange-500 stroke-none" />
     case "New":
     case "Approved":
-      return <IconCircle className="h-4 w-4" />
+      return <IconCircle className="h-4 w-4 fill-blue-500 stroke-none" />
     case "Stuck":
-      return <IconAlertCircle className="h-4 w-4" />
+      return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
     case "Actioned":
-      return <IconCircle className="h-4 w-4" />
+      return <IconCircle className="h-4 w-4 fill-purple-500 stroke-none" />
     case "Closed":
-      return <IconCircle className="h-4 w-4" />
+      return <IconCircle className="h-4 w-4 fill-green-500 stroke-none" />
     default:
-      return <IconInfoCircle className="h-4 w-4" />
+      return <IconCircle className="h-4 w-4 fill-gray-500 stroke-none" />
   }
 }
 
@@ -360,46 +360,49 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                       
                       {/* Status */}
                       <div className="flex items-center gap-2">
-                        <IconCircle className="h-4 w-4 text-muted-foreground" />
+                        {getStatusIcon(currentStatus || ticket.status)}
                         <span className="text-muted-foreground">Status:</span>
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button variant="ghost" className="h-auto p-0 hover:bg-muted/50 active:bg-muted/70 transition-colors">
-                              <Badge variant="outline" className={`${getStatusColor(currentStatus || ticket.status)} px-2 py-1 text-xs cursor-pointer hover:opacity-80 transition-opacity`}>
-                                {getDisplayStatus(currentStatus || ticket.status, isAdmin)}
-                              </Badge>
+                                                              <Badge variant="secondary" className={`${getStatusColor(currentStatus || ticket.status)} px-2 py-1 text-xs cursor-pointer hover:opacity-80 transition-opacity`}>
+                                  {getDisplayStatus(currentStatus || ticket.status, isAdmin)}
+                                </Badge>
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-56 p-2">
                             <div className="space-y-1">
-                              {statusOptions.map((option) => (
-                                <div 
-                                  key={option.value}
-                                  className={`flex items-center gap-3 p-1.5 rounded-md cursor-pointer transition-all duration-200 ${
-                                    (currentStatus || ticket.status) === option.value 
-                                      ? 'bg-primary/10 text-primary border border-primary/20' 
-                                      : 'hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
-                                  }`}
-                                  onClick={() => handleStatusChange(option.value)}
-                                >
-                                  {option.icon === 'yellow' ? (
-                                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                                  ) : option.icon === 'orange' ? (
-                                    <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                                  ) : option.icon === 'blue' ? (
-                                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                                  ) : option.icon === 'green' ? (
-                                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                                  ) : option.icon === 'red' ? (
-                                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                                  ) : option.icon === 'purple' ? (
-                                    <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                                  ) : (
-                                    <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-                                  )}
-                                  <span className="text-sm font-medium">{option.label}</span>
-                                </div>
-                              ))}
+                              {statusOptions.map((option) => {
+                                const isCurrentStatus = getDisplayStatus(currentStatus || ticket.status, isAdmin) === option.label;
+                                return (
+                                  <div 
+                                    key={option.value}
+                                    className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
+                                      isCurrentStatus 
+                                        ? 'bg-primary/10 text-primary border border-primary/20 cursor-default' 
+                                        : 'hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground cursor-pointer'
+                                    }`}
+                                    onClick={isCurrentStatus ? undefined : () => handleStatusChange(option.value)}
+                                  >
+                                    {option.icon === 'yellow' ? (
+                                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                    ) : option.icon === 'orange' ? (
+                                      <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                                    ) : option.icon === 'blue' ? (
+                                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                                    ) : option.icon === 'green' ? (
+                                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                    ) : option.icon === 'red' ? (
+                                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                    ) : option.icon === 'purple' ? (
+                                      <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                                    ) : (
+                                      <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                                    )}
+                                    <span className="text-sm font-medium">{option.label}</span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </PopoverContent>
                         </Popover>
@@ -423,9 +426,9 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                       <div className="flex items-center gap-2">
                         <IconTag className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Category:</span>
-                        <Badge variant="outline" className={`${categoryBadge.color} px-2 py-1 text-xs`}>
-                          {categoryBadge.name}
-                        </Badge>
+                                        <Badge variant="secondary" className={`text-xs h-6 flex items-center ${categoryBadge.color}`}>
+                  {categoryBadge.name}
+                </Badge>
                       </div>
                       
                       {/* Station */}
@@ -627,7 +630,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                                   </div>
                                   <span className="text-sm font-medium truncate">{userName}</span>
                                 </div>
-                                <span className="text-xs text-muted-foreground whitespace-nowrap ml-3">{commentDate.date} • {commentDate.time}</span>
+                                <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-3">{commentDate.date} • {commentDate.time}</span>
                               </div>
                               <div className="text-sm text-foreground leading-relaxed mt-1 whitespace-pre-wrap break-words">
                                 {comment.comment}
