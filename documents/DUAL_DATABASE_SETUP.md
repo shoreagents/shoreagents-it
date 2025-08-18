@@ -90,7 +90,7 @@ npm run test-bpoc-db     # Test BPOC database
 ### **When You Drag & Drop:**
 
 1. **Frontend**: Card moves to new status column
-2. **API Call**: PATCH request sent to `/api/bpoc-applicants`
+2. **API Call**: PATCH request sent to `/api/bpoc`
 3. **BPOC Update**: Status updated in `applications` table
 4. **Main DB Insert**: New record added to `recruits` table
 5. **Success**: Both databases updated, UI reflects changes

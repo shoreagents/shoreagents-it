@@ -351,7 +351,7 @@ export default function PastTicketsPage() {
   const fetchCategories = async () => {
     try {
       console.log('Fetching categories...')
-      const response = await fetch('/api/ticket-categories')
+              const response = await fetch('/api/tickets/categories')
       console.log('Categories response status:', response.status)
       
       if (response.ok) {

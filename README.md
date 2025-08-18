@@ -95,7 +95,7 @@ The app includes a comprehensive dashboard with:
 The app includes integration with a BPOC database for managing job applicants:
 
 - 👥 **Applicants Management** - Drag and drop interface for application status tracking
-- 📊 **Status Columns** - Submitted, Screened, Verify, Verified, Interview, Failed, Passed, Rejected
+- 📊 **Status Columns** - Submitted, Qualified, For Verification, Verified, Initial Interview, Final Interview, Not Qualified, Passed, Rejected, Withdrawn, Hired
 - 🔄 **Real-time Updates** - Status changes are automatically saved to the database
 - 📝 **Application Details** - View applicant information, job details, and company information
 

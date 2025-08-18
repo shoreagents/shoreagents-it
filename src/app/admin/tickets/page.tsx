@@ -892,6 +892,23 @@ export default function TicketsPage() {
     })
   )
 
+  // Compute fractional insert position within a target list
+  const calculateInsertPosition = (targetTickets: any[], dropIndex: number) => {
+    const sorted = [...targetTickets].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    if (sorted.length === 0) return 1
+    if (dropIndex <= 0) {
+      const firstPos = sorted[0]?.position ?? 1
+      return Math.max(0.1, Number(firstPos) / 2)
+    }
+    if (dropIndex >= sorted.length) {
+      const lastPos = sorted[sorted.length - 1]?.position ?? 0
+      return Number(lastPos) + 1
+    }
+    const prevPos = Number(sorted[dropIndex - 1].position ?? 0)
+    const nextPos = Number(sorted[dropIndex].position ?? prevPos + 1)
+    return Number(((prevPos + nextPos) / 2).toFixed(3))
+  }
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string)
     
@@ -991,7 +1008,13 @@ export default function TicketsPage() {
         })
         
         // Update database
-        updateTicketStatus(activeTicket.id, targetStatus)
+        await updateTicketStatus(activeTicket.id, targetStatus)
+        // Compute target list and place at bottom of target column by default
+        const targetList = tickets.filter(t => t.status === targetStatus && t.id !== activeTicket.id)
+        const dropIndex = targetList.length
+        const newPos = calculateInsertPosition(targetList, dropIndex)
+        await updateTicketPosition(activeTicket.id, newPos)
+        setTickets(items => items.map(it => it.id === activeTicket.id ? { ...it, position: newPos, status: targetStatus } : it))
       } else {
         // Status unchanged - ticket already in targetStatus status
       }
@@ -1013,58 +1036,22 @@ export default function TicketsPage() {
         })
         
         // Update database
-        updateTicketStatus(activeTicket.id, overTicket.status)
+        await updateTicketStatus(activeTicket.id, overTicket.status)
+        // Compute fractional position in the target column relative to the hovered ticket
+        const targetList = tickets.filter(t => t.status === overTicket.status && t.id !== activeTicket.id)
+        const idx = targetList.findIndex(t => t.id === overTicket.id)
+        const dropIndex = idx === -1 ? targetList.length : idx
+        const newPos = calculateInsertPosition(targetList, dropIndex)
+        await updateTicketPosition(activeTicket.id, newPos)
+        setTickets(items => items.map(it => it.id === activeTicket.id ? { ...it, position: newPos, status: overTicket.status as TicketStatus } : it))
       } else {
-        // Same status, reordering - only update database since visual changes already happened
-        const oldIndex = tickets.findIndex((item) => item.id.toString() === active.id)
-        const newIndex = tickets.findIndex((item) => item.id.toString() === over.id)
-        
-        if (oldIndex !== newIndex) {
-          console.log('🔄 Reordering tickets within same status:', activeTicket.status)
-          console.log('📊 Old index:', oldIndex, 'New index:', newIndex)
-          
-          // Reorder the tickets and update positions
-          setTickets(prevTickets => {
-            const reorderedTickets = arrayMove(prevTickets, oldIndex, newIndex)
-            const statusTickets = reorderedTickets.filter(t => t.status === activeTicket.status)
-            const positionUpdates = statusTickets.map((ticket, index) => ({
-              id: ticket.id,
-              position: index
-            }))
-            
-            console.log('📊 Position updates:', positionUpdates)
-            
-            // Update positions in database
-            fetch('/api/tickets/positions', {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ positions: positionUpdates }),
-            }).then(response => {
-              if (response.ok) {
-                console.log('✅ Positions updated successfully')
-              } else {
-                console.error('❌ Failed to update ticket positions')
-                // Revert on error
-                fetchTickets()
-              }
-            }).catch(error => {
-              console.error('❌ Error updating ticket positions:', error)
-              // Revert on error
-              fetchTickets()
-            })
-            
-            // Return updated tickets with new positions
-            return reorderedTickets.map((item) => {
-              const statusIndex = statusTickets.findIndex(t => t.id === item.id)
-              if (statusIndex !== -1) {
-                return { ...item, position: statusIndex }
-              }
-              return item
-            })
-          })
-        }
+        // Same status, reordering - compute a fractional position for the moved ticket only
+        const targetList = tickets.filter(t => t.status === activeTicket.status && t.id !== activeTicket.id)
+        const overIdx = targetList.findIndex(t => t.id.toString() === over.id)
+        const dropIndex = overIdx === -1 ? targetList.length : overIdx
+        const newPos = calculateInsertPosition(targetList, dropIndex)
+        await updateTicketPosition(activeTicket.id, newPos)
+        setTickets(prev => prev.map(it => it.id === activeTicket.id ? { ...it, position: newPos } : it))
       }
     }
   }

@@ -36,18 +36,20 @@ export async function PATCH(request: Request) {
     }
 
     // Validate status against the allowed final statuses (matching BPOC database enum)
-    const validStatuses = ['withdrawn', 'final interview', 'hired', 'failed']
+    const validStatuses = ['withdrawn', 'qualified', 'final interview', 'hired', 'failed', 'not qualified']
     if (!validStatuses.includes(newStatus.toLowerCase())) {
       console.log('❌ Invalid status value:', newStatus)
-      return NextResponse.json({ error: 'Invalid status value. Must be one of: withdrawn, final interview, hired, failed' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid status value. Must be one of: withdrawn, qualified, final interview, hired, failed, not qualified' }, { status: 400 })
     }
 
     // Map frontend status to database enum value if needed
     const statusMapping: Record<string, string> = {
       'withdrawn': 'withdrawn',
+      'qualified': 'qualified',
       'final interview': 'final interview',
       'hired': 'hired',
-      'failed': 'failed'
+      'failed': 'not qualified',
+      'not qualified': 'not qualified'
     }
     
     const dbStatus = statusMapping[newStatus.toLowerCase()] || newStatus

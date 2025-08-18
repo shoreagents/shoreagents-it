@@ -278,7 +278,7 @@ export default function PastTicketsPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/ticket-categories')
+              const response = await fetch('/api/tickets/categories')
       if (response.ok) {
         const data = await response.json()
         setCategories(data)

@@ -94,8 +94,8 @@ const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
     case "submitted":
       return "text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20"
-    case "screened":
-      return "text-orange-700 dark:text-white border-orange-600/20 bg-orange-50 dark:bg-orange-600/20"
+    case "qualified":
+      return "text-yellow-700 dark:text-white border-yellow-600/20 bg-yellow-50 dark:bg-yellow-600/20"
     case "for verification":
       return "text-teal-700 dark:text-white border-teal-600/20 bg-teal-50 dark:bg-teal-600/20"
     case "verified":
@@ -104,7 +104,11 @@ const getStatusColor = (status: string) => {
       return "text-amber-700 dark:text-white border-amber-600/20 bg-amber-50 dark:bg-amber-600/20"
     case "final interview":
       return "text-pink-700 dark:text-white border-pink-600/20 bg-pink-50 dark:bg-pink-600/20"
+    case "not qualifies":
+      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
     case "failed":
+      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
+    case "not qualified":
       return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
     case "passed":
       return "text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20"
@@ -122,8 +126,8 @@ const getStatusIcon = (status: string) => {
   switch (status.toLowerCase()) {
     case "submitted":
       return <IconCircle className="h-4 w-4 fill-blue-500 stroke-none" />
-    case "screened":
-      return <IconCircle className="h-4 w-4 fill-orange-500 stroke-none" />
+    case "qualified":
+      return <IconCircle className="h-4 w-4 fill-yellow-500 stroke-none" />
     case "for verification":
       return <IconCircle className="h-4 w-4 fill-teal-500 stroke-none" />
     case "verified":
@@ -132,7 +136,11 @@ const getStatusIcon = (status: string) => {
       return <IconCircle className="h-4 w-4 fill-amber-500 stroke-none" />
     case "final interview":
       return <IconCircle className="h-4 w-4 fill-pink-500 stroke-none" />
+    case "not qualifies":
+      return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
     case "failed":
+      return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
+    case "not qualified":
       return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
     case "passed":
       return <IconCircle className="h-4 w-4 fill-green-500 stroke-none" />
@@ -150,12 +158,13 @@ const getStatusIcon = (status: string) => {
 const getStatusLabel = (status: string) => {
   const statusOptions = [
     { value: 'submitted', label: 'New' },
-    { value: 'screened', label: 'Screened' },
+          { value: 'qualified', label: 'Qualified' },
     { value: 'for verification', label: 'For Verification' },
     { value: 'verified', label: 'Verified' },
     { value: 'initial interview', label: 'Initial Interview' },
     { value: 'final interview', label: 'Final Interview' },
-    { value: 'failed', label: 'Failed' },
+    { value: 'failed', label: 'Not Qualified' },
+          { value: 'not qualified', label: 'Not Qualified' },
     { value: 'passed', label: 'Ready for Sale' },
     // Additional possible BPOC status values
     { value: 'pending', label: 'Pending' },
@@ -242,7 +251,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
       })
       
       // Call API to update multiple fields at once
-      const response = await fetch(`/api/bpoc-applicants`, {
+      const response = await fetch(`/api/bpoc`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -447,12 +456,12 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
   const getStatusOptions = (): StatusOption[] => {
     return [
       { value: 'submitted', label: 'New', icon: 'blue', color: 'blue' },
-      { value: 'screened', label: 'Screened', icon: 'orange', color: 'orange' },
+              { value: 'qualified', label: 'Qualified', icon: 'orange', color: 'orange' },
       { value: 'for verification', label: 'For Verification', icon: 'teal', color: 'teal' },
       { value: 'verified', label: 'Verified', icon: 'purple', color: 'purple' },
       { value: 'initial interview', label: 'Initial Interview', icon: 'indigo', color: 'indigo' },
       { value: 'final interview', label: 'Final Interview', icon: 'violet', color: 'violet' },
-      { value: 'failed', label: 'Failed', icon: 'red', color: 'red' },
+        { value: 'not qualified', label: 'Not Qualified', icon: 'red', color: 'red' },
       { value: 'passed', label: 'Ready for Sale', icon: 'green', color: 'green' }
     ]
   }
@@ -552,7 +561,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
         [fieldName]: processedValue
       }
       console.log('🔍 Sending PUT request:', {
-        url: '/api/bpoc-applicants',
+        url: '/api/bpoc',
         method: 'PUT',
         body: requestBody,
         applicantId: applicant.applicant_id,
@@ -560,7 +569,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
       })
       
       // Call API to update the field
-      const response = await fetch(`/api/bpoc-applicants`, {
+      const response = await fetch(`/api/bpoc`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -653,7 +662,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
       setCurrentStatus(newStatus)
       
               // Call API to update status in both BPOC and main database
-        const response = await fetch(`/api/bpoc-applicants`, {
+        const response = await fetch(`/api/bpoc`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -810,7 +819,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                     </h4>
                                     {(() => {
                                                                               const status = applicant.all_job_statuses?.[index] || applicant.status;
-                                        const showStatus = ['withdrawn', 'final interview', 'hired', 'failed'].includes(status.toLowerCase());
+                                        const showStatus = ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
                                         
                                         // Show status badge if job has final status
                                         if (showStatus) {
@@ -829,7 +838,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                                 </PopoverTrigger>
                                                 <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
                                                   <div className="space-y-1">
-                                                    {['withdrawn', 'final interview', 'hired', 'failed'].map((statusOption) => (
+                                                    {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
                                                       <div 
                                                         key={statusOption}
                                                         className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
@@ -841,7 +850,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                                             try {
                                                               console.log(`Updating BPOC job ${index} status to:`, statusOption);
                                                               
-                                                              const response = await fetch('/api/bpoc-applicants/update-job-status/', {
+                                                              const response = await fetch('/api/bpoc/update-job-status/', {
                                                                 method: 'PATCH',
                                                                 headers: {
                                                                   'Content-Type': 'application/json',
@@ -904,7 +913,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                               <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
                                                 <div className="space-y-1">
 
-                                                  {['withdrawn', 'final interview', 'hired', 'failed'].map((statusOption) => (
+                                                  {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
                                                     <div 
                                                       key={statusOption}
                                                       className="flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground"
@@ -914,7 +923,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                                         try {
                                                           console.log(`Updating BPOC job ${index} status to:`, statusOption);
                                                           
-                                                          const response = await fetch('/api/bpoc-applicants/update-job-status/', {
+                                                          const response = await fetch('/api/bpoc/update-job-status/', {
                                                             method: 'PATCH',
                                                             headers: {
                                                               'Content-Type': 'application/json',

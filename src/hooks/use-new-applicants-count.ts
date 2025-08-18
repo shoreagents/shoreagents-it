@@ -64,8 +64,8 @@ export function useNewApplicantsCount() {
     }
 
     try {
-      console.log('useNewApplicantsCount: Fetching from: /api/bpoc-applicants?status=submitted')
-      const response = await fetch('/api/bpoc-applicants?status=submitted')
+      console.log('useNewApplicantsCount: Fetching from: /api/bpoc?status=submitted')
+      const response = await fetch('/api/bpoc?status=submitted')
       
       if (response.ok) {
         const applicants = await response.json()

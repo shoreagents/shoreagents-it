@@ -274,7 +274,7 @@ export async function PATCH(request: Request) {
     }
 
     // Validate status against the enum
-    const validStatuses = ['submitted', 'screened', 'for verification', 'verified', 'initial interview', 'final interview', 'failed', 'passed']
+    const validStatuses = ['submitted', 'qualified', 'for verification', 'verified', 'initial interview', 'final interview', 'not qualified', 'passed']
     if (!validStatuses.includes(status)) {
       console.log('❌ Invalid status value:', status)
       return NextResponse.json({ error: 'Invalid status value' }, { status: 400 })
@@ -546,11 +546,11 @@ export async function PUT(request: Request) {
 }
 
 // Cleanup endpoint to remove duplicate IDs from existing records
-// Usage: DELETE /api/bpoc-applicants
+// Usage: DELETE /api/bpoc
 // This will clean up existing duplicate job_ids and bpoc_application_ids
 // 
 // Also includes a GET parameter for diagnostics:
-// GET /api/bpoc-applicants?diagnose=true - Shows current state of arrays
+// GET /api/bpoc?diagnose=true - Shows current state of arrays
 export async function DELETE(request: Request) {
   try {
     console.log('🧹 DELETE request received for cleanup')

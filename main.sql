@@ -56,6 +56,15 @@ CREATE SEQUENCE public.activity_data_id_seq
 	START 1
 	CACHE 1
 	NO CYCLE;
+-- DROP SEQUENCE public.bpoc_comments_id_seq;
+
+CREATE SEQUENCE public.bpoc_comments_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
 -- DROP SEQUENCE public.break_sessions_id_seq;
 
 CREATE SEQUENCE public.break_sessions_id_seq
@@ -218,6 +227,15 @@ CREATE SEQUENCE public.stations_id_seq
 	START 1
 	CACHE 1
 	NO CYCLE;
+-- DROP SEQUENCE public.talent_pool_id_seq;
+
+CREATE SEQUENCE public.talent_pool_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
 -- DROP SEQUENCE public.ticket_categories_id_seq;
 
 CREATE SEQUENCE public.ticket_categories_id_seq
@@ -271,7 +289,43 @@ CREATE SEQUENCE public.weekly_activity_summary_id_seq
 	MAXVALUE 2147483647
 	START 1
 	CACHE 1
-	NO CYCLE;-- public.floor_plans definition
+	NO CYCLE;-- public.bpoc_recruits definition
+
+-- Drop table
+
+-- DROP TABLE public.bpoc_recruits;
+
+CREATE TABLE public.bpoc_recruits ( id int4 DEFAULT nextval('recruits_id_seq'::regclass) NOT NULL, applicant_id uuid NOT NULL, resume_slug text NULL, status text NOT NULL, created_at timestamptz DEFAULT now() NULL, updated_at timestamptz DEFAULT now() NULL, video_introduction_url text NULL, current_salary numeric NULL, expected_monthly_salary numeric NULL, shift text NULL, "position" numeric(10, 3) DEFAULT 0 NULL, job_ids _int4 DEFAULT '{}'::integer[] NOT NULL, bpoc_application_ids _uuid DEFAULT '{}'::uuid[] NOT NULL, CONSTRAINT bpoc_recruits_applicant_id_unique UNIQUE (applicant_id), CONSTRAINT bpoc_recruits_pkey PRIMARY KEY (id));
+CREATE INDEX idx_bpoc_recruits_status_position ON public.bpoc_recruits USING btree (status, "position");
+CREATE INDEX idx_recruits_bpoc_app_ids_gin ON public.bpoc_recruits USING gin (bpoc_application_ids);
+CREATE INDEX idx_recruits_job_ids_gin ON public.bpoc_recruits USING gin (job_ids);
+CREATE INDEX idx_status_position ON public.bpoc_recruits USING btree (status, "position");
+
+-- Table Triggers
+
+create trigger update_bpoc_recruits_updated_at before
+update
+    on
+    public.bpoc_recruits for each row execute function update_updated_at_column();
+create trigger trigger_applicant_changes after
+insert
+    or
+delete
+    or
+update
+    on
+    public.bpoc_recruits for each row execute function notify_applicant_changes();
+create trigger trigger_add_to_talent_pool_insert after
+insert
+    on
+    public.bpoc_recruits for each row execute function add_to_talent_pool();
+create trigger trigger_add_to_talent_pool_update after
+update
+    of status on
+    public.bpoc_recruits for each row execute function add_to_talent_pool();
+
+
+-- public.floor_plans definition
 
 -- Drop table
 
@@ -325,7 +379,7 @@ update
 
 -- DROP TABLE public.members;
 
-CREATE TABLE public.members ( id serial4 NOT NULL, company text NOT NULL, address text NULL, phone text NULL, logo text NULL, service text NULL, status public."member_status_enum" NULL, created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL, updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL, badge_color text NULL, country text NULL, website _text NULL, company_id uuid NOT NULL, CONSTRAINT members_company_id_key UNIQUE (company_id), CONSTRAINT members_pkey PRIMARY KEY (id));
+CREATE TABLE public.members ( id serial4 NOT NULL, company text NOT NULL, address text NULL, phone text NULL, logo text NULL, service text NULL, status public."member_status_enum" NULL, created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL, updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL, badge_color text DEFAULT '#3B82F6'::text NULL, country text NULL, website _text NULL, company_id uuid NOT NULL, CONSTRAINT members_company_id_key UNIQUE (company_id), CONSTRAINT members_pkey PRIMARY KEY (id));
 
 -- Table Triggers
 
@@ -333,22 +387,6 @@ create trigger update_members_updated_at before
 update
     on
     public.members for each row execute function update_updated_at_column();
-
-
--- public.recruits definition
-
--- Drop table
-
--- DROP TABLE public.recruits;
-
-CREATE TABLE public.recruits ( id serial4 NOT NULL, bpoc_application_id uuid NOT NULL, applicant_id uuid NULL, job_id int4 NULL, resume_slug text NULL, status text NOT NULL, previous_status text NULL, status_changed_at timestamptz DEFAULT now() NULL, recruiter_id uuid NULL, created_at timestamptz DEFAULT now() NULL, updated_at timestamptz DEFAULT now() NULL, video_introduction_url text NULL, current_salary numeric(10, 2) NULL, expected_monthly_salary numeric(10, 2) NULL, shift text NULL, CONSTRAINT recruits_pkey PRIMARY KEY (id));
-
--- Table Triggers
-
-create trigger update_recruits_updated_at before
-update
-    on
-    public.recruits for each row execute function update_updated_at_column();
 
 
 -- public.roles definition
@@ -413,6 +451,17 @@ create trigger update_activity_data_updated_at before
 update
     on
     public.activity_data for each row execute function update_updated_at_column();
+
+
+-- public.bpoc_comments definition
+
+-- Drop table
+
+-- DROP TABLE public.bpoc_comments;
+
+CREATE TABLE public.bpoc_comments ( id serial4 NOT NULL, "comment" text NOT NULL, created_by int4 NULL, created_at timestamptz DEFAULT now() NULL, updated_at timestamptz DEFAULT now() NULL, comment_type varchar(50) DEFAULT 'general'::character varying NULL, CONSTRAINT bpoc_comments_pkey PRIMARY KEY (id), CONSTRAINT bpoc_comments_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id));
+CREATE INDEX idx_bpoc_comments_created_by ON public.bpoc_comments USING btree (created_by);
+CREATE INDEX idx_bpoc_comments_type ON public.bpoc_comments USING btree (comment_type);
 
 
 -- public.clinic_logs definition
@@ -545,13 +594,25 @@ update
     public.stations for each row execute function update_updated_at_column();
 
 
+-- public.talent_pool definition
+
+-- Drop table
+
+-- DROP TABLE public.talent_pool;
+
+CREATE TABLE public.talent_pool ( id serial4 NOT NULL, applicant_id uuid NOT NULL, comment_id int4 NULL, interested_clients _int4 NULL, last_contact_date timestamptz NULL, created_at timestamptz DEFAULT now() NULL, updated_at timestamptz DEFAULT now() NULL, CONSTRAINT talent_pool_pkey PRIMARY KEY (id), CONSTRAINT talent_pool_applicant_id_fkey FOREIGN KEY (applicant_id) REFERENCES public.bpoc_recruits(applicant_id), CONSTRAINT talent_pool_comment_id_fkey FOREIGN KEY (comment_id) REFERENCES public.bpoc_comments(id));
+CREATE INDEX idx_talent_pool_applicant_id ON public.talent_pool USING btree (applicant_id);
+CREATE INDEX idx_talent_pool_comment_id ON public.talent_pool USING btree (comment_id);
+CREATE INDEX idx_talent_pool_interested_clients ON public.talent_pool USING gin (interested_clients);
+
+
 -- public.tickets definition
 
 -- Drop table
 
 -- DROP TABLE public.tickets;
 
-CREATE TABLE public.tickets ( id serial4 NOT NULL, ticket_id varchar(50) NOT NULL, user_id int4 NOT NULL, concern text NOT NULL, details text NULL, status public."ticket_status_enum" DEFAULT 'For Approval'::ticket_status_enum NOT NULL, resolved_by int4 NULL, resolved_at timestamptz NULL, created_at timestamp DEFAULT (now() AT TIME ZONE 'Asia/Manila'::text) NOT NULL, updated_at timestamp DEFAULT (now() AT TIME ZONE 'Asia/Manila'::text) NOT NULL, "position" int4 DEFAULT 0 NOT NULL, category_id int4 NULL, supporting_files _text DEFAULT '{}'::text[] NULL, file_count int4 DEFAULT 0 NULL, role_id int4 NULL, CONSTRAINT check_file_count CHECK (((file_count = array_length(supporting_files, 1)) OR ((file_count = 0) AND (supporting_files = '{}'::text[])))), CONSTRAINT tickets_pkey PRIMARY KEY (id), CONSTRAINT tickets_ticket_id_key UNIQUE (ticket_id), CONSTRAINT tickets_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.ticket_categories(id) ON DELETE SET NULL, CONSTRAINT tickets_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(id) ON DELETE SET NULL, CONSTRAINT tickets_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE);
+CREATE TABLE public.tickets ( id serial4 NOT NULL, ticket_id varchar(50) NOT NULL, user_id int4 NOT NULL, concern text NOT NULL, details text NULL, status public."ticket_status_enum" DEFAULT 'For Approval'::ticket_status_enum NOT NULL, resolved_by int4 NULL, resolved_at timestamptz NULL, created_at timestamp DEFAULT (now() AT TIME ZONE 'Asia/Manila'::text) NOT NULL, updated_at timestamp DEFAULT (now() AT TIME ZONE 'Asia/Manila'::text) NOT NULL, "position" numeric(10, 3) DEFAULT 0 NOT NULL, category_id int4 NULL, supporting_files _text DEFAULT '{}'::text[] NULL, file_count int4 DEFAULT 0 NULL, role_id int4 NULL, CONSTRAINT check_file_count CHECK (((file_count = array_length(supporting_files, 1)) OR ((file_count = 0) AND (supporting_files = '{}'::text[])))), CONSTRAINT tickets_pkey PRIMARY KEY (id), CONSTRAINT tickets_ticket_id_key UNIQUE (ticket_id), CONSTRAINT tickets_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.ticket_categories(id) ON DELETE SET NULL, CONSTRAINT tickets_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(id) ON DELETE SET NULL, CONSTRAINT tickets_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE);
 
 -- Table Triggers
 
@@ -702,18 +763,79 @@ CREATE TABLE public.ticket_comments ( id serial4 NOT NULL, ticket_id int4 NOT NU
 
 
 
--- DROP FUNCTION public.armor(bytea, _text, _text);
+-- DROP FUNCTION public.add_to_talent_pool();
 
-CREATE OR REPLACE FUNCTION public.armor(bytea, text[], text[])
+CREATE OR REPLACE FUNCTION public.add_to_talent_pool()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    -- Handle status change TO 'passed'
+    IF NEW.status = 'passed' AND (OLD.status IS NULL OR OLD.status != 'passed') THEN
+        
+        -- Check if applicant already exists in talent pool
+        IF NOT EXISTS (SELECT 1 FROM public.talent_pool WHERE applicant_id = NEW.applicant_id) THEN
+            
+            -- First, create a comment and get its ID
+            INSERT INTO public.bpoc_comments (
+                comment,
+                comment_type,
+                created_by,
+                created_at,
+                updated_at
+            ) VALUES (
+                'Added to Talent Pool', -- Default comment
+                'activity', -- Comment type for talent pool entries
+                NULL, -- Will be set by application layer with actual user ID
+                NOW(),
+                NOW()
+            );
+            
+            -- Then, insert into talent pool using the comment ID
+            INSERT INTO public.talent_pool (
+                applicant_id,
+                comment_id,
+                created_at,
+                updated_at
+            ) VALUES (
+                NEW.applicant_id,
+                currval('public.bpoc_comments_id_seq'), -- Get the ID of the comment we just created
+                NOW(),
+                NOW()
+            );
+            
+            RAISE NOTICE 'Applicant % added to talent pool', NEW.applicant_id;
+        ELSE
+            RAISE NOTICE 'Applicant % already exists in talent pool', NEW.applicant_id;
+        END IF;
+        
+    -- Handle status change FROM 'passed' to something else
+    ELSIF OLD.status = 'passed' AND NEW.status != 'passed' THEN
+        
+        -- Remove from talent pool
+        DELETE FROM public.talent_pool WHERE applicant_id = NEW.applicant_id;
+        
+        RAISE NOTICE 'Applicant % removed from talent pool (status changed to: %)', NEW.applicant_id, NEW.status;
+        
+    END IF;
+    
+    RETURN NEW;
+END;
+$function$
+;
+
+-- DROP FUNCTION public.armor(bytea);
+
+CREATE OR REPLACE FUNCTION public.armor(bytea)
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
 AS '$libdir/pgcrypto', $function$pg_armor$function$
 ;
 
--- DROP FUNCTION public.armor(bytea);
+-- DROP FUNCTION public.armor(bytea, _text, _text);
 
-CREATE OR REPLACE FUNCTION public.armor(bytea)
+CREATE OR REPLACE FUNCTION public.armor(bytea, text[], text[])
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -810,15 +932,6 @@ CREATE OR REPLACE FUNCTION public.gen_random_uuid()
 AS '$libdir/pgcrypto', $function$pg_random_uuid$function$
 ;
 
--- DROP FUNCTION public.gen_salt(text);
-
-CREATE OR REPLACE FUNCTION public.gen_salt(text)
- RETURNS text
- LANGUAGE c
- PARALLEL SAFE STRICT
-AS '$libdir/pgcrypto', $function$pg_gen_salt$function$
-;
-
 -- DROP FUNCTION public.gen_salt(text, int4);
 
 CREATE OR REPLACE FUNCTION public.gen_salt(text, integer)
@@ -826,6 +939,15 @@ CREATE OR REPLACE FUNCTION public.gen_salt(text, integer)
  LANGUAGE c
  PARALLEL SAFE STRICT
 AS '$libdir/pgcrypto', $function$pg_gen_salt_rounds$function$
+;
+
+-- DROP FUNCTION public.gen_salt(text);
+
+CREATE OR REPLACE FUNCTION public.gen_salt(text)
+ RETURNS text
+ LANGUAGE c
+ PARALLEL SAFE STRICT
+AS '$libdir/pgcrypto', $function$pg_gen_salt$function$
 ;
 
 -- DROP FUNCTION public.generate_ticket_id();
@@ -841,6 +963,15 @@ END;
 $function$
 ;
 
+-- DROP FUNCTION public.hmac(bytea, bytea, text);
+
+CREATE OR REPLACE FUNCTION public.hmac(bytea, bytea, text)
+ RETURNS bytea
+ LANGUAGE c
+ IMMUTABLE PARALLEL SAFE STRICT
+AS '$libdir/pgcrypto', $function$pg_hmac$function$
+;
+
 -- DROP FUNCTION public.hmac(text, text, text);
 
 CREATE OR REPLACE FUNCTION public.hmac(text, text, text)
@@ -850,13 +981,47 @@ CREATE OR REPLACE FUNCTION public.hmac(text, text, text)
 AS '$libdir/pgcrypto', $function$pg_hmac$function$
 ;
 
--- DROP FUNCTION public.hmac(bytea, bytea, text);
+-- DROP FUNCTION public.notify_applicant_changes();
 
-CREATE OR REPLACE FUNCTION public.hmac(bytea, bytea, text)
- RETURNS bytea
- LANGUAGE c
- IMMUTABLE PARALLEL SAFE STRICT
-AS '$libdir/pgcrypto', $function$pg_hmac$function$
+CREATE OR REPLACE FUNCTION public.notify_applicant_changes()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    payload JSON;
+BEGIN
+    -- Create payload based on trigger operation
+    CASE TG_OP
+        WHEN 'INSERT' THEN
+            payload = json_build_object(
+                'table', TG_TABLE_NAME,
+                'action', 'INSERT',
+                'record', row_to_json(NEW),
+                'timestamp', now()
+            );
+        WHEN 'UPDATE' THEN
+            payload = json_build_object(
+                'table', TG_TABLE_NAME,
+                'action', 'UPDATE',
+                'record', row_to_json(NEW),
+                'old_record', row_to_json(OLD),
+                'timestamp', now()
+            );
+        WHEN 'DELETE' THEN
+            payload = json_build_object(
+                'table', TG_TABLE_NAME,
+                'action', 'DELETE',
+                'record', row_to_json(OLD),
+                'timestamp', now()
+            );
+    END CASE;
+    
+    -- Send notification
+    PERFORM pg_notify('applicant_changes', payload::text);
+    
+    RETURN COALESCE(NEW, OLD);
+END;
+$function$
 ;
 
 -- DROP FUNCTION public.notify_ticket_change();
@@ -903,15 +1068,6 @@ CREATE OR REPLACE FUNCTION public.pgp_key_id(bytea)
 AS '$libdir/pgcrypto', $function$pgp_key_id_w$function$
 ;
 
--- DROP FUNCTION public.pgp_pub_decrypt(bytea, bytea);
-
-CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt(bytea, bytea)
- RETURNS text
- LANGUAGE c
- IMMUTABLE PARALLEL SAFE STRICT
-AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$
-;
-
 -- DROP FUNCTION public.pgp_pub_decrypt(bytea, bytea, text, text);
 
 CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt(bytea, bytea, text, text)
@@ -930,6 +1086,24 @@ CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt(bytea, bytea, text)
 AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$
 ;
 
+-- DROP FUNCTION public.pgp_pub_decrypt(bytea, bytea);
+
+CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt(bytea, bytea)
+ RETURNS text
+ LANGUAGE c
+ IMMUTABLE PARALLEL SAFE STRICT
+AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$
+;
+
+-- DROP FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea);
+
+CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea)
+ RETURNS bytea
+ LANGUAGE c
+ IMMUTABLE PARALLEL SAFE STRICT
+AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_bytea$function$
+;
+
 -- DROP FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea, text);
 
 CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea, text)
@@ -942,15 +1116,6 @@ AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_bytea$function$
 -- DROP FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea, text, text);
 
 CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea, text, text)
- RETURNS bytea
- LANGUAGE c
- IMMUTABLE PARALLEL SAFE STRICT
-AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_bytea$function$
-;
-
--- DROP FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea);
-
-CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea)
  RETURNS bytea
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -975,15 +1140,6 @@ CREATE OR REPLACE FUNCTION public.pgp_pub_encrypt(text, bytea)
 AS '$libdir/pgcrypto', $function$pgp_pub_encrypt_text$function$
 ;
 
--- DROP FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea);
-
-CREATE OR REPLACE FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea)
- RETURNS bytea
- LANGUAGE c
- PARALLEL SAFE STRICT
-AS '$libdir/pgcrypto', $function$pgp_pub_encrypt_bytea$function$
-;
-
 -- DROP FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea, text);
 
 CREATE OR REPLACE FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea, text)
@@ -993,13 +1149,13 @@ CREATE OR REPLACE FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea, text)
 AS '$libdir/pgcrypto', $function$pgp_pub_encrypt_bytea$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_decrypt(bytea, text, text);
+-- DROP FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt(bytea, text, text)
- RETURNS text
+CREATE OR REPLACE FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea)
+ RETURNS bytea
  LANGUAGE c
- IMMUTABLE PARALLEL SAFE STRICT
-AS '$libdir/pgcrypto', $function$pgp_sym_decrypt_text$function$
+ PARALLEL SAFE STRICT
+AS '$libdir/pgcrypto', $function$pgp_pub_encrypt_bytea$function$
 ;
 
 -- DROP FUNCTION public.pgp_sym_decrypt(bytea, text);
@@ -1011,18 +1167,27 @@ CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt(bytea, text)
 AS '$libdir/pgcrypto', $function$pgp_sym_decrypt_text$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_decrypt_bytea(bytea, text);
+-- DROP FUNCTION public.pgp_sym_decrypt(bytea, text, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt_bytea(bytea, text)
+CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt(bytea, text, text)
+ RETURNS text
+ LANGUAGE c
+ IMMUTABLE PARALLEL SAFE STRICT
+AS '$libdir/pgcrypto', $function$pgp_sym_decrypt_text$function$
+;
+
+-- DROP FUNCTION public.pgp_sym_decrypt_bytea(bytea, text, text);
+
+CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt_bytea(bytea, text, text)
  RETURNS bytea
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
 AS '$libdir/pgcrypto', $function$pgp_sym_decrypt_bytea$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_decrypt_bytea(bytea, text, text);
+-- DROP FUNCTION public.pgp_sym_decrypt_bytea(bytea, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt_bytea(bytea, text, text)
+CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt_bytea(bytea, text)
  RETURNS bytea
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1047,18 +1212,18 @@ CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt(text, text)
 AS '$libdir/pgcrypto', $function$pgp_sym_encrypt_text$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_encrypt_bytea(bytea, text, text);
+-- DROP FUNCTION public.pgp_sym_encrypt_bytea(bytea, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt_bytea(bytea, text, text)
+CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt_bytea(bytea, text)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT
 AS '$libdir/pgcrypto', $function$pgp_sym_encrypt_bytea$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_encrypt_bytea(bytea, text);
+-- DROP FUNCTION public.pgp_sym_encrypt_bytea(bytea, text, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt_bytea(bytea, text)
+CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt_bytea(bytea, text, text)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT

@@ -46,7 +46,7 @@ import { CSS } from "@dnd-kit/utilities"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
-type ApplicantStatus = 'submitted' | 'screened' | 'for verification' | 'verified' | 'initial interview' | 'final interview' | 'failed' | 'passed'
+type ApplicantStatus = 'submitted' | 'qualified' | 'for verification' | 'verified' | 'initial interview' | 'final interview' | 'not qualified' | 'not qualifies' | 'passed'
 
 interface Applicant {
   id: string
@@ -235,7 +235,7 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                       </h4>
                           {(() => {
                             const status = applicant.all_job_statuses?.[index] || applicant.status;
-                            const showStatus = ['withdrawn', 'final interview', 'hired', 'failed'].includes(status.toLowerCase());
+                            const showStatus = ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
                             
                             // Show status badge if job has final status
                             if (showStatus) {
@@ -254,7 +254,7 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                                     </PopoverTrigger>
                                     <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
                                       <div className="space-y-1">
-                                        {['withdrawn', 'final interview', 'hired', 'failed'].map((statusOption) => (
+                                        {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
                                           <div 
                                             key={statusOption}
                                             className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
@@ -268,7 +268,7 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                                                 console.log(`Updating BPOC job ${index} status to:`, statusOption);
                                               console.log('Request payload:', { applicantId: applicant.id, jobIndex: index, newStatus: statusOption });
                                                 
-                                                const response = await fetch('/api/bpoc-applicants/update-job-status/', {
+                                                const response = await fetch('/api/bpoc/update-job-status/', {
                                                   method: 'PATCH',
                                                   headers: {
                                                     'Content-Type': 'application/json',
@@ -329,7 +329,7 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                                   <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
                                     <div className="space-y-1">
 
-                                      {['withdrawn', 'final interview', 'hired', 'failed'].map((statusOption) => (
+                                      {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
                                         <div 
                                           key={statusOption}
                                           className="flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground"
@@ -340,7 +340,7 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                                               console.log(`Updating BPOC job ${index} status to:`, statusOption);
                                               console.log('Request payload:', { applicantId: applicant.id, jobIndex: index, newStatus: statusOption });
                                               
-                                              const response = await fetch('/api/bpoc-applicants/update-job-status/', {
+                                              const response = await fetch('/api/bpoc/update-job-status/', {
                                                 method: 'PATCH',
                                                 headers: {
                                                   'Content-Type': 'application/json',
@@ -447,7 +447,7 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                     </h4>
                       {(() => {
                         const status = applicant.all_job_statuses?.[0] || applicant.status;
-                        const showStatus = ['withdrawn', 'failed', 'final interview', 'hired'].includes(status.toLowerCase());
+                        const showStatus = ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
                         return showStatus ? (
                           <Badge variant="outline" className={`${getStatusColor(status as ApplicantStatus)} px-2 py-0.5 text-xs font-medium rounded-md`}>
                             {getStatusDisplayLabel(status)}
@@ -560,8 +560,8 @@ const getStatusColor = (status: ApplicantStatus | string) => {
   switch (status.toLowerCase()) {
     case "submitted":
       return "text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20"
-    case "screened":
-      return "text-orange-700 dark:text-white border-orange-600/20 bg-orange-50 dark:bg-orange-600/20"
+    case "qualified":
+      return "text-yellow-700 dark:text-white border-yellow-600/20 bg-yellow-50 dark:bg-yellow-600/20"
     case "for verification":
       return "text-teal-700 dark:text-white border-teal-600/20 bg-teal-50 dark:bg-teal-600/20"
     case "verified":
@@ -571,6 +571,10 @@ const getStatusColor = (status: ApplicantStatus | string) => {
     case "final interview":
       return "text-pink-700 dark:text-white border-pink-600/20 bg-pink-50 dark:bg-pink-600/20"
     case "failed":
+      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
+    case "not qualifies":
+      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
+    case "not qualified":
       return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
     case "passed":
       return "text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20"
@@ -588,7 +592,13 @@ const getStatusIcon = (status: string) => {
   switch (status.toLowerCase()) {
     case 'withdrawn':
       return <IconCircle className="h-4 w-4 fill-gray-500 stroke-none" />
+    case 'qualified':
+      return <IconCircle className="h-4 w-4 fill-yellow-500 stroke-none" />
     case 'failed':
+      return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
+    case 'not qualifies':
+      return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
+    case 'not qualified':
       return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
     case 'final interview':
       return <IconCircle className="h-4 w-4 fill-pink-500 stroke-none" />
@@ -603,8 +613,8 @@ const getCircleColor = (status: ApplicantStatus) => {
   switch (status) {
     case "submitted":
       return "bg-blue-600/20 dark:bg-blue-600/40 text-blue-700 dark:text-white"
-    case "screened":
-      return "bg-orange-600/20 dark:bg-orange-600/40 text-orange-700 dark:text-white"
+    case "qualified":
+      return "bg-yellow-600/20 dark:bg-yellow-600/40 text-yellow-700 dark:text-white"
     case "for verification":
       return "bg-teal-600/20 dark:bg-teal-600/40 text-teal-700 dark:text-white"
     case "verified":
@@ -613,7 +623,9 @@ const getCircleColor = (status: ApplicantStatus) => {
       return "bg-amber-600/20 dark:bg-amber-600/40 text-amber-700 dark:text-white"
     case "final interview":
       return "bg-pink-600/20 dark:bg-pink-600/40 text-pink-700 dark:text-white"
-    case "failed":
+    case "not qualifies":
+      return "bg-red-600/20 dark:bg-red-600/40 text-red-700 dark:text-white"
+    case "not qualified":
       return "bg-red-600/20 dark:bg-red-600/40 text-red-700 dark:text-white"
     case "passed":
       return "bg-green-600/20 dark:bg-green-600/40 text-green-700 dark:text-white"
@@ -696,7 +708,7 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                       </h4>
                           {(() => {
                             const status = applicant.all_job_statuses?.[index] || applicant.status;
-                            const showStatus = ['withdrawn', 'final interview', 'hired', 'failed'].includes(status.toLowerCase());
+                            const showStatus = ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
                             
                             // Show status badge if job has final status
                             if (showStatus) {
@@ -715,7 +727,7 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                                     </PopoverTrigger>
                                     <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
                                       <div className="space-y-1">
-                                        {['withdrawn', 'final interview', 'hired', 'failed'].map((statusOption) => (
+                                        {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
                                           <div 
                                             key={statusOption}
                                             className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
@@ -729,7 +741,7 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                                                 console.log(`Updating BPOC job ${index} status to:`, statusOption);
                                               console.log('Request payload:', { applicantId: applicant.id, jobIndex: index, newStatus: statusOption });
                                                 
-                                                const response = await fetch('/api/bpoc-applicants/update-job-status/', {
+                                                const response = await fetch('/api/bpoc/update-job-status/', {
                                                   method: 'PATCH',
                                                   headers: {
                                                     'Content-Type': 'application/json',
@@ -790,7 +802,7 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                                   <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
                                     <div className="space-y-1">
 
-                                      {['withdrawn', 'final interview', 'hired', 'failed'].map((statusOption) => (
+                                      {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
                                         <div 
                                           key={statusOption}
                                           className="flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground"
@@ -801,7 +813,7 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                                               console.log(`Updating BPOC job ${index} status to:`, statusOption);
                                               console.log('Request payload:', { applicantId: applicant.id, jobIndex: index, newStatus: statusOption });
                                               
-                                              const response = await fetch('/api/bpoc-applicants/update-job-status/', {
+                                              const response = await fetch('/api/bpoc/update-job-status/', {
                                                 method: 'PATCH',
                                                 headers: {
                                                   'Content-Type': 'application/json',
@@ -908,7 +920,7 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                     </h4>
                       {(() => {
                         const status = applicant.all_job_statuses?.[0] || applicant.status;
-                        const showStatus = ['withdrawn', 'failed', 'final interview', 'hired'].includes(status.toLowerCase());
+                        const showStatus = ['withdrawn', 'qualified', 'failed', 'final interview', 'hired'].includes(status.toLowerCase());
                         return showStatus ? (
                           <Badge variant="outline" className={`${getStatusColor(status as ApplicantStatus)} px-2 py-0.5 text-xs font-medium rounded-md`}>
                             {getStatusDisplayLabel(status)}
@@ -1010,12 +1022,13 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
 const getStatusDisplayLabel = (status: string) => {
   const statusMap: Record<string, string> = {
     'submitted': 'New',
-    'screened': 'Screened',
+    'qualified': 'Qualified',
     'for verification': 'For Verification',
     'verified': 'Verified',
     'initial interview': 'Initial Interview',
     'final interview': 'Final Interview',
-    'failed': 'Failed',
+    'failed': 'Not Qualified',
+    'not qualified': 'Not Qualified',
     'passed': 'Ready for Sale',
     // Additional possible BPOC status values
     'pending': 'Pending',
@@ -1039,7 +1052,7 @@ function TicketsSkeleton() {
           msOverflowStyle: 'none'
         }}
       >
-        {["submitted", "screened", "for verification", "verified", "initial interview", "passed", "final interview", "failed"].map((status) => (
+        {["submitted", "for verification", "verified", "initial interview", "passed", "final interview", "not qualified"].map((status) => (
           <div key={status} className="flex-shrink-0 w-[400px]">
             <div className="bg-card border border-border rounded-xl transition-all duration-200 flex flex-col shadow-sm min-h-[200px] max-h-[calc(94vh-200px)] status-cell">
               <div className="flex-shrink-0 p-4">
@@ -1173,7 +1186,7 @@ export default function BPOCApplicantsPage() {
   const enrichApplicantData = useCallback(async (rawData: any): Promise<any> => {
     try {
       // Fetch enrichment data from the API for this specific applicant
-              const response = await fetch(`/api/bpoc-applicants?id=${rawData.id}`)
+              const response = await fetch(`/api/bpoc?id=${rawData.id}`)
       if (response.ok) {
         const enrichedData = await response.json()
         // Find the matching applicant in the enriched data
@@ -1253,7 +1266,7 @@ export default function BPOCApplicantsPage() {
     try {
       setLoading(true)
       setError(null)
-              const res = await fetch('/api/bpoc-applicants')
+              const res = await fetch('/api/bpoc')
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || `Failed to fetch applicants (${res.status})`)
@@ -1282,7 +1295,7 @@ export default function BPOCApplicantsPage() {
         console.log('🔄 Auto-saving new applications on page load...')
         console.log('📊 Current BPOC applications count:', applicants.length)
         
-        const response = await fetch('/api/bpoc-applicants/auto-save', {
+        const response = await fetch('/api/bpoc/auto-save', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1380,6 +1393,23 @@ export default function BPOCApplicantsPage() {
     }
   }
 
+  // Helper: compute fractional insert position for precise ordering
+  const calculateInsertPosition = (targetApplicants: any[], dropIndex: number) => {
+    const sorted = [...targetApplicants].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    if (sorted.length === 0) return 1
+    if (dropIndex <= 0) {
+      const firstPos = sorted[0]?.position ?? 1
+      return Math.max(0.1, Number(firstPos) / 2)
+    }
+    if (dropIndex >= sorted.length) {
+      const lastPos = sorted[sorted.length - 1]?.position ?? 0
+      return Number(lastPos) + 1
+    }
+    const prevPos = Number(sorted[dropIndex - 1].position ?? 0)
+    const nextPos = Number(sorted[dropIndex].position ?? prevPos + 1)
+    return Number(((prevPos + nextPos) / 2).toFixed(3))
+  }
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     console.log('🎯 DragEnd event:', { activeId: active.id, overId: over?.id })
@@ -1425,7 +1455,7 @@ export default function BPOCApplicantsPage() {
       try {
         console.log('📡 Sending API request to update status...')
         console.log('👤 Current user ID:', user?.id)
-        const response = await fetch('/api/bpoc-applicants', {
+        const response = await fetch('/api/bpoc', {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -1448,6 +1478,30 @@ export default function BPOCApplicantsPage() {
         } else {
           const result = await response.json()
           console.log('✅ Database update successful:', result)
+          // Compute fractional position in target column and persist
+          const isOverContainer = over.id.toString().startsWith('droppable-')
+          const targetList = applicants
+            .filter(a => a.status === activeApplicant.status && a.id !== activeApplicant.id)
+          let dropIndex = 0
+          if (!isOverContainer) {
+            const overApplicant = applicants.find((item) => item.id.toString() === over.id)
+            const idx = targetList.findIndex(t => t.id === overApplicant?.id)
+            dropIndex = idx === -1 ? targetList.length : idx
+          }
+          const newPos = calculateInsertPosition(targetList, dropIndex)
+          try {
+            await fetch('/api/bpoc/positions', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ positions: [{ id: activeApplicant.id, position: newPos }] }),
+            })
+          } catch {}
+          // Update local state with new status and position
+          setApplicants(items => items.map(item => 
+            item.id === activeApplicant.id 
+              ? { ...item, status: activeApplicant.status, position: newPos }
+              : item
+          ))
         }
       } catch (error) {
         // Revert local state if database update failed
@@ -1467,47 +1521,25 @@ export default function BPOCApplicantsPage() {
           console.log('🔄 Reordering BPOC applications within same status:', activeApplicant.status)
           console.log('📊 Old index:', oldIndex, 'New index:', newIndex)
           
-          // Reorder the BPOC applications and update positions
-          setApplicants(prevApplicants => {
-            const reorderedApplicants = arrayMove(prevApplicants, oldIndex, newIndex)
-            const statusApplicants = reorderedApplicants.filter(t => t.status === activeApplicant.status)
-            const positionUpdates = statusApplicants.map((applicant, index) => ({
-              id: applicant.id,
-              position: index
-            }))
-            
-            console.log('📊 Position updates:', positionUpdates)
-            
-            // Update positions in database
-            console.log('📡 Sending position updates to API:', positionUpdates)
-            fetch('/api/bpoc-applicants/positions', {
+          // Reorder within the same status using fractional position for the moved item only
+          setApplicants(prev => {
+            const targetList = prev.filter(t => t.status === activeApplicant.status && t.id !== activeApplicant.id)
+            const isOverContainer = over.id.toString().startsWith('droppable-')
+            let dropIndex = 0
+            if (!isOverContainer) {
+              const overApplicant = prev.find((item) => item.id.toString() === over.id)
+              const idx = targetList.findIndex(t => t.id === overApplicant?.id)
+              dropIndex = idx === -1 ? targetList.length : idx
+            }
+            const newPos = calculateInsertPosition(targetList, dropIndex)
+            // Persist only the moved item's position
+            fetch('/api/bpoc/positions', {
               method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ positions: positionUpdates }),
-            }).then(response => {
-              if (response.ok) {
-                console.log('✅ Applicant positions updated successfully')
-              } else {
-                console.error('❌ Failed to update applicant positions')
-                // Revert on error - refetch only if update failed
-                fetchApplicants()
-              }
-            }).catch(error => {
-              console.error('❌ Error updating applicant positions:', error)
-              // Revert on error - refetch only if update failed
-              fetchApplicants()
-            })
-            
-            // Return updated applicants with new positions
-            return reorderedApplicants.map((item) => {
-              const statusIndex = statusApplicants.findIndex(t => t.id === item.id)
-              if (statusIndex !== -1) {
-                return { ...item, position: statusIndex }
-              }
-              return item
-            })
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ positions: [{ id: activeApplicant.id, position: newPos }] }),
+            }).catch(() => {})
+            // Update local state for the moved item
+            return prev.map(item => item.id === activeApplicant.id ? { ...item, position: newPos } : item)
           })
         }
       }
@@ -1533,7 +1565,7 @@ export default function BPOCApplicantsPage() {
     setIsModalOpen(true)
   }, [])
 
-  const statuses: ApplicantStatus[] = ["submitted", "screened", "for verification", "verified", "initial interview", "passed"]
+  const statuses: ApplicantStatus[] = ["submitted", "for verification", "verified", "initial interview", "passed"]
 
   return (
     <>
@@ -1617,7 +1649,7 @@ export default function BPOCApplicantsPage() {
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
               >
-                <div className="w-full h-[calc(100vh-240px)] px-4 lg:px-6 pb-4">
+                <div className="w-full h-[calc(100vh-240px)] px-4 lg:px-6">
                   {loading ? (
                     <TicketsSkeleton />
                   ) : error ? (
@@ -1700,7 +1732,7 @@ export default function BPOCApplicantsPage() {
                                 ))}
                                 {getApplicantsByStatus(status as ApplicantStatus).length === 0 && (
                                   <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-xl bg-muted/20">
-                                    <p className="text-sm font-medium">No BPOC Applications</p>
+                                    <p className="text-sm font-medium">No Applicants</p>
                                   </div>
                                 )}
                               </SortableContext>

@@ -8,12 +8,12 @@ COMMENT ON SCHEMA public IS 'standard public schema';
 
 CREATE TYPE public."application_status_enum" AS ENUM (
 	'submitted',
-	'screened',
+	'qualified',
 	'for verification',
 	'verified',
 	'initial interview',
 	'final interview',
-	'failed',
+	'not qualified',
 	'passed',
 	'rejected',
 	'withdrawn',
