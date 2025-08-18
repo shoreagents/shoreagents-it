@@ -282,29 +282,61 @@ export async function createTicket(ticket: Omit<Ticket, 'id' | 'created_at' | 'u
 // Update ticket status
 export async function updateTicketStatus(id: number, status: string, resolvedBy?: number): Promise<Ticket> {
   try {
-    let result
+    // First perform the update
     if (status === 'Completed' || status === 'Closed') {
       // When marking as completed or closed, set resolved_at timestamp and resolved_by
-      // Store the time in Asia/Manila timezone without converting to UTC
       if (resolvedBy) {
-        result = await pool.query(
-          'UPDATE public.tickets SET status = $1, resolved_at = NOW(), resolved_by = $3 WHERE id = $2 RETURNING *',
+        await pool.query(
+          'UPDATE public.tickets SET status = $1, resolved_at = NOW(), resolved_by = $3 WHERE id = $2',
           [status, id, resolvedBy]
         )
       } else {
-        result = await pool.query(
-          'UPDATE public.tickets SET status = $1, resolved_at = NOW() WHERE id = $2 RETURNING *',
+        await pool.query(
+          'UPDATE public.tickets SET status = $1, resolved_at = NOW() WHERE id = $2',
           [status, id]
         )
       }
-      console.log('Database returned resolved_at:', result.rows[0].resolved_at, 'type:', typeof result.rows[0].resolved_at)
     } else {
       // For other status changes, clear resolved_at and resolved_by fields
-      result = await pool.query(
-        'UPDATE public.tickets SET status = $1, resolved_at = NULL, resolved_by = NULL WHERE id = $2 RETURNING *',
+      await pool.query(
+        'UPDATE public.tickets SET status = $1, resolved_at = NULL, resolved_by = NULL WHERE id = $2',
         [status, id]
       )
     }
+    
+    // Then fetch the complete ticket data with all JOINs
+    const result = await pool.query(`
+      SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
+             t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
+             ji.employee_id,
+             resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+             u.user_type,
+             t.supporting_files, t.file_count,
+             CASE 
+               WHEN u.user_type = 'Internal' THEN 'Internal'
+               WHEN a.member_id IS NOT NULL THEN m.company
+               WHEN c.member_id IS NOT NULL THEN m.company
+               ELSE NULL
+             END as member_name,
+             CASE 
+               WHEN u.user_type = 'Internal' THEN NULL
+               WHEN a.member_id IS NOT NULL THEN m.badge_color
+               WHEN c.member_id IS NOT NULL THEN m.badge_color
+               ELSE NULL
+             END as member_color
+      FROM public.tickets t
+      LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+      LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+      LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
+      LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
+      LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
+      LEFT JOIN public.users u ON t.user_id = u.id
+      LEFT JOIN public.agents a ON t.user_id = a.user_id
+      LEFT JOIN public.clients c ON t.user_id = c.user_id
+      LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+      WHERE t.id = $1
+    `, [id])
+    
     return result.rows[0]
   } catch (error) {
     console.error('Database update failed:', error)
@@ -327,11 +359,52 @@ export async function updateTicket(id: number, updates: Partial<Ticket>): Promis
     fields[index] !== 'ticket_id'
   )
   
+  if (fields.length === 0) {
+    // No valid fields to update, just return the current ticket
+    return await getTicketById(id) as Ticket
+  }
+  
   const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ')
-  const result = await pool.query(
-    `UPDATE public.tickets SET ${setClause} WHERE id = $1 RETURNING *`,
+  
+  // First perform the update
+  await pool.query(
+    `UPDATE public.tickets SET ${setClause} WHERE id = $1`,
     [id, ...values]
   )
+  
+  // Then fetch the complete ticket data with all JOINs
+  const result = await pool.query(`
+    SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
+           t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
+           ji.employee_id,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           u.user_type,
+           t.supporting_files, t.file_count,
+           CASE 
+             WHEN u.user_type = 'Internal' THEN 'Internal'
+             WHEN a.member_id IS NOT NULL THEN m.company
+             WHEN c.member_id IS NOT NULL THEN m.company
+             ELSE NULL
+           END as member_name,
+           CASE 
+             WHEN u.user_type = 'Internal' THEN NULL
+             WHEN a.member_id IS NOT NULL THEN m.badge_color
+             WHEN c.member_id IS NOT NULL THEN m.badge_color
+             ELSE NULL
+           END as member_color
+    FROM public.tickets t
+    LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+    LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
+    LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
+    LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
+    LEFT JOIN public.users u ON t.user_id = u.id
+    LEFT JOIN public.agents a ON t.user_id = a.user_id
+    LEFT JOIN public.clients c ON t.user_id = c.user_id
+    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+    WHERE t.id = $1
+  `, [id])
+  
   return result.rows[0]
 }
 
@@ -339,6 +412,7 @@ export async function updateTicket(id: number, updates: Partial<Ticket>): Promis
 export async function deleteTicket(id: number): Promise<void> {
   await pool.query('DELETE FROM public.tickets WHERE id = $1', [id])
 }
+
 
 // Get ticket by ID
 export async function getTicketById(id: number): Promise<Ticket | null> {
@@ -452,10 +526,45 @@ export async function generateTicketId(): Promise<string> {
 // Update ticket position (for reordering within same status)
 export async function updateTicketPosition(id: number, position: number): Promise<Ticket> {
   try {
-    const result = await pool.query(
-      'UPDATE public.tickets SET position = $1 WHERE id = $2 RETURNING *',
+    // First perform the update
+    await pool.query(
+      'UPDATE public.tickets SET position = $1 WHERE id = $2',
       [position, id]
     )
+    
+    // Then fetch the complete ticket data with all JOINs
+    const result = await pool.query(`
+      SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
+             t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
+             ji.employee_id,
+             resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+             u.user_type,
+             t.supporting_files, t.file_count,
+             CASE 
+               WHEN u.user_type = 'Internal' THEN 'Internal'
+               WHEN a.member_id IS NOT NULL THEN m.company
+               WHEN c.member_id IS NOT NULL THEN m.company
+               ELSE NULL
+             END as member_name,
+             CASE 
+               WHEN u.user_type = 'Internal' THEN NULL
+               WHEN a.member_id IS NOT NULL THEN m.badge_color
+               WHEN c.member_id IS NOT NULL THEN m.badge_color
+               ELSE NULL
+             END as member_color
+      FROM public.tickets t
+      LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+      LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+      LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
+      LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
+      LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
+      LEFT JOIN public.users u ON t.user_id = u.id
+      LEFT JOIN public.agents a ON t.user_id = a.user_id
+      LEFT JOIN public.clients c ON t.user_id = c.user_id
+      LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+      WHERE t.id = $1
+    `, [id])
+    
     return result.rows[0]
   } catch (error) {
     console.error('Database position update failed:', error)
@@ -466,14 +575,27 @@ export async function updateTicketPosition(id: number, position: number): Promis
 // Update ticket positions for reordering within same status
 export async function updateTicketPositions(tickets: { id: number, position: number }[]): Promise<void> {
   try {
-    for (const ticket of tickets) {
-      await pool.query(
-        'UPDATE public.tickets SET position = $1 WHERE id = $2',
-        [ticket.position, ticket.id]
-      )
-    }
+    if (tickets.length === 0) return
+    
+    console.log('🗄️ DATABASE - Starting batch position updates:', tickets)
+    
+    // Use a single SQL query with CASE statements for batch update
+    const ids = tickets.map(t => t.id)
+    const caseStatements = tickets.map(t => `WHEN ${t.id} THEN ${t.position}`).join(' ')
+    
+    const query = `
+      UPDATE public.tickets 
+      SET position = CASE id 
+        ${caseStatements}
+        ELSE position 
+      END
+      WHERE id = ANY($1::int[])
+    `
+    
+    const result = await pool.query(query, [ids])
+    console.log(`🗄️ DATABASE - Batch updated ${result.rowCount} ticket positions`)
   } catch (error) {
-    console.error('Database positions update failed:', error)
+    console.error('Database batch positions update failed:', error)
     throw error
   }
 }

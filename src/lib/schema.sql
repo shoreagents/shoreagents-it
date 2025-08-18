@@ -121,17 +121,45 @@ RETURNS TRIGGER AS $$
 DECLARE
     notification JSON;
 BEGIN
-    -- Create notification payload
-    notification = json_build_object(
-        'table', TG_TABLE_NAME,
-        'action', TG_OP,
-        'record', row_to_json(NEW),
-        'old_record', CASE WHEN TG_OP = 'UPDATE' THEN row_to_json(OLD) ELSE NULL END,
-        'timestamp', now()
-    );
-    
-    -- Send notification
-    PERFORM pg_notify('ticket_changes', notification::text);
+    -- Only send notifications for meaningful changes, not timestamp updates
+    IF TG_OP = 'UPDATE' THEN
+        -- Check if any meaningful fields changed (excluding updated_at)
+        IF (OLD.status IS DISTINCT FROM NEW.status) OR
+           (OLD.position IS DISTINCT FROM NEW.position) OR
+           (OLD.resolved_by IS DISTINCT FROM NEW.resolved_by) OR
+           (OLD.resolved_at IS DISTINCT FROM NEW.resolved_at) OR
+           (OLD.role_id IS DISTINCT FROM NEW.role_id) OR
+           (OLD.concern IS DISTINCT FROM NEW.concern) OR
+           (OLD.details IS DISTINCT FROM NEW.details) OR
+           (OLD.category_id IS DISTINCT FROM NEW.category_id) OR
+           (OLD.supporting_files IS DISTINCT FROM NEW.supporting_files) OR
+           (OLD.file_count IS DISTINCT FROM NEW.file_count) THEN
+            
+            -- Create notification payload
+            notification = json_build_object(
+                'table', TG_TABLE_NAME,
+                'action', TG_OP,
+                'record', row_to_json(NEW),
+                'old_record', row_to_json(OLD),
+                'timestamp', now()
+            );
+            
+            -- Send notification
+            PERFORM pg_notify('ticket_changes', notification::text);
+        END IF;
+    ELSE
+        -- For INSERT and DELETE, always send notification
+        notification = json_build_object(
+            'table', TG_TABLE_NAME,
+            'action', TG_OP,
+            'record', CASE WHEN TG_OP = 'DELETE' THEN row_to_json(OLD) ELSE row_to_json(NEW) END,
+            'old_record', CASE WHEN TG_OP = 'UPDATE' THEN row_to_json(OLD) ELSE NULL END,
+            'timestamp', now()
+        );
+        
+        -- Send notification
+        PERFORM pg_notify('ticket_changes', notification::text);
+    END IF;
     
     RETURN NEW;
 END;

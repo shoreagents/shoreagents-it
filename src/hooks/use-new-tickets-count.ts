@@ -47,18 +47,37 @@ export function useNewTicketsCount() {
   const { isConnected } = useRealtimeTickets({
     onTicketCreated: (ticket) => {
       console.log('useNewTicketsCount: Ticket created:', ticket)
-      // Refresh count when new ticket is created
-      fetchNewTicketsCount()
+      // For new tickets, we can increment the count locally instead of refetching
+      setNewTicketsCount(prev => prev + 1)
     },
     onTicketUpdated: (ticket, oldTicket) => {
       console.log('useNewTicketsCount: Ticket updated:', ticket, 'Old:', oldTicket)
-      // Refresh count when ticket status changes
-      fetchNewTicketsCount()
+      // Only refresh count if the status change affects our count
+      const isAdmin = (user as any)?.roleName?.toLowerCase() === 'admin'
+      const relevantStatus = isAdmin ? 'For Approval' : 'Approved'
+      
+      // Check if the status change affects our count
+      const oldStatusRelevant = oldTicket?.status === relevantStatus
+      const newStatusRelevant = ticket.status === relevantStatus
+      
+      if (oldStatusRelevant !== newStatusRelevant) {
+        // Status change affects our count, update locally
+        if (newStatusRelevant) {
+          setNewTicketsCount(prev => prev + 1)
+        } else {
+          setNewTicketsCount(prev => Math.max(0, prev - 1))
+        }
+      }
     },
     onTicketDeleted: (ticket) => {
       console.log('useNewTicketsCount: Ticket deleted:', ticket)
-      // Refresh count when ticket is deleted
-      fetchNewTicketsCount()
+      // Check if deleted ticket was in our count
+      const isAdmin = (user as any)?.roleName?.toLowerCase() === 'admin'
+      const relevantStatus = isAdmin ? 'For Approval' : 'Approved'
+      
+      if (ticket.status === relevantStatus) {
+        setNewTicketsCount(prev => Math.max(0, prev - 1))
+      }
     },
     autoConnect: true,
     roleFilter: null // Listen to all ticket changes

@@ -698,6 +698,7 @@ function DroppableContainer({ status, children }: DroppableContainerProps) {
   return (
     <div 
       ref={setNodeRef}
+      data-status={status}
       className="h-full overflow-y-auto transition-colors duration-200"
     >
       {children}
@@ -719,25 +720,68 @@ export default function TicketsPage() {
   const [roleNameById, setRoleNameById] = useState<Record<number, string>>({})
   const [zoomLevel, setZoomLevel] = useState(1)
   const { user } = useAuth()
+  
+  // Track tickets being manually updated to prevent real-time conflicts
+  const [manuallyUpdatingTickets, setManuallyUpdatingTickets] = useState<Set<number>>(new Set())
+  
+  // Debounce state updates to prevent rapid re-renders
+  const [updateTimeout, setUpdateTimeout] = useState<NodeJS.Timeout | null>(null)
 
-  // Disable body scroll when on tickets page
-  useEffect(() => {
-    document.body.classList.add('no-scroll')
-    return () => {
-      document.body.classList.remove('no-scroll')
-    }
-  }, [])
-
-  // Real-time updates
+  // Real-time updates with conflict prevention
   const { isConnected: isRealtimeConnected } = useRealtimeTickets({
     onTicketCreated: (newTicket) => {
       setTickets(prev => [...prev, newTicket])
     },
     onTicketUpdated: (updatedTicket, oldTicket) => {
-      // Merge to preserve joined fields like member_name and user_type
-      setTickets(prev => prev.map(ticket => 
-        ticket.id === updatedTicket.id ? { ...ticket, ...updatedTicket } : ticket
-      ))
+      console.log('🔄 Real-time update received:', {
+        ticketId: updatedTicket.id,
+        isManuallyUpdating: manuallyUpdatingTickets.has(updatedTicket.id),
+        changes: {
+          status: oldTicket?.status !== updatedTicket.status ? `${oldTicket?.status} → ${updatedTicket.status}` : 'unchanged',
+          position: oldTicket?.position !== updatedTicket.position ? `${oldTicket?.position} → ${updatedTicket.position}` : 'unchanged'
+        }
+      })
+      
+      // Skip real-time updates for tickets being manually updated
+      if (manuallyUpdatingTickets.has(updatedTicket.id)) {
+        console.log('⏭️ Skipping real-time update - ticket is being manually updated')
+        return
+      }
+      
+      // Check if this is a position update and if we have a more recent local position
+      const localTicket = tickets.find(t => t.id === updatedTicket.id)
+      if (localTicket && oldTicket && updatedTicket.position !== oldTicket.position) {
+        // This is a position update from another user/client
+        // Only apply it if our local position is older
+        if (localTicket.updated_at < updatedTicket.updated_at) {
+          console.log('📡 Applying remote position update:', { 
+            ticketId: updatedTicket.id, 
+            oldPosition: oldTicket.position, 
+            newPosition: updatedTicket.position 
+          })
+        } else {
+          console.log('📡 Skipping remote position update (local is newer):', { 
+            ticketId: updatedTicket.id, 
+            localPosition: localTicket.position, 
+            remotePosition: updatedTicket.position 
+          })
+          return
+        }
+      }
+      
+      // Debounce updates to prevent rapid re-renders
+      if (updateTimeout) {
+        clearTimeout(updateTimeout)
+      }
+      
+      const timeout = setTimeout(() => {
+        // Merge to preserve joined fields like member_name and user_type
+        setTickets(prev => prev.map(ticket => 
+          ticket.id === updatedTicket.id ? { ...ticket, ...updatedTicket } : ticket
+        ))
+      }, 100) // 100ms debounce for smoother updates
+      
+      setUpdateTimeout(timeout)
     },
     onTicketDeleted: (deletedTicket) => {
       setTickets(prev => prev.filter(ticket => ticket.id !== deletedTicket.id))
@@ -758,6 +802,24 @@ export default function TicketsPage() {
       })
       .catch(() => {})
   }, [])
+
+  // Disable body scroll when on tickets page
+  useEffect(() => {
+    document.body.classList.add('no-scroll')
+    return () => {
+      document.body.classList.remove('no-scroll')
+    }
+  }, [])
+
+  // Cleanup manually updating tickets on unmount
+  useEffect(() => {
+    return () => {
+      setManuallyUpdatingTickets(new Set())
+      if (updateTimeout) {
+        clearTimeout(updateTimeout)
+      }
+    }
+  }, [updateTimeout])
 
   // Keyboard shortcuts for zooming
   useEffect(() => {
@@ -807,7 +869,12 @@ export default function TicketsPage() {
   }
 
   const updateTicketStatus = async (ticketId: number, newStatus: string) => {
+    console.log('🔄 updateTicketStatus called for ticket:', ticketId, 'new status:', newStatus)
     try {
+      // Mark this ticket as being manually updated
+      console.log('🔒 Marking ticket as manually updating:', ticketId)
+      setManuallyUpdatingTickets(prev => new Set(prev).add(ticketId))
+      
       const requestBody: any = { status: newStatus }
       
       // If the status is being changed to 'Closed', include the current user as resolvedBy
@@ -826,62 +893,196 @@ export default function TicketsPage() {
       
       if (response.ok) {
         const result = await response.json()
-        // Merge server result but preserve existing joined fields if not present in response
+        console.log('✅ updateTicketStatus successful:', result)
+        // Update with complete ticket data from server (no defensive merging needed)
         setTickets(prevTickets => prevTickets.map((item) => {
           if (item.id !== ticketId) return item
-          return {
-            ...item,
-            ...result,
-            member_name: result.member_name ?? item.member_name,
-            member_color: result.member_color ?? item.member_color,
-            user_type: result.user_type ?? item.user_type,
-            first_name: result.first_name ?? item.first_name,
-            last_name: result.last_name ?? item.last_name,
-          }
+          return result
         }))
+        
+        // Remove from manually updating set after successful update
+        console.log('🔓 Removing ticket from manually updating set (success):', ticketId)
+        setManuallyUpdatingTickets(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(ticketId)
+          return newSet
+        })
       } else {
         const errorData = await response.json()
-        console.error('Failed to update ticket status:', errorData)
+        console.error('❌ updateTicketStatus failed:', errorData)
+        // Remove from manually updating set on error
+        console.log('🔓 Removing ticket from manually updating set (error):', ticketId)
+        setManuallyUpdatingTickets(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(ticketId)
+          return newSet
+        })
         // Revert local state on error
+        console.log('🔄 Reverting local state due to error...')
         await fetchTickets()
       }
     } catch (error) {
-      console.error('Error updating ticket status:', error)
+      console.error('❌ updateTicketStatus error:', error)
+      // Remove from manually updating set on error
+      setManuallyUpdatingTickets(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(ticketId)
+        return newSet
+      })
       // Revert local state on error
+      console.log('🔄 Reverting local state due to error...')
       await fetchTickets()
     }
   }
 
-  const updateTicketPosition = async (ticketId: number, newPosition: number) => {
+  // Update all positions in a column to maintain proper sequential order
+  const updateColumnPositions = async (status: TicketStatus, movedTicketId: number, insertIndex: number) => {
     try {
-      const response = await fetch(`/api/tickets/${ticketId}/position`, {
+      console.log('🔄 Checking if column position update needed:', { status, movedTicketId, insertIndex })
+      
+      // Get all tickets in this status (excluding the moved ticket)
+      const columnTickets = tickets.filter(t => t.status === status && t.id !== movedTicketId)
+      
+      // Sort by current position to maintain relative order
+      columnTickets.sort((a, b) => (a.position || 0) - (b.position || 0))
+      
+      // Insert the moved ticket at the specified index
+      const movedTicket = tickets.find(t => t.id === movedTicketId)
+      if (!movedTicket) {
+        console.log('❌ Moved ticket not found, skipping update')
+        return
+      }
+      
+      // Note: We removed the early return check here because the moved ticket
+      // is not in columnTickets (it was filtered out), so we need to proceed
+      // with the position update to ensure proper reordering
+      
+      columnTickets.splice(insertIndex, 0, { ...movedTicket, status })
+      
+      // Calculate new sequential positions with overflow protection
+      const basePosition = getStatusCode(status)
+      const maxTicketsPerStatus = 999 // Maximum tickets per status to prevent overflow
+      
+      if (columnTickets.length > maxTicketsPerStatus) {
+        console.warn(`⚠️ Too many tickets in ${status} (${columnTickets.length}). Maximum is ${maxTicketsPerStatus}`)
+        // Could implement pagination or different strategy here
+      }
+      
+      const positionUpdates = columnTickets.map((ticket, index) => ({
+        id: ticket.id,
+        position: basePosition + ((index + 1) * 10) // 10010, 10020, 10030, etc.
+      }))
+      
+      // Always update positions when reordering is requested
+      // The drag operation itself indicates that positions should change
+      
+      console.log('📊 Column position updates:', {
+        status,
+        movedTicketId,
+        insertIndex,
+        totalTickets: columnTickets.length,
+        positionUpdates: positionUpdates.map(u => ({ id: u.id, oldPos: tickets.find(t => t.id === u.id)?.position, newPos: u.position }))
+      })
+      
+      if (positionUpdates.length > 0) {
+        // Update all positions in one API call
+        const response = await fetch('/api/tickets/positions', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ positions: positionUpdates })
+        })
+        
+        if (response.ok) {
+          console.log('✅ Column positions updated successfully')
+          
+          // Update local state with new positions
+          setTickets(prevTickets => {
+            return prevTickets.map(ticket => {
+              const update = positionUpdates.find(u => u.id === ticket.id)
+              return update ? { ...ticket, position: update.position, status } : ticket
+            })
+          })
+        } else {
+          const errorData = await response.json()
+          console.error('❌ API response error:', errorData)
+          throw new Error(`Failed to update column positions: ${errorData.error || 'Unknown error'}`)
+        }
+      }
+    } catch (error) {
+      console.error('❌ Column position update failed:', error)
+      // Don't throw the error to prevent application crashes
+      console.log('🔄 Continuing without position update...')
+    }
+  }
+
+  const updateTicketPosition = async (ticketId: number, newPosition: number, newStatus?: TicketStatus) => {
+    try {
+      // Mark this ticket as being manually updated
+      console.log('🔒 Marking ticket as manually updating:', ticketId)
+      setManuallyUpdatingTickets(prev => new Set(prev).add(ticketId))
+      
+      const requestBody = { 
+        positions: [{ id: ticketId, position: newPosition }] 
+      }
+      
+      console.log('🌐 FRONTEND - Making API call to /api/tickets/positions with:', requestBody)
+      const response = await fetch(`/api/tickets/positions`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ position: newPosition }),
+        body: JSON.stringify(requestBody),
       })
+      console.log('🌐 FRONTEND - API response status:', response.status)
 
       if (response.ok) {
         const result = await response.json()
+        console.log('✅ Position updated successfully:', { ticketId, newPosition, newStatus })
+        
         // Update local state instead of refetching
         setTickets(prevTickets => {
           return prevTickets.map((item) => 
             item.id === ticketId 
-              ? { ...item, position: newPosition }
+              ? { 
+                  ...item, 
+                  position: newPosition,
+                  ...(newStatus && { status: newStatus })
+                }
               : item
           )
         })
+        
+        // Remove from manually updating set after successful update
+        console.log('🔓 Removing ticket from manually updating set (success):', ticketId)
+        setManuallyUpdatingTickets(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(ticketId)
+          return newSet
+        })
       } else {
         const errorData = await response.json()
-        console.error('Failed to update ticket position:', errorData)
-        // Revert local state on error
-        await fetchTickets()
+        console.warn('Position update failed (non-critical):', errorData)
+        // Position updates are non-critical, don't trigger full refresh
+        // Just remove from manually updating set
+        setManuallyUpdatingTickets(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(ticketId)
+          return newSet
+        })
+        // Throw error to be caught by caller
+        throw new Error(`Position update failed: ${errorData.error || 'Unknown error'}`)
       }
     } catch (error) {
-      console.error('Error updating ticket position:', error)
-      // Revert local state on error
-      await fetchTickets()
+      console.warn('Position update error (non-critical):', error)
+      // Position updates are non-critical, don't trigger full refresh
+      // Just remove from manually updating set
+      setManuallyUpdatingTickets(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(ticketId)
+        return newSet
+      })
+      // Re-throw error to be caught by caller
+      throw error
     }
   }
 
@@ -892,21 +1093,68 @@ export default function TicketsPage() {
     })
   )
 
-  // Compute fractional insert position within a target list
-  const calculateInsertPosition = (targetTickets: any[], dropIndex: number) => {
+  // Helper function to get status code for position calculation
+  const getStatusCode = (status: string): number => {
+    const statusMap: Record<string, number> = {
+      'For Approval': 10000,    // 10,000 range (supports 999 tickets)
+      'Approved': 20000,        // 20,000 range
+      'In Progress': 30000,     // 30,000 range  
+      'Actioned': 40000,        // 40,000 range
+      'Closed': 50000,          // 50,000 range
+      'On Hold': 60000,         // 60,000 range
+      'Stuck': 70000            // 70,000 range
+    }
+    return statusMap[status] || 10000
+  }
+
+  // Compute integer position within a target list using status-based ranges
+  const calculateInsertPosition = (targetTickets: any[], dropIndex: number, status?: string) => {
     const sorted = [...targetTickets].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-    if (sorted.length === 0) return 1
-    if (dropIndex <= 0) {
-      const firstPos = sorted[0]?.position ?? 1
-      return Math.max(0.1, Number(firstPos) / 2)
+    console.log('🧮 calculateInsertPosition:', { 
+      targetTicketsLength: targetTickets.length, 
+      sortedLength: sorted.length, 
+      dropIndex, 
+      status,
+      sortedPositions: sorted.map(t => ({ id: t.id, position: t.position }))
+    })
+    
+    // If no tickets in this status, start with base position
+    if (sorted.length === 0) {
+      const basePos = status ? getStatusCode(status) : 1000
+      const result = basePos + 10
+      console.log('🧮 Empty list, returning:', result)
+      return result
     }
+    
+    // Handle dropping at the very top
+    if (dropIndex === 0) {
+      const firstPos = Number(sorted[0]?.position ?? 1000)
+      const basePos = status ? getStatusCode(status) : Math.floor(firstPos / 1000) * 1000
+      return Math.max(basePos + 1, firstPos - 10)
+    }
+    
+    // Handle dropping at the very bottom
     if (dropIndex >= sorted.length) {
-      const lastPos = sorted[sorted.length - 1]?.position ?? 0
-      return Number(lastPos) + 1
+      const lastPos = Number(sorted[sorted.length - 1]?.position ?? 0)
+      return lastPos + 10
     }
-    const prevPos = Number(sorted[dropIndex - 1].position ?? 0)
-    const nextPos = Number(sorted[dropIndex].position ?? prevPos + 1)
-    return Number(((prevPos + nextPos) / 2).toFixed(3))
+    
+    // Handle dropping in the middle
+    const prevPos = Number(sorted[dropIndex - 1]?.position ?? 0)
+    const nextPos = Number(sorted[dropIndex]?.position ?? prevPos + 20)
+    
+    // Calculate a position between the previous and next tickets
+    const gap = nextPos - prevPos
+    let result
+    if (gap >= 2) {
+      // If there's enough space, place exactly in the middle
+      result = Math.round(prevPos + (gap / 2))
+    } else {
+      // If positions are too close, place right after previous
+      result = prevPos + 1
+    }
+    console.log('🧮 Final position calculated:', result)
+    return result
   }
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -988,14 +1236,37 @@ export default function TicketsPage() {
       (window as any).dragWheelHandler = null;
     }
 
-    if (!active || !over) return
+    if (!active || !over) {
+      console.log('🚫 Drag ended without valid active/over - no drop occurred')
+      return
+    }
 
     const activeTicket = tickets.find((item) => item.id.toString() === active.id)
-    if (!activeTicket) return
+    if (!activeTicket) {
+      console.log('🚫 Active ticket not found:', active.id)
+      return
+    }
+
+    // Check if dropping on the same ticket (no change needed)
+    if (active.id === over.id) {
+      console.log('🚫 Dropped on same ticket - no change needed')
+      return
+    }
+
+    // Only proceed if there's a valid drop target
+    console.log('✅ Valid drop detected:', { activeId: active.id, overId: over.id })
+
+    console.log('🎯 Drag ended:', {
+      activeTicket: activeTicket.id,
+      activeStatus: activeTicket.status,
+      overId: over.id,
+      overType: over.id.toString().startsWith('droppable-') ? 'column' : 'ticket'
+    })
 
     // Handle dropping on a droppable zone (status column)
     if (over.id.toString().startsWith('droppable-')) {
       const targetStatus = over.id.toString().replace('droppable-', '') as TicketStatus
+      console.log('🎯 Dropping on column:', { targetStatus, currentStatus: activeTicket.status })
       
       if (activeTicket.status !== targetStatus) {
         // Update local state immediately for UI responsiveness
@@ -1007,25 +1278,154 @@ export default function TicketsPage() {
           )
         })
         
-        // Update database
-        await updateTicketStatus(activeTicket.id, targetStatus)
-        // Compute target list and place at bottom of target column by default
-        const targetList = tickets.filter(t => t.status === targetStatus && t.id !== activeTicket.id)
-        const dropIndex = targetList.length
-        const newPos = calculateInsertPosition(targetList, dropIndex)
-        await updateTicketPosition(activeTicket.id, newPos)
-        setTickets(items => items.map(it => it.id === activeTicket.id ? { ...it, position: newPos, status: targetStatus } : it))
+        try {
+          // Update database status first (critical)
+          await updateTicketStatus(activeTicket.id, targetStatus)
+          
+          // Try to update position (non-critical, can fail gracefully)
+          try {
+            const targetList = tickets.filter(t => t.status === targetStatus && t.id !== activeTicket.id)
+            
+            // Calculate drop index based on mouse position relative to the column
+            const columnElement = document.querySelector(`[data-status="${targetStatus}"]`) as HTMLElement
+            let dropIndex = targetList.length // Default to bottom
+            
+            if (columnElement) {
+              const columnRect = columnElement.getBoundingClientRect()
+              // Try to get mouse position from the event, fallback to center of column
+              let mouseY = columnRect.top + (columnRect.height / 2) // Default to center
+              
+              // Check if we can get mouse position from the event
+              if (event.activatorEvent && 'clientY' in event.activatorEvent) {
+                mouseY = (event.activatorEvent as MouseEvent).clientY
+              }
+              
+              const relativeY = mouseY - columnRect.top
+              const columnHeight = columnRect.height
+              
+              // Determine drop position based on mouse location
+              if (relativeY < columnHeight * 0.25) {
+                dropIndex = 0 // Top quarter
+              } else if (relativeY < columnHeight * 0.75) {
+                dropIndex = Math.floor(targetList.length / 2) // Middle
+              } else {
+                dropIndex = targetList.length // Bottom quarter
+              }
+            }
+            
+                      const newPos = calculateInsertPosition(targetList, dropIndex, targetStatus)
+          console.log('📍 Calculated position for column drop:', { 
+            targetStatus, 
+            dropIndex, 
+            targetListLength: targetList.length, 
+            newPos 
+          })
+          
+          // Update all positions in the target column to maintain proper order
+          await updateColumnPositions(targetStatus, activeTicket.id, dropIndex)
+          // Status update is handled separately
+          } catch (positionError) {
+            console.warn('Position update failed, but status change succeeded:', positionError)
+            // Position update failed, but status change succeeded - this is acceptable
+            // Don't trigger full refresh, just keep the current position
+          }
+        } catch (statusError) {
+          console.error('Status update failed:', statusError)
+          // Only revert on critical status failure
+          setTickets((items) => {
+            return items.map((item) => 
+              item.id.toString() === active.id 
+                ? { ...item, status: activeTicket.status } // Revert to original status
+                : item
+            )
+          })
+        }
       } else {
-        // Status unchanged - ticket already in targetStatus status
+        // Same status drop on column - move to bottom of column
+        console.log('🔄 Same status drop on column:', { status: activeTicket.status })
+        try {
+          const targetList = tickets.filter(t => t.status === activeTicket.status && t.id !== activeTicket.id)
+          
+          // Calculate drop index based on mouse position relative to the column
+          const columnElement = document.querySelector(`[data-status="${targetStatus}"]`) as HTMLElement
+          let dropIndex = targetList.length // Default to bottom
+          
+          if (columnElement) {
+            const columnRect = columnElement.getBoundingClientRect()
+            // Try to get mouse position from the event, fallback to center of column
+            let mouseY = columnRect.top + (columnRect.height / 2) // Default to center
+            
+            // Check if we can get mouse position from the event
+            if (event.activatorEvent && 'clientY' in event.activatorEvent) {
+              mouseY = (event.activatorEvent as MouseEvent).clientY
+            }
+            
+            const relativeY = mouseY - columnRect.top
+            const columnHeight = columnRect.height
+            
+            // Determine drop position based on mouse location
+            if (relativeY < columnHeight * 0.25) {
+              dropIndex = 0 // Top quarter
+            } else if (relativeY < columnHeight * 0.75) {
+              dropIndex = Math.floor(targetList.length / 2) // Middle
+            } else {
+              dropIndex = targetList.length // Bottom quarter
+            }
+          }
+          
+          // Check if the ticket is already in the correct position
+          const currentTickets = tickets.filter(t => t.status === activeTicket.status)
+          const sortedTickets = currentTickets.sort((a, b) => (a.position || 0) - (b.position || 0))
+          const currentIndex = sortedTickets.findIndex(t => t.id === activeTicket.id)
+          
+          console.log('📍 Same status column drop calculation:', { 
+            targetListLength: targetList.length, 
+            dropIndex,
+            currentIndex,
+            needsReorder: currentIndex !== dropIndex
+          })
+          
+          // Only update if the position actually needs to change
+          if (currentIndex !== dropIndex) {
+            // Update UI immediately for responsiveness (optimistic update)
+            const basePosition = getStatusCode(activeTicket.status)
+            const reorderedTickets = [...currentTickets]
+            const movedTicket = reorderedTickets.find(t => t.id === activeTicket.id)!
+            reorderedTickets.splice(currentIndex, 1) // Remove from current position
+            reorderedTickets.splice(dropIndex, 0, movedTicket) // Insert at new position
+            
+            // Update positions optimistically
+            const optimisticUpdates = reorderedTickets.map((ticket, index) => ({
+              ...ticket,
+              position: basePosition + ((index + 1) * 10)
+            }))
+            
+            // Apply optimistic updates to UI
+            setTickets(prev => prev.map(ticket => {
+              const optimisticUpdate = optimisticUpdates.find(u => u.id === ticket.id)
+              return optimisticUpdate || ticket
+            }))
+            
+            // Update all positions in the column to maintain proper order (background)
+            await updateColumnPositions(activeTicket.status, activeTicket.id, dropIndex)
+          } else {
+            console.log('✅ Ticket already in correct position, no update needed')
+          }
+          // Position update is handled inside updateColumnPositions function
+        } catch (positionError) {
+          console.warn('Position update failed during same status column drop:', positionError)
+        }
       }
       return
     }
 
     // Handle dropping on another ticket
     const overTicket = tickets.find((item) => item.id.toString() === over.id)
+    console.log('🎯 Dropping on ticket:', { overTicket: overTicket?.id, overStatus: overTicket?.status, sameTicket: activeTicket.id === overTicket?.id })
     if (overTicket && activeTicket.id !== overTicket.id) {
       // If dropping on a ticket in a different status, move to that status
       if (activeTicket.status !== overTicket.status) {
+        console.log('🔄 Status change needed:', { from: activeTicket.status, to: overTicket.status })
         // Update local state immediately for UI responsiveness
         setTickets((items) => {
           return items.map((item) => 
@@ -1035,23 +1435,141 @@ export default function TicketsPage() {
           )
         })
         
-        // Update database
-        await updateTicketStatus(activeTicket.id, overTicket.status)
-        // Compute fractional position in the target column relative to the hovered ticket
-        const targetList = tickets.filter(t => t.status === overTicket.status && t.id !== activeTicket.id)
-        const idx = targetList.findIndex(t => t.id === overTicket.id)
-        const dropIndex = idx === -1 ? targetList.length : idx
-        const newPos = calculateInsertPosition(targetList, dropIndex)
-        await updateTicketPosition(activeTicket.id, newPos)
-        setTickets(items => items.map(it => it.id === activeTicket.id ? { ...it, position: newPos, status: overTicket.status as TicketStatus } : it))
+        try {
+          // Update database status first (critical)
+          await updateTicketStatus(activeTicket.id, overTicket.status)
+          
+          // Try to update position (non-critical, can fail gracefully)
+          try {
+            const targetList = tickets.filter(t => t.status === overTicket.status && t.id !== activeTicket.id)
+            const idx = targetList.findIndex(t => t.id === overTicket.id)
+            const dropIndex = idx === -1 ? targetList.length : idx
+            // Update all positions in the target column to maintain proper order
+            await updateColumnPositions(overTicket.status as TicketStatus, activeTicket.id, dropIndex)
+            // Position and status update is handled inside updateColumnPositions function
+          } catch (positionError) {
+            console.warn('Position update failed, but status change succeeded:', positionError)
+            // Position update failed, but status change succeeded - this is acceptable
+            // Don't trigger full refresh, just keep the current position
+          }
+        } catch (statusError) {
+          console.error('Status update failed:', statusError)
+          // Only revert on critical status failure
+          setTickets((items) => {
+            return items.map((item) => 
+              item.id.toString() === active.id 
+                ? { ...item, status: activeTicket.status } // Revert to original status
+                : item
+            )
+          })
+        }
       } else {
         // Same status, reordering - compute a fractional position for the moved ticket only
-        const targetList = tickets.filter(t => t.status === activeTicket.status && t.id !== activeTicket.id)
-        const overIdx = targetList.findIndex(t => t.id.toString() === over.id)
-        const dropIndex = overIdx === -1 ? targetList.length : overIdx
-        const newPos = calculateInsertPosition(targetList, dropIndex)
-        await updateTicketPosition(activeTicket.id, newPos)
-        setTickets(prev => prev.map(it => it.id === activeTicket.id ? { ...it, position: newPos } : it))
+        console.log('🔄 Same status reordering:', { status: activeTicket.status })
+        try {
+          const targetList = tickets.filter(t => t.status === activeTicket.status && t.id !== activeTicket.id)
+          const overIdx = targetList.findIndex(t => t.id.toString() === over.id)
+          const dropIndex = overIdx === -1 ? targetList.length : overIdx
+          // Check if the ticket is already in the correct position
+          const currentTickets = tickets.filter(t => t.status === activeTicket.status)
+          const sortedTickets = currentTickets.sort((a, b) => (a.position || 0) - (b.position || 0))
+          const currentIndex = sortedTickets.findIndex(t => t.id === activeTicket.id)
+          
+          console.log('📍 Reordering calculation:', { 
+            targetListLength: targetList.length, 
+            overIdx, 
+            dropIndex,
+            currentIndex,
+            needsReorder: currentIndex !== dropIndex
+          })
+          
+          // Only update if the position actually needs to change
+          if (currentIndex !== dropIndex) {
+            // Update UI immediately for responsiveness (optimistic update)
+            const basePosition = getStatusCode(activeTicket.status)
+            const reorderedTickets = [...currentTickets]
+            const movedTicket = reorderedTickets.find(t => t.id === activeTicket.id)!
+            reorderedTickets.splice(currentIndex, 1) // Remove from current position
+            reorderedTickets.splice(dropIndex, 0, movedTicket) // Insert at new position
+            
+            // Update positions optimistically
+            const optimisticUpdates = reorderedTickets.map((ticket, index) => ({
+              ...ticket,
+              position: basePosition + ((index + 1) * 10)
+            }))
+            
+            // Apply optimistic updates to UI
+            setTickets(prev => prev.map(ticket => {
+              const optimisticUpdate = optimisticUpdates.find(u => u.id === ticket.id)
+              return optimisticUpdate || ticket
+            }))
+            
+            // Update all positions in the column to maintain proper order (background)
+            await updateColumnPositions(activeTicket.status, activeTicket.id, dropIndex)
+          } else {
+            console.log('✅ Ticket already in correct position, no update needed')
+          }
+          // Position update is handled inside updateColumnPositions function
+        } catch (positionError) {
+          console.warn('Position update failed during reordering:', positionError)
+          // Position update failed during reordering - this is acceptable
+          // Don't trigger full refresh, just keep the current position
+        }
+      }
+    } else if (overTicket) {
+      // Handle dropping on the same ticket or same status reordering
+      console.log('🔄 Same ticket or same status reordering detected')
+      
+      // Even if it's the same ticket, we might need to update position based on drop location
+      if (activeTicket.status === overTicket.status) {
+        console.log('🔄 Same status reordering within column')
+        try {
+          const targetList = tickets.filter(t => t.status === activeTicket.status && t.id !== activeTicket.id)
+          const overIdx = targetList.findIndex(t => t.id === overTicket.id)
+          const dropIndex = overIdx === -1 ? targetList.length : overIdx
+          // Check if the ticket is already in the correct position
+          const currentTickets = tickets.filter(t => t.status === activeTicket.status)
+          const sortedTickets = currentTickets.sort((a, b) => (a.position || 0) - (b.position || 0))
+          const currentIndex = sortedTickets.findIndex(t => t.id === activeTicket.id)
+          
+          console.log('📍 Same status reordering calculation:', { 
+            targetListLength: targetList.length, 
+            overIdx, 
+            dropIndex,
+            currentIndex,
+            needsReorder: currentIndex !== dropIndex
+          })
+          
+          // Only update if the position actually needs to change
+          if (currentIndex !== dropIndex) {
+            // Update UI immediately for responsiveness (optimistic update)
+            const basePosition = getStatusCode(activeTicket.status)
+            const reorderedTickets = [...currentTickets]
+            const movedTicket = reorderedTickets.find(t => t.id === activeTicket.id)!
+            reorderedTickets.splice(currentIndex, 1) // Remove from current position
+            reorderedTickets.splice(dropIndex, 0, movedTicket) // Insert at new position
+            
+            // Update positions optimistically
+            const optimisticUpdates = reorderedTickets.map((ticket, index) => ({
+              ...ticket,
+              position: basePosition + ((index + 1) * 10)
+            }))
+            
+            // Apply optimistic updates to UI
+            setTickets(prev => prev.map(ticket => {
+              const optimisticUpdate = optimisticUpdates.find(u => u.id === ticket.id)
+              return optimisticUpdate || ticket
+            }))
+            
+            // Update all positions in the column to maintain proper order (background)
+            await updateColumnPositions(activeTicket.status, activeTicket.id, dropIndex)
+          } else {
+            console.log('✅ Ticket already in correct position, no update needed')
+          }
+          // Position update is handled inside updateColumnPositions function
+        } catch (positionError) {
+          console.warn('Position update failed during same status reordering:', positionError)
+        }
       }
     }
   }
@@ -1145,6 +1663,33 @@ export default function TicketsPage() {
                     onReload={fetchTickets}
                     loading={loading}
                   />
+                  
+                  {/* Migration Button - Remove after running once */}
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch('/api/tickets/migrate-positions', {
+                          method: 'POST'
+                        })
+                        const result = await response.json()
+                        if (response.ok) {
+                          console.log('✅ Migration successful:', result)
+                          alert(`Migration successful! Updated ${result.totalUpdated} tickets`)
+                          fetchTickets() // Refresh to see new positions
+                        } else {
+                          console.error('❌ Migration failed:', result)
+                          alert('Migration failed: ' + result.error)
+                        }
+                      } catch (error) {
+                        console.error('❌ Migration error:', error)
+                        alert('Migration error: ' + error)
+                      }
+                    }}
+                    className="text-xs"
+                  >
+                    Migrate Positions
+                  </Button>
                 </div>
               </div>
 

@@ -124,37 +124,52 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
           onTicketCreated?.(record)
           break
         case 'UPDATE':
-          // Refetch the specific ticket to get complete data with profile info
-          fetch(`/api/tickets/${record.id}`)
-            .then(res => {
-              if (!res.ok) {
-                throw new Error(`HTTP error! status: ${res.status}`)
-              }
-              return res.json()
-            })
-            .then(completeTicket => {
-              // If no role filter specified (e.g., Admin board), treat as a plain update
-              if (roleFilter == null) {
-                onTicketUpdated?.(completeTicket || record, old_record)
-                return
-              }
+          // For admin board (no role filter), use the record directly without refetching
+          // This prevents duplicate API calls and blinking when manually updating tickets
+          if (roleFilter == null) {
+            onTicketUpdated?.(record, old_record)
+            return
+          }
 
-              // Role-scoped behavior (default IT): add/remove when crossing role boundary
-              if (completeTicket && completeTicket.role_id === roleFilter) {
-                const oldRoleId = old_record?.role_id
-                if (oldRoleId !== roleFilter) {
-                  onTicketCreated?.(completeTicket)
-                } else {
-                  onTicketUpdated?.(completeTicket, old_record)
+          // Role-scoped behavior (IT board): add/remove when crossing role boundary
+          // Only refetch if we need to check role changes
+          if (old_record?.role_id !== record.role_id) {
+            fetch(`/api/tickets/${record.id}`)
+              .then(res => {
+                if (!res.ok) {
+                  throw new Error(`HTTP error! status: ${res.status}`)
                 }
-              } else {
-                onTicketDeleted?.(record)
-              }
-            })
-            .catch(error => {
-              console.error('Error refetching ticket data:', error)
+                return res.json()
+              })
+              .then(completeTicket => {
+                if (completeTicket && completeTicket.role_id === roleFilter) {
+                  const oldRoleId = old_record?.role_id
+                  if (oldRoleId !== roleFilter) {
+                    onTicketCreated?.(completeTicket)
+                  } else {
+                    onTicketUpdated?.(completeTicket, old_record)
+                  }
+                } else {
+                  onTicketDeleted?.(record)
+                }
+              })
+              .catch(error => {
+                console.error('Error refetching ticket data:', error)
+                // Fallback to using the record directly
+                if (record.role_id === roleFilter) {
+                  onTicketUpdated?.(record, old_record)
+                } else {
+                  onTicketDeleted?.(record)
+                }
+              })
+          } else {
+            // No role change, use the record directly to avoid unnecessary API calls
+            if (record.role_id === roleFilter) {
               onTicketUpdated?.(record, old_record)
-            })
+            } else {
+              onTicketDeleted?.(record)
+            }
+          }
           break
         case 'DELETE':
           onTicketDeleted?.(record)
