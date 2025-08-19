@@ -786,62 +786,45 @@ export default function TicketsPage() {
       
       if (response.ok) {
         const result = await response.json()
-        // Merge server result but preserve existing joined fields if not present in response
+        // Update with complete ticket data from server (no defensive merging needed)
         setTickets(prevTickets => prevTickets.map((item) => {
           if (item.id !== ticketId) return item
-          return {
-            ...item,
-            ...result,
-            member_name: result.member_name ?? item.member_name,
-            member_color: result.member_color ?? item.member_color,
-            user_type: result.user_type ?? item.user_type,
-            first_name: result.first_name ?? item.first_name,
-            last_name: result.last_name ?? item.last_name,
-          }
+          return result
         }))
       } else {
         const errorData = await response.json()
         console.error('Failed to update ticket status:', errorData)
-        // Revert local state on error
-        await fetchTickets()
+        // Don't refresh - optimistic update stays, user can retry if needed
       }
     } catch (error) {
       console.error('Error updating ticket status:', error)
-      // Revert local state on error
-      await fetchTickets()
+      // Don't refresh - optimistic update stays, user can retry if needed
     }
   }
 
   const updateTicketPosition = async (ticketId: number, newPosition: number) => {
     try {
-      const response = await fetch(`/api/tickets/${ticketId}/position`, {
+      const response = await fetch('/api/tickets/positions', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ position: newPosition }),
+        body: JSON.stringify({ 
+          positions: [{ id: ticketId, position: newPosition }]
+        }),
       })
 
       if (response.ok) {
-        const result = await response.json()
-        // Update local state instead of refetching
-        setTickets(prevTickets => {
-          return prevTickets.map((item) => 
-            item.id === ticketId 
-              ? { ...item, position: newPosition }
-              : item
-          )
-        })
+        // Position already updated optimistically, no need to update again
+        console.log('✅ Position updated successfully in database')
       } else {
         const errorData = await response.json()
         console.error('Failed to update ticket position:', errorData)
-        // Revert local state on error
-        await fetchTickets()
+        // Don't refresh - optimistic update stays, user can retry if needed
       }
     } catch (error) {
       console.error('Error updating ticket position:', error)
-      // Revert local state on error
-      await fetchTickets()
+      // Don't refresh - optimistic update stays, user can retry if needed
     }
   }
 
@@ -952,14 +935,17 @@ export default function TicketsPage() {
           )
         })
         
-        // Update database
-        await updateTicketStatus(activeTicket.id, targetStatus)
         // Place at bottom of target column by default
         const targetList = tickets.filter(t => t.status === targetStatus && t.id !== activeTicket.id)
         const dropIndex = targetList.length
         const newPos = calculateInsertPosition(targetList, dropIndex)
-        await updateTicketPosition(activeTicket.id, newPos)
+        
+        // Update UI immediately with both status and position (optimistic update)
         setTickets(items => items.map(it => it.id === activeTicket.id ? { ...it, position: newPos, status: targetStatus } : it))
+        
+        // Update database in background
+        await updateTicketStatus(activeTicket.id, targetStatus)
+        await updateTicketPosition(activeTicket.id, newPos)
       } else {
         // Status unchanged - ticket already in targetStatus status
       }
@@ -980,23 +966,30 @@ export default function TicketsPage() {
           )
         })
         
-        // Update database
-        await updateTicketStatus(activeTicket.id, overTicket.status)
         // Compute fractional position in the target column relative to the hovered ticket
         const targetList = tickets.filter(t => t.status === overTicket.status && t.id !== activeTicket.id)
         const idx = targetList.findIndex(t => t.id === overTicket.id)
         const dropIndex = idx === -1 ? targetList.length : idx
         const newPos = calculateInsertPosition(targetList, dropIndex)
-        await updateTicketPosition(activeTicket.id, newPos)
+        
+        // Update UI immediately with both status and position (optimistic update)
         setTickets(items => items.map(it => it.id === activeTicket.id ? { ...it, position: newPos, status: overTicket.status as TicketStatus } : it))
+        
+        // Update database in background
+        await updateTicketStatus(activeTicket.id, overTicket.status)
+        await updateTicketPosition(activeTicket.id, newPos)
       } else {
         // Same status, reordering - compute a fractional position for the moved ticket only
         const targetList = tickets.filter(t => t.status === activeTicket.status && t.id !== activeTicket.id)
         const overIdx = targetList.findIndex(t => t.id.toString() === over.id)
         const dropIndex = overIdx === -1 ? targetList.length : overIdx
         const newPos = calculateInsertPosition(targetList, dropIndex)
-        await updateTicketPosition(activeTicket.id, newPos)
+        
+        // Update UI immediately for responsiveness (optimistic update)
         setTickets(prev => prev.map(it => it.id === activeTicket.id ? { ...it, position: newPos } : it))
+        
+        // Update database in background
+        await updateTicketPosition(activeTicket.id, newPos)
       }
     }
   }

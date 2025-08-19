@@ -3,10 +3,11 @@ import { getTicketById, updateTicketStatus, updateTicket, deleteTicket } from '@
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const ticket = await getTicketById(parseInt(params.id))
+    const { id } = await params
+    const ticket = await getTicketById(parseInt(id))
     
     if (!ticket) {
       return NextResponse.json(
@@ -27,18 +28,19 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const body = await request.json()
     
     const { status, resolvedBy, ...updates } = body
     
     let updatedTicket
     if (status) {
-      updatedTicket = await updateTicketStatus(parseInt(params.id), status, resolvedBy)
+      updatedTicket = await updateTicketStatus(parseInt(id), status, resolvedBy)
     } else {
-      updatedTicket = await updateTicket(parseInt(params.id), updates)
+      updatedTicket = await updateTicket(parseInt(id), updates)
     }
     
     return NextResponse.json(updatedTicket)
@@ -53,10 +55,11 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await deleteTicket(parseInt(params.id))
+    const { id } = await params
+    await deleteTicket(parseInt(id))
     return NextResponse.json({ message: 'Ticket deleted successfully' })
   } catch (error) {
     console.error('Error deleting ticket:', error)
