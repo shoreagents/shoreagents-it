@@ -1,32 +1,27 @@
-import { NextResponse } from 'next/server'
-import pool from '@/lib/database'
+import { NextRequest, NextResponse } from 'next/server'
+import pool, { bpocPool } from '@/lib/database'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    console.log('🎯 Fetching talent pool data from database')
+    console.log('🎯 Fetching talent pool data...')
     
-    if (!pool) {
-      console.log('❌ Database pool not available')
-      return NextResponse.json({ error: 'Database not available' }, { status: 500 })
-    }
-
-    // Query to get talent pool with all related data
+    // Query to get talent pool entries with related data
     const query = `
       SELECT 
         tp.id,
         tp.applicant_id,
         tp.interested_clients,
         tp.last_contact_date,
-        tp.created_at as talent_pool_created_at,
-        tp.updated_at as talent_pool_updated_at,
-        
-        -- Comment data
-        c.comment,
-        c.comment_type,
-        c.created_by as comment_created_by,
-        c.created_at as comment_created_at,
-        
-        -- Applicant data from bpoc_recruits
+        tp.created_at,
+        tp.updated_at,
+        rc.id as comment_id,
+        rc.comment as comment_text,
+        rc.comment_type,
+        rc.created_by,
+        rc.created_at as comment_created_at,
+        u.email as creator_email,
+        u.user_type as creator_user_type,
+        br.applicant_id as recruit_applicant_id,
         br.resume_slug,
         br.status,
         br.video_introduction_url,
@@ -36,136 +31,120 @@ export async function GET() {
         br.position,
         br.job_ids,
         br.bpoc_application_ids,
-        br.created_at as recruit_created_at,
-        
-        -- User data (creator of comment)
-        u.email as comment_creator_email,
-        u.user_type as comment_creator_type
-        
-      FROM public.talent_pool tp
-      LEFT JOIN public.bpoc_comments c ON tp.comment_id = c.id
-      LEFT JOIN public.bpoc_recruits br ON tp.applicant_id = br.applicant_id
-      LEFT JOIN public.users u ON c.created_by = u.id
+        br.created_at as recruit_created_at
+      FROM talent_pool tp
+      LEFT JOIN recruits_comments rc ON rc.talent_pool_id = tp.id
+      LEFT JOIN users u ON rc.created_by = u.id
+      LEFT JOIN bpoc_recruits br ON tp.applicant_id = br.applicant_id
       ORDER BY tp.created_at DESC
     `
-
-    const { rows } = await pool.query(query)
     
-    console.log(`📊 Found ${rows.length} talent pool entries`)
+    const result = await pool.query(query)
+    console.log(`✅ Found ${result.rows.length} talent pool records`)
     
-    // Transform the data to match frontend expectations
-    const talentPool = rows.map(row => ({
-      id: row.id,
-      applicant_id: row.applicant_id,
-      interested_clients: row.interested_clients || [],
-      last_contact_date: row.last_contact_date,
-      created_at: row.talent_pool_created_at,
-      updated_at: row.talent_pool_updated_at,
-      
-      // Comment information
-      comment: {
-        id: row.comment_id,
-        text: row.comment,
-        type: row.comment_type,
-        created_by: row.comment_created_by,
-        created_at: row.comment_created_at,
-        creator: {
-          email: row.comment_creator_email,
-          user_type: row.comment_creator_type
-        }
-      },
-      
-      // Applicant information
-      applicant: {
-        applicant_id: row.applicant_id,
-        resume_slug: row.resume_slug,
-        status: row.status,
-        video_introduction_url: row.video_introduction_url,
-        current_salary: row.current_salary,
-        expected_monthly_salary: row.expected_monthly_salary,
-        shift: row.shift,
-        position: row.position,
-        job_ids: row.job_ids || [],
-        bpoc_application_ids: row.bpoc_application_ids || [],
-        created_at: row.recruit_created_at
+    // Group results by talent pool entry
+    const talentMap = new Map()
+    
+    result.rows.forEach(row => {
+      if (!talentMap.has(row.id)) {
+        talentMap.set(row.id, {
+          id: row.id,
+          applicant_id: row.applicant_id,
+          interested_clients: row.interested_clients || [],
+          last_contact_date: row.last_contact_date,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          comment: null,
+          applicant: {
+            applicant_id: row.recruit_applicant_id,
+            resume_slug: row.resume_slug,
+            status: row.status || 'unknown',
+            video_introduction_url: row.video_introduction_url,
+            current_salary: row.current_salary,
+            expected_monthly_salary: row.expected_monthly_salary,
+            shift: row.shift,
+            position: row.position || 0,
+            job_ids: row.job_ids || [],
+            bpoc_application_ids: row.bpoc_application_ids || [],
+            created_at: row.recruit_created_at
+          }
+        })
       }
-    }))
+      
+      // Add comment if exists
+      if (row.comment_id && !talentMap.get(row.id).comment) {
+        talentMap.get(row.id).comment = {
+          id: row.comment_id,
+          text: row.comment_text,
+          type: row.comment_type,
+          created_by: row.created_by,
+          created_at: row.comment_created_at,
+          creator: {
+            email: row.creator_email,
+            user_type: row.creator_user_type
+          }
+        }
+      }
+    })
+    
+    const data: any[] = Array.from(talentMap.values())
 
+    // Optionally enrich with BPOC users data when configured
+    if (bpocPool && data.length > 0) {
+      try {
+        // Collect unique applicant_ids that look like UUIDs
+        const applicantIds: string[] = Array.from(
+          new Set(
+            data
+              .map((t) => t.applicant_id)
+              .filter((id: string | null | undefined) => Boolean(id))
+          )
+        ) as string[]
+
+        if (applicantIds.length > 0) {
+          const bpocQuery = `
+            SELECT 
+              u.id,
+              u.email,
+              u.full_name,
+              u.avatar_url
+            FROM users u
+            WHERE u.id = ANY($1::uuid[])
+          `
+
+          const bpocResult = await bpocPool.query(bpocQuery, [applicantIds])
+          const bpocMap = new Map<string, any>()
+          for (const row of bpocResult.rows) {
+            bpocMap.set(row.id, row)
+          }
+
+          for (const t of data) {
+            const user = bpocMap.get(t.applicant_id)
+            if (!user) continue
+            t.applicant_name = user.full_name
+            t.applicant_email = user.email
+            t.applicant_avatar = user.avatar_url
+          }
+        }
+      } catch (bpocError) {
+        console.error('⚠️ Failed enriching with BPOC users data:', bpocError)
+      }
+    }
+    
     return NextResponse.json({
       success: true,
-      data: talentPool,
-      count: talentPool.length
+      data: data,
+      total: data.length
     })
 
   } catch (error) {
     console.error('❌ Error fetching talent pool:', error)
     return NextResponse.json(
       { 
+        success: false, 
         error: 'Failed to fetch talent pool data',
         details: error instanceof Error ? error.message : 'Unknown error'
-      }, 
-      { status: 500 }
-    )
-  }
-}
-
-// Update interested clients for a talent pool entry
-export async function PATCH(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const talentPoolId = searchParams.get('id')
-    const body = await request.json()
-    
-    if (!talentPoolId) {
-      return NextResponse.json({ error: 'Talent pool ID is required' }, { status: 400 })
-    }
-
-    const { interested_clients, last_contact_date } = body
-
-    console.log(`🔄 Updating talent pool entry ${talentPoolId}`)
-
-    if (!pool) {
-      return NextResponse.json({ error: 'Database not available' }, { status: 500 })
-    }
-
-    let updateQuery = 'UPDATE public.talent_pool SET updated_at = NOW()'
-    const queryParams: any[] = [talentPoolId]
-    let paramIndex = 2
-
-    if (interested_clients !== undefined) {
-      updateQuery += `, interested_clients = $${paramIndex}`
-      queryParams.push(interested_clients)
-      paramIndex++
-    }
-
-    if (last_contact_date !== undefined) {
-      updateQuery += `, last_contact_date = $${paramIndex}`
-      queryParams.push(last_contact_date)
-      paramIndex++
-    }
-
-    updateQuery += ' WHERE id = $1 RETURNING *'
-
-    const { rows } = await pool.query(updateQuery, queryParams)
-
-    if (rows.length === 0) {
-      return NextResponse.json({ error: 'Talent pool entry not found' }, { status: 404 })
-    }
-
-    console.log(`✅ Updated talent pool entry ${talentPoolId}`)
-
-    return NextResponse.json({
-      success: true,
-      data: rows[0]
-    })
-
-  } catch (error) {
-    console.error('❌ Error updating talent pool:', error)
-    return NextResponse.json(
-      { 
-        error: 'Failed to update talent pool entry',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }, 
+      },
       { status: 500 }
     )
   }

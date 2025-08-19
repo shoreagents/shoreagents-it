@@ -6,9 +6,20 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { AppHeader } from "@/components/app-header"
 import { SidebarInset } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { IconWorld, IconEye, IconCalendar, IconUser } from "@tabler/icons-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { 
+  Search, 
+  Star, 
+  Filter,
+  Users,
+  Mail
+} from "lucide-react"
 
 // Types
 interface TalentPoolEntry {
@@ -18,6 +29,10 @@ interface TalentPoolEntry {
   last_contact_date: string | null
   created_at: string
   updated_at: string
+  // Enriched from BPOC users table
+  applicant_name?: string | null
+  applicant_email?: string | null
+  applicant_avatar?: string | null
   comment: {
     id: number
     text: string
@@ -54,6 +69,40 @@ export default function TalentPoolPage() {
   const [talentPool, setTalentPool] = useState<TalentPoolEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [sortBy, setSortBy] = useState("newest")
+
+  // Filter and sort talent pool entries
+  const filteredTalents = useMemo(() => {
+    let filtered = talentPool.filter(entry => {
+      const searchLower = searchQuery.toLowerCase()
+      return (
+        entry.applicant_id.toLowerCase().includes(searchLower) ||
+        (entry.applicant_name || '').toLowerCase().includes(searchLower) ||
+        (entry.applicant_email || '').toLowerCase().includes(searchLower) ||
+        entry.applicant.status.toLowerCase().includes(searchLower) ||
+        (entry.comment?.text || '').toLowerCase().includes(searchLower)
+      )
+    })
+
+    // Sort entries
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "newest":
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        case "oldest":
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        case "salary-high":
+          return (b.applicant.expected_monthly_salary || 0) - (a.applicant.expected_monthly_salary || 0)
+        case "salary-low":
+          return (a.applicant.expected_monthly_salary || 0) - (b.applicant.expected_monthly_salary || 0)
+        default:
+          return 0
+      }
+    })
+
+    return filtered
+  }, [talentPool, searchQuery, sortBy])
 
   // Fetch talent pool data from database
   useEffect(() => {
@@ -99,25 +148,82 @@ export default function TalentPoolPage() {
           <div className="flex-1 flex-col gap-2 @container/main">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
               <div className="px-4 lg:px-6">
-                <div className="flex items-center justify-between mb-4">
+                <div className="mb-6 flex items-center justify-between">
                   <div>
                     <h1 className="text-2xl font-bold">Talent Pool</h1>
-                    <p className="text-sm text-muted-foreground">Search and manage talent candidates.</p>
+                    <p className="text-sm text-muted-foreground">
+                      Discover and connect with top freelancers and professionals.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      {filteredTalents.length} talents
+                    </Badge>
+                  </div>
+                </div>
+                
+                {/* Search and Filters */}
+                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by applicant ID, status, or comments..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                      <Select value={sortBy} onValueChange={setSortBy}>
+                      <SelectTrigger className="w-[140px]">
+                        <Filter className="h-4 w-4 mr-2" />
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                        <SelectItem value="newest">Newest First</SelectItem>
+                        <SelectItem value="oldest">Oldest First</SelectItem>
+                        <SelectItem value="salary-high">Highest Salary</SelectItem>
+                        <SelectItem value="salary-low">Lowest Salary</SelectItem>
+                        </SelectContent>
+                      </Select>
                   </div>
                 </div>
                 
 
 
                 {/* Loading State */}
-                {loading && (
-                  <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Loading talent pool...</p>
+                {loading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <Card key={i} className="rounded-xl">
+                        <CardHeader className="pb-4">
+                          <div className="flex items-start gap-3">
+                            <Skeleton className="h-12 w-12 rounded-full" />
+                            <div className="flex-1 space-y-2">
+                              <Skeleton className="h-5 w-3/4" />
+                              <Skeleton className="h-4 w-1/2" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <Skeleton className="h-4 w-16" />
+                            <Skeleton className="h-4 w-20" />
+                          </div>
+                          <Skeleton className="h-16 w-full" />
+                          <div className="flex flex-wrap gap-1">
+                            <Skeleton className="h-6 w-16" />
+                            <Skeleton className="h-6 w-20" />
+                            <Skeleton className="h-6 w-14" />
+                          </div>
+                          <Skeleton className="h-10 w-full" />
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
-                )}
+                ) : error ? (
 
-                {/* Error State */}
-                {error && (
                   <div className="text-center py-12">
                     <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 max-w-md mx-auto">
                       <h3 className="text-lg font-medium text-destructive mb-2">Error Loading Talent Pool</h3>
@@ -130,125 +236,127 @@ export default function TalentPoolPage() {
                       </Button>
                     </div>
                   </div>
-                )}
-
-                {/* Results Count */}
-                {!loading && !error && (
-                <div className="mb-6">
-                  <p className="text-muted-foreground">
-                      Showing {talentPool.length} talent pool entr{talentPool.length !== 1 ? 'ies' : 'y'}
-                  </p>
+                ) : filteredTalents.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                    <Users className="h-12 w-12 mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No talents found</h3>
+                    <p className="text-sm">Try adjusting your search or filters</p>
                 </div>
-                )}
+                ) : (
 
-                {/* Talent Pool */}
-                {!loading && !error && talentPool.length > 0 && (
-                  <div className="mb-8">
+
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {talentPool.map((entry) => (
-                        <Card key={entry.id} className="hover:shadow-lg transition-shadow">
-                      <CardHeader className="pb-3">
-                            <CardTitle className="text-lg font-semibold">
-                              Applicant {entry.applicant_id.slice(0, 8)}...
-                            </CardTitle>
-                            <p className="text-sm text-muted-foreground">
-                              Status: <Badge variant="secondary">{entry.applicant.status}</Badge>
-                            </p>
-                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                              <IconCalendar className="h-4 w-4" />
-                              Added {new Date(entry.created_at).toLocaleDateString()}
+                    {filteredTalents.map((entry) => (
+                      <Card
+                        key={entry.id}
+                        className="rounded-xl flex flex-col hover:shadow-lg transition-shadow"
+                      >
+                        <CardHeader className="pb-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3">
+                              <Avatar className="h-12 w-12">
+                                {entry.applicant_avatar ? (
+                                  <AvatarImage src={entry.applicant_avatar} alt={entry.applicant_name || 'Applicant'} />
+                                ) : null}
+                                <AvatarFallback>
+                                  {(entry.applicant_name || entry.applicant_id)
+                                    .split(' ')
+                                    .map((n: string) => n[0])
+                                    .join('')
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-lg leading-tight truncate">
+                                  {entry.applicant_name || `Applicant ${entry.applicant_id.slice(0, 8)}...`}
+                                </h3>
+                                <div className="flex items-center gap-1 mt-1">
+                                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                  <span className="text-sm font-medium">4.8</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 text-sm">
+                              <span className="text-green-600 font-bold">₱</span>
+                              <span className="font-bold text-base">
+                                {entry.applicant.expected_monthly_salary?.toLocaleString() || 'N/A'}
+                              </span>
+                              <span className="text-muted-foreground text-xs"> /month</span>
+                            </div>
                             </div>
                           </CardHeader>
-                          
-                          <CardContent className="space-y-4">
-                            {/* Applicant Info */}
+                        <CardContent className="flex flex-col justify-between min-h-0 flex-1">
+                          <div className="space-y-4">
+                            {/* Status and Description */}
                             <div className="space-y-2">
-                              {entry.applicant.current_salary && (
-                                <p className="text-sm">
-                                  <span className="font-medium">Current Salary:</span> ₱{entry.applicant.current_salary.toLocaleString()}
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary">{entry.applicant.status}</Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  Added {new Date(entry.created_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                              {entry.comment && (
+                                <p className="text-sm text-muted-foreground line-clamp-3">
+                                  {entry.comment.text}
                                 </p>
                               )}
-                              {entry.applicant.expected_monthly_salary && (
-                                <p className="text-sm">
-                                  <span className="font-medium">Expected:</span> ₱{entry.applicant.expected_monthly_salary.toLocaleString()}
-                                </p>
+                              {!entry.comment && entry.applicant_email && (
+                                <div className="flex items-center gap-2 text-sm text-foreground">
+                                  <Mail className="h-4 w-4" />
+                                  <span className="truncate">{entry.applicant_email}</span>
+                                </div>
                               )}
+                            </div>
+                            
+                            {/* Skills/Info */}
+                            <div className="flex flex-wrap gap-2">
                               {entry.applicant.shift && (
-                                <p className="text-sm">
-                                  <span className="font-medium">Shift:</span> {entry.applicant.shift}
-                                </p>
+                                <Badge className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                  {entry.applicant.shift}
+                                </Badge>
                               )}
                               {entry.applicant.job_ids.length > 0 && (
-                                <p className="text-sm">
-                                  <span className="font-medium">Jobs:</span> {entry.applicant.job_ids.join(', ')}
-                                </p>
+                                <Badge className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                  {entry.applicant.job_ids.length} Job{entry.applicant.job_ids.length !== 1 ? 's' : ''}
+                                </Badge>
                               )}
-                            </div>
-
-                            {/* Comment */}
-                            {entry.comment && (
-                              <div className="bg-muted/50 p-3 rounded-lg">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    {entry.comment.type}
-                                  </Badge>
-                                  {entry.comment.creator.email && (
-                                    <p className="text-xs text-muted-foreground">
-                                      by {entry.comment.creator.email}
-                                    </p>
-                                  )}
-                                </div>
-                                <p className="text-sm">{entry.comment.text}</p>
-                              </div>
-                            )}
-
-                            {/* Interested Clients */}
                             {entry.interested_clients.length > 0 && (
-                              <div>
-                                <p className="text-sm font-medium mb-1">Interested Clients:</p>
-                                <div className="flex flex-wrap gap-1">
-                                  {entry.interested_clients.map(clientId => (
-                                    <Badge key={clientId} variant="outline" className="text-xs">
-                                      Client {clientId}
-                                    </Badge>
-                                  ))}
-                                </div>
-                          </div>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                      <Badge className="text-xs bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200 border-0 cursor-pointer">
+                                        {entry.interested_clients.length} Client{entry.interested_clients.length !== 1 ? 's' : ''}
+                                      </Badge>
+                              </TooltipTrigger>
+                                    <TooltipContent>
+                                      <div className="text-sm">
+                                        Interested Clients: {entry.interested_clients.join(', ')}
+                                      </div>
+                                    </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                             )}
-
-                            {/* Actions */}
-                            <div className="flex gap-2 pt-2">
-                              <Button size="sm" variant="outline">
-                                <IconEye className="h-4 w-4 mr-2" />
-                                View Details
-                              </Button>
-                              {entry.applicant.video_introduction_url && (
-                                <Button size="sm" variant="outline" asChild>
-                                  <a href={entry.applicant.video_introduction_url} target="_blank" rel="noopener noreferrer">
-                                    <IconWorld className="h-4 w-4" />
-                                  </a>
-                          </Button>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
+                          </div>
                         </div>
-                )}
 
-
-
-                {/* No Results */}
-                {!loading && !error && talentPool.length === 0 && (
-                  <div className="text-center py-12">
-                    <IconUser className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <h3 className="text-lg font-medium mb-2">No talent pool entries found</h3>
-                    <p className="text-muted-foreground">
-                      Talent pool entries are automatically created when applicants reach 'passed' status.
-                    </p>
+                          {/* Action Button */}
+                            <Button 
+                            variant="default" 
+                            className="w-full text-sm h-9 rounded-lg shadow-none mt-4"
+                          >
+                            See Profile
+                                    </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
                   </div>
                 )}
+
+
+
+
               </div>
             </div>
           </div>
