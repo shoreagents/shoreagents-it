@@ -47,10 +47,10 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
-  const [locationFilter, setLocationFilter] = useState("")
-  const [typeFilter, setTypeFilter] = useState("")
-  const [experienceFilter, setExperienceFilter] = useState("")
-  const [statusFilter, setStatusFilter] = useState("")
+  const [locationFilter, setLocationFilter] = useState("all-locations")
+  const [typeFilter, setTypeFilter] = useState("all-types")
+  const [experienceFilter, setExperienceFilter] = useState("all-levels")
+  const [statusFilter, setStatusFilter] = useState("all-status")
 
   // Mock data for demonstration
   useEffect(() => {
@@ -124,19 +124,19 @@ export default function JobsPage() {
       )
     }
 
-    if (locationFilter) {
+    if (locationFilter !== "all-locations") {
       filtered = filtered.filter(job => job.location === locationFilter)
     }
 
-    if (typeFilter) {
+    if (typeFilter !== "all-types") {
       filtered = filtered.filter(job => job.type === typeFilter)
     }
 
-    if (experienceFilter) {
+    if (experienceFilter !== "all-levels") {
       filtered = filtered.filter(job => job.experience_level === experienceFilter)
     }
 
-    if (statusFilter) {
+    if (statusFilter !== "all-status") {
       filtered = filtered.filter(job => job.status === statusFilter)
     }
 
@@ -241,7 +241,7 @@ export default function JobsPage() {
                     <SelectValue placeholder="Location" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Locations</SelectItem>
+                    <SelectItem value="all-locations">All Locations</SelectItem>
                     <SelectItem value="Manila, Philippines">Manila</SelectItem>
                     <SelectItem value="Cebu, Philippines">Cebu</SelectItem>
                     <SelectItem value="Makati, Philippines">Makati</SelectItem>
@@ -252,7 +252,7 @@ export default function JobsPage() {
                     <SelectValue placeholder="Job Type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Types</SelectItem>
+                    <SelectItem value="all-types">All Types</SelectItem>
                     <SelectItem value="Full-time">Full-time</SelectItem>
                     <SelectItem value="Part-time">Part-time</SelectItem>
                     <SelectItem value="Contract">Contract</SelectItem>
@@ -264,7 +264,7 @@ export default function JobsPage() {
                     <SelectValue placeholder="Experience" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Levels</SelectItem>
+                    <SelectItem value="all-levels">All Levels</SelectItem>
                     <SelectItem value="Entry">Entry</SelectItem>
                     <SelectItem value="Mid-level">Mid-level</SelectItem>
                     <SelectItem value="Senior">Senior</SelectItem>
@@ -276,7 +276,7 @@ export default function JobsPage() {
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Status</SelectItem>
+                    <SelectItem value="all-status">All Status</SelectItem>
                     <SelectItem value="Active">Active</SelectItem>
                     <SelectItem value="Draft">Draft</SelectItem>
                     <SelectItem value="Closed">Closed</SelectItem>

@@ -4,9 +4,19 @@ import pool, { bpocPool } from '@/lib/database'
 export async function GET(request: NextRequest) {
   try {
     console.log('🎯 Fetching talent pool data...')
-    
-    // Query to get talent pool entries with related data
-    const query = `
+
+    // Read query params
+    const { searchParams } = new URL(request.url)
+    const search = (searchParams.get('search') || '').toLowerCase()
+    const category = searchParams.get('category') || 'All'
+    const sortBy = searchParams.get('sortBy') || 'rating'
+
+    // Detect optional tables
+    const commentsExistsResult = await pool.query("SELECT to_regclass('public.bpoc_comments') IS NOT NULL AS exists")
+    const hasBpocComments = Boolean(commentsExistsResult?.rows?.[0]?.exists)
+
+    // Build query aligned to main.sql; make comments join optional
+    const selectCommon = `
       SELECT 
         tp.id,
         tp.applicant_id,
@@ -14,13 +24,6 @@ export async function GET(request: NextRequest) {
         tp.last_contact_date,
         tp.created_at,
         tp.updated_at,
-        rc.id as comment_id,
-        rc.comment as comment_text,
-        rc.comment_type,
-        rc.created_by,
-        rc.created_at as comment_created_at,
-        u.email as creator_email,
-        u.user_type as creator_user_type,
         br.applicant_id as recruit_applicant_id,
         br.resume_slug,
         br.status,
@@ -31,14 +34,32 @@ export async function GET(request: NextRequest) {
         br.position,
         br.job_ids,
         br.bpoc_application_ids,
-        br.created_at as recruit_created_at
-      FROM talent_pool tp
-      LEFT JOIN recruits_comments rc ON rc.talent_pool_id = tp.id
-      LEFT JOIN users u ON rc.created_by = u.id
-      LEFT JOIN bpoc_recruits br ON tp.applicant_id = br.applicant_id
-      ORDER BY tp.created_at DESC
-    `
-    
+        br.created_at as recruit_created_at`;
+
+    const selectWithComments = `
+        , rc.id as comment_id,
+        rc.comment as comment_text,
+        rc.comment_type,
+        rc.created_by,
+        rc.created_at as comment_created_at,
+        u.email as creator_email,
+        u.user_type as creator_user_type`;
+
+    const fromBase = `
+      FROM public.talent_pool tp
+      LEFT JOIN public.bpoc_recruits br ON tp.applicant_id = br.applicant_id`;
+
+    const joinComments = `
+      LEFT JOIN public.bpoc_comments rc ON rc.id = tp.comment_id
+      LEFT JOIN public.users u ON rc.created_by = u.id`;
+
+    const orderBy = `
+      ORDER BY tp.created_at DESC`;
+
+    const query = `${selectCommon}${hasBpocComments ? selectWithComments : ''}
+${fromBase}${hasBpocComments ? joinComments : ''}
+${orderBy}`
+
     const result = await pool.query(query)
     console.log(`✅ Found ${result.rows.length} talent pool records`)
     
@@ -71,8 +92,8 @@ export async function GET(request: NextRequest) {
         })
       }
       
-      // Add comment if exists
-      if (row.comment_id && !talentMap.get(row.id).comment) {
+      // Add comment if exists and columns present
+      if (hasBpocComments && row.comment_id && !talentMap.get(row.id).comment) {
         talentMap.get(row.id).comment = {
           id: row.comment_id,
           text: row.comment_text,
@@ -116,8 +137,7 @@ export async function GET(request: NextRequest) {
             u.full_name,
               u.avatar_url
           FROM users u
-            WHERE u.id = ANY($1::uuid[])
-          `
+            WHERE u.id = ANY($1::uuid[])`;
 
           const bpocResult = await bpocPool.query(bpocQuery, [applicantIds])
           console.log(`👤 Found ${bpocResult.rows.length} user records`)
@@ -169,8 +189,7 @@ export async function GET(request: NextRequest) {
               rg.user_id,
               rg.generated_resume_data
             FROM resumes_generated rg
-            WHERE rg.user_id = ANY($1::uuid[])
-          `
+            WHERE rg.user_id = ANY($1::uuid[])`;
 
           const skillsResult = await bpocPool.query(skillsQuery, [applicantIds])
           console.log(`📚 Found ${skillsResult.rows.length} resume records with skills`)
@@ -254,10 +273,48 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Apply lightweight filtering/sorting based on query params
+    let filtered = data
+
+    if (search) {
+      filtered = filtered.filter((t) => {
+        const haystack: string[] = []
+        if (t.applicant_id) haystack.push(String(t.applicant_id))
+        if (t.applicant_name) haystack.push(String(t.applicant_name))
+        if (t.applicant_email) haystack.push(String(t.applicant_email))
+        if (t.applicant?.status) haystack.push(String(t.applicant.status))
+        if (t.comment?.text) haystack.push(String(t.comment.text))
+        if (Array.isArray(t.applicant_skills)) haystack.push(...t.applicant_skills.map(String))
+        return haystack.some((s) => s.toLowerCase().includes(search))
+      })
+    }
+
+    // Category filtering placeholder (no explicit category in schema yet)
+    if (category && category !== 'All') {
+      // Keep as-is; when category exists, apply here
+    }
+
+    if (sortBy === 'rate') {
+      filtered.sort((a, b) => {
+        const ar = Number(a.applicant?.expected_monthly_salary ?? Infinity)
+        const br = Number(b.applicant?.expected_monthly_salary ?? Infinity)
+        return ar - br
+      })
+    } else if (sortBy === 'jobs') {
+      filtered.sort((a, b) => {
+        const ac = Array.isArray(a.interested_clients) ? a.interested_clients.length : 0
+        const bc = Array.isArray(b.interested_clients) ? b.interested_clients.length : 0
+        return bc - ac
+      })
+    } else {
+      // Default to newest first using created_at
+      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    }
+
     return NextResponse.json({ 
       success: true, 
-      data: data,
-      total: data.length
+      data: filtered,
+      total: filtered.length
     })
 
   } catch (error) {
