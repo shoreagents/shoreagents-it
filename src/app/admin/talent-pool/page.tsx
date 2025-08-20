@@ -33,6 +33,9 @@ interface TalentPoolEntry {
   applicant_name?: string | null
   applicant_email?: string | null
   applicant_avatar?: string | null
+  // Enriched from BPOC resumes_generated table
+  applicant_skills?: string[]
+  applicant_summary?: string
   comment: {
     id: number
     text: string
@@ -70,19 +73,54 @@ export default function TalentPoolPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
   const [sortBy, setSortBy] = useState("newest")
+
+  // Helper function to get status badge styling
+  const getStatusBadgeStyle = (status: string) => {
+    switch (status) {
+      case 'hired':
+        return 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
+      case 'passed':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
+      case 'rejected':
+        return 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
+      case 'withdrawn':
+      case 'closed':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+      case 'verified':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100'
+      case 'qualified':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'
+      case 'initial interview':
+      case 'final interview':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-800 dark:text-orange-100'
+      case 'for verification':
+        return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-800 dark:text-indigo-100'
+      case 'not qualified':
+        return 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
+      case 'submitted':
+        return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100'
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+    }
+  }
 
   // Filter and sort talent pool entries
   const filteredTalents = useMemo(() => {
     let filtered = talentPool.filter(entry => {
       const searchLower = searchQuery.toLowerCase()
-      return (
+      const matchesSearch = (
         entry.applicant_id.toLowerCase().includes(searchLower) ||
         (entry.applicant_name || '').toLowerCase().includes(searchLower) ||
         (entry.applicant_email || '').toLowerCase().includes(searchLower) ||
         entry.applicant.status.toLowerCase().includes(searchLower) ||
         (entry.comment?.text || '').toLowerCase().includes(searchLower)
       )
+      
+      const matchesStatus = !statusFilter || entry.applicant.status === statusFilter
+      
+      return matchesSearch && matchesStatus
     })
 
     // Sort entries
@@ -102,7 +140,7 @@ export default function TalentPoolPage() {
     })
 
     return filtered
-  }, [talentPool, searchQuery, sortBy])
+  }, [talentPool, searchQuery, statusFilter, sortBy])
 
   // Fetch talent pool data from database
   useEffect(() => {
@@ -175,22 +213,61 @@ export default function TalentPoolPage() {
                     />
                   </div>
                   <div className="flex gap-2">
-                      <Select value={sortBy} onValueChange={setSortBy}>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="All Statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All Statuses</SelectItem>
+                        <SelectItem value="submitted">Submitted</SelectItem>
+                        <SelectItem value="qualified">Qualified</SelectItem>
+                        <SelectItem value="for verification">For Verification</SelectItem>
+                        <SelectItem value="verified">Verified</SelectItem>
+                        <SelectItem value="initial interview">Initial Interview</SelectItem>
+                        <SelectItem value="final interview">Final Interview</SelectItem>
+                        <SelectItem value="not qualified">Not Qualified</SelectItem>
+                        <SelectItem value="passed">Passed</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="withdrawn">Withdrawn</SelectItem>
+                        <SelectItem value="hired">Hired</SelectItem>
+                        <SelectItem value="closed">Closed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={sortBy} onValueChange={setSortBy}>
                       <SelectTrigger className="w-[140px]">
                         <Filter className="h-4 w-4 mr-2" />
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
                         <SelectItem value="newest">Newest First</SelectItem>
                         <SelectItem value="oldest">Oldest First</SelectItem>
                         <SelectItem value="salary-high">Highest Salary</SelectItem>
                         <SelectItem value="salary-low">Lowest Salary</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 
-
+                {/* Results Count and Clear Filters */}
+                <div className="mb-4 flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {filteredTalents.length} talent{filteredTalents.length !== 1 ? 's' : ''} found
+                    {statusFilter && ` with status "${statusFilter}"`}
+                  </p>
+                  {(statusFilter || searchQuery) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setStatusFilter("")
+                        setSearchQuery("")
+                      }}
+                      className="text-xs h-7"
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
 
                 {/* Loading State */}
                 {loading ? (
@@ -272,9 +349,16 @@ export default function TalentPoolPage() {
                                 <h3 className="font-semibold text-lg leading-tight truncate">
                                   {entry.applicant_name || `Applicant ${entry.applicant_id.slice(0, 8)}...`}
                                 </h3>
-                                <div className="flex items-center gap-1 mt-1">
-                                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                  <span className="text-sm font-medium">4.8</span>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <Badge 
+                                    className={`text-xs font-medium ${getStatusBadgeStyle(entry.applicant.status)}`}
+                                  >
+                                    {entry.applicant.status.replace(/\b\w/g, l => l.toUpperCase())}
+                                  </Badge>
+                                  <div className="flex items-center gap-1">
+                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                    <span className="text-sm font-medium">4.8</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -291,18 +375,16 @@ export default function TalentPoolPage() {
                           <div className="space-y-4">
                             {/* Status and Description */}
                             <div className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Badge variant="secondary">{entry.applicant.status}</Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  Added {new Date(entry.created_at).toLocaleDateString()}
-                                </span>
-                              </div>
-                              {entry.comment && (
-                                <p className="text-sm text-muted-foreground line-clamp-3">
-                                  {entry.comment.text}
-                                </p>
+                              {/* Summary from BPOC */}
+                              {entry.applicant_summary && (
+                                <div className="space-y-2">
+                                  <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
+                                    {entry.applicant_summary}
+                                  </p>
+                                </div>
                               )}
-                              {!entry.comment && entry.applicant_email && (
+                              
+                              {entry.applicant_email && (
                                 <div className="flex items-center gap-2 text-sm text-foreground">
                                   <Mail className="h-4 w-4" />
                                   <span className="truncate">{entry.applicant_email}</span>
@@ -310,36 +392,65 @@ export default function TalentPoolPage() {
                               )}
                             </div>
                             
-                            {/* Skills/Info */}
+                                                        {/* Skills/Info */}
                             <div className="flex flex-wrap gap-2">
                               {entry.applicant.shift && (
                                 <Badge className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
                                   {entry.applicant.shift}
                                 </Badge>
                               )}
-                              {entry.applicant.job_ids.length > 0 && (
-                                <Badge className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
-                                  {entry.applicant.job_ids.length} Job{entry.applicant.job_ids.length !== 1 ? 's' : ''}
-                                </Badge>
-                              )}
-                            {entry.interested_clients.length > 0 && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
+                              {entry.interested_clients.length > 0 && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
                                       <Badge className="text-xs bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200 border-0 cursor-pointer">
                                         {entry.interested_clients.length} Client{entry.interested_clients.length !== 1 ? 's' : ''}
                                       </Badge>
-                              </TooltipTrigger>
+                                    </TooltipTrigger>
                                     <TooltipContent>
                                       <div className="text-sm">
                                         Interested Clients: {entry.interested_clients.join(', ')}
                                       </div>
                                     </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
+
+                            {/* Skills from BPOC resumes_generated */}
+                            {entry.applicant_skills && entry.applicant_skills.length > 0 && (
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-medium text-foreground">Skills</h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {entry.applicant_skills.slice(0, 8).map((skill: string, index: number) => (
+                                    <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                      {skill}
+                                    </Badge>
+                                  ))}
+                                  {entry.applicant_skills.length > 8 && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                          <Badge className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0 cursor-pointer">
+                                            +{entry.applicant_skills.length - 8} more
+                                          </Badge>
+                              </TooltipTrigger>
+                                        <TooltipContent className="max-w-xs text-center">
+                                          <div className="flex flex-wrap gap-2 justify-center">
+                                            {entry.applicant_skills.slice(8).map((skill: string, index: number) => (
+                                              <Badge key={index + 8} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                            {skill}
+                                    </Badge>
+                                        ))}
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </div>
+                              </div>
                             )}
                           </div>
-                        </div>
 
                           {/* Action Button */}
                             <Button 

@@ -88,6 +88,11 @@ export async function GET(request: NextRequest) {
     })
     
     const data: any[] = Array.from(talentMap.values())
+    console.log('📊 Processed talent pool data:', data.map(t => ({
+      id: t.id,
+      applicant_id: t.applicant_id,
+      status: t.applicant?.status
+    })))
 
     // Optionally enrich with BPOC users data when configured
     if (bpocPool && data.length > 0) {
@@ -102,37 +107,155 @@ export async function GET(request: NextRequest) {
         ) as string[]
 
         if (applicantIds.length > 0) {
+          console.log('👥 Fetching user data for applicant IDs:', applicantIds)
+          
           const bpocQuery = `
-            SELECT 
+          SELECT 
               u.id,
               u.email,
-              u.full_name,
+            u.full_name,
               u.avatar_url
-            FROM users u
+          FROM users u
             WHERE u.id = ANY($1::uuid[])
           `
 
           const bpocResult = await bpocPool.query(bpocQuery, [applicantIds])
+          console.log(`👤 Found ${bpocResult.rows.length} user records`)
+          
           const bpocMap = new Map<string, any>()
           for (const row of bpocResult.rows) {
             bpocMap.set(row.id, row)
+            console.log(`👤 User data for ${row.id}:`, { name: row.full_name, email: row.email })
           }
 
+          let usersFound = 0
           for (const t of data) {
             const user = bpocMap.get(t.applicant_id)
-            if (!user) continue
+            if (!user) {
+              console.log(`❌ No user data found for applicant ${t.applicant_id}`)
+              continue
+            }
             t.applicant_name = user.full_name
             t.applicant_email = user.email
             t.applicant_avatar = user.avatar_url
+            usersFound++
+            console.log(`✅ User data enriched for ${t.applicant_id}: ${user.full_name}`)
           }
+          
+          console.log(`🎯 Successfully enriched ${usersFound} talent entries with user data`)
         }
       } catch (bpocError) {
         console.error('⚠️ Failed enriching with BPOC users data:', bpocError)
       }
     }
-    
-    return NextResponse.json({
-      success: true,
+
+    // Optionally enrich with BPOC resume skills data when configured
+    if (bpocPool && data.length > 0) {
+      try {
+        // Use the same applicant IDs that we used for users
+        const applicantIds: string[] = Array.from(
+          new Set(
+            data
+              .map((t) => t.applicant_id)
+              .filter((id: string | null | undefined) => Boolean(id))
+          )
+        ) as string[]
+
+        if (applicantIds.length > 0) {
+          console.log('🔍 Fetching skills for applicant IDs:', applicantIds)
+          
+          const skillsQuery = `
+            SELECT 
+              rg.user_id,
+              rg.generated_resume_data
+            FROM resumes_generated rg
+            WHERE rg.user_id = ANY($1::uuid[])
+          `
+
+          const skillsResult = await bpocPool.query(skillsQuery, [applicantIds])
+          console.log(`📚 Found ${skillsResult.rows.length} resume records with skills`)
+          
+          const skillsMap = new Map<string, any>()
+          const summaryMap = new Map<string, string>()
+          
+          for (const row of skillsResult.rows) {
+            const resumeData = row.generated_resume_data
+            skillsMap.set(row.user_id, resumeData)
+            
+            // Extract summary if available
+            if (resumeData.summary && typeof resumeData.summary === 'string') {
+              summaryMap.set(row.user_id, resumeData.summary)
+            }
+            
+            console.log(`📋 Resume data for user ${row.user_id}:`, JSON.stringify(resumeData, null, 2))
+          }
+
+          let skillsFound = 0
+          for (const t of data) {
+            const resumeData = skillsMap.get(t.applicant_id)
+            if (!resumeData) {
+              console.log(`❌ No resume data found for applicant ${t.applicant_id}`)
+              continue
+            }
+            
+            // Extract skills from the generated resume data
+            try {
+              let allSkills: string[] = []
+              
+              // Check for the nested skills structure
+              if (resumeData.skills && typeof resumeData.skills === 'object') {
+                // Handle nested skills structure: { soft: [], languages: [], technical: [] }
+                if (resumeData.skills.technical && Array.isArray(resumeData.skills.technical)) {
+                  allSkills = allSkills.concat(resumeData.skills.technical)
+                }
+                if (resumeData.skills.soft && Array.isArray(resumeData.skills.soft)) {
+                  allSkills = allSkills.concat(resumeData.skills.soft)
+                }
+                if (resumeData.skills.languages && Array.isArray(resumeData.skills.languages)) {
+                  allSkills = allSkills.concat(resumeData.skills.languages)
+                }
+                
+                if (allSkills.length > 0) {
+                  t.applicant_skills = allSkills
+                  console.log(`✅ Skills extracted from nested structure for ${t.applicant_id}:`, allSkills)
+                  skillsFound++
+                }
+              } else if (resumeData.skills && Array.isArray(resumeData.skills)) {
+                // Handle flat skills array
+                t.applicant_skills = resumeData.skills
+                console.log(`✅ Skills found (flat array) for ${t.applicant_id}:`, resumeData.skills)
+                skillsFound++
+              } else if (resumeData.sections && resumeData.sections.skills) {
+                // Handle skills in sections
+                t.applicant_skills = resumeData.sections.skills
+                console.log(`✅ Skills found in sections for ${t.applicant_id}:`, resumeData.sections.skills)
+                skillsFound++
+              } else {
+                console.log(`⚠️ No skills found in resume data for ${t.applicant_id}:`, resumeData)
+                t.applicant_skills = []
+              }
+              
+              // Extract summary if available
+              const summary = summaryMap.get(t.applicant_id)
+              if (summary) {
+                t.applicant_summary = summary
+                console.log(`✅ Summary extracted for ${t.applicant_id}:`, summary.substring(0, 100) + '...')
+              }
+            } catch (parseError) {
+              console.error(`❌ Error parsing skills for ${t.applicant_id}:`, parseError)
+              t.applicant_skills = []
+            }
+          }
+          
+          console.log(`🎯 Successfully enriched ${skillsFound} talent entries with skills`)
+        }
+      } catch (skillsError) {
+        console.error('⚠️ Failed enriching with BPOC skills data:', skillsError)
+      }
+    }
+
+    return NextResponse.json({ 
+      success: true, 
       data: data,
       total: data.length
     })

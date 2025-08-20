@@ -233,7 +233,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     { title: "Forms", url: "/admin/forms" },
                   ]
                 },
-                { title: "Talent Pool", url: "/admin/talent-pool", icon: StarIcon }
+                { title: "Talent Pool", url: "/admin/talent-pool", icon: StarIcon },
+                { title: "Jobs", url: "/admin/jobs", icon: Building2Icon }
               ]}
             />
           </SidebarGroup>
