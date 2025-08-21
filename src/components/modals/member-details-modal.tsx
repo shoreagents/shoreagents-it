@@ -152,6 +152,38 @@ export function MemberDetailModal({ member, isOpen, onClose }: MemberDetailModal
     }
   }, [member])
 
+  // Prevent body scroll when modal is open
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+      document.body.style.paddingRight = '0px'
+      document.documentElement.style.overflow = 'hidden'
+      document.body.classList.add('overflow-hidden')
+      document.body.style.cssText += '; overflow: hidden !important; position: fixed; width: 100%;'
+    } else {
+      document.body.style.overflow = 'unset'
+      document.body.style.paddingRight = ''
+      document.documentElement.style.overflow = ''
+      document.body.classList.remove('overflow-hidden')
+      document.body.style.position = ''
+      document.body.style.width = ''
+      document.body.style.cssText = document.body.style.cssText.replace(/overflow:\s*hidden\s*!important;?\s*/g, '')
+    }
+  }, [isOpen])
+
+  // Cleanup function to restore scroll when component unmounts
+  React.useEffect(() => {
+    return () => {
+      document.body.style.overflow = 'unset'
+      document.body.style.paddingRight = ''
+      document.documentElement.style.overflow = ''
+      document.body.classList.remove('overflow-hidden')
+      document.body.style.position = ''
+      document.body.style.width = ''
+      document.body.style.cssText = document.body.style.cssText.replace(/overflow:\s*hidden\s*!important;?\s*/g, '')
+    }
+  }, [])
+
   const handleStatusChange = async (newStatus: MembershipStatus) => {
     if (!member) return
     
@@ -233,7 +265,7 @@ export function MemberDetailModal({ member, isOpen, onClose }: MemberDetailModal
               {/* Top Navigation Bar */}
               <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border">
                 <div className="flex items-center gap-3">
-                  <Badge variant="secondary" className="text-xs h-6 flex items-center bg-primary/10 text-primary rounded-[6px]">
+                  <Badge className="text-xs h-6 flex items-center rounded-[6px]">
                     Member
                   </Badge>
                   <span className="text-lg font-mono text-primary">

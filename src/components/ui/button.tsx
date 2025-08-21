@@ -10,14 +10,16 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-teal-600 text-white hover:bg-teal-700",
+          "bg-teal-600 text-white shadow hover:bg-teal-700 hover:border-teal-700",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 hover:border-destructive/90",
         outline:
-          "border border-teal-600 bg-teal-600 text-white hover:bg-teal-700 hover:border-teal-700",
+          "border border-teal-600 bg-teal-600 text-white shadow-sm hover:bg-teal-700 hover:border-teal-700",
         secondary:
-          "bg-teal-600 text-white hover:bg-teal-700",
-        ghost: "bg-transparent text-gray-600 hover:text-gray-800 dark:bg-transparent dark:text-gray-300 dark:hover:text-gray-100",
+          "bg-teal-600 text-white shadow-sm hover:bg-teal-700 hover:border-teal-700",
+        soft:
+          "bg-[hsl(var(--accent-foreground)/0.16)] text-foreground shadow-sm hover:bg-[hsl(var(--accent-foreground)/0.28)] hover:border-[hsl(var(--accent-foreground)/0.28)] dark:hover:bg-[hsl(var(--accent-foreground)/0.1)] dark:hover:border-[hsl(var(--accent-foreground)/0.1)]",
+        ghost: "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:border-gray-200 dark:bg-[#1e1e1e] dark:text-gray-200 dark:hover:bg-[#2a2a2a] dark:hover:border-[#2a2a2a]",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

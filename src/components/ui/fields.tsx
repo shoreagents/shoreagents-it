@@ -41,6 +41,7 @@ interface DataFieldRowProps {
   onBlur?: () => void
   onKeyDown?: (e: React.KeyboardEvent) => void
   isLast?: boolean
+  customInput?: React.ReactNode  // New prop for custom input components
 }
 
 export const DataFieldRow = ({
@@ -52,12 +53,13 @@ export const DataFieldRow = ({
   onSave,
   onBlur,
   onKeyDown,
-  isLast = false
+  isLast = false,
+  customInput
 }: DataFieldRowProps) => {
   const [isHovered, setIsHovered] = React.useState(false);
 
   return (
-    <div className={`grid grid-cols-[140px_auto_1fr] gap-2 h-[33px] items-center ${isLast ? '' : 'border-b border-[#cecece99] dark:border-border'}`}>
+    <div className={`grid grid-cols-[180px_auto_1fr] gap-2 h-[33px] items-center ${isLast ? '' : 'border-b border-[#cecece99] dark:border-border'}`}>
       <div className="flex items-center gap-3 min-w-0 px-2">
         {icon}
         <span className="text-sm text-foreground truncate">{label}</span>
@@ -68,37 +70,43 @@ export const DataFieldRow = ({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <EditableField 
-          fieldName={fieldName}
-          value={value}
-          placeholder={placeholder}
-          onSave={onSave}
-          onBlur={onBlur}
-          onKeyDown={onKeyDown}
-        />
-                {value && value.trim() !== '' && (
-          <div className={`absolute right-2 flex items-center gap-2 transition-all duration-200 ease-in-out ${
-            isHovered 
-              ? 'opacity-100 translate-x-0' 
-              : 'opacity-0 translate-x-2 pointer-events-none'
-          }`}>
-            <button
-              onClick={() => navigator.clipboard.writeText(value)}
-              className="p-0 hover:text-foreground rounded transition-colors text-muted-foreground"
-              title="Copy value"
-              tabIndex={-1}
-            >
-              <IconCopy className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => onSave(fieldName, '')}
-              className="p-0 hover:text-foreground rounded transition-colors text-muted-foreground"
-              title="Clear value"
-              tabIndex={-1}
-            >
-              <IconX className="h-4 w-4" />
-            </button>
-          </div>
+        {customInput ? (
+          customInput
+        ) : (
+          <>
+            <EditableField 
+              fieldName={fieldName}
+              value={value}
+              placeholder={placeholder}
+              onSave={onSave}
+              onBlur={onBlur}
+              onKeyDown={onKeyDown}
+            />
+            {value && value.trim() !== '' && (
+              <div className={`absolute right-2 flex items-center gap-2 transition-all duration-200 ease-in-out ${
+                isHovered 
+                  ? 'opacity-100 translate-x-0' 
+                  : 'opacity-0 translate-x-2 pointer-events-none'
+              }`}>
+                <button
+                  onClick={() => navigator.clipboard.writeText(value)}
+                  className="p-0 hover:text-foreground rounded transition-colors text-muted-foreground"
+                  title="Copy value"
+                  tabIndex={-1}
+                >
+                  <IconCopy className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => onSave(fieldName, '')}
+                  className="p-0 hover:text-foreground rounded transition-colors text-muted-foreground"
+                  title="Clear value"
+                  tabIndex={-1}
+                >
+                  <IconX className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

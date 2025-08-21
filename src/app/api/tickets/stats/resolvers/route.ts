@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pool from '@/lib/database'
+import { getResolverDataSample, getResolverStatsRange } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,23 +26,8 @@ export async function GET(request: NextRequest) {
     })
 
     // First, let's check what data we actually have
-    const checkQuery = `
-      SELECT 
-        DATE(resolved_at) as date,
-        COUNT(*) as total_resolved,
-        MIN(resolved_at) as earliest,
-        MAX(resolved_at) as latest
-      FROM public.tickets 
-      WHERE status = 'Closed' 
-        AND role_id = 1
-        AND resolved_at IS NOT NULL
-      GROUP BY DATE(resolved_at)
-      ORDER BY date DESC
-      LIMIT 10
-    `
-    
-    const checkResult = await pool.query(checkQuery)
-    console.log('Available data sample:', checkResult.rows)
+    const checkSample = await getResolverDataSample(10)
+    console.log('Available data sample:', checkSample)
 
     // Build the main query with proper GROUP BY clause
     let query = `
@@ -64,9 +49,9 @@ export async function GET(request: NextRequest) {
     let queryParams: string[] = []
     
     // If we have data in the calculated range, use it; otherwise get all data
-    if (checkResult.rows.length > 0) {
-      const latestDataDate = new Date(checkResult.rows[0].latest)
-      const earliestDataDate = new Date(checkResult.rows[0].earliest)
+    if (checkSample.length > 0) {
+      const latestDataDate = new Date(checkSample[0].latest)
+      const earliestDataDate = new Date(checkSample[0].earliest)
       
       console.log('Data date range:', {
         earliest: earliestDataDate.toISOString(),
@@ -78,22 +63,21 @@ export async function GET(request: NextRequest) {
       // If our calculated range doesn't overlap with actual data, use all data
       if (latestDataDate < startDate || earliestDataDate > endDate) {
         console.log('Date range mismatch, using all available data')
-        query += ` GROUP BY DATE(t.resolved_at), t.resolved_by, pi.first_name, pi.last_name ORDER BY date ASC, t.resolved_by ASC`
+        const rows = await getResolverStatsRange()
+        rawData = rows
       } else {
         console.log('Using calculated date range')
-        query += ` AND t.resolved_at >= $1 AND t.resolved_at < $2 GROUP BY DATE(t.resolved_at), t.resolved_by, pi.first_name, pi.last_name ORDER BY date ASC, t.resolved_by ASC`
-        queryParams = [startDate.toISOString(), endDate.toISOString()]
+        const rows = await getResolverStatsRange(startDate.toISOString(), endDate.toISOString())
+        rawData = rows
       }
     } else {
       console.log('No data found, using all available data')
-      query += ` GROUP BY DATE(t.resolved_at), t.resolved_by, pi.first_name, pi.last_name ORDER BY date ASC, t.resolved_by ASC`
+      const rows = await getResolverStatsRange()
+      rawData = rows
     }
-    
-    const result = await pool.query(query, queryParams)
-    console.log('Query result:', result.rows)
+    console.log('Query result:', rawData)
     
     // Process the data to create chart format
-    const rawData = result.rows
     const chartData: any[] = []
     const resolvers = new Set<string>()
     

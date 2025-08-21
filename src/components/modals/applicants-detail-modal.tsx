@@ -487,6 +487,38 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     setStatusOptions(getStatusOptions())
   }, [applicant])
 
+  // Prevent body scroll when modal is open
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+      document.body.style.paddingRight = '0px'
+      document.documentElement.style.overflow = 'hidden'
+      document.body.classList.add('overflow-hidden')
+      document.body.style.cssText += '; overflow: hidden !important; position: fixed; width: 100%;'
+    } else {
+      document.body.style.overflow = 'unset'
+      document.body.style.paddingRight = ''
+      document.documentElement.style.overflow = ''
+      document.body.classList.remove('overflow-hidden')
+      document.body.style.position = ''
+      document.body.style.width = ''
+      document.body.style.cssText = document.body.style.cssText.replace(/overflow:\s*hidden\s*!important;?\s*/g, '')
+    }
+  }, [isOpen])
+
+  // Cleanup function to restore scroll when component unmounts
+  React.useEffect(() => {
+    return () => {
+      document.body.style.overflow = 'unset'
+      document.body.style.paddingRight = ''
+      document.documentElement.style.overflow = ''
+      document.body.classList.remove('overflow-hidden')
+      document.body.style.position = ''
+      document.body.style.width = ''
+      document.body.style.cssText = document.body.style.cssText.replace(/overflow:\s*hidden\s*!important;?\s*/g, '')
+    }
+  }, [])
+
   // TODO: Implement comment fetching when API is ready
   const fetchComments = async () => {
     // Placeholder for future implementation
@@ -714,7 +746,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
               {/* Top Navigation Bar */}
               <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border">
                 <div className="flex items-center gap-3">
-                  <Badge variant="secondary" className="text-xs h-6 flex items-center bg-primary/10 text-primary rounded-[6px]">
+                  <Badge className="text-xs h-6 flex items-center rounded-[6px]">
                     Applicant
                   </Badge>
 
@@ -1130,13 +1162,13 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
 
 
                       {/* Shift */}
-                      <div className="grid grid-cols-[140px_auto_1fr] gap-2 h-[33px] items-center border-b border-[#cecece99] dark:border-border">
-                        <div className="flex items-center gap-3 min-w-0 px-2">
-                          <IconClockHour4 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          <span className="text-sm text-foreground truncate">Shift</span>
-                        </div>
-                        <div className="w-px bg-[#cecece99] dark:bg-[#4f4f4f99] h-full"></div>
-                        <div className="min-w-0 flex items-center relative">
+                      <DataFieldRow
+                        icon={<IconClockHour4 className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                        label="Shift"
+                        fieldName="shift"
+                        value={inputValues.shift || ''}
+                        onSave={() => {}}
+                        customInput={
                           <Popover>
                             <PopoverTrigger asChild>
                               <div 
@@ -1146,7 +1178,6 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter' || e.key === ' ') {
                                     e.preventDefault()
-                                    // Trigger the popover programmatically if needed
                                   }
                                 }}
                               >
@@ -1198,10 +1229,8 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                               </div>
                             </PopoverContent>
                           </Popover>
-                          
-
-                        </div>
-                      </div>
+                        }
+                      />
                       
                       {/* Current Salary */}
                       <DataFieldRow

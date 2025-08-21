@@ -1,4 +1,4 @@
-import pool from './database'
+import pool, { bpocPool } from './database'
 
 export type TicketStatus = 'On Hold' | 'In Progress' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
 
@@ -62,6 +62,44 @@ export interface Ticket {
   member_color?: string | null
   supporting_files?: string[]
   file_count?: number
+}
+
+export interface TalentPoolRecord {
+  id: number
+  applicant_id: string
+  interested_clients: number[]
+  last_contact_date: string | null
+  created_at: string
+  updated_at: string
+  applicant_name?: string | null
+  applicant_email?: string | null
+  applicant_avatar?: string | null
+  applicant_summary?: string | null
+  applicant_skills?: string[]
+  comment: {
+    id: number
+    text: string
+    type: string
+    created_by: number | null
+    created_at: string
+    creator: {
+      email: string | null
+      user_type: string | null
+    }
+  } | null
+  applicant: {
+    applicant_id: string | null
+    resume_slug: string | null
+    status: string
+    video_introduction_url: string | null
+    current_salary: number | null
+    expected_monthly_salary: number | null
+    shift: string | null
+    position: number
+    job_ids: number[]
+    bpoc_application_ids: string[]
+    created_at: string | null
+  }
 }
 
 // Get all tickets (filtered by IT role, excluding For Approval)
@@ -1395,4 +1433,779 @@ export async function getClientsByMember(memberId: number): Promise<{ user_id: n
   `
   const result = await pool.query(query, [memberId])
   return result.rows
+}
+
+export async function getTalentPoolData({
+  search = '',
+  category = 'All',
+  sortBy = 'rating',
+}: {
+  search?: string
+  category?: string
+  sortBy?: 'rating' | 'rate' | 'jobs' | 'newest'
+}): Promise<TalentPoolRecord[]> {
+  const commentsExistsResult = await pool.query("SELECT to_regclass('public.bpoc_comments') IS NOT NULL AS exists")
+  const hasBpocComments = Boolean(commentsExistsResult?.rows?.[0]?.exists)
+ 
+  const selectCommon = `
+    SELECT 
+      tp.id,
+      tp.applicant_id,
+      tp.interested_clients,
+      tp.last_contact_date,
+      tp.created_at,
+      tp.updated_at,
+      br.applicant_id as recruit_applicant_id,
+      br.resume_slug,
+      br.status,
+      br.video_introduction_url,
+      br.current_salary,
+      br.expected_monthly_salary,
+      br.shift,
+      br.position,
+      br.job_ids,
+      br.bpoc_application_ids,
+      br.created_at as recruit_created_at`;
+ 
+  const selectWithComments = `
+      , rc.id as comment_id,
+      rc.comment as comment_text,
+      rc.comment_type,
+      rc.created_by,
+      rc.created_at as comment_created_at,
+      u.email as creator_email,
+      u.user_type as creator_user_type`;
+ 
+  const fromBase = `
+    FROM public.talent_pool tp
+    LEFT JOIN public.bpoc_recruits br ON tp.applicant_id = br.applicant_id`;
+ 
+  const joinComments = `
+    LEFT JOIN public.bpoc_comments rc ON rc.id = tp.comment_id
+    LEFT JOIN public.users u ON rc.created_by = u.id`;
+ 
+  const orderBy = `
+    ORDER BY tp.created_at DESC`;
+ 
+  const query = `${selectCommon}${hasBpocComments ? selectWithComments : ''}
+${fromBase}${hasBpocComments ? joinComments : ''}
+${orderBy}`
+ 
+  const result = await pool.query(query)
+ 
+  const talentMap = new Map<number, TalentPoolRecord>()
+  for (const row of result.rows) {
+    if (!talentMap.has(row.id)) {
+      talentMap.set(row.id, {
+        id: row.id,
+        applicant_id: row.applicant_id,
+        interested_clients: row.interested_clients || [],
+        last_contact_date: row.last_contact_date,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        comment: null,
+        applicant: {
+          applicant_id: row.recruit_applicant_id,
+          resume_slug: row.resume_slug,
+          status: row.status || 'unknown',
+          video_introduction_url: row.video_introduction_url,
+          current_salary: row.current_salary,
+          expected_monthly_salary: row.expected_monthly_salary,
+          shift: row.shift,
+          position: row.position || 0,
+          job_ids: row.job_ids || [],
+          bpoc_application_ids: row.bpoc_application_ids || [],
+          created_at: row.recruit_created_at,
+        },
+      })
+    }
+    if (hasBpocComments && row.comment_id && !talentMap.get(row.id)!.comment) {
+      talentMap.get(row.id)!.comment = {
+        id: row.comment_id,
+        text: row.comment_text,
+        type: row.comment_type,
+        created_by: row.created_by,
+        created_at: row.comment_created_at,
+        creator: {
+          email: row.creator_email,
+          user_type: row.creator_user_type,
+        },
+      }
+    }
+  }
+ 
+  const data: TalentPoolRecord[] = Array.from(talentMap.values())
+ 
+  // Enrich from BPOC DB if configured
+  if (bpocPool && data.length > 0) {
+    try {
+      const applicantIds: string[] = Array.from(
+        new Set(
+          data.map((t) => t.applicant_id).filter((id) => Boolean(id))
+        )
+      ) as string[]
+ 
+      if (applicantIds.length > 0) {
+        const bpocResult = await bpocPool.query(
+          `SELECT u.id, u.email, u.full_name, u.avatar_url FROM users u WHERE u.id = ANY($1::uuid[])`,
+          [applicantIds]
+        )
+        const bpocMap = new Map<string, any>()
+        for (const row of bpocResult.rows) bpocMap.set(row.id, row)
+ 
+        for (const t of data) {
+          const user = bpocMap.get(t.applicant_id)
+          if (!user) continue
+          t.applicant_name = user.full_name
+          t.applicant_email = user.email
+          t.applicant_avatar = user.avatar_url
+        }
+      }
+    } catch {}
+ 
+    try {
+      const applicantIds: string[] = Array.from(
+        new Set(
+          data.map((t) => t.applicant_id).filter((id) => Boolean(id))
+        )
+      ) as string[]
+ 
+      if (applicantIds.length > 0) {
+        const skillsResult = await bpocPool.query(
+          `SELECT rg.user_id, rg.generated_resume_data FROM resumes_generated rg WHERE rg.user_id = ANY($1::uuid[])`,
+          [applicantIds]
+        )
+        const skillsMap = new Map<string, any>()
+        const summaryMap = new Map<string, string>()
+        for (const row of skillsResult.rows) {
+          const resumeData = row.generated_resume_data
+          skillsMap.set(row.user_id, resumeData)
+          if (resumeData.summary && typeof resumeData.summary === 'string') {
+            summaryMap.set(row.user_id, resumeData.summary)
+          }
+        }
+ 
+        for (const t of data) {
+          const resumeData = skillsMap.get(t.applicant_id)
+          if (!resumeData) continue
+          let allSkills: string[] = []
+          if (resumeData.skills && typeof resumeData.skills === 'object') {
+            if (Array.isArray(resumeData.skills.technical)) allSkills = allSkills.concat(resumeData.skills.technical)
+            if (Array.isArray(resumeData.skills.soft)) allSkills = allSkills.concat(resumeData.skills.soft)
+            if (Array.isArray(resumeData.skills.languages)) allSkills = allSkills.concat(resumeData.skills.languages)
+          } else if (Array.isArray(resumeData.skills)) {
+            allSkills = resumeData.skills
+          } else if (resumeData.sections && resumeData.sections.skills) {
+            allSkills = resumeData.sections.skills
+          }
+          t.applicant_skills = allSkills
+          const summary = summaryMap.get(t.applicant_id)
+          if (summary) t.applicant_summary = summary
+        }
+      }
+    } catch {}
+  }
+ 
+  // Apply filters
+  let filtered = data
+  const term = (search || '').toLowerCase()
+  if (term) {
+    filtered = filtered.filter((t) => {
+      const haystack: string[] = []
+      if (t.applicant_id) haystack.push(String(t.applicant_id))
+      if (t.applicant_name) haystack.push(String(t.applicant_name))
+      if (t.applicant_email) haystack.push(String(t.applicant_email))
+      if (t.applicant?.status) haystack.push(String(t.applicant.status))
+      if (t.comment?.text) haystack.push(String(t.comment.text))
+      if (Array.isArray(t.applicant_skills)) haystack.push(...t.applicant_skills.map(String))
+      return haystack.some((s) => s.toLowerCase().includes(term))
+    })
+  }
+  if (category && category !== 'All') {
+    // Placeholder: no category field in schema yet
+  }
+ 
+  if (sortBy === 'rate') {
+    filtered.sort((a, b) => {
+      const ar = Number(a.applicant?.expected_monthly_salary ?? Infinity)
+      const br = Number(b.applicant?.expected_monthly_salary ?? Infinity)
+      return ar - br
+    })
+  } else if (sortBy === 'jobs') {
+    filtered.sort((a, b) => {
+      const ac = Array.isArray(a.interested_clients) ? a.interested_clients.length : 0
+      const bc = Array.isArray(b.interested_clients) ? b.interested_clients.length : 0
+      return bc - ac
+    })
+  } else if (sortBy === 'newest') {
+    filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }
+ 
+  return filtered
+}
+
+// Ticket stats
+export async function countClosedTickets(): Promise<number> {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*) as count FROM public.tickets WHERE status = 'Closed' AND role_id = 1`
+  )
+  return parseInt(rows[0]?.count || '0', 10)
+}
+
+export async function countClosedTicketsWithResolvedAt(): Promise<number> {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*) as count FROM public.tickets WHERE status = 'Closed' AND role_id = 1 AND resolved_at IS NOT NULL`
+  )
+  return parseInt(rows[0]?.count || '0', 10)
+}
+
+export async function countClosedTicketsBetween(startISO: string, endISO: string): Promise<number> {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*) as count FROM public.tickets WHERE status = 'Closed' AND role_id = 1 AND resolved_at >= $1 AND resolved_at < $2`,
+    [startISO, endISO]
+  )
+  return parseInt(rows[0]?.count || '0', 10)
+}
+
+// Resolver stats
+export async function getResolverDataSample(limit: number = 10) {
+  const { rows } = await pool.query(`
+    SELECT DATE(resolved_at) as date, COUNT(*) as total_resolved, MIN(resolved_at) as earliest, MAX(resolved_at) as latest
+    FROM public.tickets
+    WHERE status = 'Closed' AND role_id = 1 AND resolved_at IS NOT NULL
+    GROUP BY DATE(resolved_at)
+    ORDER BY date DESC
+    LIMIT $1
+  `, [limit])
+  return rows
+}
+
+export async function getResolverStatsRange(startISO?: string, endISO?: string) {
+  let query = `
+    SELECT DATE(t.resolved_at) as date, t.resolved_by, CONCAT(pi.first_name, ' ', pi.last_name) as resolver_name, COUNT(*) as resolved_count
+    FROM public.tickets t
+    LEFT JOIN public.personal_info pi ON t.resolved_by = pi.user_id
+    WHERE t.status = 'Closed' AND t.role_id = 1 AND t.resolved_at IS NOT NULL AND t.resolved_by IS NOT NULL AND pi.first_name IS NOT NULL AND pi.last_name IS NOT NULL
+  `
+  const params: string[] = []
+  if (startISO && endISO) {
+    query += ` AND t.resolved_at >= $1 AND t.resolved_at < $2`
+    params.push(startISO, endISO)
+  }
+  query += ` GROUP BY DATE(t.resolved_at), t.resolved_by, pi.first_name, pi.last_name ORDER BY date ASC, t.resolved_by ASC`
+  const { rows } = await pool.query(query, params)
+  return rows
+}
+
+// Ticket comments
+export async function getTicketIdByTicketId(ticketId: string): Promise<number | null> {
+  const { rows } = await pool.query(`SELECT id FROM public.tickets WHERE ticket_id = $1`, [ticketId])
+  return rows[0]?.id ?? null
+}
+
+export async function getCommentsByTicketId(ticketNumericId: number) {
+  const { rows } = await pool.query(`
+    SELECT tc.id, tc.ticket_id, tc.user_id, tc.comment, tc.created_at, tc.updated_at,
+           u.email, pi.first_name, pi.last_name, pi.profile_picture
+    FROM public.ticket_comments tc
+    LEFT JOIN public.users u ON tc.user_id = u.id
+    LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+    WHERE tc.ticket_id = $1
+    ORDER BY tc.created_at ASC
+  `, [ticketNumericId])
+  return rows
+}
+
+export async function insertTicketComment(ticketNumericId: number, userId: number, comment: string) {
+  const { rows } = await pool.query(
+    `INSERT INTO public.ticket_comments (ticket_id, user_id, comment) VALUES ($1, $2, $3) RETURNING id, ticket_id, user_id, comment, created_at, updated_at`,
+    [ticketNumericId, userId, comment]
+  )
+  return rows[0]
+}
+
+export async function getUserBasicProfile(userId: number) {
+  const { rows } = await pool.query(`
+    SELECT u.id, u.email, pi.first_name, pi.last_name, pi.profile_picture
+    FROM public.users u
+    LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+    WHERE u.id = $1
+  `, [userId])
+  return rows[0] || null
+}
+
+// Companies
+export interface NewCompanyInput {
+  company: string
+  address: string
+  phone: string
+  country: string
+  service: string | null
+  website: string[]
+  logo: string | null
+  badge_color?: string
+  status: 'Current Client' | 'Lost Client'
+}
+
+export async function createMemberCompany(input: NewCompanyInput) {
+  const insertColumns = ['company', 'address', 'phone', 'country', 'service', 'website', 'logo', 'status', 'company_id']
+  const companyId = (globalThis.crypto?.randomUUID?.() || undefined) as unknown as string || Math.random().toString(36).slice(2)
+  const insertValues: any[] = [
+    input.company,
+    input.address,
+    input.phone,
+    input.country,
+    input.service,
+    input.website,
+    input.logo,
+    input.status,
+    companyId,
+  ]
+  if (input.badge_color && input.badge_color.trim() !== '') {
+    insertColumns.push('badge_color')
+    insertValues.push(input.badge_color)
+  }
+  const placeholders = insertValues.map((_, i) => `$${i + 1}`).join(', ')
+  const result = await pool.query(
+    `INSERT INTO public.members (${insertColumns.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+    insertValues
+  )
+  const created = result.rows[0]
+  // Optional BPOC sync
+  if (bpocPool) {
+    try {
+      await bpocPool.query(
+        `INSERT INTO public.members (company, company_id) VALUES ($1, $2)
+         ON CONFLICT (company_id) DO UPDATE SET company = EXCLUDED.company, updated_at = CURRENT_TIMESTAMP`,
+        [input.company, companyId]
+      )
+    } catch {}
+  }
+  return created
+}
+
+// BPOC positions utilities
+export async function ensureRecruitsPositionColumn() {
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'bpoc_recruits' AND column_name = 'position'
+      ) THEN
+        ALTER TABLE public.bpoc_recruits ADD COLUMN position INTEGER DEFAULT 0;
+        CREATE INDEX IF NOT EXISTS idx_bpoc_recruits_status_position ON public.bpoc_recruits(status, position);
+      END IF;
+    END$$;
+  `)
+}
+
+export async function ensureBpocApplicationsPositionColumn() {
+  if (!bpocPool) return
+  await bpocPool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'applications' AND column_name = 'position'
+      ) THEN
+        ALTER TABLE public.applications ADD COLUMN position INTEGER DEFAULT 0;
+        CREATE INDEX IF NOT EXISTS idx_applications_status_position ON public.applications(status, position);
+      END IF;
+    END$$;
+  `)
+}
+
+export async function updateApplicantPositions(positions: { id: number; position: number }[]) {
+  await ensureRecruitsPositionColumn()
+  for (const p of positions) {
+    await pool.query('UPDATE public.bpoc_recruits SET position = $1 WHERE id = $2', [p.position, p.id])
+  }
+  if (bpocPool) {
+    await ensureBpocApplicationsPositionColumn()
+    for (const p of positions) {
+      const { rows } = await pool.query('SELECT bpoc_application_ids FROM public.bpoc_recruits WHERE id = $1', [p.id])
+      const ids: string[] = rows[0]?.bpoc_application_ids || []
+      for (const appId of ids) {
+        await bpocPool.query('UPDATE public.applications SET position = $1 WHERE id = $2', [p.position, appId])
+      }
+    }
+  }
+}
+
+// BPOC application status update
+export async function updateBpocApplicationStatus(applicantId: number, jobIndex: number, dbStatus: string) {
+  const applicantResult = await pool.query(`
+    SELECT bpoc_application_ids 
+    FROM public.bpoc_recruits 
+    WHERE id = $1
+  `, [applicantId])
+  if (applicantResult.rows.length === 0) {
+    throw new Error('Applicant not found')
+  }
+  const bpocApplicationIds: string[] = applicantResult.rows[0].bpoc_application_ids || []
+  if (!bpocApplicationIds || jobIndex < 0 || jobIndex >= bpocApplicationIds.length) {
+    throw new Error('Invalid jobIndex or no applications')
+  }
+  const targetApplicationId = bpocApplicationIds[jobIndex]
+  if (!bpocPool) throw new Error('BPOC database is not configured')
+  const updateResult = await bpocPool.query(
+    `UPDATE public.applications SET status = $1::application_status_enum, updated_at = NOW() WHERE id = $2::uuid RETURNING id, status, updated_at`,
+    [dbStatus, targetApplicationId]
+  )
+  const updated = updateResult.rows[0]
+  return { updated, targetApplicationId }
+}
+
+export async function notifyApplicantChange(payload: any) {
+  await pool.query('SELECT pg_notify($1, $2)', ['applicant_changes', JSON.stringify(payload)])
+}
+
+// Auto-save from BPOC applications into bpoc_recruits
+export async function autoSaveSubmittedApplications() {
+  if (!bpocPool) throw new Error('BPOC database is not configured')
+  const applicationsQuery = `
+    SELECT a.id::text, a.user_id::text, a.job_id, a.resume_slug, a.status::text, a.created_at,
+           u.first_name, u.last_name, u.full_name, u.avatar_url, p.job_title, m.company AS company_name,
+           COALESCE(a.position, 0) as position
+    FROM public.applications a
+    JOIN public.users u ON u.id = a.user_id
+    LEFT JOIN public.processed_job_requests p ON p.id = a.job_id
+    LEFT JOIN public.members m ON m.company_id = p.company_id
+    WHERE a.status = 'submitted'
+    ORDER BY a.created_at DESC
+  `
+  const { rows: applications } = await bpocPool.query(applicationsQuery)
+  const { rows: existingRecruits } = await pool.query(`SELECT applicant_id, job_ids, bpoc_application_ids FROM public.bpoc_recruits`)
+  const existingApplicants = new Map(existingRecruits.map((r: any) => [r.applicant_id, r]))
+  const applicationsByApplicant = new Map<string, any[]>()
+  for (const app of applications) {
+    const key = app.user_id
+    if (!applicationsByApplicant.has(key)) applicationsByApplicant.set(key, [])
+    applicationsByApplicant.get(key)!.push(app)
+  }
+  let createdCount = 0
+  let updatedCount = 0
+  for (const [applicantId, apps] of applicationsByApplicant) {
+    const existing = existingApplicants.get(applicantId)
+    if (existing) {
+      const newJobIds = apps.filter((a: any) => !existing.job_ids.includes(a.job_id)).map((a: any) => a.job_id)
+      const newAppIds = apps.filter((a: any) => !existing.bpoc_application_ids.includes(a.id)).map((a: any) => a.id)
+      if (newJobIds.length > 0 || newAppIds.length > 0) {
+        await pool.query(`
+          UPDATE public.bpoc_recruits 
+          SET 
+            job_ids = CASE WHEN $1::int[] IS NOT NULL AND array_length($1, 1) > 0 
+              THEN (SELECT ARRAY(SELECT DISTINCT unnest(array_cat(job_ids, $1)))) ELSE job_ids END,
+            bpoc_application_ids = CASE WHEN $2::uuid[] IS NOT NULL AND array_length($2, 1) > 0 
+              THEN (SELECT ARRAY(SELECT DISTINCT unnest(array_cat(bpoc_application_ids, $2::uuid[])))) ELSE bpoc_application_ids END,
+            updated_at = now()
+          WHERE applicant_id = $3
+        `, [newJobIds, newAppIds, applicantId])
+        updatedCount++
+      }
+    } else {
+      const uniqueJobIds = [...new Set(apps.map((a: any) => a.job_id))]
+      const uniqueAppIds = [...new Set(apps.map((a: any) => a.id))]
+      await pool.query(`
+        INSERT INTO public.bpoc_recruits (applicant_id, job_ids, bpoc_application_ids, resume_slug, status, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [applicantId, uniqueJobIds, uniqueAppIds, apps[0].resume_slug, 'submitted', apps[0].created_at])
+      createdCount++
+    }
+  }
+  return { createdCount, updatedCount, totalApplicants: applicationsByApplicant.size, totalApplications: applications.length }
+}
+
+// Ticket positions migration
+export async function migrateTicketPositions() {
+  const { rows: tickets } = await pool.query(`
+    SELECT id, status, created_at FROM public.tickets ORDER BY status, created_at ASC, id ASC
+  `)
+  const ticketsByStatus: Record<string, any[]> = {}
+  for (const t of tickets) {
+    if (!ticketsByStatus[t.status]) ticketsByStatus[t.status] = []
+    ticketsByStatus[t.status].push(t)
+  }
+  const statusCodes: Record<string, number> = {
+    'For Approval': 10000,
+    'Approved': 20000,
+    'In Progress': 30000,
+    'Actioned': 40000,
+    'Closed': 50000,
+    'On Hold': 60000,
+    'Stuck': 70000,
+  }
+  let totalUpdated = 0
+  for (const [status, list] of Object.entries(ticketsByStatus)) {
+    const base = statusCodes[status] || 1000
+    for (let i = 0; i < list.length; i++) {
+      const newPos = base + ((i + 1) * 10)
+      await pool.query('UPDATE public.tickets SET position = $1 WHERE id = $2', [newPos, list[i].id])
+      totalUpdated++
+    }
+  }
+  return { totalUpdated, statusBreakdown: Object.fromEntries(Object.entries(ticketsByStatus).map(([s, l]) => [s, l.length])) }
+}
+
+// Internal user lookup
+export async function getInternalUserByEmail(email: string, role: string = '') {
+  const roleCondition = role === 'admin'
+    ? `AND ir.role_id = (SELECT id FROM roles WHERE name = 'Admin')`
+    : role === 'it'
+      ? `AND (ir.role_id = 1 OR ir.role_id = (SELECT id FROM roles WHERE name = 'IT'))`
+      : ''
+  const { rows } = await pool.query(`
+    SELECT u.id, u.email, u.user_type, pi.first_name, pi.last_name, pi.profile_picture, ir.role_id, r.name as role_name
+    FROM public.users u
+    LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+    LEFT JOIN public.internal i ON u.id = i.user_id
+    LEFT JOIN public.internal_roles ir ON i.user_id = ir.internal_user_id
+    LEFT JOIN public.roles r ON ir.role_id = r.id
+    WHERE u.email = $1 AND i.user_id IS NOT NULL ${roleCondition}
+    LIMIT 1
+  `, [email])
+  return rows[0] || null
+}
+
+// BPOC applicants: fetch with optional enrichment
+export async function getApplicants({ status, diagnose = false }: { status?: string | null; diagnose?: boolean }) {
+  if (!pool) throw new Error('Main database is not configured')
+  let applicantsQuery = `
+    SELECT 
+      r.id,
+      r.bpoc_application_ids,
+      r.applicant_id,
+      r.job_ids,
+      r.resume_slug,
+      r.status,
+      r.created_at,
+      r.updated_at,
+      r.video_introduction_url,
+      r.current_salary,
+      r.expected_monthly_salary,
+      r.shift,
+      COALESCE(r.position, 0) as position
+    FROM public.bpoc_recruits r
+  `
+  const params: any[] = []
+  if (status) {
+    applicantsQuery += ` WHERE r.status = $1`
+    params.push(status)
+  }
+  applicantsQuery += ` ORDER BY COALESCE(r.position, 0), r.created_at DESC LIMIT 500`
+  const { rows: applicants } = await pool.query(applicantsQuery, params)
+  if (status) return applicants
+
+  let enrichedData = applicants
+  if (diagnose) {
+    enrichedData = enrichedData.map((app: any) => ({
+      ...app,
+      _diagnostic: {
+        job_ids_length: app.job_ids ? app.job_ids.length : 0,
+        bpoc_app_ids_length: app.bpoc_application_ids ? app.bpoc_application_ids.length : 0,
+        has_duplicates: (app.job_ids && app.job_ids.length > 1) || (app.bpoc_application_ids && app.bpoc_application_ids.length > 1)
+      }
+    }))
+  }
+  if (!bpocPool) return enrichedData
+
+  try {
+    const applicationIds = applicants.flatMap((app: any) => app.bpoc_application_ids || []).filter(Boolean)
+    const jobIds = applicants.flatMap((app: any) => app.job_ids || []).filter(Boolean)
+    let enrichmentData: any[] = []
+    let jobData: any[] = []
+    if (applicationIds.length > 0) {
+      const enrichmentQuery = `
+        SELECT a.id::text, a.user_id::text, u.first_name, u.last_name, u.full_name, u.avatar_url,
+               p.job_title, m.company AS company_name, a.job_id, a.status::text as application_status,
+               a.created_at as application_created_at
+        FROM public.applications a
+        JOIN public.users u ON u.id = a.user_id
+        LEFT JOIN public.processed_job_requests p ON p.id = a.job_id
+        LEFT JOIN public.members m ON m.company_id = p.company_id
+        WHERE a.id IN (${applicationIds.map((_, i) => `$${i + 1}`).join(',')})
+      `
+      const { rows } = await bpocPool.query(enrichmentQuery, applicationIds)
+      enrichmentData = rows
+    }
+    if (jobIds.length > 0) {
+      const jobQuery = `
+        SELECT p.id as job_id, p.job_title, m.company AS company_name
+        FROM public.processed_job_requests p
+        LEFT JOIN public.members m ON m.company_id = p.company_id
+        WHERE p.id IN (${jobIds.map((_, i) => `$${i + 1}`).join(',')})
+      `
+      const { rows } = await bpocPool.query(jobQuery, jobIds)
+      jobData = rows
+    }
+    enrichedData = applicants.map((applicant: any) => {
+      const applicantApplications = enrichmentData.filter((e: any) => applicant.bpoc_application_ids?.includes(e.id))
+      const applicantJobs = jobData.filter((j: any) => applicant.job_ids?.includes(j.job_id))
+      const firstApplication = applicantApplications[0] || enrichmentData.find((e: any) => e.user_id === applicant.applicant_id)
+      const applicationJobPairs = applicantApplications
+        .filter((app: any) => app.job_title)
+        .map((app: any) => ({
+          job_title: app.job_title,
+          company_name: app.company_name || null,
+          application_status: app.application_status || 'submitted',
+          application_created_at: app.application_created_at,
+        }))
+      const directJobPairs = applicantJobs
+        .filter((job: any) => job.job_title)
+        .map((job: any) => ({
+          job_title: job.job_title,
+          company_name: job.company_name || null,
+          application_status: 'submitted',
+          application_created_at: null,
+        }))
+      const allJobPairs = [...applicationJobPairs, ...directJobPairs]
+      const uniqueJobPairs = allJobPairs.filter((pair, index, self) => index === self.findIndex(p => p.job_title === pair.job_title && p.company_name === pair.company_name))
+      const allJobTitles = uniqueJobPairs.map(pair => pair.job_title)
+      const allCompanies = uniqueJobPairs.map(pair => pair.company_name)
+      const allJobStatuses = uniqueJobPairs.map(pair => pair.application_status || 'submitted')
+      const allJobTimestamps = uniqueJobPairs.map(pair => pair.application_created_at)
+      return {
+        ...applicant,
+        user_id: firstApplication?.user_id || applicant.applicant_id,
+        first_name: firstApplication?.first_name || null,
+        last_name: firstApplication?.last_name || null,
+        full_name: firstApplication?.full_name || null,
+        profile_picture: firstApplication?.avatar_url || null,
+        job_title: allJobTitles[0] || null,
+        company_name: allCompanies[0] || null,
+        all_job_titles: allJobTitles,
+        all_companies: allCompanies,
+        all_job_statuses: allJobStatuses,
+        all_job_timestamps: allJobTimestamps,
+      }
+    })
+  } catch (e) {
+    // fall back to basic data
+    return enrichedData
+  }
+  return enrichedData
+}
+
+export async function updateRecruitStatusAndSyncBpoc(id: number, status: string) {
+  const validStatuses = ['submitted', 'qualified', 'for verification', 'verified', 'initial interview', 'final interview', 'not qualified', 'passed']
+  if (!validStatuses.includes(status)) throw new Error('Invalid status value')
+  const { rows } = await pool.query(`
+    UPDATE public.bpoc_recruits SET status = $1, updated_at = now() WHERE id = $2 RETURNING id, status, updated_at, bpoc_application_ids
+  `, [status, id])
+  if (rows.length === 0) throw new Error('Failed to update applicant')
+  const recruitRecord = rows[0]
+  if (bpocPool && recruitRecord.bpoc_application_ids && recruitRecord.bpoc_application_ids.length > 0) {
+    try {
+      const statusCheck = await bpocPool.query(`
+        SELECT id, status::text as current_status FROM public.applications WHERE id = ANY($1)
+      `, [recruitRecord.bpoc_application_ids])
+      const finalBpocStatuses = ['withdrawn', 'final interview', 'hired', 'failed']
+      const applicationsToUpdate = statusCheck.rows.filter((row: any) => !finalBpocStatuses.includes(row.current_status.toLowerCase()))
+      for (const application of applicationsToUpdate) {
+        await bpocPool.query(`
+          UPDATE public.applications SET status = $1::application_status_enum WHERE id = $2 RETURNING id
+        `, [status, application.id])
+      }
+    } catch (e) {
+      // fallback try to fetch ids from main db again
+      try {
+        const { rows: r } = await pool.query(`SELECT bpoc_application_ids FROM public.bpoc_recruits WHERE id = $1`, [id])
+        const ids: string[] = r[0]?.bpoc_application_ids || []
+        for (const appId of ids) {
+          await bpocPool?.query(`UPDATE public.applications SET status = $1::application_status_enum WHERE id = $2 RETURNING id`, [status, appId])
+        }
+      } catch {}
+    }
+  }
+  return recruitRecord
+}
+
+export async function updateRecruitFields(id: number, updates: Record<string, any>) {
+  const allowedFields = ['resume_slug_recruits', 'shift', 'current_salary', 'expected_monthly_salary', 'video_introduction_url']
+  const valid: any = {}
+  for (const key of Object.keys(updates)) {
+    if (allowedFields.includes(key) && updates[key] !== undefined) valid[key] = updates[key]
+  }
+  if (Object.keys(valid).length === 0) throw new Error('No valid fields to update')
+  const setClause = Object.keys(valid).map((key, idx) => `${key} = $${idx + 2}`).join(', ')
+  const params = [id, ...Object.values(valid)]
+  const { rows } = await pool.query(`
+    UPDATE public.bpoc_recruits SET ${setClause}, updated_at = now() WHERE id = $1 RETURNING id, ${Object.keys(valid).join(', ')}, updated_at
+  `, params)
+  return rows[0]
+}
+
+export async function getRecruitById(id: number) {
+  const { rows } = await pool.query(`
+    SELECT id, resume_slug, shift, current_salary, expected_monthly_salary, video_introduction_url, updated_at, status
+    FROM public.bpoc_recruits WHERE id = $1
+  `, [id])
+  return rows[0] || null
+}
+
+export async function cleanupBpocRecruitsDuplicates() {
+  const { rows } = await pool.query(`
+    UPDATE public.bpoc_recruits SET 
+      job_ids = array_remove(array_remove(job_ids, NULL), job_ids[1]),
+      bpoc_application_ids = array_remove(array_remove(bpoc_application_ids, NULL), bpoc_application_ids[1]),
+      updated_at = now()
+    WHERE (array_length(job_ids, 1) > 1 OR array_length(bpoc_application_ids, 1) > 1)
+      AND (job_ids IS NOT NULL OR bpoc_application_ids IS NOT NULL)
+    RETURNING id, job_ids, bpoc_application_ids
+  `)
+  return { cleanedRecords: rows.length, sample: rows.slice(0, 3) }
+}
+
+// BPOC debug helpers
+export async function getBpocDebugInfo() {
+  const envInfo = {
+    NODE_ENV: process.env.NODE_ENV,
+    BPOC_DATABASE_URL: process.env.BPOC_DATABASE_URL ? 'Set' : 'Not set',
+    DATABASE_URL: process.env.DATABASE_URL ? 'Set' : 'Not set',
+  }
+  if (!bpocPool) return { error: 'BPOC pool is null', envInfo }
+  const { rows: testRows } = await bpocPool.query('SELECT 1 as test')
+  const { rows: appTbl } = await bpocPool.query(`
+    SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'applications') as table_exists
+  `)
+  const { rows: usersTbl } = await bpocPool.query(`
+    SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users') as table_exists
+  `)
+  const { rows: jobsTbl } = await bpocPool.query(`
+    SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'processed_job_requests') as table_exists
+  `)
+  const { rows: membersTbl } = await bpocPool.query(`
+    SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'members') as table_exists
+  `)
+  return {
+    message: 'Debug successful',
+    envInfo,
+    tables: {
+      applications: appTbl[0].table_exists,
+      users: usersTbl[0].table_exists,
+      processed_job_requests: jobsTbl[0].table_exists,
+      members: membersTbl[0].table_exists,
+    },
+    test: testRows[0],
+  }
+}
+
+export async function getBpocApplicationsCount() {
+  if (!bpocPool) throw new Error('BPOC database is not configured')
+  const { rows } = await bpocPool.query('SELECT COUNT(*) as count FROM public.applications')
+  return parseInt(rows[0]?.count || '0', 10)
+}
+
+// Auth helpers
+export async function getInternalLoginUserByEmail(email: string) {
+  const { rows } = await pool.query(`
+    SELECT u.id, u.email, u.user_type, pi.first_name, pi.last_name, pi.profile_picture, ir.role_id
+    FROM public.users u
+    LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+    LEFT JOIN public.internal i ON u.id = i.user_id
+    LEFT JOIN public.internal_roles ir ON i.user_id = ir.internal_user_id
+    WHERE u.email = $1 AND i.user_id IS NOT NULL AND (ir.role_id = 1 OR ir.role_id = (SELECT id FROM roles WHERE name = 'IT'))
+  `, [email])
+  return rows[0] || null
 }

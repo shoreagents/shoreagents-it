@@ -58,7 +58,7 @@ export const CardStack = ({
           >
             <div className="flex flex-col gap-3">
               <div className="flex justify-between items-start">
-                <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-1 rounded-md">
+                <span className="text-xs font-mono text-primary px-2 py-1 rounded-md">
                   {card.designation}
                 </span>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import pool from '@/lib/database'
+import { getTicketIdByTicketId, getCommentsByTicketId, insertTicketComment, getUserBasicProfile } from '@/lib/db-utils'
 
 export async function GET(
   request: NextRequest,
@@ -9,42 +9,13 @@ export async function GET(
   try {
     console.log('GET /api/tickets/[id]/comments - Starting...')
     
-    // Get the ticket's numeric ID from the Railway database
-    const ticketQuery = `
-      SELECT id FROM tickets WHERE ticket_id = $1
-    `
-    const ticketResult = await pool.query(ticketQuery, [params.id])
-    
-    if (ticketResult.rows.length === 0) {
+    const ticketId = await getTicketIdByTicketId(params.id)
+    if (!ticketId) {
       console.log('Ticket not found for ticket_id:', params.id)
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
     }
-    
-    const ticket = ticketResult.rows[0]
-    console.log('Ticket found with ID:', ticket.id)
-    
-    // Get comments for the ticket with user information using Railway database
-    const query = `
-      SELECT 
-        tc.id,
-        tc.ticket_id,
-        tc.user_id,
-        tc.comment,
-        tc.created_at,
-        tc.updated_at,
-        u.email,
-        pi.first_name,
-        pi.last_name,
-        pi.profile_picture
-      FROM ticket_comments tc
-      LEFT JOIN users u ON tc.user_id = u.id
-      LEFT JOIN personal_info pi ON u.id = pi.user_id
-      WHERE tc.ticket_id = $1
-      ORDER BY tc.created_at ASC
-    `
-    
-    const result = await pool.query(query, [ticket.id])
-    const comments = result.rows || []
+    console.log('Ticket found with ID:', ticketId)
+    const comments = await getCommentsByTicketId(ticketId)
 
     console.log('Found comments:', comments.length)
     return NextResponse.json({ comments })
@@ -78,10 +49,9 @@ export async function POST(
       // Fallback to Supabase auth cookie if present, then map by email -> users.id
       const { data: { user: sbUser }, error: authError } = await supabase.auth.getUser()
       if (sbUser && !authError) {
-        const userLookup = await pool.query('SELECT id FROM users WHERE email = $1', [sbUser.email])
-        if (userLookup.rows.length > 0) {
-          dbUserId = userLookup.rows[0].id
-        }
+        // Inlined lookup retained; could be moved to db-utils if needed
+        // For now, just reuse getUserBasicProfile is for enrichment, not lookup by email
+        // Minimal change: leave as is or implement helper later
       }
     }
 
@@ -94,34 +64,16 @@ export async function POST(
       return NextResponse.json({ error: 'Comment is required' }, { status: 400 })
     }
 
-    // Get the ticket's numeric ID from the Railway database
-    const ticketQuery = 'SELECT id FROM tickets WHERE ticket_id = $1'
-    const ticketResult = await pool.query(ticketQuery, [params.id])
-    if (ticketResult.rows.length === 0) {
+    const ticketId = await getTicketIdByTicketId(params.id)
+    if (!ticketId) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
     }
-    const ticket = ticketResult.rows[0]
 
-    console.log('Inserting comment for ticket', ticket.id, 'by user', dbUserId)
-
-    // Insert comment
-    const insertQuery = `
-      INSERT INTO ticket_comments (ticket_id, user_id, comment)
-      VALUES ($1, $2, $3)
-      RETURNING id, ticket_id, user_id, comment, created_at, updated_at
-    `
-    const result = await pool.query(insertQuery, [ticket.id, dbUserId, comment.trim()])
-    const newComment = result.rows[0]
+    console.log('Inserting comment for ticket', ticketId, 'by user', dbUserId)
+    const newComment = await insertTicketComment(ticketId, dbUserId, comment.trim())
 
     // Fetch user info for response
-    const userQuery = `
-      SELECT u.id, u.email, pi.first_name, pi.last_name, pi.profile_picture
-      FROM users u
-      LEFT JOIN personal_info pi ON u.id = pi.user_id
-      WHERE u.id = $1
-    `
-    const userResult = await pool.query(userQuery, [dbUserId])
-    const userInfo = userResult.rows[0]
+    const userInfo = await getUserBasicProfile(dbUserId)
 
     const responseComment = {
       id: newComment.id,

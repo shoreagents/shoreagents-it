@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pool from '@/lib/database'
 import { createClient } from '@supabase/supabase-js'
+import { getInternalLoginUserByEmail } from '@/lib/db-utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,25 +18,6 @@ export async function POST(request: NextRequest) {
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Query to check if user exists and is an internal user with specific roles
-    const userQuery = `
-      SELECT 
-        u.id,
-        u.email,
-        u.user_type,
-        pi.first_name,
-        pi.last_name,
-        pi.profile_picture,
-        ir.role_id
-      FROM users u
-      LEFT JOIN personal_info pi ON u.id = pi.user_id
-      LEFT JOIN internal i ON u.id = i.user_id
-      LEFT JOIN internal_roles ir ON i.user_id = ir.internal_user_id
-      WHERE u.email = $1 
-        AND i.user_id IS NOT NULL 
-        AND (ir.role_id = 1 OR ir.role_id = (SELECT id FROM roles WHERE name = 'IT'))
-    `
-
     // First, authenticate with Supabase
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
@@ -51,9 +32,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Now check if user exists in our database and has proper roles
-    const userResult = await pool.query(userQuery, [email])
-
-    if (userResult.rows.length === 0) {
+    const dbUser = await getInternalLoginUserByEmail(email)
+    if (!dbUser) {
       // Logout from Supabase if user doesn't exist in our database
       await supabase.auth.signOut()
       return NextResponse.json(
@@ -62,16 +42,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const user = userResult.rows[0]
-
     // Create session data (in a real app, you'd use JWT or session management)
     const sessionData = {
-      id: user.id,
-      email: user.email,
-      userType: user.user_type,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      profilePicture: user.profile_picture,
+      id: dbUser.id,
+      email: dbUser.email,
+      userType: dbUser.user_type,
+      firstName: dbUser.first_name,
+      lastName: dbUser.last_name,
+      profilePicture: dbUser.profile_picture,
       isAuthenticated: true
     }
 

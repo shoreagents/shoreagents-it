@@ -112,7 +112,7 @@ export default function ChatPage({ params }: ChatPageProps) {
         style={{ WebkitAppRegion: 'drag' }}
       >
                  <div className="flex items-center gap-2">
-           <div className="text-sm font-mono text-primary bg-primary/10 px-2 py-1 rounded-md">
+           <div className="text-sm font-mono text-primary px-2 py-1 rounded-md">
              {ticket?.ticket_id || 'Loading...'}
            </div>
                                                <div className="min-w-0">

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pool, { bpocPool } from '@/lib/database'
 import { createServiceClient } from '@/lib/supabase/server'
+import { createMemberCompany } from '@/lib/db-utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -132,34 +132,8 @@ export async function POST(request: NextRequest) {
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ') : null
 
-    console.log('API: Attempting database insertion...')
-    
-    // Insert company data into members table using Railway database (main system)
-    // Schema: members (id, company, address, phone, logo, service, status, created_at, updated_at, badge_color, country, website, company_id)
-    // Note: website is _text (array type), status is member_status_enum
-    console.log('API: Using Railway database connection')
-    
-    // Prepare insert data, only including badge_color if it has a value
-    const insertColumns = ['company', 'address', 'phone', 'country', 'service', 'website', 'logo', 'status', 'company_id']
-    const insertValues = [
-      company,
-      address,
-      phone,
-      country,
-      formattedService,
-      websiteArray,
-      logoUrl,
-      status as 'Current Client' | 'Lost Client',
-      crypto.randomUUID()
-    ]
-    
-    // Add badge_color only if it has a value
-    if (badge_color && badge_color.trim() !== '') {
-      insertColumns.push('badge_color')
-      insertValues.push(badge_color)
-    }
-    
-    const insertData = {
+    console.log('API: Attempting database insertion via db-utils...')
+    const companyData = await createMemberCompany({
       company,
       address,
       phone,
@@ -169,55 +143,7 @@ export async function POST(request: NextRequest) {
       logo: logoUrl,
       badge_color: badge_color && badge_color.trim() !== '' ? badge_color : undefined,
       status: status as 'Current Client' | 'Lost Client',
-      company_id: insertValues[insertValues.length - 1] // Get the generated UUID
-    }
-    
-    console.log('API: Inserting data:', insertData)
-    console.log('API: Insert columns:', insertColumns)
-    console.log('API: Insert values count:', insertValues.length)
-    
-    let companyData
-    try {
-      const placeholders = insertValues.map((_, index) => `$${index + 1}`).join(', ')
-      const result = await pool.query(`
-        INSERT INTO members (${insertColumns.join(', ')})
-        VALUES (${placeholders})
-        RETURNING *
-      `, insertValues)
-
-      companyData = result.rows[0]
-      console.log('API: Company created successfully in Railway database:', companyData)
-      
-      // Also insert into BPOC database for recruitment purposes
-      if (bpocPool) {
-        try {
-          console.log('API: Inserting company into BPOC database...')
-          const bpocResult = await bpocPool.query(`
-            INSERT INTO members (company, company_id)
-            VALUES ($1, $2)
-            ON CONFLICT (company_id) DO UPDATE SET
-              company = EXCLUDED.company,
-              updated_at = CURRENT_TIMESTAMP
-            RETURNING *
-          `, [company, insertData.company_id])
-          
-          console.log('API: Company synced to BPOC database:', bpocResult.rows[0])
-        } catch (bpocError) {
-          console.error('API: BPOC database sync failed:', bpocError)
-          // Don't fail the main request, just log the error
-          console.log('API: Continuing without BPOC sync...')
-        }
-      } else {
-        console.log('API: BPOC database not configured, skipping sync')
-      }
-    } catch (dbError) {
-      console.error('API: Database operation exception:', dbError)
-      console.error('API: Exception details:', {
-        message: dbError instanceof Error ? dbError.message : 'Unknown error',
-        stack: dbError instanceof Error ? dbError.stack : 'No stack trace'
-      })
-      throw dbError
-    }
+    })
 
     console.log('API: Returning success response')
     return NextResponse.json({ 

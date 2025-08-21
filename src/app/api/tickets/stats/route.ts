@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pool from '@/lib/database'
+import { countClosedTickets, countClosedTicketsWithResolvedAt, countClosedTicketsBetween } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,28 +14,9 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    // Test query to see total closed tickets
-    const totalClosedQuery = `
-      SELECT COUNT(*) as count
-      FROM public.tickets 
-      WHERE status = 'Closed' 
-        AND role_id = 1
-    `
-    const totalClosedResult = await pool.query(totalClosedQuery)
-    const totalClosed = parseInt(totalClosedResult.rows[0]?.count || '0')
+    const totalClosed = await countClosedTickets()
     console.log('Total closed tickets in system:', totalClosed)
-
-    // Check if closed tickets have resolved_at values
-    const closedWithResolvedAtQuery = `
-      SELECT COUNT(*) as count
-      FROM public.tickets 
-      WHERE status = 'Closed' 
-        AND role_id = 1
-        AND resolved_at IS NOT NULL
-    `
-    const closedWithResolvedAtResult = await pool.query(closedWithResolvedAtQuery)
-    const closedWithResolvedAt = parseInt(closedWithResolvedAtResult.rows[0]?.count || '0')
+    const closedWithResolvedAt = await countClosedTicketsWithResolvedAt()
     console.log('Closed tickets with resolved_at:', closedWithResolvedAt)
 
     // Get current date in Asia/Manila timezone and calculate previous periods
@@ -159,30 +140,16 @@ export async function GET(request: NextRequest) {
 
 
     // Execute queries
-    const [
-      currentDayResult,
-      currentWeekResult,
-      currentMonthResult,
-      previousDayResult,
-      previousWeekResult,
-      previousMonthResult
-    ] = await Promise.all([
-      pool.query(currentDayQuery, [today.toISOString(), tomorrow.toISOString()]),
-      pool.query(currentWeekQuery, [thisWeekStart.toISOString(), nextWeek.toISOString()]),
-      pool.query(currentMonthQuery, [firstDayOfCurrentMonth.toISOString(), nextMonth.toISOString()]),
-      pool.query(previousDayQuery, [yesterday.toISOString(), today.toISOString()]),
-      pool.query(previousWeekQuery, [lastWeekStart.toISOString(), thisWeekStart.toISOString()]),
-      pool.query(previousMonthQuery, [firstDayOfPreviousMonth.toISOString(), firstDayOfCurrentMonth.toISOString()])
+    const [currentDay, currentWeek, currentMonth, previousDay, previousWeek, previousMonth] = await Promise.all([
+      countClosedTicketsBetween(today.toISOString(), tomorrow.toISOString()),
+      countClosedTicketsBetween(thisWeekStart.toISOString(), nextWeek.toISOString()),
+      countClosedTicketsBetween(firstDayOfCurrentMonth.toISOString(), nextMonth.toISOString()),
+      countClosedTicketsBetween(yesterday.toISOString(), today.toISOString()),
+      countClosedTicketsBetween(lastWeekStart.toISOString(), thisWeekStart.toISOString()),
+      countClosedTicketsBetween(firstDayOfPreviousMonth.toISOString(), firstDayOfCurrentMonth.toISOString()),
     ])
 
 
-
-    const currentDay = parseInt(currentDayResult.rows[0]?.count || '0')
-    const currentWeek = parseInt(currentWeekResult.rows[0]?.count || '0')
-    const currentMonth = parseInt(currentMonthResult.rows[0]?.count || '0')
-    const previousDay = parseInt(previousDayResult.rows[0]?.count || '0')
-    const previousWeek = parseInt(previousWeekResult.rows[0]?.count || '0')
-    const previousMonth = parseInt(previousMonthResult.rows[0]?.count || '0')
 
     console.log('Stats calculation results:', {
       currentDay,

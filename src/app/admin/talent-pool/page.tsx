@@ -141,7 +141,7 @@ export default function TalentPoolPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="flex items-center gap-1">
+                    <Badge className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
                       {(talents?.length ?? 0)} talents
                     </Badge>
@@ -279,7 +279,7 @@ export default function TalentPoolPage() {
                                   {talent.skills && talent.skills.length > 0 ? (
                                     <>
                                       {talent.skills.slice(0, 8).map((skill: string, index: number) => (
-                                        <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                        <Badge key={index} className="text-xs">
                                           {skill}
                                         </Badge>
                                       ))}
@@ -287,7 +287,7 @@ export default function TalentPoolPage() {
                                         <TooltipProvider>
                                           <Tooltip>
                                             <TooltipTrigger asChild>
-                                              <Badge className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0 cursor-pointer hover:bg-gray-300 dark:hover:bg-zinc-700 transition-colors">
+                                              <Badge className="text-xs cursor-pointer hover:opacity-80 transition-colors">
                                                 +{talent.skills.length - 8} more
                                               </Badge>
                                             </TooltipTrigger>
@@ -295,7 +295,7 @@ export default function TalentPoolPage() {
                                               <div className="text-center">
                                                 <div className="flex flex-wrap gap-2 justify-center">
                                                   {talent.skills.slice(8).map((skill: string, index: number) => (
-                                                    <Badge key={index + 8} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                                    <Badge key={index + 8} className="text-xs">
                                                       {skill}
                                                     </Badge>
                                                   ))}

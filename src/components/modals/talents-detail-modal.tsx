@@ -264,6 +264,38 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
     loadChatData()
   }, [isOpen, talent?.id, activityTab, conversationStarters.length])
 
+  // Prevent body scroll when modal is open
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+      document.body.style.paddingRight = '0px'
+      document.documentElement.style.overflow = 'hidden'
+      document.body.classList.add('overflow-hidden')
+      document.body.style.cssText += '; overflow: hidden !important; position: fixed; width: 100%;'
+    } else {
+      document.body.style.overflow = 'unset'
+      document.body.style.paddingRight = ''
+      document.documentElement.style.overflow = ''
+      document.body.classList.remove('overflow-hidden')
+      document.body.style.position = ''
+      document.body.style.width = ''
+      document.body.style.cssText = document.body.style.cssText.replace(/overflow:\s*hidden\s*!important;?\s*/g, '')
+    }
+  }, [isOpen])
+
+  // Cleanup function to restore scroll when component unmounts
+  React.useEffect(() => {
+    return () => {
+      document.body.style.overflow = 'unset'
+      document.body.style.paddingRight = ''
+      document.documentElement.style.overflow = ''
+      document.body.classList.remove('overflow-hidden')
+      document.body.style.position = ''
+      document.body.style.width = ''
+      document.body.style.cssText = document.body.style.cssText.replace(/overflow:\s*hidden\s*!important;?\s*/g, '')
+    }
+  }, [])
+
   if (!talent) return null
 
   const handleCommentSubmit = async (e: React.FormEvent) => {
@@ -535,7 +567,7 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
                                         </h4>
                                         <div className="flex flex-wrap gap-2">
                                           {originalSkillsData[category].map((skill: string, index: number) => (
-                                            <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                            <Badge key={index} className="text-xs">
                                               {skill}
                                             </Badge>
                                           ))}
@@ -552,7 +584,7 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
                                       <h4 className="text-sm font-medium text-muted-foreground mb-2">All Skills</h4>
                                       <div className="flex flex-wrap gap-2">
                                         {talent.skills.map((skill: string, index: number) => (
-                                          <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                          <Badge key={index} className="text-xs">
                                             {skill}
                                           </Badge>
                                         ))}

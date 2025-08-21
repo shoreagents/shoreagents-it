@@ -334,7 +334,7 @@ export default function Dashboard() {
                                     <div className="flex flex-col items-end gap-1 min-w-0">
                                       <div className="flex justify-end">
                                         <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-[6px] h-6 flex items-center">
-                                          #{ticket.ticket_id || ticket.id}
+                                          {ticket.ticket_id}
                                         </span>
                                       </div>
                                       <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground min-w-0">
