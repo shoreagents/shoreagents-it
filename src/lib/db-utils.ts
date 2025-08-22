@@ -26,7 +26,6 @@ export interface AgentRecord {
   work_email: string | null
   start_date: string | null
   exit_date: string | null
-  exp_points: number
   member_id: number | null
   member_company: string | null
   member_badge_color: string | null
@@ -911,22 +910,21 @@ export async function getAllAgents(): Promise<AgentRecord[]> {
         ji.work_email,
         ji.start_date,
         ji.exit_date,
-        a.exp_points,
         m.id AS member_id,
         m.company AS member_company,
         m.badge_color AS member_badge_color,
         d.id AS department_id,
         d.name AS department_name,
         s.station_id
-     FROM public.users u
-     INNER JOIN public.agents a ON u.id = a.user_id
-     LEFT JOIN public.personal_info pi ON u.id = pi.user_id
-     LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
-     LEFT JOIN public.members m ON a.member_id = m.id
-     LEFT JOIN public.departments d ON a.department_id = d.id
-     LEFT JOIN public.stations s ON u.id = s.assigned_user_id
-     WHERE u.user_type = 'Agent'
-     ORDER BY COALESCE(pi.first_name, '') ASC, COALESCE(pi.last_name, '') ASC`
+      FROM public.users u
+      INNER JOIN public.agents a ON u.id = a.user_id
+      LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+      LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
+      LEFT JOIN public.members m ON a.member_id = m.id
+      LEFT JOIN public.departments d ON a.department_id = d.id
+      LEFT JOIN public.stations s ON u.id = s.assigned_user_id
+      WHERE u.user_type = 'Agent'
+      ORDER BY COALESCE(pi.first_name, '') ASC, COALESCE(pi.last_name, '') ASC`
   )
   return result.rows
 }
@@ -963,12 +961,11 @@ export async function getAgentsPaginated({
     whereParts.push(
       `(
         COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
-        OR u.email ILIKE ${t}
         OR COALESCE(ji.employee_id,'') ILIKE ${t}
         OR COALESCE(ji.job_title,'') ILIKE ${t}
         OR COALESCE(m.company,'') ILIKE ${t}
-        OR COALESCE(d.name,'') ILIKE ${t}
-        OR COALESCE(s.station_id,'') ILIKE ${t}
+        OR COALESCE(pi.phone,'') ILIKE ${t}
+        OR u.email ILIKE ${t}
       )`
     )
   }
@@ -1034,7 +1031,6 @@ export async function getAgentsPaginated({
         ji.work_email,
         ji.start_date,
         ji.exit_date,
-        a.exp_points,
         m.id AS member_id,
         m.company AS member_company,
         m.badge_color AS member_badge_color,
@@ -1070,6 +1066,74 @@ export async function getAgentMembers(): Promise<{ id: number; company: string }
   return result.rows
 }
 
+// Update agent member_id assignment
+export async function updateAgentMember(userId: number, memberId: number | null): Promise<any> {
+  try {
+    const query = `
+      UPDATE public.agents 
+      SET member_id = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = $2
+      RETURNING *
+    `
+    const result = await pool.query(query, [memberId, userId])
+    
+    if (result.rows.length === 0) {
+      throw new Error(`Agent with user_id ${userId} not found`)
+    }
+    
+    return result.rows[0]
+  } catch (error) {
+    console.error('Error updating agent member:', error)
+    throw error
+  }
+}
+
+// Get agent by user_id with full details
+export async function getAgentById(userId: number): Promise<any> {
+  try {
+    const query = `
+      SELECT 
+        a.user_id,
+        a.member_id,
+        a.department_id,
+        a.created_at,
+        a.updated_at,
+        u.email,
+        u.user_type,
+        pi.first_name,
+        pi.last_name,
+        pi.profile_picture,
+        pi.phone,
+        ji.employee_id,
+        ji.job_title,
+        ji.work_email,
+        ji.start_date,
+        ji.exit_date,
+        m.company AS member_company,
+        m.badge_color AS member_badge_color,
+        d.name AS department_name
+      FROM public.agents a
+      INNER JOIN public.users u ON a.user_id = u.id
+      LEFT JOIN public.personal_info pi ON a.user_id = pi.user_id
+      LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
+      LEFT JOIN public.members m ON a.member_id = m.id
+      LEFT JOIN public.departments d ON a.department_id = d.id
+      WHERE a.user_id = $1
+    `
+    
+    const result = await pool.query(query, [userId])
+    
+    if (result.rows.length === 0) {
+      return null
+    }
+    
+    return result.rows[0]
+  } catch (error) {
+    console.error('Error fetching agent by ID:', error)
+    throw error
+  }
+}
+
 // Get clients with pagination and optional search
 export async function getClientsPaginated({
   search = "",
@@ -1102,9 +1166,9 @@ export async function getClientsPaginated({
     whereParts.push(
       `(
         COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
-        OR u.email ILIKE ${t}
         OR COALESCE(m.company,'') ILIKE ${t}
-        OR COALESCE(s.station_id,'') ILIKE ${t}
+        OR u.email ILIKE ${t}
+        OR COALESCE(pi.phone,'') ILIKE ${t}
       )`
     )
   }
@@ -1167,7 +1231,6 @@ export async function getClientsPaginated({
         ji.work_email,
         NULL::date AS start_date,
         NULL::date AS exit_date,
-        NULL::int AS exp_points,
         m.id AS member_id,
         m.company AS member_company,
         m.badge_color AS member_badge_color,
@@ -1202,6 +1265,71 @@ export async function getClientMembers(): Promise<{ id: number; company: string 
   return result.rows
 }
 
+// Update client member_id assignment
+export async function updateClientMember(userId: number, memberId: number | null): Promise<any> {
+  try {
+    const query = `
+      UPDATE public.clients 
+      SET member_id = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = $2
+      RETURNING *
+    `
+    const result = await pool.query(query, [memberId, userId])
+    
+    if (result.rows.length === 0) {
+      throw new Error(`Client with user_id ${userId} not found`)
+    }
+    
+    return result.rows[0]
+  } catch (error) {
+    console.error('Error updating client member:', error)
+    throw error
+  }
+}
+
+// Get client by user_id with full details
+export async function getClientById(userId: number): Promise<any> {
+  try {
+    const query = `
+      SELECT 
+        c.user_id,
+        c.member_id,
+        c.department_id,
+        c.created_at,
+        c.updated_at,
+        u.email,
+        u.user_type,
+        pi.first_name,
+        pi.last_name,
+        pi.profile_picture,
+        pi.phone,
+        ji.employee_id,
+        ji.job_title,
+        ji.work_email,
+        m.company AS member_company,
+        m.badge_color AS member_badge_color
+      FROM public.clients c
+      INNER JOIN public.users u ON c.user_id = u.id
+      LEFT JOIN public.personal_info pi ON c.user_id = pi.user_id
+      LEFT JOIN public.job_info ji ON c.user_id = ji.agent_user_id
+      LEFT JOIN public.stations s ON u.id = s.assigned_user_id
+      LEFT JOIN public.members m ON c.member_id = m.id
+      WHERE c.user_id = $1
+    `
+    
+    const result = await pool.query(query, [userId])
+    
+    if (result.rows.length === 0) {
+      return null
+    }
+    
+    return result.rows[0]
+  } catch (error) {
+    console.error('Error fetching client by ID:', error)
+    throw error
+  }
+}
+
 // Members (Companies) pagination
 export async function getMembersPaginated({
   search = "",
@@ -1231,7 +1359,9 @@ export async function getMembersPaginated({
         m.company ILIKE ${t} OR
         COALESCE(m.service,'') ILIKE ${t} OR
         COALESCE(m.country,'') ILIKE ${t} OR
-        COALESCE(m.phone,'') ILIKE ${t}
+        COALESCE(m.phone,'') ILIKE ${t} OR
+        COALESCE(m.address,'') ILIKE ${t} OR
+        COALESCE(m.website::text,'') ILIKE ${t}
       )`
     )
   }
@@ -1433,6 +1563,20 @@ export async function getClientsByMember(memberId: number): Promise<{ user_id: n
   `
   const result = await pool.query(query, [memberId])
   return result.rows
+}
+
+// Get all clients for a specific member with full details
+export async function getClientsForMember(memberId: number): Promise<any[]> {
+  try {
+    const { agents } = await getClientsPaginated({ 
+      memberId, 
+      limit: 1000 
+    })
+    return agents
+  } catch (error) {
+    console.error('Error fetching clients for member:', error)
+    throw error
+  }
 }
 
 export async function getTalentPoolData({
@@ -1782,6 +1926,42 @@ export async function createMemberCompany(input: NewCompanyInput) {
     } catch {}
   }
   return created
+}
+
+// Get a single member by ID
+export async function getMemberById(id: number) {
+  const result = await pool.query(
+    'SELECT * FROM public.members WHERE id = $1',
+    [id]
+  )
+  return result.rows[0] || null
+}
+
+// Update a member by ID
+export async function updateMember(id: number, updates: Partial<NewCompanyInput>) {
+  const updateColumns = Object.keys(updates).filter(key => updates[key as keyof NewCompanyInput] !== undefined)
+  const updateValues = Object.values(updates).filter(value => value !== undefined)
+  
+  if (updateColumns.length === 0) {
+    throw new Error('No valid updates provided')
+  }
+  
+  const placeholders = updateColumns.map((_, i) => `${updateColumns[i]} = $${i + 2}`).join(', ')
+  
+  const query = `
+    UPDATE public.members 
+    SET ${placeholders}, updated_at = CURRENT_TIMESTAMP 
+    WHERE id = $1 
+    RETURNING *
+  `
+  
+  const result = await pool.query(query, [id, ...updateValues])
+  
+  if (result.rows.length === 0) {
+    throw new Error(`Member with ID ${id} not found`)
+  }
+  
+  return result.rows[0]
 }
 
 // BPOC positions utilities
@@ -2208,4 +2388,170 @@ export async function getInternalLoginUserByEmail(email: string) {
     WHERE u.email = $1 AND i.user_id IS NOT NULL AND (ir.role_id = 1 OR ir.role_id = (SELECT id FROM roles WHERE name = 'IT'))
   `, [email])
   return rows[0] || null
+}
+
+// Modal-specific search functions for quick selection (simplified search)
+export async function getAgentsForModal(
+  page: number = 1,
+  limit: number = 20,
+  search?: string,
+  memberId?: string,
+  sortField: string = 'first_name',
+  sortDirection: 'asc' | 'desc' = 'asc'
+): Promise<{ agents: any[], pagination: { totalCount: number, totalPages: number, currentPage: number } }> {
+  const offset = (page - 1) * limit
+  const params: any[] = []
+  let paramIndex = 1
+  const whereParts: string[] = []
+  
+  // Add member filter
+  if (memberId && memberId !== 'all') {
+    if (memberId === 'none') {
+      whereParts.push('a.member_id IS NULL')
+    } else {
+      params.push(parseInt(memberId))
+      whereParts.push(`a.member_id = $${paramIndex++}`)
+    }
+  }
+  
+  // Add simplified search filter for modal (name + employee ID only)
+  if (search && search.trim()) {
+    const term = `%${search.trim()}%`
+    params.push(term)
+    const t = `$${paramIndex++}`
+    whereParts.push(
+      `(
+        COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
+        OR COALESCE(ji.employee_id,'') ILIKE ${t}
+      )`
+    )
+  }
+  
+  const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : ''
+  
+  // Count total records
+  const countQuery = `
+    SELECT COUNT(*) as total
+    FROM public.agents a
+    LEFT JOIN public.personal_info pi ON a.user_id = pi.user_id
+    LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
+    LEFT JOIN public.members m ON a.member_id = m.id
+    ${whereClause}
+  `
+  
+  const countResult = await pool.query(countQuery, params)
+  const totalCount = parseInt(countResult.rows[0]?.total || '0', 10)
+  const totalPages = Math.ceil(totalCount / limit)
+  
+  // Get paginated results - only essential fields for modal selection
+  const dataQuery = `
+    SELECT 
+      a.user_id,
+      pi.first_name,
+      pi.last_name,
+      pi.profile_picture,
+      ji.employee_id,
+      ji.job_title,
+      m.company as member_company,
+      m.badge_color as member_badge_color
+    FROM public.agents a
+    LEFT JOIN public.personal_info pi ON a.user_id = pi.user_id
+    LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
+    LEFT JOIN public.members m ON a.member_id = m.id
+    ${whereClause}
+    ORDER BY ${sortField} ${sortDirection.toUpperCase()}
+    LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+  `
+  
+  params.push(limit, offset)
+  const result = await pool.query(dataQuery, params)
+  
+  return {
+    agents: result.rows,
+    pagination: {
+      totalCount,
+      totalPages,
+      currentPage: page
+    }
+  }
+}
+
+export async function getClientsForModal(
+  page: number = 1,
+  limit: number = 20,
+  search?: string,
+  memberId?: string,
+  sortField: string = 'first_name',
+  sortDirection: 'asc' | 'desc' = 'asc'
+): Promise<{ agents: any[], pagination: { totalCount: number, totalPages: number, currentPage: number } }> {
+  const offset = (page - 1) * limit
+  const params: any[] = []
+  let paramIndex = 1
+  const whereParts: string[] = []
+  
+  // Add member filter
+  if (memberId && memberId !== 'all') {
+    if (memberId === 'none') {
+      whereParts.push('c.member_id IS NULL')
+    } else {
+      params.push(parseInt(memberId))
+      whereParts.push(`c.member_id = $${paramIndex++}`)
+    }
+  }
+  
+  // Add simplified search filter for modal (name only)
+  if (search && search.trim()) {
+    const term = `%${search.trim()}%`
+    params.push(term)
+    const t = `$${paramIndex++}`
+    whereParts.push(
+      `(
+        COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
+      )`
+    )
+  }
+  
+  const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : ''
+  
+  // Count total records
+  const countQuery = `
+    SELECT COUNT(*) as total
+    FROM public.clients c
+    LEFT JOIN public.personal_info pi ON c.user_id = pi.user_id
+    LEFT JOIN public.members m ON c.member_id = m.id
+    ${whereClause}
+  `
+  
+  const countResult = await pool.query(countQuery, params)
+  const totalCount = parseInt(countResult.rows[0]?.total || '0', 10)
+  const totalPages = Math.ceil(totalCount / limit)
+  
+  // Get paginated results - only essential fields for modal selection
+  const dataQuery = `
+    SELECT 
+      c.user_id,
+      pi.first_name,
+      pi.last_name,
+      pi.profile_picture,
+      m.company as member_company,
+      m.badge_color as member_badge_color
+    FROM public.clients c
+    LEFT JOIN public.personal_info pi ON c.user_id = pi.user_id
+    LEFT JOIN public.members m ON c.member_id = m.id
+    ${whereClause}
+    ORDER BY ${sortField} ${sortDirection.toUpperCase()}
+    LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+  `
+  
+  params.push(limit, offset)
+  const result = await pool.query(dataQuery, params)
+  
+  return {
+    agents: result.rows,
+    pagination: {
+      totalCount,
+      totalPages,
+      currentPage: page
+    }
+  }
 }

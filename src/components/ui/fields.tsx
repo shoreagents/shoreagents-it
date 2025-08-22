@@ -33,9 +33,9 @@ export const EditableField = ({
 
 interface DataFieldRowProps {
   icon: React.ReactNode
-  label: string
+  label: React.ReactNode
   fieldName: string
-  value: string
+  value: string | number | boolean | null | undefined
   placeholder?: string
   onSave: (fieldName: string, value: string) => void
   onBlur?: () => void
@@ -76,13 +76,13 @@ export const DataFieldRow = ({
           <>
             <EditableField 
               fieldName={fieldName}
-              value={value}
+              value={typeof value === 'string' ? value : String(value || '')}
               placeholder={placeholder}
               onSave={onSave}
               onBlur={onBlur}
               onKeyDown={onKeyDown}
             />
-            {value && value.trim() !== '' && (
+            {value && typeof value === 'string' && value.trim() !== '' && (
               <div className={`absolute right-2 flex items-center gap-2 transition-all duration-200 ease-in-out ${
                 isHovered 
                   ? 'opacity-100 translate-x-0' 

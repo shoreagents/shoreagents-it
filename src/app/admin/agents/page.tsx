@@ -35,7 +35,7 @@ interface AgentRecord {
   work_email: string | null
   start_date: string | null
   exit_date: string | null
-  exp_points: number
+
   member_id: number | null
   member_company: string | null
   member_badge_color: string | null
@@ -161,7 +161,7 @@ export default function AgentsPage() {
                   <div className="relative flex-1">
                     <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search agents..."
+                      placeholder="Search by name, employee ID, job title, member, phone, or email..."
                       className="pl-8"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}

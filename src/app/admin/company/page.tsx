@@ -24,7 +24,7 @@ import {
   PaginationNext,
 } from "@/components/ui/pagination"
 import { useTheme } from "next-themes"
-import { AddCompanyModal } from "@/components/modals/add-company-modal"
+import { AddCompanyModal } from "@/components/modals/members-detail-modal"
 
 interface MemberRecord {
   id: number
@@ -72,6 +72,17 @@ export default function CompaniesPage() {
   const [loadingUsersKey, setLoadingUsersKey] = useState<string | null>(null)
   const [memberUsersCache, setMemberUsersCache] = useState<Record<string, { type: 'agents' | 'clients', users: { user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, employee_id: string | null }[] }>>({})
   const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false)
+  const [companyToEdit, setCompanyToEdit] = useState<MemberRecord | null>(null)
+
+  const openEditModal = (company: MemberRecord) => {
+    setCompanyToEdit(company)
+    setIsAddCompanyModalOpen(true)
+  }
+
+  const closeModal = () => {
+    setIsAddCompanyModalOpen(false)
+    setCompanyToEdit(null)
+  }
 
   const fetchUsersForMember = async (memberId: number, type: 'agents' | 'clients') => {
     const key = `${type}:${memberId}`
@@ -165,7 +176,7 @@ export default function CompaniesPage() {
                   <div className="relative flex-1">
                     <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search companies..."
+                      placeholder="Search by company, service, country, phone, address, or website..."
                       className="pl-8"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
@@ -187,18 +198,12 @@ export default function CompaniesPage() {
                   <div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {members.map((m) => (
-                        <Card key={m.id} className="h-full">
+                        <Card key={m.id} className="h-full cursor-pointer hover:shadow-md transition-shadow" onClick={() => openEditModal(m)}>
                           <CardContent className="p-4 h-full flex flex-col">
                               <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <Avatar className="h-9 w-9">
-                                  <AvatarImage src={m.logo ?? undefined} alt={m.company} />
-                                  <AvatarFallback>{(m.company || 'C').slice(0, 2).toUpperCase()}</AvatarFallback>
-                                </Avatar>
-                                <div className="min-w-0">
-                                  <div className="font-medium truncate max-w-[14rem]">{m.company}</div>
-                                </div>
-                              </div>
+                                                             <div className="min-w-0">
+                                 <div className="font-medium truncate max-w-[14rem]">{m.company}</div>
+                               </div>
                               {m.service && (
                                 <span className={`inline-block rounded-md px-2 py-1 text-xs font-medium ${getServiceBadgeClass(m.service)}`}>
                                   {m.service}
@@ -227,8 +232,8 @@ export default function CompaniesPage() {
                                 </div>
                               )}
                             </div>
-                            <div className="mt-auto pt-2">
-                              <div className="h-px bg-border mb-2" />
+                            <div className="mt-auto pt-4">
+                              <div className="h-px bg-border mb-3" />
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium text-foreground">Employees</span>
@@ -388,12 +393,13 @@ export default function CompaniesPage() {
         </div>
       </SidebarInset>
 
-      {/* Add Company Modal */}
+      {/* Add/Edit Company Modal */}
       <AddCompanyModal 
         isOpen={isAddCompanyModalOpen}
-        onClose={() => setIsAddCompanyModalOpen(false)}
+        onClose={closeModal}
+        companyToEdit={companyToEdit}
         onCompanyAdded={(company) => {
-          console.log('New company added:', company)
+          console.log('Company saved:', company)
           // Refresh the companies list
           fetchMembers()
         }}

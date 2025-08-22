@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getMemberById, updateMember } from '@/lib/db-utils'
 import { createServiceClient } from '@/lib/supabase/server'
-import { createMemberCompany } from '@/lib/db-utils'
 
-export async function POST(request: NextRequest) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    console.log('API: Starting company creation...')
-    console.log('API: Request URL:', request.url)
-    console.log('API: Request method:', request.method)
-    console.log('API: Request headers:', Object.fromEntries(request.headers.entries()))
-    
-    // Simple authentication check - if they can reach this endpoint, they're logged in
-    // The admin dashboard already protects this route
+    const { id } = await params
+    const memberId = parseInt(id, 10)
+    if (isNaN(memberId)) {
+      return NextResponse.json({ error: 'Invalid member ID' }, { status: 400 })
+    }
 
+    console.log('API: Starting member update for ID:', memberId)
+    
     const formData = await request.formData()
     
     // Extract form data
@@ -25,7 +28,7 @@ export async function POST(request: NextRequest) {
     const badge_color = formData.get('badge_color') as string
     const status = formData.get('status') as string
     
-    console.log('API: Form data extracted:', {
+    console.log('API: Form data extracted for update:', {
       company,
       address: address ? 'present' : 'missing',
       phone,
@@ -38,8 +41,8 @@ export async function POST(request: NextRequest) {
     })
 
     // Validate required fields
-    if (!company || !address || !phone || !country || !service) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    if (!company) {
+      return NextResponse.json({ error: 'Company name is required' }, { status: 400 })
     }
 
     // Validate status enum values
@@ -52,13 +55,6 @@ export async function POST(request: NextRequest) {
 
     // Handle logo upload if provided
     let logoUrl = null
-    console.log('Logo file received:', {
-      hasLogo: !!logo,
-      logoSize: logo?.size,
-      logoName: logo?.name,
-      logoType: logo?.type
-    })
-    
     if (logo && logo.size > 0) {
       try {
         // Use service role key for storage operations (more permissions)
@@ -70,12 +66,11 @@ export async function POST(request: NextRequest) {
         const folderPath = `${company}/Logos`
         const fullPath = `${folderPath}/${logoFileName}`
         
-        console.log('Attempting to upload logo to Supabase storage:', {
+        console.log('Attempting to upload logo for update:', {
           bucket: 'members',
           path: fullPath,
           fileName: logo.name,
-          fileSize: logo.size,
-          fileType: logo.type
+          fileSize: logo.size
         })
         
         // Upload logo to Supabase storage
@@ -87,73 +82,78 @@ export async function POST(request: NextRequest) {
           })
         
         if (uploadError) {
-          console.error('Logo upload error details:', {
-            error: uploadError,
-            message: uploadError.message
-          })
-          // Don't fail the entire request, just skip logo upload
-          console.log('Logo upload failed, continuing without logo')
+          console.error('Logo upload error for update:', uploadError)
           logoUrl = null
         } else {
-          console.log('Upload successful, data:', uploadData)
-          
           // Get public URL for the uploaded logo
           const { data: urlData } = supabase.storage
             .from('members')
             .getPublicUrl(fullPath)
           
           logoUrl = urlData.publicUrl
-          console.log('Logo uploaded successfully to:', fullPath)
-          console.log('Public URL:', logoUrl)
-          
-          // Verify the URL was generated
-          if (!logoUrl) {
-            console.error('Failed to generate public URL for uploaded logo')
-            logoUrl = null
-          }
+          console.log('Logo uploaded successfully for update:', logoUrl)
         }
-        
       } catch (uploadError) {
-        console.error('Logo upload exception:', uploadError)
-        // Don't fail the entire request, just skip logo upload
-        console.log('Logo upload failed due to exception, continuing without logo')
+        console.error('Logo upload exception for update:', uploadError)
         logoUrl = null
       }
     }
 
     // Prepare website data (convert to array format as per schema)
-    // Note: website field is _text (array type) in the database
-    const websiteArray = website ? [website] : []
+    const websiteArray = website && website.trim() !== '' ? [website] : []
 
-    // Format service field for consistency (capitalize first letter of each word)
+    // Format service field for consistency
     const formattedService = service ? service
       .toLowerCase()
       .split(' ')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ') : null
 
-    console.log('API: Attempting database insertion via db-utils...')
-    const companyData = await createMemberCompany({
+    // Prepare update data
+    const updateData: any = {
       company,
       address,
       phone,
       country,
       service: formattedService,
       website: websiteArray,
-      logo: logoUrl,
       badge_color: badge_color && badge_color.trim() !== '' ? badge_color : undefined,
       status: status as 'Current Client' | 'Lost Client',
-    })
+    }
 
-    console.log('API: Returning success response')
+    // Only update logo if a new one was uploaded
+    if (logoUrl) {
+      updateData.logo = logoUrl
+    }
+
+    // Clean up the update data - remove undefined values
+    const cleanUpdateData = Object.fromEntries(
+      Object.entries(updateData).filter(([_, value]) => value !== undefined)
+    )
+    
+    console.log('API: Updating member in database:', memberId, cleanUpdateData)
+    
+    // Use db-utils function to update member
+    const updatedMember = await updateMember(memberId, cleanUpdateData)
+    
+    console.log('API: Member updated successfully:', updatedMember)
+    
     return NextResponse.json({ 
       success: true, 
-      company: companyData 
+      company: updatedMember // Keep 'company' key for frontend compatibility
     })
 
   } catch (error) {
-    console.error('API: Unexpected error:', error)
-    console.error('API: Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+    console.error('API: Unexpected error during member update:', error)
+    
+    // Handle specific errors
+    if (error instanceof Error && error.message.includes('not found')) {
+      return NextResponse.json({ 
+        error: 'Member not found',
+        details: error.message
+      }, { status: 404 })
+    }
+    
     return NextResponse.json({ 
       error: 'Internal server error', 
       details: error instanceof Error ? error.message : 'Unknown error'
@@ -161,13 +161,27 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    // For now, return empty array - you can implement database fetch later
-    return NextResponse.json({ companies: [] })
+    const { id } = await params
+    const memberId = parseInt(id, 10)
+    if (isNaN(memberId)) {
+      return NextResponse.json({ error: 'Invalid member ID' }, { status: 400 })
+    }
 
+    // Use db-utils function to get member
+    const member = await getMemberById(memberId)
+
+    if (!member) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ company: member }) // Keep 'company' key for frontend compatibility
   } catch (error) {
-    console.error('Error fetching companies:', error)
+    console.error('Error fetching member:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

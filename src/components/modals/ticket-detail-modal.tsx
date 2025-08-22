@@ -60,7 +60,7 @@ interface Ticket {
   member_address?: string
   member_phone?: string
   department_name?: string
-  agent_exp_points?: number
+
   job_title?: string
   shift_period?: string
   shift_schedule?: string
