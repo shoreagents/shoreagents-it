@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogPortal, DialogOverlay } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,7 @@ import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/auth-context"
 import { ColorPicker } from "@/components/ui/color-picker"
 import { LinkPreview } from "@/components/ui/link-preview"
+
 
 
 interface AddCompanyModalProps {
@@ -97,6 +98,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   const [inputWidth, setInputWidth] = React.useState(0)
   const [isAddAgentDrawerOpen, setIsAddAgentDrawerOpen] = React.useState(false)
   const [showAgentSelection, setShowAgentSelection] = React.useState(false)
+  const [showResetConfirmation, setShowResetConfirmation] = React.useState(false)
   const [agents, setAgents] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
   const [selectedAgents, setSelectedAgents] = React.useState<Set<number>>(new Set())
   const [selectedAgentsData, setSelectedAgentsData] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
@@ -646,6 +648,13 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     setSelectedClientsData([])
     setShowClientSelection(false)
     setClientSearch('')
+    
+    // Close confirmation dialog
+    setShowResetConfirmation(false)
+  }
+
+  const handleResetClick = () => {
+    setShowResetConfirmation(true)
   }
 
   // Check if all required fields are completed
@@ -1285,7 +1294,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                               <LinkPreview
                                 url="#"
                                 isStatic={true}
-                                imageSrc={logoPreviewUrl || undefined}
+                                imageSrc={logoPreviewUrl || ''}
                                 width={200}
                                 height={200}
                               >
@@ -1493,9 +1502,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             {/* Actions Footer */}
             <div className="flex items-center justify-start gap-3 px-6 py-4 border-t bg-sidebar">
               <Button type="submit" form="add-company-form" disabled={isSubmitting || !isFormValid()}>
-                {isSubmitting ? 'Saving...' : companyToEdit ? 'Update Company' : 'Save Changes'}
+                {isSubmitting ? 'Saving...' : companyToEdit ? 'Save Changes' : 'Save Changes'}
               </Button>
-              <Button type="button" variant="ghost" onClick={resetForm}>
+              <Button type="button" variant="ghost" onClick={handleResetClick}>
                 Reset
               </Button>
             </div>
@@ -1997,6 +2006,32 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           </div>
         </div>
       </DialogContent>
+
+      {/* Reset Confirmation Dialog */}
+      <Dialog open={showResetConfirmation} onOpenChange={setShowResetConfirmation}>
+        <DialogContent className="sm:max-w-[380px] w-[90vw] rounded-xl [&>button]:hidden">
+          <div className="flex flex-col space-y-1.5 text-center sm:text-center">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">Confirm Reset</h2>
+          </div>
+          <div className="text-sm space-y-2">
+            <p className="text-muted-foreground">Are you sure you want to reset the form? This will clear all entered data and cannot be undone.</p>
+          </div>
+          <div className="flex justify-center gap-2 pt-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowResetConfirmation(false)}
+            >
+              No
+            </Button>
+            <Button 
+              variant="default" 
+              onClick={resetForm}
+            >
+              Yes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

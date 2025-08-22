@@ -1168,7 +1168,7 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
 
                {/* Delete Confirmation Modal */}
         <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-          <DialogContent className="max-w-sm" hideClose>
+          <DialogContent className="max-w-sm">
             <DialogHeader>
               <DialogTitle>
                 Delete Comment
