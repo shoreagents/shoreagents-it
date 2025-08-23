@@ -136,7 +136,7 @@ export default function InternalPage() {
                 ) : (
                   <div>
                     <Card>
-                      <CardContent className="px-3 pt-0 pb-3">
+                      <CardContent className="px-0 pt-0 pb-0">
                         <div className="rounded-xl overflow-hidden">
                           <Table className="table-fixed w-full">
                             <colgroup>
@@ -145,18 +145,18 @@ export default function InternalPage() {
                               <col className="w-[22rem]" />
                             </colgroup>
                             <TableHeader>
-                              <TableRow>
-                                <TableHead onClick={() => handleSort('first_name')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'first_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+                              <TableRow variant="no-hover">
+                                <TableHead onClick={() => handleSort('first_name')} className={`cursor-pointer ${sortField === 'first_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
                                   <div className="flex items-center gap-1">
                                     Employee <span className="w-4 h-4">{sortField === 'first_name' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
                                   </div>
                                 </TableHead>
-                                <TableHead onClick={() => handleSort('job_title')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'job_title' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+                                <TableHead onClick={() => handleSort('job_title')} className={`cursor-pointer ${sortField === 'job_title' ? 'text-primary font-medium bg-accent/50' : ''}`}>
                                   <div className="flex items-center gap-1">
                                     Job Title <span className="w-4 h-4">{sortField === 'job_title' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
                                   </div>
                                 </TableHead>
-                                <TableHead onClick={() => handleSort('work_email')} className={`cursor-pointer hover:bg-accent transition-colors ${sortField === 'work_email' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+                                <TableHead onClick={() => handleSort('work_email')} className={`cursor-pointer ${sortField === 'work_email' ? 'text-primary font-medium bg-accent/50' : ''}`}>
                                   <div className="flex items-center gap-1">
                                     Contact <span className="w-4 h-4">{sortField === 'work_email' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
                                   </div>

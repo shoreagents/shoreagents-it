@@ -1961,7 +1961,60 @@ export async function updateMember(id: number, updates: Partial<NewCompanyInput>
     throw new Error(`Member with ID ${id} not found`)
   }
   
+  // BPOC sync for company name updates
+  if (bpocPool && updates.company) {
+    try {
+      const companyIdResult = await pool.query('SELECT company_id FROM public.members WHERE id = $1', [id])
+      if (companyIdResult.rows.length > 0) {
+        const companyId = companyIdResult.rows[0].company_id
+        await bpocPool.query(
+          `UPDATE public.members SET company = $1, updated_at = CURRENT_TIMESTAMP WHERE company_id = $2`,
+          [updates.company, companyId]
+        )
+      }
+    } catch (error) {
+      console.warn('BPOC sync failed for member update:', error)
+    }
+  }
+  
   return result.rows[0]
+}
+
+// Delete a member by ID
+export async function deleteMember(id: number): Promise<void> {
+  // Get company_id before deletion for BPOC sync
+  let companyId: string | null = null
+  if (bpocPool) {
+    try {
+      const companyIdResult = await pool.query('SELECT company_id FROM public.members WHERE id = $1', [id])
+      if (companyIdResult.rows.length > 0) {
+        companyId = companyIdResult.rows[0].company_id
+      }
+    } catch (error) {
+      console.warn('Failed to get company_id for BPOC sync:', error)
+    }
+  }
+  
+  const result = await pool.query(
+    'DELETE FROM public.members WHERE id = $1 RETURNING id',
+    [id]
+  )
+  
+  if (result.rowCount === 0) {
+    throw new Error(`Member with ID ${id} not found`)
+  }
+  
+  // BPOC sync for member deletion
+  if (bpocPool && companyId) {
+    try {
+      await bpocPool.query(
+        'DELETE FROM public.members WHERE company_id = $1',
+        [companyId]
+      )
+    } catch (error) {
+      console.warn('BPOC sync failed for member deletion:', error)
+    }
+  }
 }
 
 // BPOC positions utilities

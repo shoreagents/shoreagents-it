@@ -39,6 +39,15 @@ async function startListening() {
     // Listen for applicant changes
     await notificationClient.query('LISTEN applicant_changes')
     
+    // Listen for member/company changes
+    await notificationClient.query('LISTEN member_detail_changes')
+    
+    // Listen for agent member changes
+    await notificationClient.query('LISTEN agent_assignment_changes')
+    
+    // Listen for client member changes
+    await notificationClient.query('LISTEN client_assignment_changes')
+    
     notificationClient.on('notification', (msg) => {
       try {
         const payload = JSON.parse(msg.payload)
@@ -48,16 +57,28 @@ async function startListening() {
         let messageType = 'ticket_update'
         if (msg.channel === 'applicant_changes') {
           messageType = 'applicant_update'
+        } else if (msg.channel === 'member_detail_changes') {
+          messageType = 'member_update'
+        } else if (msg.channel === 'agent_assignment_changes') {
+          messageType = 'agent_update'
+        } else if (msg.channel === 'client_assignment_changes') {
+          messageType = 'client_update'
         }
         
         // Broadcast to all connected WebSocket clients
         if (wss) {
+          const message = JSON.stringify({
+            type: messageType,
+            data: payload
+          })
+          console.log('Broadcasting WebSocket message:', message)
+          console.log('Message type:', messageType)
+          console.log('Channel:', msg.channel)
+          console.log('Connected clients:', wss.clients.size)
+          
           wss.clients.forEach((client) => {
             if (client.readyState === 1) { // WebSocket.OPEN
-              client.send(JSON.stringify({
-                type: messageType,
-                data: payload
-              }))
+              client.send(message)
             }
           })
         }
@@ -67,7 +88,7 @@ async function startListening() {
     })
     
     isListening = true
-    console.log('Started listening for PostgreSQL notifications (tickets & applicants)')
+    console.log('Started listening for PostgreSQL notifications (tickets, applicants, members, agents & clients)')
   } catch (error) {
     console.error('Error starting notification listener:', error)
   }

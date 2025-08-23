@@ -57,23 +57,32 @@ export const DataFieldRow = ({
   customInput
 }: DataFieldRowProps) => {
   const [isHovered, setIsHovered] = React.useState(false);
+  const [isActive, setIsActive] = React.useState(false);
 
   return (
-    <div className={`grid grid-cols-[180px_auto_1fr] gap-2 h-[33px] items-center ${isLast ? '' : 'border-b border-[#cecece99] dark:border-border'}`}>
+    <div className={`grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden ${
+      isLast ? '' : 'border-b border-[#cecece99] dark:border-border'
+    }`}>
       <div className="flex items-center gap-3 min-w-0 px-2">
         {icon}
         <span className="text-sm text-foreground truncate">{label}</span>
       </div>
       <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
       <div 
-        className="min-w-0 flex items-center relative"
+        className={`min-w-0 flex items-center relative transition-colors duration-200 pl-2 pr-2 ${
+          (isActive || isHovered) 
+            ? 'bg-[#ebebeb] dark:bg-[#0a0a0a]' 
+            : ''
+        }`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onFocus={() => setIsActive(true)}
+        onBlur={() => setIsActive(false)}
       >
         {customInput ? (
           customInput
         ) : (
-          <>
+          <div className="flex items-center gap-2 w-full">
             <EditableField 
               fieldName={fieldName}
               value={typeof value === 'string' ? value : String(value || '')}
@@ -83,13 +92,17 @@ export const DataFieldRow = ({
               onKeyDown={onKeyDown}
             />
             {value && typeof value === 'string' && value.trim() !== '' && (
-              <div className={`absolute right-2 flex items-center gap-2 transition-all duration-200 ease-in-out ${
+              <div className={`flex items-center gap-2 transition-all duration-200 ease-in-out ${
                 isHovered 
                   ? 'opacity-100 translate-x-0' 
                   : 'opacity-0 translate-x-2 pointer-events-none'
               }`}>
                 <button
-                  onClick={() => navigator.clipboard.writeText(value)}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    navigator.clipboard.writeText(value)
+                  }}
                   className="p-0 hover:text-foreground rounded transition-colors text-muted-foreground"
                   title="Copy value"
                   tabIndex={-1}
@@ -97,7 +110,11 @@ export const DataFieldRow = ({
                   <IconCopy className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => onSave(fieldName, '')}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onSave(fieldName, '')
+                  }}
                   className="p-0 hover:text-foreground rounded transition-colors text-muted-foreground"
                   title="Clear value"
                   tabIndex={-1}
@@ -106,7 +123,7 @@ export const DataFieldRow = ({
                 </button>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

@@ -189,7 +189,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
   // Define status options based on application usage
   const getStatusOptions = (): StatusOption[] => {
     const options: StatusOption[] = [
-      { value: 'New', label: isAdmin ? 'Approved' : 'New', icon: 'blue', color: 'blue' },
+      { value: 'Approved', label: isAdmin ? 'Approved' : 'New', icon: 'blue', color: 'blue' },
       { value: 'In Progress', label: 'In Progress', icon: 'orange', color: 'orange' },
       { value: 'Stuck', label: 'Stuck', icon: 'red', color: 'red' },
       { value: 'Actioned', label: 'Actioned', icon: 'purple', color: 'purple' },
@@ -396,11 +396,12 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                         <span className="text-muted-foreground">Status:</span>
                         <Popover>
                           <PopoverTrigger asChild>
-                            <Button variant="ghost" className="h-auto p-0 hover:bg-muted/50 active:bg-muted/70 transition-colors">
-                                                              <Badge variant="secondary" className={`${getStatusColor(currentStatus || ticket.status)} px-2 py-1 text-xs cursor-pointer hover:opacity-80 transition-opacity`}>
-                                  {getDisplayStatus(currentStatus || ticket.status, isAdmin)}
-                                </Badge>
-                            </Button>
+                                                        <Badge 
+                              variant="secondary" 
+                              className={`${getStatusColor(currentStatus || ticket.status)} text-xs h-6 flex items-center px-2 cursor-pointer hover:opacity-80 transition-opacity`}
+                            >
+                              {getDisplayStatus(currentStatus || ticket.status, isAdmin)}
+                            </Badge>
                           </PopoverTrigger>
                           <PopoverContent className="w-56 p-2">
                             <div className="space-y-1">

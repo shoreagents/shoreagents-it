@@ -3,10 +3,11 @@ import { updateClientMember, getClientById } from '@/lib/db-utils'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const clientId = parseInt(params.id, 10)
+    const { id } = await params
+    const clientId = parseInt(id, 10)
     if (isNaN(clientId)) {
       return NextResponse.json({ error: 'Invalid client ID' }, { status: 400 })
     }
@@ -38,10 +39,11 @@ export async function PATCH(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const clientId = parseInt(params.id, 10)
+    const { id } = await params
+    const clientId = parseInt(id, 10)
     if (isNaN(clientId)) {
       return NextResponse.json({ error: 'Invalid client ID' }, { status: 400 })
     }

@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink } from "@tabler/icons-react"
+import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconActivity, IconSend } from "@tabler/icons-react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -21,6 +22,7 @@ import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/auth-context"
 import { ColorPicker } from "@/components/ui/color-picker"
 import { LinkPreview } from "@/components/ui/link-preview"
+import { MembersActivityLog } from "@/components/members-activity-log"
 
 
 
@@ -45,6 +47,11 @@ interface CompanyData {
   id?: number
   originalAgentIds?: number[] // Added for tracking original assignments
   originalClientIds?: number[] // Added for tracking original client assignments
+  // Redis storage fields for selected agents and clients
+  selectedAgentIds?: number[]
+  selectedClientIds?: number[]
+  selectedAgentsData?: Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>
+  selectedClientsData?: Array<{user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>
 }
 
 const serviceOptions = [
@@ -98,7 +105,13 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   const [inputWidth, setInputWidth] = React.useState(0)
   const [isAddAgentDrawerOpen, setIsAddAgentDrawerOpen] = React.useState(false)
   const [showAgentSelection, setShowAgentSelection] = React.useState(false)
-  const [showResetConfirmation, setShowResetConfirmation] = React.useState(false)
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = React.useState(false)
+  const [isDeleting, setIsDeleting] = React.useState(false)
+  const [isAgentsHovered, setIsAgentsHovered] = React.useState(false)
+  const [isClientsHovered, setIsClientsHovered] = React.useState(false)
+  const [comment, setComment] = React.useState("")
+  const [isSubmittingComment, setIsSubmittingComment] = React.useState(false)
+  const [commentsList, setCommentsList] = React.useState<Array<{id: string, comment: string, user_name: string, created_at: string}>>([])
   const [agents, setAgents] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
   const [selectedAgents, setSelectedAgents] = React.useState<Set<number>>(new Set())
   const [selectedAgentsData, setSelectedAgentsData] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
@@ -121,6 +134,11 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   const [isLoadingMoreClients, setIsLoadingMoreClients] = React.useState(false)
   const [currentClientPage, setCurrentClientPage] = React.useState(1)
   const [totalClientCount, setTotalClientCount] = React.useState(0)
+  
+  // Smart Sync state
+  const [redisKey, setRedisKey] = React.useState<string>('')
+  const [lastRedisSave, setLastRedisSave] = React.useState<Date | null>(null)
+  const [lastDatabaseSync, setLastDatabaseSync] = React.useState<Date | null>(null)
   
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [formData, setFormData] = React.useState<CompanyData>({
@@ -160,15 +178,322 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   // Use agents directly since we're now doing server-side search
   const displayAgents = agents
 
+  // Manual save function
+  const handleSave = async () => {
+    if (!companyToEdit?.id) return
+    
+    try {
+      console.log('💾 Starting manual save...')
+      console.log('🔍 Current selected agents:', Array.from(selectedAgents))
+      console.log('🔍 Current selected clients:', Array.from(selectedClients))
+      
+      // Create data for Redis
+      const redisData = {
+        ...formData,
+        logo: null, // Don't store File object in Redis
+        logoUrl: formData.logoUrl || existingLogoUrl,
+        selectedAgentIds: Array.from(selectedAgents),
+        selectedClientIds: Array.from(selectedClients),
+        selectedAgentsData: selectedAgentsData,
+        selectedClientsData: selectedClientsData
+      }
+      
+      // Save to Redis
+      const redisResponse = await fetch('/api/redis/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: redisKey,
+          data: redisData,
+          expiry: 3600 // 1 hour expiry
+        })
+      })
+      
+      if (redisResponse.ok) {
+        console.log('✅ Redis save successful')
+        
+        // Update database
+        await updateDatabase(formData)
+        
+        // Update agent and client assignments
+        await updateAssignments()
+        
+        // Reset unsaved changes flag
+        setHasUnsavedChanges(false)
+        
+        console.log('✅ Manual save completed successfully')
+      } else {
+        console.error('❌ Redis save failed')
+        throw new Error('Redis save failed')
+      }
+      
+    } catch (error) {
+      console.error('❌ Manual save error:', error)
+      alert('Failed to save changes. Please try again.')
+    }
+  }
+
+  // Update database function
+  const updateDatabase = async (data: CompanyData) => {
+    if (!companyToEdit?.id) return
+    
+    try {
+      console.log('🔄 Updating database...')
+      
+      const formDataToSend = new FormData()
+      formDataToSend.append('company', data.company)
+      if (data.address) formDataToSend.append('address', data.address)
+      if (data.phone) formDataToSend.append('phone', data.phone)
+      if (data.country) formDataToSend.append('country', data.country)
+      if (data.service) formDataToSend.append('service', data.service)
+      if (data.website) formDataToSend.append('website', data.website)
+      if (data.badge_color) formDataToSend.append('badge_color', data.badge_color)
+      if (data.status) formDataToSend.append('status', data.status)
+      
+      if (data.logo) {
+        formDataToSend.append('logo', data.logo)
+      }
+      
+      const dbResponse = await fetch(`/api/members/${companyToEdit.id}`, {
+        method: 'PATCH',
+        body: formDataToSend
+      })
+      
+      if (!dbResponse.ok) {
+        throw new Error(`Database update failed: ${dbResponse.status}`)
+      }
+      
+      console.log('✅ Database updated successfully')
+      
+    } catch (error) {
+      console.error('❌ Database update error:', error)
+      throw error
+    }
+  }
+
+  // Update assignments function
+  const updateAssignments = async () => {
+    if (!companyToEdit?.id) return
+    
+    try {
+      console.log('🔄 Updating assignments...')
+      
+      // Update agent assignments
+      if (selectedAgents.size > 0) {
+        console.log(`🔄 Updating ${selectedAgents.size} agent assignments...`)
+        
+        const agentUpdatePromises = Array.from(selectedAgents).map(async (agentId) => {
+          const agentResponse = await fetch(`/api/agents/${agentId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ member_id: companyToEdit.id })
+          })
+          
+          if (!agentResponse.ok) {
+            console.error(`❌ Failed to update agent ${agentId}:`, agentResponse.status)
+            return false
+          }
+          
+          return true
+        })
+        
+        const agentResults = await Promise.all(agentUpdatePromises)
+        const agentSuccessCount = agentResults.filter(Boolean).length
+        
+        if (agentSuccessCount === selectedAgents.size) {
+          console.log('✅ All agent assignments updated in database')
+        } else {
+          console.warn(`⚠️ ${agentSuccessCount}/${selectedAgents.size} agent assignments updated`)
+        }
+      }
+      
+      // Update client assignments
+      if (selectedClients.size > 0) {
+        console.log(`🔄 Updating ${selectedClients.size} client assignments...`)
+        
+        const clientUpdatePromises = Array.from(selectedClients).map(async (clientId) => {
+          const clientResponse = await fetch(`/api/clients/${clientId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ member_id: companyToEdit.id })
+          })
+          
+          if (!clientResponse.ok) {
+            console.error(`❌ Failed to update client ${clientId}:`, clientResponse.status)
+            return false
+          }
+          
+          return true
+        })
+        
+        const clientResults = await Promise.all(clientUpdatePromises)
+        const clientSuccessCount = clientResults.filter(Boolean).length
+        
+        if (clientSuccessCount === selectedClients.size) {
+          console.log('✅ All client assignments updated in database')
+        } else {
+          console.warn(`⚠️ ${clientSuccessCount}/${selectedClients.size} client assignments updated`)
+        }
+      }
+      
+      // Handle deselections
+      if (formData.originalAgentIds) {
+        const deselectedAgentIds = formData.originalAgentIds.filter(id => 
+          !selectedAgents.has(id)
+        )
+        
+        if (deselectedAgentIds.length > 0) {
+          console.log(`🔄 Removing ${deselectedAgentIds.length} deselected agent assignments...`)
+          
+          const agentRemovePromises = deselectedAgentIds.map(async (agentId) => {
+            const agentResponse = await fetch(`/api/agents/${agentId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ member_id: null })
+            })
+            
+            if (!agentResponse.ok) {
+              console.error(`❌ Failed to remove agent ${agentId} assignment:`, agentResponse.status)
+              return false
+            }
+            
+            return true
+          })
+          
+          const agentRemoveResults = await Promise.all(agentRemovePromises)
+          const agentRemoveSuccessCount = agentRemoveResults.filter(Boolean).length
+          
+          if (agentRemoveSuccessCount === deselectedAgentIds.length) {
+            console.log('✅ All deselected agent assignments removed from database')
+          } else {
+            console.warn(`⚠️ ${agentRemoveSuccessCount}/${deselectedAgentIds.length} deselected agent assignments removed`)
+          }
+        }
+      }
+      
+      if (formData.originalClientIds) {
+        const deselectedClientIds = formData.originalClientIds.filter(id => 
+          !selectedClients.has(id)
+        )
+        
+        if (deselectedClientIds.length > 0) {
+          console.log(`🔄 Removing ${deselectedClientIds.length} deselected client assignments...`)
+          
+          const clientRemovePromises = deselectedClientIds.map(async (clientId) => {
+            const clientResponse = await fetch(`/api/clients/${clientId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ member_id: null })
+            })
+            
+            if (!clientResponse.ok) {
+              console.error(`❌ Failed to remove client ${clientId} assignment:`, clientResponse.status)
+              return false
+            }
+          
+            return true
+          })
+          
+          const clientRemoveResults = await Promise.all(clientRemovePromises)
+          const clientRemoveSuccessCount = clientRemoveResults.filter(Boolean).length
+          
+          if (clientRemoveSuccessCount === deselectedClientIds.length) {
+            console.log('✅ All deselected client assignments removed from database')
+          } else {
+            console.warn(`⚠️ ${clientRemoveSuccessCount}/${deselectedClientIds.length} deselected client assignments removed`)
+          }
+        }
+      }
+      
+      console.log('✅ All assignments updated successfully')
+      
+    } catch (error) {
+      console.error('❌ Assignment update error:', error)
+      throw error
+    }
+  }
+
+  // Load data from Redis
+  const loadFromRedis = async () => {
+    if (!redisKey) return
+    
+    try {
+      const response = await fetch(`/api/redis/get?key=${redisKey}`)
+      if (response.ok) {
+        const result = await response.json()
+        if (result.data) {
+          setFormData(result.data)
+          
+          // Restore selected agents and clients from Redis
+          if (result.data.selectedAgentIds) {
+            setSelectedAgents(new Set(result.data.selectedAgentIds))
+          }
+          if (result.data.selectedClientIds) {
+            setSelectedClients(new Set(result.data.selectedClientIds))
+          }
+          if (result.data.selectedAgentsData) {
+            setSelectedAgentsData(result.data.selectedAgentsData)
+          }
+          if (result.data.selectedClientsData) {
+            setSelectedClientsData(result.data.selectedClientsData)
+          }
+          
+          // Debug: Log what was loaded from Redis
+          console.log('🔍 Redis data loaded:', {
+            company: result.data.company,
+            originalAgentIds: result.data.originalAgentIds,
+            selectedAgentIds: result.data.selectedAgentIds,
+            originalClientIds: result.data.originalClientIds,
+            selectedClientIds: result.data.selectedClientIds
+          })
+          
+          console.log('Loaded unsaved changes from Redis including agents/clients selections')
+          return true
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load from Redis:', error)
+    }
+    return false
+  }
+
   const handleInputChange = (field: keyof CompanyData, value: string | File | null) => {
-    setFormData(prev => ({
-      ...prev,
+    const newData = {
+      ...formData,
       [field]: value
-    }))
+    }
+    
+    setFormData(newData)
+    
+    // No more auto-save timer - user must click save button
+    console.log(`📝 Field '${field}' updated to:`, value)
   }
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null
+    console.log('🖼️ Logo upload triggered:', file)
+    
+    if (file) {
+      console.log('📁 File details:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: new Date(file.lastModified).toLocaleString()
+      })
+      
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file (JPEG, PNG, GIF, etc.)')
+        return
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size too large. Please select an image smaller than 5MB.')
+        return
+      }
+    }
+    
     handleInputChange('logo', file)
   }
 
@@ -180,10 +505,10 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         setIsLoadingMore(true)
       }
       
-      // Build query parameters
+      // Build query parameters - increase limit to ensure scrolling is possible
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '10'
+        limit: '20' // Increased from 10 to 20 for better scroll experience
       })
       
       if (searchQuery.trim()) {
@@ -219,13 +544,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           searchQuery
         })
         
-        // Only load one more page initially if we have very few agents and no search
-        if (page === 1 && !searchQuery.trim() && data.pagination?.totalCount > 10 && data.agents.length < 5) {
-          // Load just one more page to ensure we have enough agents to make scrolling possible
+        // Auto-load more pages if content height is too short for scrolling
+        if (page === 1 && !searchQuery.trim() && data.pagination?.totalCount > 20) {
+          // Check if we need more content for scrolling
           setTimeout(() => {
-            console.log('Initial load: Very few agents, loading one more page...')
-            fetchAgents(2, true, searchQuery)
-          }, 100)
+            checkAndLoadMoreIfNeeded(searchQuery)
+          }, 300)
         }
       } else {
         const errorData = await response.json().catch(() => ({}))
@@ -242,6 +566,28 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     } finally {
       setIsLoadingAgents(false)
       setIsLoadingMore(false)
+    }
+  }
+
+  // Check if more content is needed for scrolling
+  const checkAndLoadMoreIfNeeded = async (searchQuery: string) => {
+    const container = document.querySelector('[data-agent-list]') as HTMLElement
+    if (!container) return
+    
+    const { scrollHeight, clientHeight } = container
+    const needsMoreContent = scrollHeight <= clientHeight + 100 // Add 100px buffer
+    
+    console.log('Scroll check:', {
+      scrollHeight,
+      clientHeight,
+      needsMoreContent,
+      hasMore,
+      isLoadingMore
+    })
+    
+    if (needsMoreContent && hasMore && !isLoadingMore) {
+      console.log('Content too short, auto-loading more...')
+      await fetchAgents(currentPage + 1, true, searchQuery)
     }
   }
 
@@ -364,10 +710,17 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       return
     }
 
+    // For editing mode, just close - user must save manually
+    if (companyToEdit?.id) {
+      console.log('Edit mode - closing without auto-save. User must click Save Changes first.')
+      onClose()
+      return
+    }
+
     try {
       setIsSubmitting(true)
       
-      // Create FormData for API call
+      // Create FormData for API call (only for new companies)
       const formDataToSend = new FormData()
       formDataToSend.append('company', formData.company)
       if (formData.address) formDataToSend.append('address', formData.address)
@@ -385,38 +738,19 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         formDataToSend.append('status', formData.status)
       }
       
-      let response
-      let result
+      // Create new company
+      const response = await fetch('/api/members', {
+        method: 'POST',
+        body: formDataToSend
+      })
       
-      if (companyToEdit?.id) {
-        // Update existing company
-        response = await fetch(`/api/members/${companyToEdit.id}`, {
-          method: 'PATCH',
-          body: formDataToSend
-        })
-        
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Failed to update company')
-        }
-        
-        result = await response.json()
-        console.log('Company updated successfully:', result.company)
-      } else {
-        // Create new company
-        response = await fetch('/api/members', {
-          method: 'POST',
-          body: formDataToSend
-        })
-        
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Failed to create company')
-        }
-        
-        result = await response.json()
-        console.log('Company created successfully:', result.company)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create company')
       }
+      
+      const result = await response.json()
+      console.log('Company created successfully:', result.company)
       
       // Update selected agents with the new member_id if any agents are selected
       if (selectedAgents.size > 0) {
@@ -624,37 +958,80 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     }
   }
 
-  const resetForm = () => {
-    setFormData({
-      company: '',
-      address: '',
-      phone: '',
-      country: '',
-      service: '',
-      website: '',
-      logo: null,
-      badge_color: '#0EA5E9',
-      status: 'Current Client'
-    })
-    // Reset agent selection
-    setSelectedAgents(new Set())
-    setSelectedAgentsData([])
-    // Reset agent search and selection state
-    setAgentSearch('')
-    setShowAgentSelection(false)
-    
-    // Reset client selection
-    setSelectedClients(new Set())
-    setSelectedClientsData([])
-    setShowClientSelection(false)
-    setClientSearch('')
-    
-    // Close confirmation dialog
-    setShowResetConfirmation(false)
+
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirmation(true)
   }
 
-  const handleResetClick = () => {
-    setShowResetConfirmation(true)
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!comment.trim() || !companyToEdit?.id || isSubmittingComment) return
+
+    setIsSubmittingComment(true)
+    try {
+      // For now, just add to local state (you can implement API call later)
+      const newComment = {
+        id: Date.now().toString(),
+        comment: comment.trim(),
+        user_name: user ? `${user.firstName} ${user.lastName}` : 'Unknown User',
+        created_at: new Date().toISOString()
+      }
+      
+      setCommentsList((prev) => [newComment, ...prev])
+      setComment("")
+      console.log('Comment submitted successfully:', newComment)
+    } catch (error) {
+      console.error('Error submitting comment:', error)
+      alert('Failed to submit comment. Please try again.')
+    } finally {
+      setIsSubmittingComment(false)
+    }
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!companyToEdit?.id) return
+    
+    try {
+      setIsDeleting(true)
+      
+      console.log('Attempting to delete company with ID:', companyToEdit.id)
+      console.log('Company data:', companyToEdit)
+      
+      // Delete the company
+      const response = await fetch(`/api/members/${companyToEdit.id}`, {
+        method: 'DELETE'
+      })
+      
+      console.log('Delete response status:', response.status)
+      console.log('Delete response headers:', Object.fromEntries(response.headers.entries()))
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.log('Error response data:', errorData)
+        throw new Error(errorData.error || 'Failed to delete company')
+      }
+      
+      const responseData = await response.json()
+      console.log('Success response data:', responseData)
+      console.log('Company deleted successfully')
+      
+      // Close modal and notify parent
+      setShowDeleteConfirmation(false)
+      onClose()
+      
+      // Optionally refresh the companies list if there's a callback
+      if (onCompanyAdded) {
+        // Trigger a refresh by calling the callback with a deleted indicator
+        onCompanyAdded({ ...companyToEdit, _deleted: true } as any)
+      }
+      
+    } catch (error) {
+      console.error('Error deleting company:', error)
+      alert(error instanceof Error ? error.message : 'Failed to delete company. Please try again.')
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   // Check if all required fields are completed
@@ -690,12 +1067,42 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         setHasMoreClients(newClients.length === 20)
         setCurrentClientPage(page)
         setTotalClientCount(data.pagination?.totalCount || 0)
+        
+        // Auto-load more pages if content height is too short for scrolling
+        if (page === 1 && !search && data.pagination?.totalCount > 20) {
+          // Check if we need more content for scrolling
+          setTimeout(() => {
+            checkAndLoadMoreClientsIfNeeded(search)
+          }, 300)
+        }
       }
     } catch (error) {
       console.error('Error fetching clients:', error)
     } finally {
       setIsLoadingClients(false)
       setIsLoadingMoreClients(false)
+    }
+  }
+
+  // Check if more client content is needed for scrolling
+  const checkAndLoadMoreClientsIfNeeded = async (searchQuery: string) => {
+    const container = document.querySelector('[data-client-list]') as HTMLElement
+    if (!container) return
+    
+    const { scrollHeight, clientHeight } = container
+    const needsMoreContent = scrollHeight <= clientHeight + 100 // Add 100px buffer
+    
+    console.log('Client scroll check:', {
+      scrollHeight,
+      clientHeight,
+      needsMoreContent,
+      hasMoreClients,
+      isLoadingMoreClients
+    })
+    
+    if (needsMoreContent && hasMoreClients && !isLoadingMoreClients) {
+      console.log('Client content too short, auto-loading more...')
+      await fetchClients(searchQuery, currentClientPage + 1)
     }
   }
 
@@ -726,72 +1133,116 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     setShowAgentSelection(false) // Close agent selection when opening client selection
   }
 
-  const closeAllSelections = () => {
+  const closeSelectionContainers = () => {
     setShowAgentSelection(false)
     setShowClientSelection(false)
+    
+    // No auto-save when closing selection containers - user must click save button
+    console.log('📝 Selection containers closed - changes will be saved when you click Save Changes')
   }
 
+  // Update the useEffect that loads company data
   React.useEffect(() => {
     if (isOpen) {
       if (fileInputRef.current) {
         setInputWidth(fileInputRef.current.offsetWidth);
       }
       
+      // Generate Redis key for this editing session
+      if (companyToEdit?.id) {
+        const sessionKey = `company_edit:${companyToEdit.id}:${Date.now()}`
+        setRedisKey(sessionKey)
+        console.log('Generated Redis key:', sessionKey)
+      }
+      
       // If editing a company, populate the form
       if (companyToEdit) {
-        setFormData({
-          company: companyToEdit.company || '',
-          address: companyToEdit.address || '',
-          phone: companyToEdit.phone || '',
-          country: companyToEdit.country || '',
-          service: companyToEdit.service || '',
-          website: Array.isArray(companyToEdit.website) && companyToEdit.website.length > 0 ? companyToEdit.website[0] : (companyToEdit.website as string) || '',
-          logo: null, // Logo editing not yet implemented - would need to handle file conversion
-          logoUrl: typeof companyToEdit.logo === 'string' ? companyToEdit.logo : companyToEdit.logoUrl,
-          badge_color: companyToEdit.badge_color || '#0EA5E9',
-          status: companyToEdit.status || 'Current Client',
-          id: companyToEdit.id,
-          originalAgentIds: companyToEdit.originalAgentIds, // Store original agent IDs
-          originalClientIds: companyToEdit.originalClientIds // Store original client IDs
-        })
-        // Set existing logo URL for display
-        const logoUrl = typeof companyToEdit.logo === 'string' ? companyToEdit.logo : companyToEdit.logoUrl
-        setExistingLogoUrl(logoUrl || null)
-        
-        // Load company agents if editing
-        if (companyToEdit.id) {
-          fetchCompanyAgents(companyToEdit.id)
-          // Also load clients
-          fetchCompanyClients(companyToEdit.id)
+        // Load data from database
+        const loadCompanyData = async () => {
+          const sessionKey = `company_edit:${companyToEdit.id}:${Date.now()}`
+          setRedisKey(sessionKey)
+          
+          // Try to load from Redis first (preserves unsaved work)
+          const hasRedisData = await loadFromRedis()
+          
+          if (hasRedisData) {
+            // ✅ Redis has unsaved work - preserve it
+            console.log('✅ Loaded unsaved changes from Redis')
+          } else {
+            // ❌ No Redis data - load from database
+            console.log('🔄 No Redis data - loading fresh from database')
+            
+            const freshData = {
+              company: companyToEdit.company || '',
+              address: companyToEdit.address || '',
+              phone: companyToEdit.phone || '',
+              country: companyToEdit.country || '',
+              service: companyToEdit.service || '',
+              website: Array.isArray(companyToEdit.website) && companyToEdit.website.length > 0 ? companyToEdit.website[0] : (companyToEdit.website as string) || '',
+              logo: null,
+              logoUrl: typeof companyToEdit.logo === 'string' ? companyToEdit.logo : companyToEdit.logoUrl,
+              badge_color: companyToEdit.badge_color || '#0EA5E9',
+              status: companyToEdit.status || 'Current Client',
+              id: companyToEdit.id,
+              originalAgentIds: [],
+              originalClientIds: []
+            }
+            
+            // Set form data with fresh database data
+            setFormData(freshData)
+            setLastRedisSave(new Date())
+            setLastDatabaseSync(new Date())
+            
+            // Fetch current assignments from database and set original IDs
+            if (companyToEdit.id) {
+              // Fetch agents and set original IDs
+              const agentsResponse = await fetch(`/api/agents/modal?memberId=${companyToEdit.id}&limit=1000`)
+              if (agentsResponse.ok) {
+                const agentsData = await agentsResponse.json()
+                const companyAgents = agentsData.agents || []
+                const agentIds = companyAgents.map((agent: any) => agent.user_id)
+                
+                setSelectedAgents(new Set(agentIds))
+                setSelectedAgentsData(companyAgents)
+                
+                // Set original agent IDs for tracking deselection
+                setFormData(prev => ({
+                  ...prev,
+                  originalAgentIds: agentIds
+                }))
+                
+                console.log('✅ Set original agent IDs:', agentIds)
+              }
+              
+              // Fetch clients and set original IDs
+              const clientsResponse = await fetch(`/api/clients/modal?memberId=${companyToEdit.id}&limit=1000`)
+              if (clientsResponse.ok) {
+                const clientsData = await clientsResponse.json()
+                const companyClients = clientsData.agents || []
+                const clientIds = companyClients.map((client: any) => client.user_id)
+                
+                setSelectedClients(new Set(clientIds))
+                setSelectedClientsData(companyClients)
+                
+                // Set original client IDs for tracking deselection
+                setFormData(prev => ({
+                  ...prev,
+                  originalClientIds: clientIds
+                }))
+                
+                console.log('✅ Set original client IDs:', clientIds)
+              }
+            }
+          }
         }
-      } else {
-        // Reset form for new company
-        setFormData({
-          company: '',
-          address: '',
-          phone: '',
-          country: '',
-          service: '',
-          website: '',
-          logo: null,
-          badge_color: '#0EA5E9',
-          status: 'Current Client'
-        })
+        
+        loadCompanyData()
       }
-    } else {
-      // Reset agent selection when modal closes
-      setSelectedAgents(new Set())
-      setSelectedAgentsData([])
-      setShowAgentSelection(false)
-      setAgentSearch('')
-      
-      // Reset client selection when modal closes
-      setSelectedClients(new Set())
-      setSelectedClientsData([])
-      setShowClientSelection(false)
-      setClientSearch('')
     }
   }, [isOpen, companyToEdit])
+
+  // Remove the syncQueue effect
+  // React.useEffect(() => { ... }, [syncQueue])
 
   // Prevent body scroll when either modal or sheet is open
   React.useEffect(() => {
@@ -929,8 +1380,33 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       document.body.style.position = ''
       document.body.style.width = ''
       document.body.style.cssText = document.body.style.cssText.replace(/overflow:\s*hidden\s*!important;?\s*/g, '')
+      
+      // Auto-save functionality removed - user must click save button
     }
-  }, [])
+  }, [companyToEdit?.id, redisKey, formData])
+
+  // Track if there are unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false)
+
+  // Update hasUnsavedChanges when form data or selections change
+  React.useEffect(() => {
+    if (companyToEdit?.id) {
+      // Check if there are any changes compared to original data
+      const hasChanges = 
+        formData.company !== companyToEdit.company ||
+        formData.address !== companyToEdit.address ||
+        formData.phone !== companyToEdit.phone ||
+        formData.country !== companyToEdit.country ||
+        formData.service !== companyToEdit.service ||
+        formData.website !== (Array.isArray(companyToEdit.website) ? companyToEdit.website[0] : companyToEdit.website) ||
+        formData.badge_color !== companyToEdit.badge_color ||
+        formData.status !== companyToEdit.status ||
+        selectedAgents.size > 0 ||
+        selectedClients.size > 0
+      
+      setHasUnsavedChanges(hasChanges)
+    }
+  }, [formData, selectedAgents, selectedClients, companyToEdit])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -943,21 +1419,27 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           {/* Left Panel - Form */}
           <div className="flex-1 flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-start px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border">
-              {companyToEdit && existingLogoUrl ? (
-                                  <img 
-                    src={existingLogoUrl} 
-                    alt={companyToEdit.company}
-                    className="h-12 w-auto object-contain"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                    }}
-                  />
-              ) : (
-                <h2 className="text-xl font-semibold">
-                  {companyToEdit ? 'Edit Company' : 'Add Company'}
-                </h2>
+            <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border">
+              <div className="flex items-center gap-3">
+                <Badge className="text-xs h-6 flex items-center rounded-[6px]">
+                  Company
+                </Badge>
+              </div>
+              
+              {/* Save Button */}
+              {companyToEdit?.id && (
+                <Button 
+                  onClick={handleSave}
+                  className={`${
+                    hasUnsavedChanges 
+                      ? 'bg-primary hover:bg-primary/90 text-white' 
+                      : 'bg-muted text-muted-foreground cursor-not-allowed'
+                  }`}
+                  size="sm"
+                  disabled={!hasUnsavedChanges}
+                >
+                  {hasUnsavedChanges ? '💾 Save Changes' : '✅ All Changes Saved'}
+                </Button>
               )}
             </div>
 
@@ -1012,11 +1494,11 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                   <div className="space-y-2">
                     <h3 className="text-lg font-medium text-muted-foreground">Information</h3>
                     {/* Company Information Container */}
-                    <div className="rounded-lg border border-[#cecece99] dark:border-border">
+                    <div className="rounded-lg border border-[#cecece99] dark:border-border overflow-hidden">
                     {/* Company Name */}
                     <DataFieldRow
                       icon={<IconBuilding className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                      label="Company Name *"
+                      label="Name *"
                       fieldName="company"
                       value={formData.company || ''}
                       onSave={(fieldName, value) => handleInputChange(fieldName as keyof CompanyData, value)}
@@ -1086,31 +1568,21 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       label="Phone"
                       fieldName="phone"
                       value={formData.phone || ''}
-                      onSave={(fieldName, value) => handleInputChange(fieldName as keyof CompanyData, value)}
+                      onSave={(fieldName, value) => {
+                        // Only allow numbers, spaces, dashes, and parentheses
+                        const cleanValue = value.replace(/[^0-9\s\-\(\)]/g, '')
+                        handleInputChange(fieldName as keyof CompanyData, cleanValue)
+                      }}
                       placeholder="-"
-                      customInput={
-                        <Input
-                          value={formData.phone || ''}
-                          onChange={(e) => {
-                            // Only allow numbers, spaces, dashes, and parentheses
-                            const value = e.target.value.replace(/[^0-9\s\-\(\)]/g, '')
-                            handleInputChange('phone', value)
-                          }}
-                          onKeyDown={(e) => {
-                            // Allow: backspace, delete, tab, escape, enter, and navigation keys
-                            if ([8, 9, 27, 13, 46, 37, 38, 39, 40].includes(e.keyCode) ||
-                                // Allow: numbers, space, dash, parentheses
-                                /[0-9\s\-\(\)]/.test(e.key)) {
-                              return
-                            }
-                            e.preventDefault()
-                          }}
-                          className="h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none"
-                          placeholder="-"
-                          inputMode="tel"
-                          pattern="[0-9\s\-\(\)]+"
-                        />
-                      }
+                      onKeyDown={(e) => {
+                        // Allow: backspace, delete, tab, escape, enter, and navigation keys
+                        if ([8, 9, 27, 13, 46, 37, 38, 39, 40].includes(e.keyCode) ||
+                            // Allow: numbers, space, dash, parentheses
+                            /[0-9\s\-\(\)]/.test(e.key)) {
+                          return
+                        }
+                        e.preventDefault()
+                      }}
                     />
 
                     {/* Country */}
@@ -1277,7 +1749,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                     {/* Company Logo */}
                     <DataFieldRow
                       icon={<IconFile className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                      label="Company Logo"
+                      label="Logo"
                       fieldName="logo"
                       value={formData.logo ? formData.logo.name : ''}
                       onSave={() => {}}
@@ -1327,18 +1799,53 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                   {/* Agents Section */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between min-h-[40px]">
-                      <h3 className="text-lg font-medium text-muted-foreground">Agents</h3>
-                      {!showAgentSelection && (
-                        <Button
+                      <h3 className="text-lg font-medium text-muted-foreground">
+                        Agents
+                        {selectedAgents.size > 0 && (
+                          <span className="ml-2 text-sm text-muted-foreground">
+                            ({selectedAgents.size})
+                          </span>
+                        )}
+                      </h3>
+                                              <button
                           type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={openAgentSelection}
+                          onClick={async () => {
+                            // Force hover state to false immediately on click
+                            setIsAgentsHovered(false)
+                            // Small delay to ensure state update, then open selection
+                            setTimeout(() => openAgentSelection(), 100)
+                          }}
+                          onMouseEnter={() => setIsAgentsHovered(true)}
+                          onMouseLeave={() => setIsAgentsHovered(false)}
+                          className="text-sm text-primary hover:text-primary/80 transition-all duration-300 cursor-pointer flex items-center gap-2 group"
                         >
-                          <IconPlus className="h-4 w-4" />
-                          Add Agents
-                        </Button>
-                      )}
+                        <AnimatePresence>
+                          {isAgentsHovered && (
+                            <motion.span
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -10 }}
+                              transition={{ duration: 0.3, ease: "easeOut" }}
+                              className="whitespace-nowrap overflow-hidden flex items-center"
+                            >
+                              Add Agents
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                        <AnimatePresence mode="wait">
+                          {!showAgentSelection && (
+                            <motion.div
+                              key="agent-icon"
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.8 }}
+                              transition={{ duration: 0.3, ease: "easeOut" }}
+                            >
+                              <IconPlus className="h-4 w-4" />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </button>
                     </div>
                     
 
@@ -1358,12 +1865,11 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                               </div>
                             ))}
                           </div>
-                        ) : selectedAgents.size > 0 ? (
-                          <div className="space-y-3">
-                            <h4 className="text-sm font-medium text-muted-foreground">Selected Agents ({selectedAgents.size})</h4>
-                            <div className="flex flex-wrap gap-2">
+                                                  ) : selectedAgents.size > 0 ? (
+                            <div className="space-y-3">
+                              <div className="flex flex-wrap gap-2">
                               {selectedAgentsData.map((agent) => (
-                                <div key={agent.user_id} className="flex items-center gap-2 p-2 bg-primary/5 border border-primary/20 rounded-lg min-w-0">
+                                <div key={agent.user_id} className="relative flex items-center gap-2 p-2 px-3 bg-primary/5 border border-primary/20 rounded-lg min-w-0">
                                   <Avatar className="w-6 h-6 flex-shrink-0">
                                     <AvatarImage src={agent.profile_picture || undefined} alt={agent.first_name || 'Agent'} />
                                     <AvatarFallback className="text-xs">
@@ -1385,17 +1891,35 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                     </span>
                                   </div>
                                   <button
-                                    onClick={() => {
+                                                                        onClick={async () => {
                                       const newSelected = new Set(selectedAgents)
                                       newSelected.delete(agent.user_id)
                                       setSelectedAgents(newSelected)
                                       
                                       // Also remove from selectedAgentsData immediately
                                       setSelectedAgentsData(prev => prev.filter(a => a.user_id !== agent.user_id))
+                                      
+                                      // Trigger Redis save for agent removal
+                                      if (companyToEdit?.id && redisKey) {
+                                        // Use the updated selection state directly
+                                        const newData = { 
+                                          ...formData,
+                                          selectedAgentIds: Array.from(newSelected),
+                                          selectedAgentsData: selectedAgentsData.filter(a => a.user_id !== agent.user_id)
+                                        }
+                                        
+                                        // Database update will happen when save button is clicked
+                                        console.log(`📝 Agent ${agent.user_id} deselected from local state (will be saved when you click Save Changes)`)
+                                        
+                                        // Auto-save removed - user must click save button
+                                      }
                                     }}
-                                    className="text-muted-foreground hover:text-foreground transition-colors p-1 flex-shrink-0"
+                                    className="absolute -top-2 -right-2 w-5 h-5 text-white rounded-full flex items-center justify-center transition-colors duration-200 flex-shrink-0 shadow-sm hover:shadow-md"
+                                    style={{ backgroundColor: theme === 'dark' ? '#626262' : '#888787' }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#7a7a7a' : '#9a9a9a'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#626262' : '#888787'}
                                   >
-                                    <IconX className="h-3 w-3" />
+                                    <IconMinus className="h-3 w-3" />
                                   </button>
                                 </div>
                               ))}
@@ -1403,7 +1927,6 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                           </div>
                         ) : (
                           <div className="text-center py-6 text-muted-foreground">
-                            <IconUser className="h-8 w-8 mx-auto mb-2 opacity-50" />
                             <p className="text-sm">No Agents Added Yet</p>
                           </div>
                         )}
@@ -1414,18 +1937,53 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                 {/* Clients Section */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between min-h-[40px]">
-                    <h3 className="text-lg font-medium text-muted-foreground">Clients</h3>
-                    {!showClientSelection && (
-                      <Button
+                    <h3 className="text-lg font-medium text-muted-foreground">
+                      Clients
+                      {selectedClients.size > 0 && (
+                        <span className="ml-2 text-sm text-muted-foreground">
+                          ({selectedClients.size})
+                        </span>
+                      )}
+                    </h3>
+                                          <button
                         type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={openClientSelection}
+                        onClick={async () => {
+                          // Force hover state to false immediately on click
+                          setIsClientsHovered(false)
+                          // Small delay to ensure state update, then open selection
+                          setTimeout(() => openClientSelection(), 100)
+                        }}
+                        onMouseEnter={() => setIsClientsHovered(true)}
+                        onMouseLeave={() => setIsClientsHovered(false)}
+                        className="text-sm text-primary hover:text-primary/80 transition-all duration-300 cursor-pointer flex items-center gap-2 group"
                       >
-                        <IconPlus className="h-4 w-4" />
-                        Add Clients
-                      </Button>
-                    )}
+                      <AnimatePresence>
+                        {isClientsHovered && (
+                          <motion.span
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -10 }}
+                            transition={{ duration: 0.3, ease: "easeOut" }}
+                            className="whitespace-nowrap overflow-hidden flex items-center"
+                          >
+                            Add Clients
+                          </motion.span>
+                          )}
+                      </AnimatePresence>
+                      <AnimatePresence mode="wait">
+                        {!showClientSelection && (
+                          <motion.div
+                            key="client-icon"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            transition={{ duration: 0.3, ease: "easeOut" }}
+                          >
+                            <IconPlus className="h-4 w-4" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </button>
                   </div>
                   
                   <div className="rounded-lg border border-[#cecece99] dark:border-border">
@@ -1443,55 +2001,71 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                             </div>
                           ))}
                         </div>
-                      ) : selectedClients.size > 0 ? (
-                        <div className="space-y-3">
-                          <h4 className="text-sm font-medium text-muted-foreground">Selected Clients ({selectedClients.size})</h4>
-                          <div className="flex flex-wrap gap-2">
+                                             ) : selectedClients.size > 0 ? (
+                         <div className="space-y-3">
+                           <div className="flex flex-wrap gap-2">
                             {selectedClientsData.map((client) => (
-                              <div key={client.user_id} className="flex items-center gap-2 p-2 bg-primary/5 border border-primary/20 rounded-lg min-w-0">
-                                <Avatar className="w-6 h-6 flex-shrink-0">
-                                  <AvatarImage src={client.profile_picture || undefined} alt={client.first_name || 'Client'} />
-                                  <AvatarFallback className="text-xs">
-                                    {client.first_name && client.last_name 
-                                      ? `${client.first_name.charAt(0)}${client.last_name.charAt(0)}`
-                                      : client.first_name?.charAt(0) || client.last_name?.charAt(0) || 'C'
-                                    }
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="min-w-0 max-w-[120px]">
-                                  <h4 className="text-xs truncate">
-                                    {client.first_name && client.last_name 
-                                      ? `${client.first_name} ${client.last_name}` 
-                                      : client.first_name || client.last_name || 'Unknown Name'
-                                    }
-                                  </h4>
-                                  <span className="text-xs text-muted-foreground truncate block">
-                                    {client.member_company || 'No Member'}
-                                  </span>
+                                                              <div key={client.user_id} className="relative flex items-center gap-2 p-2 px-3 bg-primary/5 border border-primary/20 rounded-lg min-w-0">
+                                  <Avatar className="w-6 h-6 flex-shrink-0">
+                                    <AvatarImage src={client.profile_picture || undefined} alt={client.first_name || 'Client'} />
+                                    <AvatarFallback className="text-xs">
+                                      {client.first_name && client.last_name 
+                                        ? `${client.first_name.charAt(0)}${client.last_name.charAt(0)}`
+                                        : client.first_name?.charAt(0) || client.last_name?.charAt(0) || 'C'
+                                      }
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="min-w-0 max-w-[120px]">
+                                    <h4 className="text-xs truncate">
+                                      {client.first_name && client.last_name 
+                                        ? `${client.first_name} ${client.last_name}` 
+                                        : client.first_name || client.last_name || 'Unknown Name'
+                                      }
+                                    </h4>
+                                    <span className="text-xs text-muted-foreground truncate block">
+                                      {client.member_company || 'No Member'}
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={async () => {
+                                      const newSelected = new Set(selectedClients)
+                                      newSelected.delete(client.user_id)
+                                      setSelectedClients(newSelected)
+                                      
+                                      // Also remove from selectedClientsData immediately
+                                      setSelectedClientsData(prev => prev.filter(c => c.user_id !== client.user_id))
+                                      
+                                      // Trigger Redis save for client removal
+                                      if (companyToEdit?.id && redisKey) {
+                                        // Use the updated selection state directly
+                                        const newData = { 
+                                          ...formData,
+                                          selectedClientIds: Array.from(newSelected),
+                                          selectedClientsData: selectedClientsData.filter(c => c.user_id !== client.user_id)
+                                        }
+                                        
+                                        // Database update will happen when save button is clicked
+                                        console.log(`📝 Client ${client.user_id} deselected from local state (will be saved when you click Save Changes)`)
+                                        
+                                        // Auto-save removed - user must click save button // Reduced delay since we're using the updated state directly
+                                      }
+                                    }}
+                                    className="absolute -top-2 -right-2 w-5 h-5 text-white rounded-full flex items-center justify-center transition-colors duration-200 flex-shrink-0 shadow-sm hover:shadow-md"
+                                    style={{ backgroundColor: theme === 'dark' ? '#626262' : '#888787' }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#7a7a7a' : '#888787'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#626262' : '#888787'}
+                                  >
+                                    <IconMinus className="h-3 w-3" />
+                                  </button>
                                 </div>
-                                <button
-                                  onClick={() => {
-                                    const newSelected = new Set(selectedClients)
-                                    newSelected.delete(client.user_id)
-                                    setSelectedClients(newSelected)
-                                    
-                                    // Also remove from selectedClientsData immediately
-                                    setSelectedClientsData(prev => prev.filter(c => c.user_id !== client.user_id))
-                                  }}
-                                  className="text-muted-foreground hover:text-foreground transition-colors p-1 flex-shrink-0"
-                                >
-                                  <IconX className="h-3 w-3" />
-                                </button>
-                              </div>
                             ))}
                           </div>
                         </div>
                       ) : (
                         <div className="text-center py-6 text-muted-foreground">
-                          <IconUser className="h-8 w-8 mx-auto mb-2 opacity-50" />
                           <p className="text-sm">No Clients Added Yet</p>
-                          </div>
-                        )}
+                        </div>
+                      )}
                       </div>
                   </div>
                 </div>
@@ -1500,13 +2074,27 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             </div>
 
             {/* Actions Footer */}
-            <div className="flex items-center justify-start gap-3 px-6 py-4 border-t bg-sidebar">
-              <Button type="submit" form="add-company-form" disabled={isSubmitting || !isFormValid()}>
-                {isSubmitting ? 'Saving...' : companyToEdit ? 'Save Changes' : 'Save Changes'}
-              </Button>
-              <Button type="button" variant="ghost" onClick={handleResetClick}>
-                Reset
-              </Button>
+            <div className="flex items-center justify-between px-6 py-4 border-t bg-sidebar">
+              <div className="flex items-center gap-3">
+                {!companyToEdit && (
+                  <Button type="submit" form="add-company-form" disabled={isSubmitting || !isFormValid()}>
+                    {isSubmitting ? 'Saving...' : 'Save'}
+                  </Button>
+                )}
+
+                {companyToEdit && (
+                  <Button 
+                    type="button" 
+                    variant="destructive" 
+                    onClick={handleDeleteClick}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                  </Button>
+                )}
+              </div>
+              
+
             </div>
           </div>
 
@@ -1514,7 +2102,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           <div className="w-96 flex flex-col border-l border-[#cecece99] dark:border-border h-full bg-[#ebebeb] dark:bg-[#0a0a0a]">
             <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border flex-shrink-0">
               <h3 className="font-medium">
-                {showClientSelection ? 'Select Clients' : showAgentSelection ? 'Select Agents' : 'Preview'}
+                {showClientSelection ? 'Select Clients' : showAgentSelection ? 'Select Agents' : 'Activity'}
               </h3>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-[#ebebeb] dark:bg-[#0a0a0a]">
@@ -1544,6 +2132,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
 
                   {/* Agents List */}
                   <div 
+                    data-agent-list
                     className="space-y-4 flex-1 overflow-y-auto min-h-0 px-2 py-2"
                     onScroll={(e) => {
                       const target = e.target as HTMLDivElement
@@ -1566,7 +2155,6 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                         loadMoreAgents()
                       }
                     }}
-
                   >
                     {isLoadingAgents ? (
                       <div className="space-y-3">
@@ -1598,27 +2186,48 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                         : 'hover:border-primary/50 hover:bg-primary/5'
                                     }`
                               }`}
-                              onClick={() => {
-                                // Disable selection for agents assigned to other companies
-                                if (agent.member_company && agent.member_company !== companyToEdit?.company) return
-                                
-                                const newSelected = new Set(selectedAgents)
-                                if (newSelected.has(agent.user_id)) {
-                                  newSelected.delete(agent.user_id)
-                                  // Remove from selectedAgentsData when unselecting
-                                  setSelectedAgentsData(prev => prev.filter(a => a.user_id !== agent.user_id))
-                                } else {
-                                  newSelected.add(agent.user_id)
-                                  // Only add if not already in selectedAgentsData
-                                  setSelectedAgentsData(prev => {
-                                    if (prev.some(a => a.user_id === agent.user_id)) {
-                                      return prev
+                                                                onClick={async () => {
+                                    // Disable selection for agents assigned to other companies
+                                    if (agent.member_company && agent.member_company !== companyToEdit?.company) return
+                                    
+                                    const newSelected = new Set(selectedAgents)
+                                    if (newSelected.has(agent.user_id)) {
+                                      newSelected.delete(agent.user_id)
+                                      // Remove from selectedAgentsData when unselecting
+                                      setSelectedAgentsData(prev => prev.filter(a => a.user_id !== agent.user_id))
+                                    } else {
+                                      newSelected.add(agent.user_id)
+                                      // Only add if not already in selectedAgentsData
+                                      setSelectedAgentsData(prev => {
+                                        if (prev.some(a => a.user_id === agent.user_id)) {
+                                          return prev
+                                        }
+                                        return [...prev, agent]
+                                      })
                                     }
-                                    return [...prev, agent]
-                                  })
-                                }
-                                setSelectedAgents(newSelected)
-                              }}
+                                    setSelectedAgents(newSelected)
+                                    
+                                    // Trigger Redis save for agent selection changes
+                                    if (companyToEdit?.id && redisKey) {
+                                      // Use the updated selection state directly
+                                      const newData = { 
+                                        ...formData,
+                                        selectedAgentIds: Array.from(newSelected),
+                                        selectedAgentsData: newSelected.has(agent.user_id) 
+                                          ? [...selectedAgentsData, agent].filter((a, index, arr) => 
+                                              arr.findIndex(item => item.user_id === a.user_id) === index
+                                            )
+                                          : selectedAgentsData.filter(a => a.user_id !== agent.user_id)
+                                      }
+                                      
+                                      // Database update will happen when save button is clicked
+                                      if (!newSelected.has(agent.user_id)) {
+                                        console.log(`📝 Agent ${agent.user_id} deselected from local state (will be saved when you click Save Changes)`)
+                                      }
+                                      
+                                      // Auto-save removed - user must click save button
+                                    }
+                                  }}
                             >
                               <div className="grid grid-cols-[auto_1fr_auto] items-start gap-3">
                                 <div className="relative">
@@ -1699,13 +2308,8 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       </>
                     ) : (
                                               <div className="text-center py-8 text-muted-foreground">
-                          <p className="text-sm">
-                            {agentSearch ? 'No Agents Found' : 'No agents found'}
-                          </p>
-                          <p className="text-xs">
-                            {!agentSearch && 'No agents are currently available'}
-                          </p>
-                        </div>
+                        <p className="text-sm font-medium">No Agents Found</p>
+                      </div>
                     )}
                   </div>
 
@@ -1728,7 +2332,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                           // 3. Close the agent selection
                           // 4. Show success message
                           
-                          closeAllSelections()
+                          closeSelectionContainers()
                         }}
                       >
                         Done
@@ -1737,7 +2341,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       <Button 
                         variant="outline"
                         className="w-full"
-                        onClick={closeAllSelections}
+                        onClick={closeSelectionContainers}
                       >
                         Done
                       </Button>
@@ -1769,7 +2373,31 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                   </div>
 
                   {/* Clients List */}
-                  <div className="space-y-4 flex-1 overflow-y-auto min-h-0 px-2 py-2">
+                  <div 
+                    data-client-list
+                    className="space-y-4 flex-1 overflow-y-auto min-h-0 px-2 py-2"
+                    onScroll={(e) => {
+                      const target = e.target as HTMLDivElement
+                      const { scrollTop, scrollHeight, clientHeight } = target
+                      
+                      // Debug scroll values
+                      console.log('Client Scroll Debug:', {
+                        scrollTop,
+                        scrollHeight,
+                        clientHeight,
+                        threshold: scrollHeight * 0.8,
+                        shouldLoad: scrollTop + clientHeight >= scrollHeight * 0.8,
+                        hasMoreClients,
+                        isLoadingMoreClients
+                      })
+                      
+                      // Load more when user scrolls to 80% of the content
+                      if (scrollTop + clientHeight >= scrollHeight * 0.8 && hasMoreClients && !isLoadingMoreClients) {
+                        console.log('Loading more clients...')
+                        loadMoreClients()
+                      }
+                    }}
+                  >
                     {isLoadingClients ? (
                       <div className="space-y-3">
                         {[...Array(6)].map((_, index) => (
@@ -1820,6 +2448,21 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                   })
                                 }
                                 setSelectedClients(newSelected)
+                                
+                                // Trigger Redis save for client selection changes
+                                if (companyToEdit?.id && redisKey) {
+                                  // Use the updated selection state directly
+                                  const newData = { 
+                                    ...formData,
+                                    selectedClientIds: Array.from(newSelected),
+                                    selectedClientsData: newSelected.has(client.user_id) 
+                                      ? [...selectedClientsData, client].filter((c, index, arr) => 
+                                          arr.findIndex(item => item.user_id === c.user_id) === index
+                                        )
+                                      : selectedClientsData.filter(c => c.user_id !== client.user_id)
+                                  }
+                                  // Auto-save removed - user must click save button
+                                }
                               }}
                             >
                               <div className="grid grid-cols-[auto_1fr_auto] items-start gap-3">
@@ -1899,9 +2542,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       </>
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
-                        <IconUser className="h-12 w-12 mx-auto mb-3 opacity-50" />
                         <p className="text-sm font-medium">No Clients Found</p>
-                        <p className="text-xs">Try adjusting your search criteria</p>
                       </div>
                     )}
                   </div>
@@ -1925,7 +2566,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                           // 3. Close the client selection
                           // 4. Show success message
                           
-                          closeAllSelections()
+                          closeSelectionContainers()
                         }}
                       >
                         Done
@@ -1934,7 +2575,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       <Button 
                         variant="outline"
                         className="w-full"
-                        onClick={closeAllSelections}
+                        onClick={closeSelectionContainers}
                       >
                         Done
                       </Button>
@@ -1942,92 +2583,91 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                   </div>
                 </div>
               ) : (
-                // Company Preview Content
-                <div className="rounded-lg p-4 bg-sidebar border space-y-4">
-                  {isLoadingCompany ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <Skeleton className="h-10 w-10 rounded-full" />
-                        <div className="space-y-1">
-                          <Skeleton className="h-4 w-28" />
-                          <Skeleton className="h-3 w-16" />
-                        </div>
-                      </div>
-                      {[...Array(3)].map((_, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Skeleton className="h-3 w-3" />
-                          <Skeleton className="h-3 w-20" />
-                        </div>
-                      ))}
-                    </div>
+                // Activity Content - Shows company activity and recent changes
+                <div className="space-y-4">
+                  {companyToEdit?.id ? (
+                    <MembersActivityLog 
+                      memberId={companyToEdit.id} 
+                      companyName={companyToEdit.company || 'Unknown Company'} 
+                    />
                   ) : (
-                    <>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-12 w-12">
-                          {logoPreviewUrl ? (
-                            <AvatarImage src={logoPreviewUrl} alt={formData.company || 'Logo'} />
-                          ) : (
-                            <AvatarFallback>{(formData.company || 'C').slice(0, 2).toUpperCase()}</AvatarFallback>
-                          )}
-                        </Avatar>
-                        <div className="min-w-0">
-                          <div className="font-semibold truncate">{formData.company || 'Company Name'}</div>
-                          <div className="text-xs text-muted-foreground truncate">{formData.service || 'Service'}</div>
-                        </div>
-                      </div>
-                      {formData.country && (
-                        <div className="text-sm flex items-center gap-2">
-                          <IconMapPin className="h-4 w-4 text-muted-foreground" />
-                          <span>{formData.country}</span>
-                        </div>
-                      )}
-                      {formData.phone && (
-                        <div className="text-sm flex items-center gap-2">
-                          <IconPhone className="h-4 w-4 text-muted-foreground" />
-                          <span>{formData.phone}</span>
-                        </div>
-                      )}
-                      {formData.website && (
-                        <div className="text-sm flex items-center gap-2">
-                          <IconLink className="h-4 w-4 text-muted-foreground" />
-                          <span className="truncate">{formData.website}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Badge:</span>
-                        <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: formData.badge_color || '#3B82F6' }} />
-                      </div>
-                      <div className="text-xs text-muted-foreground">Status: {formData.status}</div>
-                    </>
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p className="text-sm">Activity log will appear here when editing a company</p>
+                    </div>
                   )}
                 </div>
               )}
             </div>
+
+            {/* Comment Input Section - Outside main content */}
+            {!showAgentSelection && !showClientSelection && (
+              <div className="px-3 pb-3 bg-[#ebebeb] dark:bg-[#0a0a0a]">
+                <div className="flex gap-3 bg-sidebar rounded-lg p-3 border">
+                  <Avatar className="h-8 w-8 flex-shrink-0">
+                    <AvatarImage src="" alt="Current User" />
+                    <AvatarFallback className="text-xs">
+                      CU
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <form onSubmit={handleCommentSubmit}>
+                      <Input 
+                        placeholder="Write a comment..." 
+                        value={comment}
+                        onChange={(e) => setComment(e.target.value)}
+                        className="text-sm h-9"
+                        disabled={isSubmittingComment}
+                      />
+                    </form>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    className="rounded-lg bg-teal-600 hover:bg-teal-700 hover:border-teal-700 h-9 px-3" 
+                    onClick={handleCommentSubmit}
+                    disabled={!comment.trim() || isSubmittingComment}
+                    type="submit"
+                  >
+                    {isSubmittingComment ? (
+                      <>
+                        <IconClock className="h-4 w-4 mr-1 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <IconSend className="h-4 w-4 mr-1" />
+                        Send
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>
 
-      {/* Reset Confirmation Dialog */}
-      <Dialog open={showResetConfirmation} onOpenChange={setShowResetConfirmation}>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirmation} onOpenChange={setShowDeleteConfirmation}>
         <DialogContent className="sm:max-w-[380px] w-[90vw] rounded-xl [&>button]:hidden">
           <div className="flex flex-col space-y-1.5 text-center sm:text-center">
-            <h2 className="text-lg font-semibold leading-none tracking-tight">Confirm Reset</h2>
+            <h2 className="text-lg font-semibold leading-none tracking-tight">Confirm Delete</h2>
           </div>
           <div className="text-sm space-y-2">
-            <p className="text-muted-foreground">Are you sure you want to reset the form? This will clear all entered data and cannot be undone.</p>
+            <p className="text-muted-foreground">Are you sure you want to delete this company? This action cannot be undone and will remove all associated data.</p>
           </div>
           <div className="flex justify-center gap-2 pt-2">
             <Button 
               variant="ghost" 
-              onClick={() => setShowResetConfirmation(false)}
+              onClick={() => setShowDeleteConfirmation(false)}
             >
               No
             </Button>
             <Button 
-              variant="default" 
-              onClick={resetForm}
+              variant="destructive" 
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
             >
-              Yes
+              {isDeleting ? 'Deleting...' : 'Yes'}
             </Button>
           </div>
         </DialogContent>

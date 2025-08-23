@@ -1,5 +1,19 @@
 "use client"
 
+/**
+ * Companies Page with Real-time Updates
+ * 
+ * This page displays all member companies and automatically updates in real-time when:
+ * - New companies are created
+ * - Existing companies are updated
+ * - Companies are deleted
+ * - Agents are assigned/unassigned from companies
+ * - Clients are assigned/unassigned from companies
+ * 
+ * Real-time updates are powered by PostgreSQL NOTIFY/LISTEN and WebSocket connections.
+ * The modal (AddCompanyModal) uses Redis for temporary work storage.
+ */
+
 import { useEffect, useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
@@ -25,6 +39,7 @@ import {
 } from "@/components/ui/pagination"
 import { useTheme } from "next-themes"
 import { AddCompanyModal } from "@/components/modals/members-detail-modal"
+import { useRealtimeMembers } from "@/hooks/use-realtime-members"
 
 interface MemberRecord {
   id: number
@@ -44,8 +59,161 @@ interface MemberRecord {
   client_count?: number
 }
 
+// Type for the modal that extends CompanyData
+interface CompanyModalData {
+  id: number
+  company: string
+  address: string | null
+  phone: string | null
+  logo: File | null
+  logoUrl: string | null
+  service: string | null
+  status: string | null
+  badge_color?: string
+  country: string | null
+  website: string | null
+  originalAgentIds: number[]
+  originalClientIds: number[]
+  selectedAgentIds: number[]
+  selectedClientIds: number[]
+  selectedAgentsData: any[]
+  selectedClientsData: any[]
+}
+
 export default function CompaniesPage() {
   const { theme } = useTheme()
+  
+  // Realtime updates hook
+  const { isConnected } = useRealtimeMembers({
+    onMemberCreated: (newCompany) => {
+      console.log('🆕 New company created:', newCompany)
+      // Add new company to the list if it matches current search/filters
+      if (!search.trim() || 
+          newCompany.company?.toLowerCase().includes(search.toLowerCase()) ||
+          newCompany.service?.toLowerCase().includes(search.toLowerCase()) ||
+          newCompany.country?.toLowerCase().includes(search.toLowerCase())) {
+        setMembers(prev => [newCompany, ...prev])
+        setTotalCount(prev => prev + 1)
+      }
+    },
+    onMemberUpdated: (updatedCompany) => {
+      console.log('📝 Company updated:', updatedCompany)
+      // Update company in the list, preserving existing counts if not provided
+      setMembers(prev => prev.map(c => {
+        if (c.id === updatedCompany.id) {
+          return {
+            ...updatedCompany,
+            // Preserve existing counts if the update doesn't include them
+            employee_count: updatedCompany.employee_count ?? c.employee_count,
+            client_count: updatedCompany.client_count ?? c.client_count
+          }
+        }
+        return c
+      }))
+      // Clear cache for this company's users since assignments might have changed
+      setMemberUsersCache(prev => {
+        const newCache = { ...prev }
+        delete newCache[`agents:${updatedCompany.id}`]
+        delete newCache[`clients:${updatedCompany.id}`]
+        return newCache
+      })
+    },
+    onMemberDeleted: (deletedCompany) => {
+      console.log('🗑️ Company deleted:', deletedCompany)
+      
+      // Handle null or undefined deletedCompany
+      if (!deletedCompany || !deletedCompany.id) {
+        console.warn('⚠️ Received null/undefined deletedCompany in onMemberDeleted')
+        return
+      }
+      
+      // Remove company from the list
+      setMembers(prev => prev.filter(c => c.id !== deletedCompany.id))
+      setTotalCount(prev => Math.max(0, prev - 1))
+      // Clear cache for this company's users
+      setMemberUsersCache(prev => {
+        const newCache = { ...prev }
+        delete newCache[`agents:${deletedCompany.id}`]
+        delete newCache[`clients:${deletedCompany.id}`]
+        return newCache
+      })
+    },
+    onAgentMemberChanged: (agent, oldAgent, notificationData) => {
+      console.log('👤 Agent moved from company', oldAgent?.member_id, 'to', agent?.member_id)
+      console.log('📊 Real-time count updates:', notificationData?.count_updates)
+      
+      // Handle null or undefined parameters
+      if (!agent || !oldAgent) {
+        console.warn('⚠️ Received null/undefined agent or oldAgent in onAgentMemberChanged')
+        return
+      }
+      
+      // Clear cache for both old and new companies since agent assignments changed
+      setMemberUsersCache(prev => {
+        const newCache = { ...prev }
+        if (oldAgent.member_id) delete newCache[`agents:${oldAgent.member_id}`]
+        if (agent.member_id) delete newCache[`agents:${agent.member_id}`]
+        return newCache
+      })
+      
+      // Update employee counts using real-time data from enhanced database triggers
+      console.log('🔍 Full notification data:', notificationData)
+      
+      if (notificationData?.count_updates) {
+        console.log('✅ Using real-time count updates:', notificationData.count_updates)
+        const { old_company_id, old_employee_count, new_company_id, new_employee_count } = notificationData.count_updates
+        
+        setMembers(prev => prev.map(m => {
+          if (m.id === old_company_id) {
+            return { ...m, employee_count: old_employee_count || 0 }
+          }
+          if (m.id === new_company_id) {
+            return { ...m, employee_count: new_employee_count || 0 }
+          }
+          return m
+        }))
+      }
+      // No fallback - only real-time counts from database triggers
+    },
+    onClientMemberChanged: (client, oldClient, notificationData) => {
+      console.log('🏢 Client moved from company', oldClient?.member_id, 'to', client?.member_id)
+      console.log('📊 Real-time count updates:', notificationData?.count_updates)
+      
+      // Handle null or undefined parameters
+      if (!client || !oldClient) {
+        console.warn('⚠️ Received null/undefined client or oldClient in onClientMemberChanged')
+        return
+      }
+      
+      // Clear cache for both old and new companies since client assignments changed
+      setMemberUsersCache(prev => {
+        const newCache = { ...prev }
+        if (oldClient.member_id) delete newCache[`clients:${oldClient.member_id}`]
+        if (client.member_id) delete newCache[`clients:${client.member_id}`]
+        return newCache
+      })
+      
+      // Update client counts using real-time data from enhanced database triggers
+      console.log('🔍 Full notification data for client:', notificationData)
+      
+      if (notificationData?.count_updates) {
+        console.log('✅ Using real-time client count updates:', notificationData.count_updates)
+        const { old_company_id, old_client_count, new_company_id, new_client_count } = notificationData.count_updates
+        
+        setMembers(prev => prev.map(m => {
+          if (m.id === old_company_id) {
+            return { ...m, client_count: old_client_count || 0 }
+          }
+          if (m.id === new_company_id) {
+            return { ...m, client_count: new_client_count || 0 }
+          }
+          return m
+        }))
+      }
+      // No fallback - only real-time counts from database triggers
+    }
+  })
+
   const getServiceBadgeClass = (service: string | null): string => {
     const s = (service || '').toLowerCase()
     if (s === 'workforce') {
@@ -72,10 +240,30 @@ export default function CompaniesPage() {
   const [loadingUsersKey, setLoadingUsersKey] = useState<string | null>(null)
   const [memberUsersCache, setMemberUsersCache] = useState<Record<string, { type: 'agents' | 'clients', users: { user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, employee_id: string | null }[] }>>({})
   const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false)
-  const [companyToEdit, setCompanyToEdit] = useState<MemberRecord | null>(null)
+  const [companyToEdit, setCompanyToEdit] = useState<CompanyModalData | null>(null)
 
   const openEditModal = (company: MemberRecord) => {
-    setCompanyToEdit(company)
+    // Convert MemberRecord to CompanyModalData format for the modal
+    const companyData: CompanyModalData = {
+      id: company.id,
+      company: company.company,
+      address: company.address,
+      phone: company.phone,
+      logo: null, // Logo editing not yet implemented
+      logoUrl: typeof company.logo === 'string' ? company.logo : null,
+      service: company.service,
+      status: company.status,
+      badge_color: company.badge_color || '#0EA5E9',
+      country: company.country,
+      website: Array.isArray(company.website) && company.website.length > 0 ? company.website[0] : null,
+      originalAgentIds: [], // Will be populated by the modal
+      originalClientIds: [], // Will be populated by the modal
+      selectedAgentIds: [],
+      selectedClientIds: [],
+      selectedAgentsData: [],
+      selectedClientsData: []
+    }
+    setCompanyToEdit(companyData)
     setIsAddCompanyModalOpen(true)
   }
 
@@ -198,7 +386,7 @@ export default function CompaniesPage() {
                   <div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {members.map((m) => (
-                        <Card key={m.id} className="h-full cursor-pointer hover:shadow-md transition-shadow" onClick={() => openEditModal(m)}>
+                        <Card key={m.id} className="h-full cursor-pointer hover:border-primary/50 hover:text-primary transition-all duration-200" onClick={() => openEditModal(m)}>
                           <CardContent className="p-4 h-full flex flex-col">
                               <div className="flex items-start justify-between gap-3">
                                                              <div className="min-w-0">
@@ -239,7 +427,7 @@ export default function CompaniesPage() {
                                   <span className="font-medium text-foreground">Employees</span>
                                   <Popover>
                                     <PopoverTrigger asChild>
-                                      <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent" onClick={async () => { await fetchUsersForMember(m.id, 'agents') }}>
+                                      <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer" onClick={async (e) => { e.stopPropagation(); await fetchUsersForMember(m.id, 'agents') }}>
                                         {typeof m.employee_count === 'number' ? m.employee_count : 0}
                                       </button>
                                     </PopoverTrigger>
@@ -293,7 +481,7 @@ export default function CompaniesPage() {
                                   <span className="font-medium text-foreground">Clients</span>
                                   <Popover>
                                     <PopoverTrigger asChild>
-                                      <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent" onClick={async () => { await fetchUsersForMember(m.id, 'clients') }}>
+                                      <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer" onClick={async (e) => { e.stopPropagation(); await fetchUsersForMember(m.id, 'clients') }}>
                                         {typeof m.client_count === 'number' ? m.client_count : 0}
                                       </button>
                                     </PopoverTrigger>
@@ -400,8 +588,7 @@ export default function CompaniesPage() {
         companyToEdit={companyToEdit}
         onCompanyAdded={(company) => {
           console.log('Company saved:', company)
-          // Refresh the companies list
-          fetchMembers()
+          // Real-time updates handle the refresh automatically
         }}
       />
     </>

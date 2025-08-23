@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getMemberById, updateMember } from '@/lib/db-utils'
+import { getMemberById, updateMember, deleteMember } from '@/lib/db-utils'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function PATCH(
@@ -25,6 +25,7 @@ export async function PATCH(
     const service = formData.get('service') as string
     const website = formData.get('website') as string
     const logo = formData.get('logo') as File | null
+    const remove_logo = formData.get('remove_logo') as string
     const badge_color = formData.get('badge_color') as string
     const status = formData.get('status') as string
     
@@ -121,10 +122,17 @@ export async function PATCH(
       status: status as 'Current Client' | 'Lost Client',
     }
 
-    // Only update logo if a new one was uploaded
-    if (logoUrl) {
+    // Handle logo updates
+    if (remove_logo === 'true') {
+      // Remove existing logo
+      updateData.logo = null
+      console.log('API: Logo removal requested - setting logo to null')
+    } else if (logoUrl) {
+      // Update with new logo
       updateData.logo = logoUrl
+      console.log('API: New logo uploaded:', logoUrl)
     }
+    // If neither remove_logo nor new logo, logo field won't be included in update
 
     // Clean up the update data - remove undefined values
     const cleanUpdateData = Object.fromEntries(
@@ -183,5 +191,59 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching member:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const memberId = parseInt(id, 10)
+    if (isNaN(memberId)) {
+      return NextResponse.json({ error: 'Invalid member ID' }, { status: 400 })
+    }
+
+    console.log('API: Starting member deletion for ID:', memberId)
+    console.log('API: Raw params id:', id)
+    console.log('API: Parsed memberId:', memberId)
+    
+    // First, check if the member exists using the same method as other functions
+    console.log('API: Checking if member exists in database...')
+    const existingMember = await getMemberById(memberId)
+    
+    console.log('API: Database query result:', { existingMember })
+    
+    if (!existingMember) {
+      console.log('API: Member not found, returning 404')
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
+    
+    // Delete the member from the database using db-utils function
+    console.log('API: Deleting member from database...')
+    await deleteMember(memberId)
+    
+    console.log('API: Member deleted successfully from database:', memberId)
+    
+    // Note: Logo file deletion would require Supabase storage access
+    // For now, we'll just delete from the database
+    // TODO: Implement logo cleanup if needed
+    
+    console.log('API: Member deleted successfully:', memberId)
+    
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Member deleted successfully',
+      deletedId: memberId
+    })
+
+  } catch (error) {
+    console.error('API: Unexpected error during member deletion:', error)
+    
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }
