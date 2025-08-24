@@ -3093,7 +3093,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       <Dialog open={showDeleteConfirmation} onOpenChange={setShowDeleteConfirmation}>
         <DialogContent className="sm:max-w-[380px] w-[90vw] rounded-xl [&>button]:hidden">
           <div className="flex flex-col space-y-1.5 text-center sm:text-center">
-            <h2 className="text-lg font-semibold leading-none tracking-tight">Confirm Delete</h2>
+            <h2 className="text-lg font-semibold leading-none tracking-tight">Delete</h2>
           </div>
           <div className="text-sm space-y-2">
             <p className="text-muted-foreground">Are you sure you want to delete this company? This action cannot be undone and will remove all associated data.</p>

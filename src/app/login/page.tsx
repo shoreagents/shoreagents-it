@@ -178,48 +178,48 @@ export default function LoginPage() {
             >
               <div className="w-80 text-center">
                 <form onSubmit={handleSubmit} className="space-y-4" name="login-form">
-                                      <div className="space-y-2">
-                      <Label htmlFor="email" className="text-white text-left block font-sans">Email</Label>
-                      <div className="relative">
-                        <IconMail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
-                        <CustomInput
-                          id="email"
-                          type="email"
-                          placeholder="Enter your email"
-                          value={email}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-                          autoComplete="username"
-                          required
-                        />
-                      </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-white text-left block font-sans">Email</Label>
+                    <div className="relative">
+                      <IconMail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
+                      <CustomInput
+                        id="email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={email}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                        autoComplete="username"
+                        required
+                      />
                     </div>
+                  </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="password" className="text-white text-left block font-sans">Password</Label>
-                      <div className="relative">
-                        <IconLock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
-                        <CustomInput
-                          id="password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Enter your password"
-                          value={password}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-                          autoComplete="current-password"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white transition-colors"
-                        >
-                          {showPassword ? (
-                            <IconEyeOff className="h-4 w-4" />
-                          ) : (
-                            <IconEye className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-white text-left block font-sans">Password</Label>
+                    <div className="relative">
+                      <IconLock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
+                      <CustomInput
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                        autoComplete="current-password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white transition-colors"
+                      >
+                        {showPassword ? (
+                          <IconEyeOff className="h-4 w-4" />
+                        ) : (
+                          <IconEye className="h-4 w-4" />
+                        )}
+                      </button>
                     </div>
+                  </div>
 
                   <div className="flex items-center justify-end">
                     <span
@@ -228,13 +228,13 @@ export default function LoginPage() {
                       Forgot Password?
                     </span>
                   </div>
+
+                  <div className="w-full flex justify-center mt-6">
+                    <NormalButton type="submit">
+                      Sign In
+                    </NormalButton>
+                  </div>
                 </form>
-                
-                <div className="w-full flex justify-center mt-6">
-                  <NormalButton type="submit" onClick={handleSubmit}>
-                    Sign In
-                  </NormalButton>
-                </div>
               </div>
             </Content>
           }
@@ -300,13 +300,13 @@ export default function LoginPage() {
                       Forgot Password?
                     </span>
                   </div>
+
+                  <div className="w-full flex justify-center mt-6">
+                    <NormalButton type="submit">
+                      Sign In
+                    </NormalButton>
+                  </div>
                 </form>
-                
-                <div className="w-full flex justify-center mt-6">
-                  <NormalButton type="submit" onClick={handleAdminSubmit}>
-                    Sign In
-                  </NormalButton>
-                </div>
               </div>
             </Content>
           }

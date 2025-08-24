@@ -162,11 +162,7 @@ function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUs
                 Additional Details <span className="w-4 h-4">{sortField === 'details' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
               </div>
             </TableHead>
-            <TableHead onClick={() => onSort('created_at')} className={`cursor-pointer hover:bg-accent dark:hover:bg-[#0f0f0f] transition-colors ${sortField === 'created_at' ? 'text-primary font-medium bg-accent/50' : ''}`}>
-              <div className="flex items-center gap-1">
-                Filed at <span className="w-4 h-4">{sortField === 'created_at' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
-              </div>
-            </TableHead>
+
             <TableHead onClick={() => onSort('resolved_at')} className={`cursor-pointer hover:bg-accent dark:hover:bg-[#0f0f0f] transition-colors ${sortField === 'resolved_at' ? 'text-primary font-medium bg-accent/50' : ''}`}>
               <div className="flex items-center gap-1">
                 Resolved at <span className="w-4 h-4">{sortField === 'resolved_at' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
@@ -225,9 +221,7 @@ function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUs
                   <span className="text-sm text-muted-foreground/50">-</span>
                 )}
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {formatDate(ticket.created_at)}
-              </TableCell>
+
               <TableCell className="text-sm text-muted-foreground">
                 {ticket.resolved_at ? formatDate(ticket.resolved_at) : '-'}
               </TableCell>
@@ -288,7 +282,6 @@ function PastTicketsSkeleton() {
             <TableHead><Skeleton className="h-4 w-12" /></TableHead>
             <TableHead><Skeleton className="h-4 w-24" /></TableHead>
             <TableHead><Skeleton className="h-4 w-32" /></TableHead>
-            <TableHead><Skeleton className="h-4 w-16" /></TableHead>
             <TableHead><Skeleton className="h-4 w-20" /></TableHead>
             <TableHead><Skeleton className="h-4 w-24" /></TableHead>
           </TableRow>
@@ -306,7 +299,6 @@ function PastTicketsSkeleton() {
               </TableCell>
               <TableCell><Skeleton className="h-4 w-48" /></TableCell>
               <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
               <TableCell><Skeleton className="h-4 w-24" /></TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
@@ -601,13 +593,14 @@ export default function PastTicketsPage() {
                         )}
                       </div>
                     ) : (
-                      <div className="flex flex-col justify-center h-full">
-                        <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-lg bg-muted/20">
-                          <IconHistory className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-                          <p className="text-sm font-medium">No Past Tickets</p>
-                          <p className="text-xs text-muted-foreground/70">
-                            {searchTerm ? 'No tickets match your search criteria' : ''}
-                          </p>
+                      <div className="flex flex-col h-[75vh]">
+                        <div className="text-center py-16 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-lg bg-muted/20 flex-1 flex items-center justify-center">
+                          <div>
+                            <p className="text-sm font-medium">No Past Tickets</p>
+                            <p className="text-xs text-muted-foreground/70">
+                              {searchTerm ? 'No tickets match your search criteria' : ''}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     )}

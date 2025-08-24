@@ -16,8 +16,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ReloadButton } from "@/components/ui/reload-button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 
-import { IconSearch, IconFilter, IconGripVertical, IconCalendar, IconClock, IconEye, IconMessage } from "@tabler/icons-react"
+import { IconSearch, IconFilter, IconGripVertical, IconCalendar, IconClock, IconEye, IconMessage, IconDots } from "@tabler/icons-react"
 import { useRealtimeTickets } from "@/hooks/use-realtime-tickets"
 import {
   DndContext,
@@ -228,7 +230,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
           </div>
           <div className="flex flex-col gap-2">
             <div className="flex flex-col text-xs text-muted-foreground py-1 rounded-none mb-3">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2">
                 <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-[6px] h-6 flex items-center">
                   {ticket.ticket_id}
                 </span>
@@ -236,28 +238,9 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
                   {categoryBadge?.name || 'General'}
                 </Badge>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-xs font-medium text-muted-foreground/70 mr-2">Filed at:</span>
-                <IconCalendar className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium text-muted-foreground">
-                  {new Date(ticket.created_at).toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric'
-                  })}
-                </span>
-                <span className="text-muted-foreground/70">•</span>
-                <IconClock className="h-4 w-4 text-muted-foreground" />
-                <span className="font-mono text-muted-foreground">
-                  {new Date(ticket.created_at).toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                  })}
-                </span>
-              </div>
             </div>
           </div>
-                      <div className="flex items-center gap-2 mb-3">
+                      <div className="flex items-center gap-2">
               <Avatar className="h-8 w-8 flex-shrink-0">
                 <AvatarImage src={ticket.profile_picture || ''} alt={`User ${ticket.user_id}`} />
                 <AvatarFallback className="text-sm bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
@@ -274,23 +257,8 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
                     : `User ${ticket.user_id}`
                   }
                 </span>
-                {ticket.user_type === 'Internal' ? (
-                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400 truncate">
-                    Internal
-                  </span>
-                ) : ticket.member_name && (
-                  <span 
-                    className="text-xs font-medium truncate"
-                    style={{ color: ticket.member_color || undefined }}
-                  >
-                    {ticket.member_name}
-                  </span>
-                )}
               </div>
-                          <div className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-center">
-              <span className="font-medium text-muted-foreground/70">Station</span>
-              <span className="text-sm font-medium text-primary">{ticket.station_id || 'Unassigned'}</span>
-            </div>
+
             </div>
           <div className="border border-gray-300 dark:border-[#84848440] rounded-lg p-3 text-left flex flex-col justify-center mt-6">
             <span className="text-xs font-medium text-muted-foreground/70">Concern:</span>
@@ -314,7 +282,7 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
                     <p className="text-sm text-primary leading-relaxed break-words mt-1">{ticket.details}</p>
                   </div>
                 )}
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2">
                  <Button 
                    size="sm" 
                    variant="outline" 
@@ -342,37 +310,35 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
            </motion.div>
                   )}
        </AnimatePresence>
-      {ticket.status === 'Closed' && ticket.resolved_at && (
-        <div className="pt-3 mt-3">
-          <div className="flex items-center justify-between">
+      <div className="pt-3 mt-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground/70 truncate">
+            Filed at: <span className="text-foreground font-medium">
+              {new Date(ticket.created_at).toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric'
+              })} • {new Date(ticket.created_at).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              })}
+            </span>
+          </span>
+          {ticket.status === 'Closed' && ticket.resolved_at && (
             <span className="text-xs font-medium text-muted-foreground/70 truncate">
               Resolved by: <span className="text-foreground font-medium">
-                {ticket.resolver_first_name && ticket.resolver_last_name 
-                  ? `${ticket.resolver_first_name}`
-                  : (ticket.resolved_by ? `User ${ticket.resolved_by}` : 'Unknown')
+                {ticket.resolved_by === parseInt(user?.id || '0') 
+                  ? 'You'
+                  : (ticket.resolver_first_name && ticket.resolver_last_name 
+                      ? `${ticket.resolver_first_name}`
+                      : (ticket.resolved_by ? `User ${ticket.resolved_by}` : 'Unknown')
+                    )
                 }
               </span>
             </span>
-            <span className="text-xs font-mono text-muted-foreground flex items-center gap-1">
-              <IconCalendar className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-muted-foreground">
-                {new Date(ticket.resolved_at).toLocaleDateString('en-US', { 
-                  month: 'short', 
-                  day: 'numeric',
-                  timeZone: 'Asia/Manila'
-                })}
-              </span>
-              <span className="text-muted-foreground/70">•</span>
-              <IconClock className="h-4 w-4 text-muted-foreground" />
-              {new Date(ticket.resolved_at).toLocaleTimeString('en-US', { 
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZone: 'Asia/Manila'
-              })}
-            </span>
-          </div>
+          )}
         </div>
-      )}
+      </div>
       </Card>
   )
 })
@@ -434,7 +400,7 @@ function TicketSkeleton() {
   )
 }
 
-function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: boolean }) {
+function DraggingTicket({ ticket, isExpanded, user }: { ticket: Ticket; isExpanded: boolean; user: any }) {
   const categoryBadge = getCategoryBadge(ticket)
   
   return (
@@ -449,7 +415,7 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
           </div>
           <div className="flex flex-col gap-2">
             <div className="flex flex-col text-xs text-muted-foreground py-1 rounded-none mb-3">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2">
                 <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-[6px] h-6 flex items-center">
                   {ticket.ticket_id}
                 </span>
@@ -457,28 +423,9 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
                   {categoryBadge?.name || 'General'}
                 </Badge>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-xs font-medium text-muted-foreground/70 mr-2">Filed at:</span>
-                <IconCalendar className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium text-muted-foreground">
-                  {new Date(ticket.created_at).toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric'
-                  })}
-                </span>
-                <span className="text-muted-foreground/70">•</span>
-                <IconClock className="h-4 w-4 text-muted-foreground" />
-                <span className="font-mono text-muted-foreground">
-                  {new Date(ticket.created_at).toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                  })}
-                </span>
-              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2">
             <Avatar className="h-8 w-8 flex-shrink-0">
               <AvatarImage src={ticket.profile_picture || ''} alt={`User ${ticket.user_id}`} />
               <AvatarFallback className="text-sm bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
@@ -495,23 +442,9 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
                   : `User ${ticket.user_id}`
                 }
               </span>
-              {ticket.user_type === 'Internal' ? (
-                <span className="text-xs font-medium text-blue-600 dark:text-blue-400 truncate">
-                  Internal
-                </span>
-              ) : ticket.member_name && (
-                <span 
-                  className="text-xs font-medium truncate"
-                  style={{ color: ticket.member_color || undefined }}
-                >
-                  {ticket.member_name}
-                </span>
-              )}
+
             </div>
-            <div className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-center">
-              <span className="font-medium text-muted-foreground/70">Station</span>
-              <span className="text-sm font-medium text-primary">{ticket.station_id || 'Unassigned'}</span>
-            </div>
+
           </div>
           <div className="border border-gray-300 dark:border-[#84848440] rounded-lg p-3 text-left flex flex-col justify-center mt-6">
             <span className="text-xs font-medium text-muted-foreground/70">Concern:</span>
@@ -529,7 +462,7 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
                   <p className="text-sm text-primary leading-relaxed break-words mt-1">{ticket.details}</p>
                 </div>
               )}
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2">
                 <Button 
                   size="sm" 
                   variant="outline" 
@@ -551,32 +484,27 @@ function DraggingTicket({ ticket, isExpanded }: { ticket: Ticket; isExpanded: bo
           </div>
         )}
       
-      {ticket.status === 'Closed' && ticket.resolved_at && (
-        <div className="pt-3 mt-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground/70 truncate">
-              Resolved by: <span className="text-foreground font-medium">{ticket.resolver_first_name && ticket.resolver_last_name ? `${ticket.resolver_first_name}` : (ticket.resolved_by ? `User ${ticket.resolved_by}` : 'Unknown')}</span>
-            </span>
-            <span className="text-xs font-mono text-muted-foreground flex items-center gap-1">
-              <IconCalendar className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-muted-foreground">
-                {new Date(ticket.resolved_at).toLocaleDateString('en-US', { 
-                  month: 'short', 
-                  day: 'numeric',
-                  timeZone: 'Asia/Manila'
-                })}
-              </span>
-              <span className="text-muted-foreground/70">•</span>
-              <IconClock className="h-4 w-4 text-muted-foreground" />
-              {new Date(ticket.resolved_at).toLocaleTimeString('en-US', { 
+      <div className="pt-3 mt-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground/70 truncate">
+            Filed at: <span className="text-foreground font-medium">
+              {new Date(ticket.created_at).toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric'
+              })} • {new Date(ticket.created_at).toLocaleTimeString('en-US', {
                 hour: '2-digit',
                 minute: '2-digit',
-                timeZone: 'Asia/Manila'
+                hour12: true
               })}
             </span>
-          </div>
+          </span>
+          {ticket.status === 'Closed' && ticket.resolved_at && (
+            <span className="text-xs font-medium text-muted-foreground/70 truncate">
+              Resolved by: <span className="text-foreground font-medium">{ticket.resolved_by === parseInt(user?.id || '0') ? 'You' : (ticket.resolver_first_name && ticket.resolver_last_name ? `${ticket.resolver_first_name}` : (ticket.resolved_by ? `User ${ticket.resolved_by}` : 'Unknown'))}</span>
+            </span>
+          )}
         </div>
-      )}
+      </div>
     </Card>
   )
 }
@@ -667,7 +595,63 @@ export default function TicketsPage() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(1)
+  const [showClearConfirmation, setShowClearConfirmation] = useState(false)
+  const [clearStatus, setClearStatus] = useState<string>('')
+  const [clearCount, setClearCount] = useState(0)
   const { user } = useAuth()
+  
+
+
+  // Function to clear all closed tickets in a status column
+  const clearAllClosedTicketsInStatus = async (status: string) => {
+    try {
+      // Get all closed tickets in this status column
+      const closedTicketsInStatus = tickets.filter(ticket => ticket.status === status && ticket.status === 'Closed')
+      
+      if (closedTicketsInStatus.length === 0) {
+        console.log('No closed tickets to clear in status:', status)
+        return
+      }
+
+      // Clear all closed tickets in this status
+      const clearPromises = closedTicketsInStatus.map(ticket => 
+        fetch('/api/tickets/clear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticketId: ticket.id, action: 'clear' })
+        })
+      )
+
+      const responses = await Promise.all(clearPromises)
+      const allSuccessful = responses.every(response => response.ok)
+
+      if (allSuccessful) {
+        // Remove all cleared tickets from the current view
+        setTickets(prev => prev.filter(ticket => !(ticket.status === status && ticket.status === 'Closed')))
+        console.log(`Cleared ${closedTicketsInStatus.length} tickets from ${status} column`)
+      } else {
+        console.error('Failed to clear some tickets')
+      }
+    } catch (error) {
+      console.error('Error clearing tickets:', error)
+    }
+  }
+
+  // Function to show clear confirmation modal
+  const showClearConfirmationModal = (status: string) => {
+    const closedTicketsCount = tickets.filter(t => t.status === status && t.status === 'Closed').length
+    setClearStatus(status)
+    setClearCount(closedTicketsCount)
+    setShowClearConfirmation(true)
+  }
+
+  // Function to handle clear confirmation
+  const handleClearConfirm = async () => {
+    setShowClearConfirmation(false)
+    if (clearStatus) {
+      await clearAllClosedTicketsInStatus(clearStatus)
+    }
+  }
 
   // Compute fractional insert position within a target list
   const calculateInsertPosition = (targetTickets: any[], dropIndex: number) => {
@@ -1151,16 +1135,33 @@ export default function TicketsPage() {
                                                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
                                   <Badge variant="outline" className={`${getStatusColor(status as TicketStatus)} px-3 py-1 font-medium rounded-xl`}>
-                                    {getStatusDisplayLabel(status)} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${getCircleColor(status as TicketStatus)}`}>{getTicketsByStatus(status as TicketStatus).length}</span>
+                                    {getStatusDisplayLabel(status)} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${
+                                      getCircleColor(status as TicketStatus)
+                                    }`}>{getTicketsByStatus(status as TicketStatus).length}</span>
                                   </Badge>
                                 </div>
                                 {status === 'Closed' && (
-                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                    </svg>
-                                    <span>Shows last 7 days only</span>
-                                  </div>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button 
+                                        className="text-xs h-7 w-7 p-0 text-muted-foreground border-0 bg-transparent hover:bg-transparent focus:outline-none focus:ring-0"
+                                      >
+                                        <IconDots className="h-5 w-5 hover:text-gray-800 dark:hover:text-gray-200 transition-colors" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="end" className="w-32 p-1" onOpenAutoFocus={(e) => e.preventDefault()}>
+                                      <button
+                                        className="relative w-full text-left text-sm py-1.5 pl-2 pr-8 rounded-lg transition-colors flex items-center hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent/90 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                                        onClick={(e) => { 
+                                          e.preventDefault(); 
+                                          e.stopPropagation(); 
+                                          showClearConfirmationModal(status);
+                                        }}
+                                      >
+                                        Clear All
+                                      </button>
+                                    </PopoverContent>
+                                  </Popover>
                                 )}
                               </div>
                             </div>
@@ -1218,6 +1219,7 @@ export default function TicketsPage() {
                         <DraggingTicket 
                           ticket={tickets.find(ticket => ticket.id.toString() === activeId)!}
                           isExpanded={expandedTickets.has(activeId)}
+                          user={user}
                         />
                       </div>
                     ) : null}
@@ -1236,6 +1238,32 @@ export default function TicketsPage() {
         isOpen={isModalOpen}
         onClose={handleModalClose}
       />
+
+      {/* Clear All Confirmation Dialog */}
+      <Dialog open={showClearConfirmation} onOpenChange={setShowClearConfirmation}>
+        <DialogContent className="sm:max-w-[380px] w-[90vw] rounded-xl [&>button]:hidden">
+          <div className="flex flex-col space-y-1.5 text-center sm:text-center">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">Clear All</h2>
+          </div>
+          <div className="text-sm space-y-2">
+            <p className="text-muted-foreground">Clear all {clearCount} closed tickets? You can still view them in the records page.</p>
+          </div>
+          <div className="flex justify-center gap-2 pt-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowClearConfirmation(false)}
+            >
+              No
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleClearConfirm}
+            >
+              Yes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 } 

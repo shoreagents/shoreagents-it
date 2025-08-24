@@ -61,6 +61,7 @@ export interface Ticket {
   member_color?: string | null
   supporting_files?: string[]
   file_count?: number
+  clear?: boolean
 }
 
 export interface TalentPoolRecord {
@@ -132,7 +133,7 @@ export async function getAllTickets(): Promise<Ticket[]> {
     LEFT JOIN public.agents a ON t.user_id = a.user_id
     LEFT JOIN public.clients c ON t.user_id = c.user_id
     LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
-    WHERE t.role_id = 1 AND (t.status != 'Closed' OR t.resolved_at >= NOW() - INTERVAL '7 days')
+    WHERE t.role_id = 1 AND NOT (t.status = 'Closed' AND t.clear = true)
     ORDER BY t.status, t.position ASC, t.created_at DESC
   `)
   return result.rows
@@ -169,7 +170,7 @@ export async function getAllTicketsAdmin(): Promise<Ticket[]> {
     LEFT JOIN public.agents a ON t.user_id = a.user_id
     LEFT JOIN public.clients c ON t.user_id = c.user_id
     LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
-    WHERE (t.status != 'Closed' OR t.resolved_at >= NOW() - INTERVAL '7 days')
+    WHERE NOT (t.status = 'Closed' AND t.clear = true)
     ORDER BY t.status, t.position ASC, t.created_at DESC
   `)
   return result.rows
@@ -181,9 +182,9 @@ export async function getTicketsByStatus(status: string, past: boolean = false):
   let queryParams = [status]
   let paramIndex = 2
   
-  // Add 7-day filter for closed/completed tickets based on resolved_at
-  if (status === 'Closed' || status === 'Completed') {
-    whereConditions.push(`t.resolved_at >= NOW() - INTERVAL '7 days'`)
+  // Add filter to hide cleared closed tickets
+  if (status === 'Closed') {
+    whereConditions.push('t.clear = false')
   }
   
   const whereClause = whereConditions.join(' AND ')
@@ -232,9 +233,9 @@ export async function getTicketsByStatusAdmin(status: string): Promise<Ticket[]>
   let whereConditions = ['t.status = $1']
   let queryParams = [status]
   
-  // Add 7-day filter for closed/completed tickets based on resolved_at
-  if (status === 'Closed' || status === 'Completed') {
-    whereConditions.push(`t.resolved_at >= NOW() - INTERVAL '7 days'`)
+  // Add filter to hide cleared closed tickets
+  if (status === 'Closed') {
+    whereConditions.push('t.clear = false')
   }
   
   const whereClause = whereConditions.join(' AND ')
@@ -731,10 +732,9 @@ export async function getTicketsResolvedByUserCount(userId: number, status: stri
     't.resolved_by = $2'
   ]
   
-  // Add 7-day filter for closed/completed tickets based on resolved_at
-  // BUT only when NOT fetching past tickets (past=false)
-  if ((status === 'Closed' || status === 'Completed') && !past) {
-    whereParts.push(`t.resolved_at >= NOW() - INTERVAL '7 days'`)
+  // Add filter to hide cleared closed tickets, but show them in past tickets
+  if (status === 'Closed' && !past) {
+    whereParts.push('t.clear = false')
   }
   
   if (!isAdmin) {
@@ -792,10 +792,9 @@ export async function getTicketsByStatusWithPagination(
     queryParams.push(status)
     paramIndex = 2
     
-    // Add 7-day filter for closed/completed tickets based on resolved_at
-    // BUT only when NOT fetching past tickets (past=false)
-    if ((status === 'Closed' || status === 'Completed') && !past) {
-      whereConditions.push(`t.resolved_at >= NOW() - INTERVAL '7 days'`)
+    // Add filter to hide cleared closed tickets, but show them in past tickets
+    if (status === 'Closed' && !past) {
+      whereConditions.push('t.clear = false')
     }
   }
   
@@ -2612,4 +2611,60 @@ export async function getClientsForModal(
       currentPage: page
     }
   }
+}
+
+// Mark a ticket as cleared (hidden from main pages)
+export async function markTicketAsCleared(ticketId: number): Promise<void> {
+  await pool.query(`
+    UPDATE public.tickets 
+    SET clear = true 
+    WHERE id = $1 AND status = 'Closed'
+  `, [ticketId])
+}
+
+// Unmark a ticket as cleared (show on main pages again)
+export async function unmarkTicketAsCleared(ticketId: number): Promise<void> {
+  await pool.query(`
+    UPDATE public.tickets 
+    SET clear = false 
+    WHERE id = $1 AND status = 'Closed'
+  `, [ticketId])
+}
+
+// Get cleared tickets (for admin review)
+export async function getClearedTickets(): Promise<Ticket[]> {
+  const result = await pool.query(`
+    SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
+           t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
+           ji.employee_id,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           u.user_type,
+           t.supporting_files, t.file_count,
+           CASE 
+             WHEN u.user_type = 'Internal' THEN 'Internal'
+             WHEN a.member_id IS NOT NULL THEN m.company
+             WHEN c.member_id IS NOT NULL THEN m.company
+             ELSE NULL
+           END as member_name,
+           CASE 
+             WHEN u.user_type = 'Internal' THEN NULL
+             WHEN a.member_id IS NOT NULL THEN m.badge_color
+             WHEN c.member_id IS NOT NULL THEN m.badge_color
+             ELSE NULL
+           END as member_color,
+           t.clear
+    FROM public.tickets t
+    LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+    LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
+    LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
+    LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
+    LEFT JOIN public.users u ON t.user_id = u.id
+    LEFT JOIN public.agents a ON t.user_id = a.user_id
+    LEFT JOIN public.clients c ON t.user_id = c.user_id
+    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+    WHERE t.status = 'Closed' AND t.clear = true
+    ORDER BY t.resolved_at DESC
+  `)
+  return result.rows
 }

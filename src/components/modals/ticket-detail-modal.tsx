@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { getStorageUrl } from "@/lib/supabase"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/auth-context"
+import { SendHorizontal } from "lucide-react"
 
 interface TicketDetailModalProps {
   ticket: Ticket | null
@@ -71,8 +72,8 @@ interface Ticket {
   staff_source?: string
   start_date?: string
   exit_date?: string
-  resolved_by_name?: string
-  resolved_by_email?: string
+  resolver_first_name?: string | null
+  resolver_last_name?: string | null
 }
 
 type TicketStatus = 'For Approval' | 'On Hold' | 'In Progress' | 'New' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
@@ -185,6 +186,8 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
   const [isSubmittingComment, setIsSubmittingComment] = React.useState(false)
   const { user } = useAuth()
   const isAdmin = ((user as any)?.roleName || '').toLowerCase() === 'admin'
+  const [isCommentFocused, setIsCommentFocused] = React.useState<boolean>(false)
+  const commentTextareaRef = React.useRef<HTMLTextAreaElement>(null)
 
   // Define status options based on application usage
   const getStatusOptions = (): StatusOption[] => {
@@ -207,9 +210,34 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
     if (ticket) {
       setCurrentStatus(ticket.status)
       fetchComments()
+      // Reset comment state when ticket changes
+      setIsCommentFocused(false)
+      setComment("")
+      // Ensure textarea is not focused
+      if (commentTextareaRef.current) {
+        commentTextareaRef.current.blur()
+      }
     }
     setStatusOptions(getStatusOptions())
   }, [ticket])
+
+  // Reset comment focus state when modal opens/closes
+  React.useEffect(() => {
+    if (isOpen) {
+      console.log('Modal opened, resetting comment state')
+      setIsCommentFocused(false)
+      setComment("")
+      // Ensure textarea is not focused
+      if (commentTextareaRef.current) {
+        commentTextareaRef.current.blur()
+      }
+    }
+  }, [isOpen])
+
+  // Debug state changes
+  React.useEffect(() => {
+    console.log('State changed - isCommentFocused:', isCommentFocused, 'comment:', comment, 'comment.trim():', comment.trim())
+  }, [isCommentFocused, comment])
 
   // Prevent body scroll when modal is open
   React.useEffect(() => {
@@ -343,6 +371,8 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
         <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden p-0 rounded-xl" style={{ 
           backgroundColor: theme === 'dark' ? '#111111' : '#f8f9fa' 
         }}>
+          <DialogTitle className="sr-only">Ticket Details</DialogTitle>
+          <DialogDescription className="sr-only">View and manage ticket information</DialogDescription>
           <div className="flex h-[95vh]">
             {/* Left Panel - Task Details */}
             <div className="flex-1 flex flex-col">
@@ -362,9 +392,9 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                      {ticket.concern}
                    </h1>
                    
-                                       {/* Metadata Grid */}
+                   {/* Metadata Grid */}
                     <div className="grid grid-cols-2 gap-4 text-sm">
-                                            {/* User */}
+                      {/* 1. Employee */}
                       <div className="flex items-center gap-2">
                         <IconUser className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Employee:</span>
@@ -387,13 +417,38 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                         </div>
                       </div>
                       
-                      {/* Status */}
+                      {/* 2. Ticket ID */}
+                      <div className="flex items-center gap-2">
+                        <IconId className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Ticket ID:</span>
+                        <span className="font-mono font-medium text-primary">
+                          {ticket.ticket_id}
+                        </span>
+                      </div>
+                      
+                      {/* 3. Filed at */}
+                      <div className="flex items-center gap-2">
+                        <IconCalendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Filed at:</span>
+                        <span className="font-medium">{createdDate.date} • {createdDate.time}</span>
+                      </div>
+                      
+                      {/* 4. Category */}
+                      <div className="flex items-center gap-2">
+                        <IconTag className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Category:</span>
+                        <Badge variant="secondary" className={`text-xs h-6 flex items-center ${categoryBadge.color}`}>
+                          {categoryBadge.name}
+                        </Badge>
+                      </div>
+                      
+                      {/* 5. Status */}
                       <div className="flex items-center gap-2">
                         {getStatusIcon(currentStatus || ticket.status)}
                         <span className="text-muted-foreground">Status:</span>
                         <Popover>
                           <PopoverTrigger asChild>
-                                                        <Badge 
+                            <Badge 
                               variant="secondary" 
                               className={`${getStatusColor(currentStatus || ticket.status)} text-xs h-6 flex items-center px-2 cursor-pointer hover:opacity-80 transition-opacity`}
                             >
@@ -438,54 +493,43 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                         </Popover>
                       </div>
                       
-                      {/* Company */}
-                      {ticket.member_name && (
+                      {/* 6. Resolved by */}
+                      {ticket.status === 'Closed' && ticket.resolved_by && (
                         <div className="flex items-center gap-2">
-                          <IconBriefcase className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">Company:</span>
-                          <span 
-                            className="font-medium"
-                            style={{ color: ticket.member_color || undefined }}
-                          >
-                            {ticket.member_name}
+                          <IconUser className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Resolved by:</span>
+                          <span className="font-medium">
+                            {ticket.resolved_by === parseInt(user?.id || '0') 
+                              ? 'You' 
+                              : (ticket.resolver_first_name && ticket.resolver_last_name 
+                                  ? `${ticket.resolver_first_name} ${ticket.resolver_last_name}`
+                                  : `User ${ticket.resolved_by}`
+                                )
+                            }
                           </span>
                         </div>
                       )}
                       
-                      {/* Category */}
-                      <div className="flex items-center gap-2">
-                        <IconTag className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Category:</span>
-                                        <Badge variant="secondary" className={`text-xs h-6 flex items-center ${categoryBadge.color}`}>
-                  {categoryBadge.name}
-                </Badge>
-                      </div>
-                      
-                      {/* Dates */}
-                      <div className="flex items-center gap-2">
-                        <IconCalendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Filed at:</span>
-                        <span className="font-medium">{createdDate.date} • {createdDate.time}</span>
-                      </div>
-                      
-                      {/* Ticket ID */}
-                      <div className="flex items-center gap-2">
-                        <IconId className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Ticket ID:</span>
-                        <span className="font-mono font-medium text-primary">
-                          {ticket.ticket_id}
-                        </span>
-                      </div>
-                      
-                      {/* Station */}
-                      {ticket.station_id && (
+                      {/* 7. Resolved at */}
+                      {ticket.status === 'Closed' && ticket.resolved_at && (
                         <div className="flex items-center gap-2">
-                          <IconBuilding className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">Station:</span>
-                          <span className="font-medium">{ticket.station_id}</span>
+                          <IconClock className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Resolved at:</span>
+                          <span className="font-medium">
+                            {new Date(ticket.resolved_at).toLocaleDateString('en-US', { 
+                              year: 'numeric',
+                              month: 'short', 
+                              day: 'numeric',
+                              timeZone: 'Asia/Manila'
+                            })} • {new Date(ticket.resolved_at).toLocaleTimeString('en-US', { 
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              timeZone: 'Asia/Manila'
+                            })}
+                          </span>
                         </div>
                       )}
-                   </div>
+                    </div>
                 </div>
                 <div className="px-6">
                   <Separator />
@@ -688,30 +732,58 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
 
               {/* Comment Input */}
               <div className="px-3 pb-3 bg-[#ebebeb] dark:bg-[#0a0a0a]">
-                <div className="flex gap-3 bg-sidebar rounded-lg p-4 border border-[#cecece99] dark:border-border">
-                  <Avatar className="h-8 w-8 flex-shrink-0">
-                    <AvatarImage src="" alt="Current User" />
-                    <AvatarFallback className="text-xs">CU</AvatarFallback>
-                  </Avatar>
+                <div className="flex gap-2">
                   <div className="flex-1">
                     <form onSubmit={handleCommentSubmit}>
-                      <Input 
-                        placeholder="Write a comment..." 
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        className="text-sm"
-                        disabled={isSubmittingComment}
-                      />
+                      <div className={`border rounded-lg bg-sidebar overflow-hidden transition-all duration-300 ease-in-out [&>*]:border-none [&>*]:outline-none [&>textarea]:transition-all [&>textarea]:duration-300 [&>textarea]:ease-in-out ${
+                        (isCommentFocused || comment.trim()) 
+                          ? 'border-muted-foreground' 
+                          : 'border-border'
+                      }`}>
+                        <textarea 
+                          ref={commentTextareaRef}
+                          placeholder="Write a comment..." 
+                          value={comment}
+                          onChange={(e) => {
+                            setComment(e.target.value)
+                            // Auto-resize the textarea
+                            e.target.style.height = 'auto'
+                            e.target.style.height = e.target.scrollHeight + 'px'
+                          }}
+                          onFocus={(e) => {
+                            console.log('Comment focused, setting isCommentFocused to true')
+                            setIsCommentFocused(true)
+                          }}
+                          onBlur={(e) => {
+                            console.log('Comment blurred, setting isCommentFocused to false')
+                            setIsCommentFocused(false)
+                          }}
+                          className="w-full resize-none border-0 bg-transparent text-foreground px-3 py-2 shadow-none text-sm focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:text-foreground placeholder:text-muted-foreground align-middle transition-all duration-300 ease-in-out min-h-[36px] overflow-hidden"
+                          disabled={isSubmittingComment}
+                          rows={1}
+                          tabIndex={-1}
+                        />
+                        
+                        {/* Send button - only show when expanded, inside the textarea container */}
+                        {(isCommentFocused || comment.trim()) && (
+                          <div className="p-1 flex justify-end animate-in fade-in duration-300">
+                            <button
+                              type="submit"
+                              onClick={handleCommentSubmit}
+                              disabled={!comment.trim() || isSubmittingComment}
+                              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                            >
+                              {isSubmittingComment ? (
+                                <IconClock className="h-3 w-3 text-muted-foreground animate-spin" />
+                                ) : (
+                                <SendHorizontal className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </form>
                   </div>
-                  <Button 
-                    size="sm" 
-                    className="rounded-lg" 
-                    onClick={handleCommentSubmit}
-                    disabled={!comment.trim() || isSubmittingComment}
-                  >
-                    {isSubmittingComment ? 'Sending...' : 'Send'}
-                  </Button>
                 </div>
               </div>
             </div>
