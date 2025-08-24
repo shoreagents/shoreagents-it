@@ -1632,7 +1632,7 @@ export default function TicketsPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                       </svg>
                     </Button>
-                    <div className="px-3 py-1 border-x border-border">
+                    <div className="px-3 py-1">
                       <span className="text-sm font-medium text-foreground min-w-[50px] text-center block">
                         {Math.round(zoomLevel * 100)}%
                       </span>
@@ -1663,32 +1663,7 @@ export default function TicketsPage() {
                     loading={loading}
                   />
                   
-                  {/* Migration Button - Remove after running once */}
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      try {
-                        const response = await fetch('/api/tickets/migrate-positions', {
-                          method: 'POST'
-                        })
-                        const result = await response.json()
-                        if (response.ok) {
-                          console.log('✅ Migration successful:', result)
-                          alert(`Migration successful! Updated ${result.totalUpdated} tickets`)
-                          fetchTickets() // Refresh to see new positions
-                        } else {
-                          console.error('❌ Migration failed:', result)
-                          alert('Migration failed: ' + result.error)
-                        }
-                      } catch (error) {
-                        console.error('❌ Migration error:', error)
-                        alert('Migration error: ' + error)
-                      }
-                    }}
-                    className="text-xs"
-                  >
-                    Migrate Positions
-                  </Button>
+
                 </div>
               </div>
 

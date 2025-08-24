@@ -1605,7 +1605,7 @@ export default function BPOCApplicantsPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                       </svg>
                     </Button>
-                    <div className="px-3 py-1 border-x border-border">
+                    <div className="px-3 py-1">
                       <span className="text-sm font-medium text-foreground min-w-[50px] text-center block">
                         {Math.round(zoomLevel * 100)}%
                       </span>

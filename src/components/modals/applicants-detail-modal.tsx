@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -216,106 +216,28 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
   // Editable input values
   const [inputValues, setInputValues] = useState<Record<string, string>>({})
   const [isSaving, setIsSaving] = useState(false)
-  const [savedField, setSavedField] = useState<string | null>(null)
-  
-  // Track which field is being edited
-  const [editingField, setEditingField] = useState<string | null>(null)
-  
-  // Track which fields were successfully saved
-  const [savedFields, setSavedFields] = useState<Set<string>>(new Set())
-  
   // Store original values for change detection
   const [originalValues, setOriginalValues] = useState<Record<string, string>>({})
   
-  // Batch update functionality
-  const [pendingUpdates, setPendingUpdates] = useState<Record<string, string>>({})
-  
-  // Batch save function for immediate saves
-  const handleBatchSave = async (updates: Record<string, string>) => {
-    if (!applicant || isSaving) return
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = useMemo(() => {
+    if (!applicant) return false
     
-    try {
-      setIsSaving(true)
-      console.log('🔄 Starting batch save for fields:', Object.keys(updates))
+    return Object.keys(inputValues).some(fieldName => {
+      const currentValue = inputValues[fieldName]
+      const originalValue = originalValues[fieldName]
       
-      // Convert salary fields to numbers for the API
-      const processedUpdates: Record<string, any> = {}
-      Object.entries(updates).forEach(([key, value]) => {
-        if (key === 'current_salary' || key === 'expected_monthly_salary') {
-          // Convert empty string to null, otherwise to number
-          const numValue = value === '' ? null : parseFloat(value)
-          processedUpdates[key] = numValue
-        } else {
-          processedUpdates[key] = value
-        }
-      })
-      
-      // Call API to update multiple fields at once
-      const response = await fetch(`/api/bpoc`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: applicant.id,
-          ...processedUpdates
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to update fields: ${response.statusText}`)
+      if (fieldName === 'current_salary' || fieldName === 'expected_monthly_salary') {
+        // For salary fields, compare numeric values
+        const currentNumeric = currentValue === '' ? null : parseFloat(currentValue)
+        const originalNumeric = originalValue === '' ? null : parseFloat(originalValue)
+        return currentNumeric !== originalNumeric
+      } else {
+        // For other fields, compare string values
+        return currentValue !== originalValue
       }
-
-      const result = await response.json()
-      console.log(`✅ Batch update successful:`, result)
-      
-      // Clear pending updates after successful save
-      setPendingUpdates({})
-      console.log('✅ Cleared pending updates')
-      
-      // Track which fields were successfully saved
-      const updatedFieldNames = Object.keys(updates)
-      setSavedFields(prev => new Set([...prev, ...updatedFieldNames]))
-      
-      // Update original values after successful save
-      setOriginalValues(prev => ({
-        ...prev,
-        ...updates
-      }))
-      console.log('✅ Updated original values after save')
-      
-      // Show success feedback for all updated fields
-      const fieldNames = Object.keys(updates).map(name => name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))
-      setSavedField(fieldNames.join(', '))
-      
-      // Clear success states after 2 seconds
-      setTimeout(() => {
-        setSavedFields(prev => {
-          const newSet = new Set(prev)
-          updatedFieldNames.forEach(field => newSet.delete(field))
-          return newSet
-        })
-        setSavedField(null)
-      }, 2000)
-      
-    } catch (error) {
-      console.error(`❌ Error in batch update:`, error)
-      // Clear pending updates on error to stop showing spinners
-      setPendingUpdates({})
-      console.log('❌ Cleared pending updates due to error')
-      
-      // Revert the input values on error
-      setInputValues(prev => ({
-        ...prev,
-        ...Object.fromEntries(
-          Object.keys(updates).map(key => [key, (applicant as any)[key] || ''])
-        )
-      }))
-    } finally {
-      setIsSaving(false)
-      console.log('✅ Batch save completed, isSaving set to false')
-    }
-  }
+    })
+  }, [inputValues, originalValues, applicant])
   
   // Real-time updates for applicant data
   const { isConnected: isRealtimeConnected } = useRealtimeApplicants({
@@ -345,9 +267,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
         // Update input values immediately (no delay)
         setInputValues(newValues)
         
-        // Show a notification that data was updated
-        setSavedField('realtime_update')
-        setTimeout(() => setSavedField(null), 3000)
+
       } else {
         console.log('🔄 Real-time: Update not for current applicant, skipping')
       }
@@ -365,91 +285,14 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     }
   }, [])
 
-  // Debug: Monitor pendingUpdates state changes
-  useEffect(() => {
-    console.log('📊 pendingUpdates state changed:', pendingUpdates)
-  }, [pendingUpdates])
 
-  // Debug: Monitor savedFields state changes
-  useEffect(() => {
-    console.log('📊 savedFields state changed:', Array.from(savedFields))
-  }, [savedFields])
 
-  // Immediate save function for instant saving
-  const handleImmediateSave = useCallback((fieldName: string) => {
-    const value = inputValues[fieldName]
-    if (!applicant) return
-    
-    // Check if value has actually changed against original values
-    const originalValue = originalValues[fieldName]
-    let hasChanged = false
-    
-    if (fieldName === 'current_salary' || fieldName === 'expected_monthly_salary') {
-      // For salary fields, compare numeric values
-      const currentNumeric = value === '' ? null : parseFloat(value.replace(/,/g, ''))
-      const originalNumeric = originalValue === '' ? null : parseFloat(originalValue.replace(/,/g, ''))
-      hasChanged = currentNumeric !== originalNumeric
-      console.log(`🔢 Salary comparison for ${fieldName}:`, { current: currentNumeric, original: originalNumeric, hasChanged })
-    } else {
-      // For other fields, compare string values
-      const currentString = value || ''
-      const originalString = originalValue || ''
-      hasChanged = currentString !== originalString
-      console.log(`📝 String comparison for ${fieldName}:`, { current: currentString, original: originalString, hasChanged })
-    }
-    
-    if (!hasChanged) {
-      console.log(`⏭️ Skipping save for ${fieldName} - value unchanged:`, { current: value, original: originalValue })
-      return
-    }
-    
-    console.log(`🚀 Immediate save triggered for ${fieldName}:`, value)
-    
-    // Add to pending updates to show spinner
-    setPendingUpdates(prev => ({ ...prev, [fieldName]: value }))
-    console.log(`📝 Added ${fieldName} to pending updates`)
-    
-    // Save immediately
-    handleBatchSave({ [fieldName]: value })
-  }, [inputValues, applicant, originalValues, pendingUpdates])
 
-  // Save on blur function - saves immediately when leaving input
-  const handleBlurSave = useCallback((fieldName: string) => {
-    const value = inputValues[fieldName]
-    if (!applicant) return
-    
-    // Check if value has actually changed against original values
-    const originalValue = originalValues[fieldName]
-    let hasChanged = false
-    
-    if (fieldName === 'current_salary' || fieldName === 'expected_monthly_salary') {
-      // For salary fields, compare numeric values
-      const currentNumeric = value === '' ? null : parseFloat(value.replace(/,/g, ''))
-      const originalNumeric = originalValue === '' ? null : parseFloat(originalValue.replace(/,/g, ''))
-      hasChanged = currentNumeric !== originalNumeric
-      console.log(`🔢 Salary comparison for ${fieldName}:`, { current: currentNumeric, original: originalNumeric, hasChanged })
-    } else {
-      // For other fields, compare string values
-      const currentString = value || ''
-      const originalString = originalValue || ''
-      hasChanged = currentString !== originalString
-      console.log(`📝 String comparison for ${fieldName}:`, { current: currentString, original: originalString, hasChanged })
-    }
-    
-    if (!hasChanged) {
-      console.log(`⏭️ Skipping save for ${fieldName} - value unchanged:`, { current: value, original: originalValue })
-      return
-    }
-    
-    console.log(`👁️ Blur save triggered for ${fieldName}:`, value)
-    
-    // Add to pending updates to show spinner
-    setPendingUpdates(prev => ({ ...prev, [fieldName]: value }))
-    console.log(`📝 Added ${fieldName} to pending updates`)
-    
-    // Save immediately
-    handleBatchSave({ [fieldName]: value })
-  }, [inputValues, applicant, originalValues, pendingUpdates])
+
+
+
+
+
 
 
   // Define status options for applicants
@@ -572,84 +415,8 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
   }
 
   // Handle saving input values
-  const handleInputSave = async (fieldName: string) => {
-    if (!applicant || isSaving) return
-    
-    const value = inputValues[fieldName]
-    if (value === undefined) return
-    
-    try {
-      setIsSaving(true)
-      
-      // Convert salary fields to numbers for the API
-      let processedValue: any = value
-      if (fieldName === 'current_salary' || fieldName === 'expected_monthly_salary') {
-        processedValue = value === '' ? null : parseFloat(value)
-      }
-      
-      // Debug: Log what we're sending
-      const requestBody = {
-        id: applicant.id, // Use the primary key ID
-        [fieldName]: processedValue
-      }
-      console.log('🔍 Sending PUT request:', {
-        url: '/api/bpoc',
-        method: 'PUT',
-        body: requestBody,
-        applicantId: applicant.applicant_id,
-        applicantPrimaryId: applicant.id
-      })
-      
-      // Call API to update the field
-      const response = await fetch(`/api/bpoc`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      })
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`❌ Response not OK:`, {
-          status: response.status,
-          statusText: response.statusText,
-          errorText
-        })
-        throw new Error(`Failed to update ${fieldName}: ${response.status} ${response.statusText}`)
-      }
 
-      const result = await response.json()
-      console.log(`✅ ${fieldName} updated successfully:`, result)
-      
-      // Update local state with the updated applicant data
-      if (applicant && result.applicant) {
-        // Update the specific field in the applicant object
-        (applicant as any)[fieldName] = processedValue
-        
-        // Also update the inputValues to reflect the saved state
-        setInputValues(prev => ({
-          ...prev,
-          [fieldName]: value
-        }))
-      }
-      
-      // Show success feedback (you could add a toast notification here)
-      setSavedField(fieldName)
-      setTimeout(() => setSavedField(null), 2000) // Hide after 2 seconds
-      
-    } catch (error) {
-      console.error(`❌ Error updating ${fieldName}:`, error)
-      // Revert the input value on error
-      setInputValues(prev => ({
-        ...prev,
-        [fieldName]: (applicant as any)[fieldName] || ''
-      }))
-      // You could show an error toast here
-    } finally {
-      setIsSaving(false)
-    }
-  }
 
   // Format number with commas and hide unnecessary decimals
   const formatNumber = (value: string | number | null): string => {
@@ -725,13 +492,126 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     }
   }
 
+  // Auto-save function that can be called before closing
+  const autoSaveBeforeClose = async (): Promise<boolean> => {
+    if (!applicant || !hasUnsavedChanges) {
+      return true // No need to save, can close
+    }
+
+    try {
+      console.log('🔄 Auto-saving changes before closing...')
+      setIsSaving(true)
+      
+      // Get all fields that have been changed
+      const changedFields: Record<string, string> = {}
+      Object.keys(inputValues).forEach(fieldName => {
+        const currentValue = inputValues[fieldName]
+        const originalValue = originalValues[fieldName]
+        
+        if (fieldName === 'current_salary' || fieldName === 'expected_monthly_salary') {
+          // For salary fields, compare numeric values
+          const currentNumeric = currentValue === '' ? null : parseFloat(currentValue)
+          const originalNumeric = originalValue === '' ? null : parseFloat(originalValue)
+          if (currentNumeric !== originalNumeric) {
+            changedFields[fieldName] = currentValue
+          }
+        } else {
+          // For other fields, compare string values
+          if (currentValue !== originalValue) {
+            changedFields[fieldName] = currentValue
+          }
+        }
+      })
+      
+      // Convert salary fields to numbers for the API
+      const processedUpdates: Record<string, any> = {}
+      Object.entries(changedFields).forEach(([key, value]) => {
+        if (key === 'current_salary' || key === 'expected_monthly_salary') {
+          // Convert empty string to null, otherwise to number
+          const numValue = value === '' ? null : parseFloat(value)
+          processedUpdates[key] = numValue
+        } else {
+          processedUpdates[key] = value
+        }
+      })
+      
+      // Call API to update multiple fields at once
+      const response = await fetch(`/api/bpoc`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: applicant.id,
+          ...processedUpdates
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to update fields: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      console.log(`✅ Auto-save completed successfully:`, result)
+      
+      // Update original values after successful save
+      setOriginalValues(prev => ({
+        ...prev,
+        ...changedFields
+      }))
+      
+      return true
+    } catch (error) {
+      console.error(`❌ Auto-save failed:`, error)
+      return false
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Modified close handler with auto-save
+  const handleClose = async () => {
+    console.log('🔒 handleClose called:', { 
+      applicant: applicant?.id, 
+      hasUnsavedChanges, 
+      isOpen
+    })
+    
+    if (applicant && hasUnsavedChanges) {
+      // Auto-save changes before closing
+      try {
+        console.log('🔄 Auto-saving changes before close...')
+        const saveSuccess = await autoSaveBeforeClose()
+        
+        if (saveSuccess) {
+          console.log('✅ Changes saved successfully, closing modal')
+          onClose() // Call the original onClose prop
+        } else {
+          // Don't close if save failed
+          console.error('❌ Failed to save changes')
+          alert('Failed to save changes. Please try again.')
+          return
+        }
+      } catch (error) {
+        // Don't close if save failed
+        console.error('❌ Failed to save changes:', error)
+        alert('Failed to save changes. Please try again.')
+        return
+      }
+    } else {
+      // No unsaved changes, just close
+      console.log('🔒 Closing without auto-save - no changes detected')
+      onClose() // Call the original onClose prop
+    }
+  }
+
 
 
 
 
   return (
     <TooltipProvider>
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent 
           className="max-w-7xl max-h-[95vh] overflow-hidden p-0 rounded-xl" 
           style={{ 
@@ -1212,11 +1092,9 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                         const newValue = shiftOption.value
                                         console.log(`💾 Saving shift with new value: "${newValue}"`)
                                         
-                                        // Add to pending updates to show spinner
-                                        setPendingUpdates(prev => ({ ...prev, shift: newValue }))
+
                                         
-                                        // Save immediately with the new value
-                                        handleBatchSave({ shift: newValue })
+
                                       } else {
                                         console.log(`⏭️ Shift value unchanged: "${shiftOption.value}"`)
                                       }
@@ -1239,8 +1117,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                         fieldName="current_salary"
                         value={formatNumber(inputValues.current_salary)}
                         onSave={handleInputChange}
-                        onBlur={() => handleBlurSave('current_salary')}
-                        onKeyDown={(e) => e.key === 'Enter' && handleImmediateSave('current_salary')}
+                        
                       />
                       
                       {/* Expected Salary */}
@@ -1250,8 +1127,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                         fieldName="expected_monthly_salary"
                         value={formatNumber(inputValues.expected_monthly_salary)}
                         onSave={handleInputChange}
-                        onBlur={() => handleBlurSave('expected_monthly_salary')}
-                        onKeyDown={(e) => e.key === 'Enter' && handleImmediateSave('expected_monthly_salary')}
+                        
                       />
                       
                       {/* Video Introduction */}
@@ -1261,8 +1137,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                         fieldName="video_introduction_url"
                         value={inputValues.video_introduction_url || ''}
                         onSave={handleInputChange}
-                        onBlur={() => handleBlurSave('video_introduction_url')}
-                        onKeyDown={(e) => e.key === 'Enter' && handleImmediateSave('video_introduction_url')}
+                        
                         isLast={true}
                       />
                     </div>

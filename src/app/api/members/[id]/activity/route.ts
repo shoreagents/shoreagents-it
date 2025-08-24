@@ -20,8 +20,8 @@ export async function GET(
     const action = searchParams.get('action') || null
     const offset = (page - 1) * limit
 
-    // Build the query
-    let query = `
+    // Fetch activity logs
+    let activityQuery = `
       SELECT 
         mal.id,
         mal.member_id,
@@ -30,65 +30,105 @@ export async function GET(
         mal.new_value,
         mal.action,
         mal.created_at,
-        u.first_name || ' ' || u.last_name as user_name
+        mal.user_id,
+        COALESCE(pi.first_name || ' ' || pi.last_name, u.email) as user_name
       FROM public.members_activity_log mal
       LEFT JOIN public.users u ON mal.user_id = u.id
+      LEFT JOIN public.personal_info pi ON u.id = pi.user_id
       WHERE mal.member_id = $1
     `
-    
-    const queryParams: any[] = [memberId]
-    let paramIndex = 1
 
     if (action) {
-      paramIndex++
-      query += ` AND mal.action = $${paramIndex}`
-      queryParams.push(action)
+      activityQuery += ` AND mal.action = $2`
     }
 
-    // Get total count
+    // Fetch comments
+    const commentsQuery = `
+      SELECT 
+        mc.id,
+        mc.comment,
+        mc.created_at,
+        mc.user_id,
+        COALESCE(pi.first_name || ' ' || pi.last_name, u.email) as user_name,
+        pi.profile_picture
+      FROM public.member_comments mc
+      LEFT JOIN public.users u ON mc.user_id = u.id
+      LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+      WHERE mc.member_id = $1
+    `
+
+    // Get total count for both activities and comments
     const countQuery = `
-      SELECT COUNT(*) as total
-      FROM public.members_activity_log mal
-      WHERE mal.member_id = $1
-      ${action ? 'AND mal.action = $2' : ''}
+      SELECT 
+        (SELECT COUNT(*) FROM public.members_activity_log WHERE member_id = $1 ${action ? 'AND action = $2' : ''}) as activity_count,
+        (SELECT COUNT(*) FROM public.member_comments WHERE member_id = $1) as comment_count
     `
     
     const countResult = await pool.query(countQuery, action ? [memberId, action] : [memberId])
-    const totalCount = parseInt(countResult.rows[0]?.total || '0', 10)
+    const totalActivityCount = parseInt(countResult.rows[0]?.activity_count || '0', 10)
+    const totalCommentCount = parseInt(countResult.rows[0]?.comment_count || '0', 10)
+    const totalCount = totalActivityCount + totalCommentCount
 
-    // Get paginated results
-    query += ` ORDER BY mal.created_at DESC LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}`
-    queryParams.push(limit, offset)
-
-    const result = await pool.query(query, queryParams)
+    // Get ALL activities and comments for this member (we'll paginate after combining)
+    const activityResult = await pool.query(activityQuery, action ? [memberId, action] : [memberId])
+    const commentsResult = await pool.query(commentsQuery, [memberId])
     
-    // Format the response
-    const activities = result.rows.map(row => ({
-      id: row.id,
+    // Format activities
+    const activities = activityResult.rows.map(row => ({
+      id: `activity_${row.id}`,
+      type: 'activity' as const,
       action: row.action,
       fieldName: row.field_name,
       oldValue: row.old_value,
       newValue: row.new_value,
       createdAt: row.created_at,
-      userName: row.user_name
+      userName: row.user_name,
+      userId: row.user_id
     }))
+    
+    // Format comments
+    const comments = commentsResult.rows.map(row => ({
+      id: `comment_${row.id}`,
+      type: 'comment' as const,
+      comment: row.comment,
+      createdAt: row.created_at,
+      userName: row.user_name,
+      userId: row.user_id,
+      profilePicture: row.profile_picture
+    }))
+    
+    // Combine and sort by timestamp (oldest first - chronological order)
+    const allEntries = [...activities, ...comments].sort((a, b) => 
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    )
+    
+    // Apply pagination to combined results
+    const paginatedEntries = allEntries.slice(offset, offset + limit)
+    
+    // Debug logging
+    console.log('🔍 Activity logs found:', activities.length)
+    console.log('🔍 Comments found:', comments.length)
+    console.log('🔍 Total combined entries:', allEntries.length)
+    console.log('🔍 Paginated entries:', paginatedEntries.length)
 
     const totalPages = Math.ceil(totalCount / limit)
 
     return NextResponse.json({
-      activities,
+      entries: paginatedEntries,
       pagination: {
         page,
         limit,
         totalCount,
-        totalPages
+        totalPages,
+        activityCount: totalActivityCount,
+        commentCount: totalCommentCount
       }
     })
 
   } catch (error) {
-    console.error('Error fetching member activity:', error)
+    console.error('Error fetching member activity and comments:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch member activity' },
+      { error: 'Failed to fetch member activity and comments' },
       { status: 500 }
     )
   }

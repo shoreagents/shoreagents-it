@@ -352,9 +352,6 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                     <Badge className="text-xs h-6 flex items-center rounded-[6px]">
                       Ticket
                     </Badge>
-                    <span className="text-lg font-mono text-primary">
-                      {ticket.ticket_id}
-                    </span>
                   </div>
                </div>
 
@@ -464,6 +461,22 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                 </Badge>
                       </div>
                       
+                      {/* Dates */}
+                      <div className="flex items-center gap-2">
+                        <IconCalendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Filed at:</span>
+                        <span className="font-medium">{createdDate.date} • {createdDate.time}</span>
+                      </div>
+                      
+                      {/* Ticket ID */}
+                      <div className="flex items-center gap-2">
+                        <IconId className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Ticket ID:</span>
+                        <span className="font-mono font-medium text-primary">
+                          {ticket.ticket_id}
+                        </span>
+                      </div>
+                      
                       {/* Station */}
                       {ticket.station_id && (
                         <div className="flex items-center gap-2">
@@ -472,13 +485,6 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                           <span className="font-medium">{ticket.station_id}</span>
                         </div>
                       )}
-                      
-                      {/* Dates */}
-                      <div className="flex items-center gap-2">
-                        <IconCalendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Filed at:</span>
-                        <span className="font-medium">{createdDate.date} • {createdDate.time}</span>
-                      </div>
                    </div>
                 </div>
                 <div className="px-6">
@@ -674,9 +680,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                       })
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
-                        <IconMessage className="h-12 w-12 mx-auto mb-2 opacity-50" />
                         <p className="text-sm">No Comments Yet</p>
-                        <p className="text-xs">Be the first to add a comment!</p>
                       </div>
                     )}
                   </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMembersPaginated, getAgentsByMember, getClientsByMember, createMemberCompany } from '@/lib/db-utils'
 import { createServiceClient } from '@/lib/supabase/server'
+import { MembersActivityLogger } from '@/lib/logs-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,12 +47,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🚀🚀🚀 API ROUTE EXECUTED - POST /api/members 🚀🚀🚀')
     console.log('API: Starting member creation...')
     console.log('API: Request URL:', request.url)
     console.log('API: Request method:', request.method)
     console.log('API: Request headers:', Object.fromEntries(request.headers.entries()))
     
     const formData = await request.formData()
+    
+    // Debug: Log all FormData entries
+    console.log('🔍 All FormData entries:')
+    for (let [key, value] of formData.entries()) {
+      console.log(`  ${key}: ${value}`)
+    }
     
     // Extract form data
     const company = formData.get('company') as string
@@ -63,6 +71,17 @@ export async function POST(request: NextRequest) {
     const logo = formData.get('logo') as File | null
     const badge_color = formData.get('badge_color') as string
     const status = formData.get('status') as string
+    
+    console.log('🔍 API extracted form data:')
+    console.log('  company:', company)
+    console.log('  address:', address)
+    console.log('  phone:', phone)
+    console.log('  country:', country)
+    console.log('  service:', service)
+    console.log('  website:', website)
+    console.log('  logo:', logo ? `File: ${logo.name}` : 'none')
+    console.log('  badge_color:', badge_color)
+    console.log('  status:', status)
     
     console.log('API: Form data extracted:', {
       company,
@@ -80,13 +99,29 @@ export async function POST(request: NextRequest) {
     if (!company) {
       return NextResponse.json({ error: 'Company name is required' }, { status: 400 })
     }
+    
+    // Validate status field
+    if (status && status !== 'Current Client' && status !== 'Lost Client') {
+      console.log('API: Invalid status value:', status)
+      return NextResponse.json({ error: 'Invalid status value' }, { status: 400 })
+    }
+    
+    // Set default values if not provided
+    const finalBadgeColor = badge_color || '#0EA5E9'
+    const finalStatus: 'Current Client' | 'Lost Client' = status as 'Current Client' | 'Lost Client' || 'Current Client'
+    
+    console.log('API: Final values for database:')
+    console.log('  badge_color:', finalBadgeColor)
+    console.log('  status:', finalStatus)
 
-    // Validate status enum values
-    const validStatuses = ['Current Client', 'Lost Client']
-    if (status && !validStatuses.includes(status)) {
-      return NextResponse.json({ 
-        error: 'Invalid status value. Must be one of: ' + validStatuses.join(', ') 
-      }, { status: 400 })
+    // Validate status enum values if provided
+    if (status) {
+      const validStatuses = ['Current Client', 'Lost Client']
+      if (!validStatuses.includes(status)) {
+        return NextResponse.json({ 
+          error: 'Invalid status value. Must be one of: ' + validStatuses.join(', ') 
+        }, { status: 400 })
+      }
     }
 
     // Handle logo upload if provided
@@ -144,6 +179,10 @@ export async function POST(request: NextRequest) {
           logoUrl = urlData.publicUrl
           console.log('Logo uploaded successfully to:', fullPath)
           console.log('Public URL:', logoUrl)
+          console.log('🔍 Logo URL details:')
+          console.log('  - URL length:', logoUrl?.length)
+          console.log('  - URL starts with http:', logoUrl?.startsWith('http'))
+          console.log('  - URL includes supabase:', logoUrl?.includes('supabase'))
           
           // Verify the URL was generated
           if (!logoUrl) {
@@ -159,9 +198,21 @@ export async function POST(request: NextRequest) {
         logoUrl = null
       }
     }
+    
+    console.log('🔍 After logo processing:')
+    console.log('  logoUrl final value:', logoUrl)
+    console.log('  logoUrl type:', typeof logoUrl)
+    console.log('  logoUrl truthy:', !!logoUrl)
 
     // Prepare website data (convert to array format as per schema)
     const websiteArray = website ? [website] : []
+    
+    console.log('🔍 Website logging check:')
+    console.log('  website:', website)
+    console.log('  website type:', typeof website)
+    console.log('  website truthy:', !!website)
+    console.log('  websiteArray:', websiteArray)
+    console.log('  websiteArray length:', websiteArray.length)
 
     // Format service field for consistency (capitalize first letter of each word)
     const formattedService = service ? service
@@ -170,7 +221,10 @@ export async function POST(request: NextRequest) {
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ') : null
 
-    console.log('API: Attempting database insertion via db-utils...')
+    // Get user ID from request headers (sent by frontend)
+    const userId = request.headers.get('x-user-id')
+    const currentUserId = userId ? parseInt(userId, 10) : undefined
+    
     const memberData = await createMemberCompany({
       company,
       address,
@@ -179,9 +233,77 @@ export async function POST(request: NextRequest) {
       service: formattedService,
       website: websiteArray,
       logo: logoUrl,
-      badge_color: badge_color && badge_color.trim() !== '' ? badge_color : undefined,
-      status: status as 'Current Client' | 'Lost Client',
+      badge_color: finalBadgeColor,
+      status: finalStatus,
+      created_by: currentUserId
     })
+
+    // Log company creation activity
+    try {
+      await MembersActivityLogger.logCompanyCreated(memberData.id, company, memberData.created_by || null)
+      
+      // Log initial field values if they exist
+      if (address && address.trim()) {
+        await MembersActivityLogger.logFieldSet(memberData.id, 'Address', address, memberData.created_by || null)
+      }
+      if (phone && phone.trim()) {
+        await MembersActivityLogger.logFieldSet(memberData.id, 'Phone', phone, memberData.created_by || null)
+      }
+      if (country && country.trim()) {
+        await MembersActivityLogger.logFieldSet(memberData.id, 'Country', country, memberData.created_by || null)
+      }
+      if (formattedService && formattedService.trim()) {
+        await MembersActivityLogger.logFieldSet(memberData.id, 'Service', formattedService, memberData.created_by || null)
+      }
+      if (websiteArray.length > 0) {
+        console.log('✅ Logging website to activity log:', websiteArray.join(', '))
+        try {
+          const logResult = await MembersActivityLogger.logFieldSet(memberData.id, 'Website', websiteArray.join(', '), memberData.created_by || null)
+          console.log('✅ Website logged successfully:', logResult)
+        } catch (logError) {
+          console.error('❌ Error logging website:', logError)
+        }
+      } else {
+        console.log('❌ No website to log - websiteArray is empty')
+      }
+      
+      // Log logo if it was uploaded
+      console.log('🔍 Logo logging check:')
+      console.log('  logoUrl:', logoUrl)
+      console.log('  logoUrl type:', typeof logoUrl)
+      console.log('  logoUrl truthy:', !!logoUrl)
+      console.log('  logoUrl length:', logoUrl?.length)
+      console.log('  logoUrl includes http:', logoUrl?.includes('http'))
+      
+      if (logoUrl && logoUrl.trim()) {
+        // Create a shortened, user-friendly version of the URL
+        const urlParts = logoUrl.split('/')
+        const fileName = urlParts[urlParts.length - 1] || 'logo'
+        const shortenedUrl = fileName
+        
+        console.log('✅ Logging logo to activity log:', shortenedUrl)
+        try {
+          const logResult = await MembersActivityLogger.logFieldSet(memberData.id, 'Logo', shortenedUrl, memberData.created_by || null)
+          console.log('✅ Logo logged successfully:', logResult)
+        } catch (logError) {
+          console.error('❌ Error logging logo:', logError)
+        }
+      } else {
+        console.log('❌ No logo to log - logoUrl is falsy or empty')
+      }
+      
+      // Log badge_color and status if they were set
+      if (finalBadgeColor) {
+        await MembersActivityLogger.logFieldSet(memberData.id, 'Badge Color', finalBadgeColor, memberData.created_by || null)
+      }
+      if (finalStatus) {
+        await MembersActivityLogger.logFieldSet(memberData.id, 'Status', finalStatus, memberData.created_by || null)
+      }
+
+    } catch (loggingError) {
+      console.error('API: Failed to log activity (non-critical):', loggingError)
+      // Don't fail the request if logging fails
+    }
 
     console.log('API: Returning success response')
     return NextResponse.json({ 

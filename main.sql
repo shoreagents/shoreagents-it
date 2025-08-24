@@ -164,14 +164,24 @@ CREATE SEQUENCE public.job_info_id_seq
 	START 1
 	CACHE 1
 	NO CYCLE;
+-- DROP SEQUENCE public.member_comments_id_seq;
+
+CREATE SEQUENCE public.member_comments_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
 -- DROP SEQUENCE public.members_activity_log_id_seq;
--- CREATE SEQUENCE public.members_activity_log_id_seq
--- 	INCREMENT BY 1
--- 	MINVALUE 1
--- 	MAXVALUE 2147483647
--- 	START 1
--- 	CACHE 1
--- 	NO CYCLE;
+
+CREATE SEQUENCE public.members_activity_log_id_seq
+	INCREMENT BY 1
+	MINVALUE 1
+	MAXVALUE 2147483647
+	START 1
+	CACHE 1
+	NO CYCLE;
 -- DROP SEQUENCE public.members_id_seq;
 
 CREATE SEQUENCE public.members_id_seq
@@ -361,8 +371,8 @@ CREATE TABLE public.floor_plans (
 	building text NULL,
 	svg_url text NULL,
 	svg_path text NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT floor_plans_pkey PRIMARY KEY (id)
 );
 
@@ -431,8 +441,8 @@ CREATE TABLE public.roles (
 	id serial4 NOT NULL,
 	"name" text NOT NULL,
 	description text NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT roles_name_key UNIQUE (name),
 	CONSTRAINT roles_pkey PRIMARY KEY (id)
 );
@@ -454,8 +464,8 @@ update
 CREATE TABLE public.ticket_categories (
 	id serial4 NOT NULL,
 	"name" varchar(100) NOT NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT ticket_categories_name_key UNIQUE (name),
 	CONSTRAINT ticket_categories_pkey PRIMARY KEY (id)
 );
@@ -478,8 +488,8 @@ CREATE TABLE public.users (
 	id serial4 NOT NULL,
 	email text NOT NULL,
 	user_type public."user_type_enum" NOT NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT users_email_key UNIQUE (email),
 	CONSTRAINT users_pkey PRIMARY KEY (id)
 );
@@ -550,8 +560,8 @@ CREATE TABLE public.clinic_logs (
 
 CREATE TABLE public.internal (
 	user_id int4 NOT NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT internal_pkey PRIMARY KEY (user_id),
 	CONSTRAINT internal_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
@@ -574,8 +584,8 @@ CREATE TABLE public.internal_roles (
 	id serial4 NOT NULL,
 	internal_user_id int4 NOT NULL,
 	role_id int4 NOT NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT internal_roles_pkey PRIMARY KEY (id),
 	CONSTRAINT unique_internal_role_assignment UNIQUE (internal_user_id, role_id),
 	CONSTRAINT internal_roles_internal_user_id_fkey FOREIGN KEY (internal_user_id) REFERENCES public.internal(user_id) ON DELETE CASCADE,
@@ -637,9 +647,9 @@ CREATE TABLE public.members (
 	logo text NULL,
 	service text NULL,
 	status public."member_status_enum" NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	badge_color text DEFAULT '#3B82F6'::text NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
+	badge_color text NULL,
 	country text NULL,
 	website _text NULL,
 	company_id uuid NOT NULL,
@@ -657,10 +667,6 @@ CREATE INDEX idx_members_status ON public.members USING btree (status);
 
 -- Table Triggers
 
-create trigger update_members_updated_at before
-update
-    on
-    public.members for each row execute function update_updated_at_column();
 create trigger trigger_member_changes after
 insert
     or
@@ -669,6 +675,36 @@ delete
 update
     on
     public.members for each row execute function notify_member_changes();
+create trigger update_members_updated_at before
+update
+    on
+    public.members for each row execute function update_updated_at_column();
+
+
+-- public.members_activity_log definition
+
+-- Drop table
+
+-- DROP TABLE public.members_activity_log;
+
+CREATE TABLE public.members_activity_log (
+	id serial4 NOT NULL,
+	member_id int4 NOT NULL,
+	field_name text NOT NULL,
+	"action" text NOT NULL,
+	old_value text NULL,
+	new_value text NULL,
+	user_id int4 NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	CONSTRAINT members_activity_log_action_check CHECK ((action = ANY (ARRAY['created'::text, 'set'::text, 'updated'::text, 'removed'::text, 'selected'::text, 'deselected'::text]))),
+	CONSTRAINT members_activity_log_pkey PRIMARY KEY (id),
+	CONSTRAINT fk_members_activity_log_member FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE CASCADE,
+	CONSTRAINT fk_members_activity_log_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL
+);
+CREATE INDEX idx_members_activity_log_action ON public.members_activity_log USING btree (action);
+CREATE INDEX idx_members_activity_log_created_at ON public.members_activity_log USING btree (created_at);
+CREATE INDEX idx_members_activity_log_member_id ON public.members_activity_log USING btree (member_id);
+CREATE INDEX idx_members_activity_log_user_id ON public.members_activity_log USING btree (user_id);
 
 
 -- public.personal_info definition
@@ -690,8 +726,8 @@ CREATE TABLE public.personal_info (
 	city text NULL,
 	address text NULL,
 	gender public."gender_enum" NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT personal_info_pkey PRIMARY KEY (id),
 	CONSTRAINT personal_info_user_id_key UNIQUE (user_id),
 	CONSTRAINT personal_info_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
@@ -749,8 +785,8 @@ CREATE TABLE public.stations (
 	assigned_user_id int4 NULL,
 	asset_id varchar(50) NULL,
 	floor_plan_id int4 NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT stations_pkey PRIMARY KEY (id),
 	CONSTRAINT stations_station_id_key UNIQUE (station_id),
 	CONSTRAINT unique_user_per_station UNIQUE (assigned_user_id),
@@ -800,9 +836,9 @@ CREATE TABLE public.tickets (
 	details text NULL,
 	status public."ticket_status_enum" DEFAULT 'For Approval'::ticket_status_enum NOT NULL,
 	resolved_by int4 NULL,
-	resolved_at timestamptz NULL,
-	created_at timestamp DEFAULT (now() AT TIME ZONE 'Asia/Manila'::text) NOT NULL,
-	updated_at timestamp DEFAULT (now() AT TIME ZONE 'Asia/Manila'::text) NOT NULL,
+	resolved_at timestamptz DEFAULT now() NULL,
+	created_at timestamptz DEFAULT now() NOT NULL,
+	updated_at timestamptz DEFAULT now() NOT NULL,
 	"position" int4 DEFAULT 0 NOT NULL,
 	category_id int4 NULL,
 	supporting_files _text DEFAULT '{}'::text[] NULL,
@@ -946,8 +982,8 @@ CREATE TABLE public.departments (
 	"name" text NOT NULL,
 	description text NULL,
 	member_id int4 NOT NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT departments_pkey PRIMARY KEY (id),
 	CONSTRAINT unique_department_id_member UNIQUE (id, member_id),
 	CONSTRAINT unique_department_per_member UNIQUE (name, member_id),
@@ -972,13 +1008,35 @@ CREATE TABLE public.floor_plan_members (
 	id serial4 NOT NULL,
 	floor_plan_id int4 NOT NULL,
 	member_id int4 NOT NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT floor_plan_members_floor_plan_id_member_id_key UNIQUE (floor_plan_id, member_id),
 	CONSTRAINT floor_plan_members_pkey PRIMARY KEY (id),
 	CONSTRAINT floor_plan_members_floor_plan_id_fkey FOREIGN KEY (floor_plan_id) REFERENCES public.floor_plans(id) ON DELETE CASCADE,
 	CONSTRAINT floor_plan_members_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE SET NULL
 );
+
+
+-- public.member_comments definition
+
+-- Drop table
+
+-- DROP TABLE public.member_comments;
+
+CREATE TABLE public.member_comments (
+	id serial4 NOT NULL,
+	member_id int4 NOT NULL,
+	user_id int4 NOT NULL,
+	"comment" text NOT NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
+	CONSTRAINT member_comments_pkey PRIMARY KEY (id),
+	CONSTRAINT member_comments_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE CASCADE,
+	CONSTRAINT member_comments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_member_comments_created_at ON public.member_comments USING btree (created_at);
+CREATE INDEX idx_member_comments_member_id ON public.member_comments USING btree (member_id);
+CREATE INDEX idx_member_comments_user_id ON public.member_comments USING btree (user_id);
 
 
 -- public.recruits_comments definition
@@ -1015,8 +1073,8 @@ CREATE TABLE public.ticket_comments (
 	ticket_id int4 NOT NULL,
 	user_id int4 NOT NULL,
 	"comment" text NOT NULL,
-	created_at timestamp DEFAULT (now() AT TIME ZONE 'Asia/Manila'::text) NOT NULL,
-	updated_at timestamp DEFAULT (now() AT TIME ZONE 'Asia/Manila'::text) NOT NULL,
+	created_at timestamptz DEFAULT now() NOT NULL,
+	updated_at timestamptz DEFAULT now() NOT NULL,
 	CONSTRAINT ticket_comments_pkey PRIMARY KEY (id),
 	CONSTRAINT ticket_comments_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES public.tickets(id) ON DELETE CASCADE,
 	CONSTRAINT ticket_comments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
@@ -1033,8 +1091,8 @@ CREATE TABLE public.agents (
 	user_id int4 NOT NULL,
 	member_id int4 NULL,
 	department_id int4 NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT agents_pkey PRIMARY KEY (user_id),
 	CONSTRAINT agents_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL,
 	CONSTRAINT agents_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE SET NULL,
@@ -1068,15 +1126,15 @@ CREATE TABLE public.break_sessions (
 	id serial4 NOT NULL,
 	agent_user_id int4 NOT NULL,
 	break_type public."break_type_enum" NOT NULL,
-	start_time timestamp DEFAULT (now() AT TIME ZONE 'Asia/Manila'::text) NULL,
-	end_time timestamp NULL,
+	start_time timestamptz DEFAULT now() NULL,
+	end_time timestamptz NULL,
 	duration_minutes int4 NULL,
-	created_at timestamp DEFAULT (now() AT TIME ZONE 'Asia/Manila'::text) NULL,
-	pause_time timestamp NULL,
-	resume_time timestamp NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	pause_time timestamptz NULL,
+	resume_time timestamptz NULL,
 	pause_used bool DEFAULT false NULL,
 	time_remaining_at_pause int4 NULL,
-	break_date date DEFAULT (now() AT TIME ZONE 'Asia/Manila'::text)::date NOT NULL,
+	break_date date DEFAULT now()::date NOT NULL,
 	CONSTRAINT break_sessions_pkey PRIMARY KEY (id),
 	CONSTRAINT chk_pause_resume_order CHECK (((pause_time IS NULL) OR (resume_time IS NULL) OR (pause_time < resume_time))),
 	CONSTRAINT break_sessions_agent_user_id_fkey FOREIGN KEY (agent_user_id) REFERENCES public.agents(user_id) ON DELETE CASCADE
@@ -1093,8 +1151,8 @@ CREATE TABLE public.clients (
 	user_id int4 NOT NULL,
 	member_id int4 NULL,
 	department_id int4 NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT clients_pkey PRIMARY KEY (user_id),
 	CONSTRAINT clients_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL,
 	CONSTRAINT clients_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE SET NULL,
@@ -1135,8 +1193,8 @@ CREATE TABLE public.job_info (
 	staff_source text NULL,
 	start_date date NULL,
 	exit_date date NULL,
-	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	work_email text NULL,
 	CONSTRAINT chk_job_info_employee_type CHECK ((((agent_user_id IS NOT NULL) AND (internal_user_id IS NULL)) OR ((agent_user_id IS NULL) AND (internal_user_id IS NOT NULL)))),
 	CONSTRAINT job_info_employee_id_key UNIQUE (employee_id),
@@ -1602,6 +1660,15 @@ CREATE OR REPLACE FUNCTION public.pgp_key_id(bytea)
 AS '$libdir/pgcrypto', $function$pgp_key_id_w$function$
 ;
 
+-- DROP FUNCTION public.pgp_pub_decrypt(bytea, bytea, text);
+
+CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt(bytea, bytea, text)
+ RETURNS text
+ LANGUAGE c
+ IMMUTABLE PARALLEL SAFE STRICT
+AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$
+;
+
 -- DROP FUNCTION public.pgp_pub_decrypt(bytea, bytea, text, text);
 
 CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt(bytea, bytea, text, text)
@@ -1614,15 +1681,6 @@ AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$
 -- DROP FUNCTION public.pgp_pub_decrypt(bytea, bytea);
 
 CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt(bytea, bytea)
- RETURNS text
- LANGUAGE c
- IMMUTABLE PARALLEL SAFE STRICT
-AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$
-;
-
--- DROP FUNCTION public.pgp_pub_decrypt(bytea, bytea, text);
-
-CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt(bytea, bytea, text)
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1692,18 +1750,18 @@ CREATE OR REPLACE FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea)
 AS '$libdir/pgcrypto', $function$pgp_pub_encrypt_bytea$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_decrypt(bytea, text, text);
+-- DROP FUNCTION public.pgp_sym_decrypt(bytea, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt(bytea, text, text)
+CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt(bytea, text)
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
 AS '$libdir/pgcrypto', $function$pgp_sym_decrypt_text$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_decrypt(bytea, text);
+-- DROP FUNCTION public.pgp_sym_decrypt(bytea, text, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt(bytea, text)
+CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt(bytea, text, text)
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1728,18 +1786,18 @@ CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt_bytea(bytea, text)
 AS '$libdir/pgcrypto', $function$pgp_sym_decrypt_bytea$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_encrypt(text, text);
+-- DROP FUNCTION public.pgp_sym_encrypt(text, text, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt(text, text)
+CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt(text, text, text)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT
 AS '$libdir/pgcrypto', $function$pgp_sym_encrypt_text$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_encrypt(text, text, text);
+-- DROP FUNCTION public.pgp_sym_encrypt(text, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt(text, text, text)
+CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt(text, text)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT
@@ -1789,7 +1847,7 @@ CREATE OR REPLACE FUNCTION public.update_updated_at_column()
  LANGUAGE plpgsql
 AS $function$
 BEGIN
-    NEW.updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila');
+    NEW.updated_at = now();  -- ✅ Use UTC (now() returns UTC)
     RETURN NEW;
 END;
 $function$

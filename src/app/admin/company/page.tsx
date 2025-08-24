@@ -588,7 +588,18 @@ export default function CompaniesPage() {
         companyToEdit={companyToEdit}
         onCompanyAdded={(company) => {
           console.log('Company saved:', company)
-          // Real-time updates handle the refresh automatically
+          
+          // Real-time updates will handle the refresh automatically
+          // Just clear cache to ensure fresh data when real-time updates arrive
+          if (company && company.id) {
+            console.log('🔄 Clearing cache for real-time updates...')
+            setMemberUsersCache(prev => {
+              const newCache = { ...prev }
+              delete newCache[`agents:${company.id}`]
+              delete newCache[`clients:${company.id}`]
+              return newCache
+            })
+          }
         }}
       />
     </>

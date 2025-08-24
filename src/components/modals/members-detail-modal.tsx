@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconActivity, IconSend } from "@tabler/icons-react"
+import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus } from "@tabler/icons-react"
+import { SendHorizontal } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -23,6 +24,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { ColorPicker } from "@/components/ui/color-picker"
 import { LinkPreview } from "@/components/ui/link-preview"
 import { MembersActivityLog } from "@/components/members-activity-log"
+import { Comment } from "@/components/ui/comment"
+
 
 
 
@@ -47,7 +50,7 @@ interface CompanyData {
   id?: number
   originalAgentIds?: number[] // Added for tracking original assignments
   originalClientIds?: number[] // Added for tracking original client assignments
-  // Redis storage fields for selected agents and clients
+  // Storage fields for selected agents and clients
   selectedAgentIds?: number[]
   selectedClientIds?: number[]
   selectedAgentsData?: Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>
@@ -98,6 +101,74 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       document.head.removeChild(style)
     }
   }, [])
+
+  // Auto-save function that can be called before closing
+  const autoSaveBeforeClose = async (): Promise<boolean> => {
+    if (!companyToEdit?.id || !hasUnsavedChanges) {
+      return true // No need to save, can close
+    }
+
+    try {
+      console.log('🔄 Auto-saving changes before closing...')
+      setIsSubmitting(true)
+      
+      // Update company data
+      await updateDatabase(formData)
+      
+      // Update assignments
+      await updateAssignments()
+      
+      console.log('✅ Auto-save completed successfully')
+      
+      // Refresh activity log to show the latest changes
+      setActivityRefreshKey(prev => prev + 1)
+      
+      return true
+    } catch (error) {
+      console.error('❌ Auto-save failed:', error)
+      return false
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Modified close handler with auto-save for company data only
+  const handleClose = async () => {
+    console.log('🔒 handleClose called:', { 
+      companyToEdit: companyToEdit?.id, 
+      hasUnsavedChanges, 
+      isOpen,
+      formDataLogo: formData.logo,
+      formDataLogoUrl: formData.logoUrl,
+      companyToEditLogo: companyToEdit?.logo,
+      companyToEditLogoUrl: companyToEdit?.logoUrl
+    })
+    
+    if (companyToEdit?.id && hasUnsavedChanges) {
+      // Auto-save company data changes before closing
+      try {
+        console.log('🔄 Auto-saving changes before close...')
+        await updateDatabase(formData)
+        console.log('✅ Company data saved successfully')
+        
+        // Notify parent of changes
+        if (onCompanyAdded) {
+          onCompanyAdded(companyToEdit)
+        }
+        onClose() // Call the original onClose prop
+      } catch (error) {
+        // Don't close if save failed
+        console.error('❌ Failed to save company data:', error)
+        alert('Failed to save company changes. Please try again.')
+        return
+      }
+    } else {
+      // No unsaved changes or not in edit mode, just close
+      console.log('🔒 Closing without auto-save - no changes detected')
+      onClose() // Call the original onClose prop
+    }
+  }
+
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [countrySearch, setCountrySearch] = React.useState('')
   const [agentSearch, setAgentSearch] = React.useState('')
@@ -109,7 +180,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   const [isDeleting, setIsDeleting] = React.useState(false)
   const [isAgentsHovered, setIsAgentsHovered] = React.useState(false)
   const [isClientsHovered, setIsClientsHovered] = React.useState(false)
+  const [isLogoHovered, setIsLogoHovered] = React.useState(false)
   const [comment, setComment] = React.useState("")
+  const [isCommentFocused, setIsCommentFocused] = React.useState(false)
   const [isSubmittingComment, setIsSubmittingComment] = React.useState(false)
   const [commentsList, setCommentsList] = React.useState<Array<{id: string, comment: string, user_name: string, created_at: string}>>([])
   const [agents, setAgents] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
@@ -134,10 +207,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   const [isLoadingMoreClients, setIsLoadingMoreClients] = React.useState(false)
   const [currentClientPage, setCurrentClientPage] = React.useState(1)
   const [totalClientCount, setTotalClientCount] = React.useState(0)
+  const [activityRefreshKey, setActivityRefreshKey] = React.useState(0)
   
-  // Smart Sync state
-  const [redisKey, setRedisKey] = React.useState<string>('')
-  const [lastRedisSave, setLastRedisSave] = React.useState<Date | null>(null)
+  // Database sync state
   const [lastDatabaseSync, setLastDatabaseSync] = React.useState<Date | null>(null)
   
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -162,14 +234,22 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         return null
       }
     }
-    return formData.logoUrl || existingLogoUrl
-  }, [formData.logo, formData.logoUrl, existingLogoUrl])
+    // Only use formData.logoUrl for display, not existingLogoUrl
+    // existingLogoUrl is only for comparison to detect changes
+    return formData.logoUrl
+  }, [formData.logo, formData.logoUrl])
 
   React.useEffect(() => {
     return () => {
       if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl)
     }
   }, [logoPreviewUrl])
+
+  // Debug effect to monitor logo changes
+  React.useEffect(() => {
+    console.log('🔍 formData.logoUrl changed to:', formData.logoUrl)
+    console.log('🔍 formData.logo changed to:', formData.logo)
+  }, [formData.logoUrl, formData.logo])
 
   const filteredCountries = countryOptions.filter(country =>
     country.toLowerCase().includes(countrySearch.toLowerCase())
@@ -183,53 +263,38 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     if (!companyToEdit?.id) return
     
     try {
+      setIsSubmitting(true)
       console.log('💾 Starting manual save...')
       console.log('🔍 Current selected agents:', Array.from(selectedAgents))
       console.log('🔍 Current selected clients:', Array.from(selectedClients))
       
-      // Create data for Redis
-      const redisData = {
-        ...formData,
-        logo: null, // Don't store File object in Redis
-        logoUrl: formData.logoUrl || existingLogoUrl,
-        selectedAgentIds: Array.from(selectedAgents),
-        selectedClientIds: Array.from(selectedClients),
-        selectedAgentsData: selectedAgentsData,
-        selectedClientsData: selectedClientsData
+      // Update database
+      await updateDatabase(formData)
+      
+      // Update agent and client assignments
+      await updateAssignments()
+      
+      // Reset unsaved changes flag
+      setHasUnsavedChanges(false)
+      
+      console.log('✅ Manual save completed successfully')
+      
+      // Refresh activity log to show the latest changes
+      setActivityRefreshKey(prev => prev + 1)
+      
+      // Call the callback if provided (same as add company)
+      if (onCompanyAdded) {
+        onCompanyAdded(companyToEdit)
       }
       
-      // Save to Redis
-      const redisResponse = await fetch('/api/redis/set', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: redisKey,
-          data: redisData,
-          expiry: 3600 // 1 hour expiry
-        })
-      })
-      
-      if (redisResponse.ok) {
-        console.log('✅ Redis save successful')
-        
-        // Update database
-        await updateDatabase(formData)
-        
-        // Update agent and client assignments
-        await updateAssignments()
-        
-        // Reset unsaved changes flag
-        setHasUnsavedChanges(false)
-        
-        console.log('✅ Manual save completed successfully')
-      } else {
-        console.error('❌ Redis save failed')
-        throw new Error('Redis save failed')
-      }
+      // Close modal after successful save (same as add company)
+      handleClose()
       
     } catch (error) {
       console.error('❌ Manual save error:', error)
       alert('Failed to save changes. Please try again.')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -238,7 +303,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     if (!companyToEdit?.id) return
     
     try {
-      console.log('🔄 Updating database...')
+      console.log('🔄 Updating database...', {
+        dataLogo: data.logo,
+        dataLogoUrl: data.logoUrl,
+        companyToEditLogo: companyToEdit.logo,
+        companyToEditLogoUrl: companyToEdit.logoUrl
+      })
       
       const formDataToSend = new FormData()
       formDataToSend.append('company', data.company)
@@ -252,7 +322,17 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       
       if (data.logo) {
         formDataToSend.append('logo', data.logo)
+        console.log('🔄 New logo being uploaded')
+      } else if (data.logoUrl === null && existingLogoUrl) {
+        // Logo was cleared - send remove_logo flag
+        formDataToSend.append('remove_logo', 'true')
+        console.log('🔄 Logo removal requested - remove_logo flag added')
+        console.log('🔄 Logo removal details:', { dataLogoUrl: data.logoUrl, existingLogoUrl })
+      } else {
+        console.log('🔄 No logo changes detected:', { dataLogoUrl: data.logoUrl, existingLogoUrl })
       }
+      
+      console.log('🔄 FormData contents:', Array.from(formDataToSend.entries()))
       
       const dbResponse = await fetch(`/api/members/${companyToEdit.id}`, {
         method: 'PATCH',
@@ -271,12 +351,157 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     }
   }
 
-  // Update assignments function
+  // Real-time update function for immediate database updates
+  const updateAssignmentRealTime = async (agentId: number, isSelected: boolean, type: 'agent' | 'client') => {
+    if (!companyToEdit?.id) return
+    
+    try {
+      console.log(`🔄 Real-time ${type} assignment update:`, { agentId, isSelected, companyId: companyToEdit.id })
+      
+      const endpoint = type === 'agent' ? `/api/agents/${agentId}` : `/api/clients/${agentId}`
+      const body = { member_id: isSelected ? companyToEdit.id : null }
+      
+      const response = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      
+      if (!response.ok) {
+        console.error(`❌ Failed to update ${type} ${agentId}:`, response.status)
+        throw new Error(`Failed to update ${type} assignment`)
+      }
+      
+      console.log(`✅ Real-time ${type} assignment updated successfully`)
+      
+      // Log activity for the assignment change
+      if (user?.id) {
+        try {
+          const currentUserId = parseInt(user.id, 10)
+          
+          if (type === 'agent') {
+            // Get current state for logging
+            const currentOriginalAgentIds = formData.originalAgentIds || []
+            let newOriginalAgentIds: number[]
+            
+            if (isSelected) {
+              newOriginalAgentIds = [...currentOriginalAgentIds, agentId]
+            } else {
+              newOriginalAgentIds = currentOriginalAgentIds.filter(id => id !== agentId)
+            }
+            
+            // Log the agent assignment change
+            await fetch(`/api/members/${companyToEdit.id}/log-assignments`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                originalAgentIds: currentOriginalAgentIds,
+                currentAgentIds: newOriginalAgentIds,
+                originalClientIds: formData.originalClientIds || [],
+                currentClientIds: Array.from(selectedClients),
+                userId: currentUserId
+              })
+            })
+            
+            console.log('✅ Agent assignment activity logged')
+          } else {
+            // Get current state for logging
+            const currentOriginalClientIds = formData.originalClientIds || []
+            let newOriginalClientIds: number[]
+            
+            if (isSelected) {
+              newOriginalClientIds = [...currentOriginalClientIds, agentId]
+            } else {
+              newOriginalClientIds = currentOriginalClientIds.filter(id => id !== agentId)
+            }
+            
+            // Log the client assignment change
+            await fetch(`/api/members/${companyToEdit.id}/log-assignments`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                originalAgentIds: formData.originalAgentIds || [],
+                currentAgentIds: Array.from(selectedAgents),
+                originalClientIds: currentOriginalClientIds,
+                currentClientIds: newOriginalClientIds,
+                userId: currentUserId
+              })
+            })
+            
+            console.log('✅ Client assignment activity logged')
+          }
+        } catch (logError) {
+          console.error('❌ Failed to log assignment activity:', logError)
+          // Don't throw - logging failure shouldn't break the main operation
+        }
+      }
+      
+      // Update original IDs to reflect the change
+      if (type === 'agent') {
+        if (isSelected) {
+          setFormData(prev => ({
+            ...prev,
+            originalAgentIds: [...(prev.originalAgentIds || []), agentId]
+          }))
+        } else {
+          setFormData(prev => ({
+            ...prev,
+            originalAgentIds: (prev.originalAgentIds || []).filter(id => id !== agentId)
+          }))
+        }
+      } else {
+        if (isSelected) {
+          setFormData(prev => ({
+            ...prev,
+            originalClientIds: [...(prev.originalClientIds || []), agentId]
+          }))
+        } else {
+          setFormData(prev => ({
+            ...prev,
+            originalClientIds: (prev.originalClientIds || []).filter(id => id !== agentId)
+          }))
+        }
+      }
+      
+    } catch (error) {
+      console.error(`❌ Real-time ${type} update error:`, error)
+      // Revert the selection change on error
+      if (type === 'agent') {
+        setSelectedAgents(prev => {
+          const newSet = new Set(prev)
+          if (isSelected) {
+            newSet.delete(agentId)
+          } else {
+            newSet.add(agentId)
+          }
+          return newSet
+        })
+      } else {
+        setSelectedClients(prev => {
+          const newSet = new Set(prev)
+          if (isSelected) {
+            newSet.delete(agentId)
+          } else {
+            newSet.add(agentId)
+          }
+          return newSet
+        })
+      }
+      throw error
+    }
+  }
+
+  // Update assignments function with timeout protection
   const updateAssignments = async () => {
     if (!companyToEdit?.id) return
     
     try {
       console.log('🔄 Updating assignments...')
+      
+      // Create a timeout promise to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Assignment update timeout after 10 seconds')), 10000)
+      })
       
       // Update agent assignments
       if (selectedAgents.size > 0) {
@@ -297,7 +522,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           return true
         })
         
-        const agentResults = await Promise.all(agentUpdatePromises)
+        // Race against timeout to prevent hanging
+        const agentResults = await Promise.race([
+          Promise.all(agentUpdatePromises),
+          timeoutPromise
+        ]) as boolean[]
+        
         const agentSuccessCount = agentResults.filter(Boolean).length
         
         if (agentSuccessCount === selectedAgents.size) {
@@ -326,7 +556,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           return true
         })
         
-        const clientResults = await Promise.all(clientUpdatePromises)
+        // Race against timeout to prevent hanging
+        const clientResults = await Promise.race([
+          Promise.all(clientUpdatePromises),
+          timeoutPromise
+        ]) as boolean[]
+        
         const clientSuccessCount = clientResults.filter(Boolean).length
         
         if (clientSuccessCount === selectedClients.size) {
@@ -360,7 +595,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             return true
           })
           
-          const agentRemoveResults = await Promise.all(agentRemovePromises)
+          // Race against timeout to prevent hanging
+          const agentRemoveResults = await Promise.race([
+            Promise.all(agentRemovePromises),
+            timeoutPromise
+          ]) as boolean[]
+          
           const agentRemoveSuccessCount = agentRemoveResults.filter(Boolean).length
           
           if (agentRemoveSuccessCount === deselectedAgentIds.length) {
@@ -394,7 +634,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             return true
           })
           
-          const clientRemoveResults = await Promise.all(clientRemovePromises)
+          // Race against timeout to prevent hanging
+          const clientRemoveResults = await Promise.race([
+            Promise.all(clientRemovePromises),
+            timeoutPromise
+          ]) as boolean[]
+          
           const clientRemoveSuccessCount = clientRemoveResults.filter(Boolean).length
           
           if (clientRemoveSuccessCount === deselectedClientIds.length) {
@@ -407,55 +652,60 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       
       console.log('✅ All assignments updated successfully')
       
+      // Log activity for assignment changes via API
+      if (companyToEdit.id && user?.id) {
+        try {
+          const currentUserId = parseInt(user.id, 10)
+          const originalAgentIds = formData.originalAgentIds || []
+          const currentAgentIds = Array.from(selectedAgents)
+          const originalClientIds = formData.originalClientIds || []
+          const currentClientIds = Array.from(selectedClients)
+          
+          // Debug logging
+          console.log('🔍 Sending assignment data to API:', {
+            memberId: companyToEdit.id,
+            originalAgentIds,
+            currentAgentIds,
+            originalClientIds,
+            currentClientIds,
+            userId: currentUserId,
+            formDataKeys: Object.keys(formData),
+            hasOriginalAgentIds: 'originalAgentIds' in formData,
+            hasOriginalClientIds: 'originalClientIds' in formData
+          })
+          
+          const response = await fetch(`/api/members/${companyToEdit.id}/log-assignments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              originalAgentIds,
+              currentAgentIds,
+              originalClientIds,
+              currentClientIds,
+              userId: currentUserId
+            })
+          })
+          
+          if (!response.ok) {
+            const errorData = await response.json()
+            console.error('❌ API response error:', response.status, errorData)
+          } else {
+            const result = await response.json()
+            console.log('✅ Activity logged for assignment changes:', result)
+          }
+        } catch (logError) {
+          console.error('❌ Failed to log assignment activity:', logError)
+          // Don't throw - logging failure shouldn't break the main operation
+        }
+      }
+      
     } catch (error) {
       console.error('❌ Assignment update error:', error)
       throw error
     }
   }
 
-  // Load data from Redis
-  const loadFromRedis = async () => {
-    if (!redisKey) return
-    
-    try {
-      const response = await fetch(`/api/redis/get?key=${redisKey}`)
-      if (response.ok) {
-        const result = await response.json()
-        if (result.data) {
-          setFormData(result.data)
-          
-          // Restore selected agents and clients from Redis
-          if (result.data.selectedAgentIds) {
-            setSelectedAgents(new Set(result.data.selectedAgentIds))
-          }
-          if (result.data.selectedClientIds) {
-            setSelectedClients(new Set(result.data.selectedClientIds))
-          }
-          if (result.data.selectedAgentsData) {
-            setSelectedAgentsData(result.data.selectedAgentsData)
-          }
-          if (result.data.selectedClientsData) {
-            setSelectedClientsData(result.data.selectedClientsData)
-          }
-          
-          // Debug: Log what was loaded from Redis
-          console.log('🔍 Redis data loaded:', {
-            company: result.data.company,
-            originalAgentIds: result.data.originalAgentIds,
-            selectedAgentIds: result.data.selectedAgentIds,
-            originalClientIds: result.data.originalClientIds,
-            selectedClientIds: result.data.selectedClientIds
-          })
-          
-          console.log('Loaded unsaved changes from Redis including agents/clients selections')
-          return true
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load from Redis:', error)
-    }
-    return false
-  }
+
 
   const handleInputChange = (field: keyof CompanyData, value: string | File | null) => {
     const newData = {
@@ -467,6 +717,16 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     
     // No more auto-save timer - user must click save button
     console.log(`📝 Field '${field}' updated to:`, value)
+    console.log(`📝 New formData.${field} will be:`, newData[field])
+    
+    if (field === 'badge_color') {
+      console.log('🎨 Badge color changed to:', value)
+      console.log('🎨 New formData.badge_color will be:', newData.badge_color)
+    }
+    
+    if (field === 'logo' || field === 'logoUrl') {
+      console.log('🖼️ Logo field change:', { field, value, newLogo: newData.logo, newLogoUrl: newData.logoUrl })
+    }
   }
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -677,7 +937,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
               const response = await fetch(`/api/clients/modal?memberId=${memberId}&limit=1000`)
       if (response.ok) {
         const data = await response.json()
-        const companyClients = data.agents || []
+        const companyClients = data.clients || []
         
         // Set the selected clients
         const clientIds = companyClients.map((client: any) => client.user_id)
@@ -710,15 +970,18 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       return
     }
 
-    // For editing mode, just close - user must save manually
+    // For editing mode, auto-save company data before closing
     if (companyToEdit?.id) {
-      console.log('Edit mode - closing without auto-save. User must click Save Changes first.')
-      onClose()
+      console.log('Edit mode - auto-saving company data before closing...')
+      await handleClose()
       return
     }
 
     try {
       setIsSubmitting(true)
+      
+      console.log('🚀 Starting form submission...')
+      console.log('🔍 Current formData:', formData)
       
       // Create FormData for API call (only for new companies)
       const formDataToSend = new FormData()
@@ -731,16 +994,23 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       if (formData.logo) {
         formDataToSend.append('logo', formData.logo)
       }
-      if (formData.badge_color) {
-        formDataToSend.append('badge_color', formData.badge_color)
-      }
-      if (formData.status) {
-        formDataToSend.append('status', formData.status)
+      // Always send badge_color and status (they have default values)
+      console.log('🔍 Form submission - badge_color:', formData.badge_color)
+      console.log('🔍 Form submission - status:', formData.status)
+      formDataToSend.append('badge_color', formData.badge_color || '#0EA5E9')
+      formDataToSend.append('status', formData.status || 'Current Client')
+      
+      console.log('📤 FormData being sent:')
+      for (let [key, value] of formDataToSend.entries()) {
+        console.log(`  ${key}: ${value}`)
       }
       
       // Create new company
       const response = await fetch('/api/members', {
         method: 'POST',
+        headers: {
+          'x-user-id': user?.id || ''
+        },
         body: formDataToSend
       })
       
@@ -964,25 +1234,61 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     setShowDeleteConfirmation(true)
   }
 
+  // Load existing comments for the company
+  const loadComments = async (memberId: number) => {
+    try {
+      const response = await fetch(`/api/members/${memberId}/comments`)
+      if (response.ok) {
+        const data = await response.json()
+        setCommentsList(data.comments || [])
+      } else {
+        console.error('Failed to fetch comments:', response.status)
+        setCommentsList([])
+      }
+    } catch (error) {
+      console.error('Error loading comments:', error)
+      setCommentsList([])
+    }
+  }
+
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!comment.trim() || !companyToEdit?.id || isSubmittingComment) return
 
     setIsSubmittingComment(true)
+    
+    // Create the comment object
+    const newComment = {
+      id: Date.now().toString(),
+      comment: comment.trim(),
+      user_name: user ? `${user.firstName} ${user.lastName}` : 'Unknown User',
+      created_at: new Date().toISOString()
+    }
+    
     try {
-      // For now, just add to local state (you can implement API call later)
-      const newComment = {
-        id: Date.now().toString(),
-        comment: comment.trim(),
-        user_name: user ? `${user.firstName} ${user.lastName}` : 'Unknown User',
-        created_at: new Date().toISOString()
-      }
-      
+      // Add to local state immediately for optimistic UI
       setCommentsList((prev) => [newComment, ...prev])
       setComment("")
+      
+      // Save comment to database
+      const response = await fetch(`/api/members/${companyToEdit.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          comment: newComment.comment,
+          user_id: user?.id
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to save comment')
+      }
+      
       console.log('Comment submitted successfully:', newComment)
     } catch (error) {
       console.error('Error submitting comment:', error)
+      // Remove the comment from local state if API call fails
+      setCommentsList((prev) => prev.filter(c => c.id !== newComment.id))
       alert('Failed to submit comment. Please try again.')
     } finally {
       setIsSubmittingComment(false)
@@ -1018,7 +1324,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       
       // Close modal and notify parent
       setShowDeleteConfirmation(false)
-      onClose()
+      onClose() // Call original onClose directly to avoid auto-save during deletion
       
       // Optionally refresh the companies list if there's a callback
       if (onCompanyAdded) {
@@ -1054,7 +1360,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       const response = await fetch(`/api/clients/modal?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
-        const newClients = data.agents || [] // Note: API returns 'agents' field for clients
+        const newClients = data.clients || []
         
         if (page === 1) {
           setClients(newClients)
@@ -1148,101 +1454,149 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         setInputWidth(fileInputRef.current.offsetWidth);
       }
       
-      // Generate Redis key for this editing session
+      // Refresh activity log when modal opens
       if (companyToEdit?.id) {
-        const sessionKey = `company_edit:${companyToEdit.id}:${Date.now()}`
-        setRedisKey(sessionKey)
-        console.log('Generated Redis key:', sessionKey)
+        setActivityRefreshKey(prev => prev + 1)
       }
       
       // If editing a company, populate the form
       if (companyToEdit) {
+        console.log('🔄 Starting to load company data for:', companyToEdit.id)
+        console.log('🔄 companyToEdit full data:', companyToEdit)
+        
+        // Set loading state to show skeleton
+        setIsLoadingCompany(true)
+        
         // Load data from database
         const loadCompanyData = async () => {
-          const sessionKey = `company_edit:${companyToEdit.id}:${Date.now()}`
-          setRedisKey(sessionKey)
+          console.log('🔄 Loading fresh data from database')
           
-          // Try to load from Redis first (preserves unsaved work)
-          const hasRedisData = await loadFromRedis()
+          const freshData = {
+            company: companyToEdit.company || '',
+            address: companyToEdit.address || '',
+            phone: companyToEdit.phone || '',
+            country: companyToEdit.country || '',
+            service: companyToEdit.service || '',
+            website: Array.isArray(companyToEdit.website) && companyToEdit.website.length > 0 ? companyToEdit.website[0] : (companyToEdit.website as string) || '',
+            logo: null,
+            logoUrl: typeof companyToEdit.logo === 'string' ? companyToEdit.logo : companyToEdit.logoUrl,
+            badge_color: companyToEdit.badge_color || '#0EA5E9',
+            status: companyToEdit.status || 'Current Client',
+            id: companyToEdit.id,
+            originalAgentIds: [],
+            originalClientIds: []
+          }
           
-          if (hasRedisData) {
-            // ✅ Redis has unsaved work - preserve it
-            console.log('✅ Loaded unsaved changes from Redis')
-          } else {
-            // ❌ No Redis data - load from database
-            console.log('🔄 No Redis data - loading fresh from database')
-            
-            const freshData = {
-              company: companyToEdit.company || '',
-              address: companyToEdit.address || '',
-              phone: companyToEdit.phone || '',
-              country: companyToEdit.country || '',
-              service: companyToEdit.service || '',
-              website: Array.isArray(companyToEdit.website) && companyToEdit.website.length > 0 ? companyToEdit.website[0] : (companyToEdit.website as string) || '',
-              logo: null,
-              logoUrl: typeof companyToEdit.logo === 'string' ? companyToEdit.logo : companyToEdit.logoUrl,
-              badge_color: companyToEdit.badge_color || '#0EA5E9',
-              status: companyToEdit.status || 'Current Client',
-              id: companyToEdit.id,
-              originalAgentIds: [],
-              originalClientIds: []
-            }
-            
-            // Set form data with fresh database data
-            setFormData(freshData)
-            setLastRedisSave(new Date())
-            setLastDatabaseSync(new Date())
-            
-            // Fetch current assignments from database and set original IDs
-            if (companyToEdit.id) {
-              // Fetch agents and set original IDs
-              const agentsResponse = await fetch(`/api/agents/modal?memberId=${companyToEdit.id}&limit=1000`)
-              if (agentsResponse.ok) {
-                const agentsData = await agentsResponse.json()
-                const companyAgents = agentsData.agents || []
-                const agentIds = companyAgents.map((agent: any) => agent.user_id)
-                
-                setSelectedAgents(new Set(agentIds))
-                setSelectedAgentsData(companyAgents)
-                
-                // Set original agent IDs for tracking deselection
-                setFormData(prev => ({
-                  ...prev,
-                  originalAgentIds: agentIds
-                }))
-                
-                console.log('✅ Set original agent IDs:', agentIds)
-              }
+          // Set existing logo URL for comparison
+          console.log('🔍 companyToEdit logo data:', {
+            logo: companyToEdit.logo,
+            logoUrl: companyToEdit.logoUrl,
+            logoType: typeof companyToEdit.logo,
+            logoUrlType: typeof companyToEdit.logoUrl
+          })
+          
+          const originalLogoUrl = typeof companyToEdit.logo === 'string' ? companyToEdit.logo : companyToEdit.logoUrl || null
+          setExistingLogoUrl(originalLogoUrl)
+          console.log('🔍 Set existingLogoUrl for comparison:', originalLogoUrl)
+          
+          // Set form data with fresh database data
+          setFormData(freshData)
+          setLastDatabaseSync(new Date())
+          
+          // Fetch current assignments from database and set original IDs
+          if (companyToEdit.id) {
+            // Fetch agents and set original IDs
+            const agentsResponse = await fetch(`/api/agents/modal?memberId=${companyToEdit.id}&limit=1000`)
+            if (agentsResponse.ok) {
+              const agentsData = await agentsResponse.json()
+              const companyAgents = agentsData.agents || []
+              const agentIds = companyAgents.map((agent: any) => agent.user_id)
               
-              // Fetch clients and set original IDs
-              const clientsResponse = await fetch(`/api/clients/modal?memberId=${companyToEdit.id}&limit=1000`)
-              if (clientsResponse.ok) {
-                const clientsData = await clientsResponse.json()
-                const companyClients = clientsData.agents || []
-                const clientIds = companyClients.map((client: any) => client.user_id)
-                
-                setSelectedClients(new Set(clientIds))
-                setSelectedClientsData(companyClients)
-                
-                // Set original client IDs for tracking deselection
-                setFormData(prev => ({
-                  ...prev,
-                  originalClientIds: clientIds
-                }))
-                
-                console.log('✅ Set original client IDs:', clientIds)
-              }
+              setSelectedAgents(new Set(agentIds))
+              setSelectedAgentsData(companyAgents)
+              
+              // Set original agent IDs for tracking deselection
+              setFormData(prev => ({
+                ...prev,
+                originalAgentIds: agentIds
+              }))
+              
+              console.log('✅ Set original agent IDs:', agentIds)
             }
+            
+            // Fetch clients and set original IDs
+            const clientsResponse = await fetch(`/api/clients/modal?memberId=${companyToEdit.id}&limit=1000`)
+            if (clientsResponse.ok) {
+              const clientsData = await clientsResponse.json()
+              console.log('🔍 Clients API response:', clientsData)
+              
+              const companyClients = clientsData.clients || []
+              console.log('🔍 Company clients extracted:', companyClients)
+              
+              const clientIds = companyClients.map((client: any) => client.user_id)
+              console.log('🔍 Client IDs extracted:', clientIds)
+              
+              setSelectedClients(new Set(clientIds))
+              setSelectedClientsData(companyClients)
+              
+              // Set original client IDs for tracking deselection
+              setFormData(prev => ({
+                ...prev,
+                originalClientIds: clientIds
+              }))
+              
+              console.log('✅ Set original client IDs:', clientIds)
+              console.log('✅ selectedClientsData set to:', companyClients)
+            } else {
+              console.error('❌ Failed to fetch clients:', clientsResponse.status, clientsResponse.statusText)
+            }
+            
+            // Load comments for this company
+            await loadComments(companyToEdit.id)
           }
         }
         
-        loadCompanyData()
+        loadCompanyData().finally(() => {
+          setIsLoadingCompany(false)
+        })
+      } else {
+        // If adding a new company, reset form to empty state
+        console.log('🆕 Resetting form for new company')
+        setFormData({
+          company: '',
+          address: '',
+          phone: '',
+          country: '',
+          service: '',
+          website: '',
+          logo: null,
+          logoUrl: null,
+          badge_color: '#0EA5E9',
+          status: 'Current Client',
+          id: undefined,
+          originalAgentIds: [],
+          originalClientIds: []
+        })
+        
+        // Reset selections
+        setSelectedAgents(new Set())
+        setSelectedAgentsData([])
+        setSelectedClients(new Set())
+        setSelectedClientsData([])
+        
+        // Reset unsaved changes flag
+        setHasUnsavedChanges(false)
       }
     }
   }, [isOpen, companyToEdit])
 
   // Remove the syncQueue effect
   // React.useEffect(() => { ... }, [syncQueue])
+
+  // Debug: Monitor selectedClientsData changes
+  React.useEffect(() => {
+    console.log('🔍 selectedClientsData changed:', selectedClientsData)
+  }, [selectedClientsData])
 
   // Prevent body scroll when either modal or sheet is open
   React.useEffect(() => {
@@ -1267,7 +1621,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       // Remove the important overflow style
       document.body.style.cssText = document.body.style.cssText.replace(/overflow:\s*hidden\s*!important;?\s*/g, '')
     }
-  }, [isOpen, isAddAgentDrawerOpen, showAgentSelection])
+  }, [isOpen, isAddAgentDrawerOpen, showAgentSelection, showClientSelection])
 
   React.useEffect(() => {
     if (isAddAgentDrawerOpen || showAgentSelection) {
@@ -1332,6 +1686,17 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     return () => clearTimeout(timeoutId)
   }, [clientSearch, showClientSelection])
 
+  // Cleanup effect to reset selection states when modal closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      // Reset all selection states when modal closes
+      setShowAgentSelection(false)
+      setShowClientSelection(false)
+      setShowDeleteConfirmation(false)
+      console.log('🧹 Modal closed - resetting all selection states')
+    }
+  }, [isOpen])
+
   // Fetch selected agents data whenever selection changes
   React.useEffect(() => {
     if (selectedAgents.size > 0) {
@@ -1383,7 +1748,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       
       // Auto-save functionality removed - user must click save button
     }
-  }, [companyToEdit?.id, redisKey, formData])
+  }, [companyToEdit?.id, formData])
 
   // Track if there are unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false)
@@ -1392,6 +1757,16 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   React.useEffect(() => {
     if (companyToEdit?.id) {
       // Check if there are any changes compared to original data
+      // Debug logo comparison
+      const logoChanged = formData.logo !== null || formData.logoUrl !== existingLogoUrl
+      
+      console.log('🔍 Logo comparison debug:', {
+        formDataLogo: formData.logo,
+        formDataLogoUrl: formData.logoUrl,
+        existingLogoUrl,
+        logoChanged
+      })
+      
       const hasChanges = 
         formData.company !== companyToEdit.company ||
         formData.address !== companyToEdit.address ||
@@ -1399,17 +1774,34 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         formData.country !== companyToEdit.country ||
         formData.service !== companyToEdit.service ||
         formData.website !== (Array.isArray(companyToEdit.website) ? companyToEdit.website[0] : companyToEdit.website) ||
+        logoChanged ||
         formData.badge_color !== companyToEdit.badge_color ||
         formData.status !== companyToEdit.status ||
-        selectedAgents.size > 0 ||
-        selectedClients.size > 0
+        // Check if agent selection has changed from original
+        JSON.stringify(Array.from(selectedAgents).sort()) !== JSON.stringify((formData.originalAgentIds || []).sort()) ||
+        // Check if client selection has changed from original
+        JSON.stringify(Array.from(selectedClients).sort()) !== JSON.stringify((formData.originalClientIds || []).sort())
       
+      console.log('🔍 hasChanges result:', hasChanges)
+      console.log('🔍 Full change detection:', {
+        company: formData.company !== companyToEdit.company,
+        address: formData.address !== companyToEdit.address,
+        phone: formData.phone !== companyToEdit.phone,
+        country: formData.country !== companyToEdit.country,
+        service: formData.service !== companyToEdit.service,
+        website: formData.website !== (Array.isArray(companyToEdit.website) ? companyToEdit.website[0] : companyToEdit.website),
+        logo: logoChanged,
+        badge_color: formData.badge_color !== companyToEdit.badge_color,
+        status: formData.status !== companyToEdit.status,
+        agents: JSON.stringify(Array.from(selectedAgents).sort()) !== JSON.stringify((formData.originalAgentIds || []).sort()),
+        clients: JSON.stringify(Array.from(selectedClients).sort()) !== JSON.stringify((formData.originalClientIds || []).sort())
+      })
       setHasUnsavedChanges(hasChanges)
     }
-  }, [formData, selectedAgents, selectedClients, companyToEdit])
+  }, [formData, selectedAgents, selectedClients, companyToEdit, existingLogoUrl])
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent
         className="max-w-7xl max-h-[95vh] overflow-hidden p-0 rounded-xl"
         style={{ backgroundColor: theme === 'dark' ? '#111111' : '#f8f9fa' }}
@@ -1426,21 +1818,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                 </Badge>
               </div>
               
-              {/* Save Button */}
-              {companyToEdit?.id && (
-                <Button 
-                  onClick={handleSave}
-                  className={`${
-                    hasUnsavedChanges 
-                      ? 'bg-primary hover:bg-primary/90 text-white' 
-                      : 'bg-muted text-muted-foreground cursor-not-allowed'
-                  }`}
-                  size="sm"
-                  disabled={!hasUnsavedChanges}
-                >
-                  {hasUnsavedChanges ? '💾 Save Changes' : '✅ All Changes Saved'}
-                </Button>
-              )}
+
             </div>
 
             {/* Scrollable Form Content */}
@@ -1479,6 +1857,30 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                               <div className="flex-1 min-w-0">
                                 <Skeleton className="h-3 w-16 mb-1" />
                                 <Skeleton className="h-2 w-12" />
+                              </div>
+                              <Skeleton className="w-3 h-3" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Clients Section Skeleton */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between min-h-[40px]">
+                      <Skeleton className="h-6 w-16" />
+                      <Skeleton className="h-9 w-24" />
+                    </div>
+                    <div className="rounded-lg border border-[#cecece99] dark:border-border p-4">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          {[...Array(3)].map((_, index) => (
+                            <div key={index} className="flex items-center gap-2 p-2 bg-primary/5 border border-primary/20 rounded-lg">
+                              <Skeleton className="w-5 h-5 rounded-full flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <Skeleton className="h-3 w-20 mb-1" />
+                                <Skeleton className="h-2 w-14" />
                               </div>
                               <Skeleton className="w-3 h-3" />
                             </div>
@@ -1756,13 +2158,17 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       placeholder="Choose file..."
                       isLast={true}
                       customInput={
-                        <div className="flex items-center gap-2 w-full">
+                        <div 
+                          className="flex items-center gap-2 w-full"
+                          onMouseEnter={() => setIsLogoHovered(true)}
+                          onMouseLeave={() => setIsLogoHovered(false)}
+                        >
                           <input id="logo" type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
                           <label
                             htmlFor="logo"
                             className="w-full cursor-pointer"
                           >
-                            {(formData.logo || logoPreviewUrl) ? (
+                            {(formData.logo || formData.logoUrl) ? (
                               <LinkPreview
                                 url="#"
                                 isStatic={true}
@@ -1773,7 +2179,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                 <Input
                                   ref={fileInputRef}
                                   placeholder="-"
-                                                                      value={formData.logo ? formData.logo.name : (formData.logoUrl || '')}
+                                  value={formData.logo ? formData.logo.name : (formData.logoUrl || '')}
                                   readOnly
                                   className="h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none cursor-pointer"
                                   onClick={() => document.getElementById('logo')?.click()}
@@ -1786,10 +2192,52 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                 value=""
                                 readOnly
                                 className="h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none cursor-pointer"
-                                onClick={() => document.getElementById('logo')?.click()}
+                                  onClick={() => document.getElementById('logo')?.click()}
                               />
                             )}
                           </label>
+                          
+                          {/* Clear button - only show when there's a logo */}
+                          {(formData.logo || formData.logoUrl) && (
+                            <div className={`flex items-center gap-2 transition-all duration-200 ease-in-out ${
+                              isLogoHovered 
+                                ? 'opacity-100 translate-x-0' 
+                                : 'opacity-0 translate-x-2 pointer-events-none'
+                            }`}>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  console.log('🧹 Logo clear button clicked')
+                                  console.log('🧹 Before clearing - formData.logo:', formData.logo)
+                                  console.log('🧹 Before clearing - formData.logoUrl:', formData.logoUrl)
+                                  console.log('🧹 Before clearing - existingLogoUrl:', existingLogoUrl)
+                                  
+                                  // Clear both the file and the URL using setFormData directly to ensure immediate update
+                                  setFormData(prev => {
+                                    const newData = {
+                                      ...prev,
+                                      logo: null,
+                                      logoUrl: null
+                                    }
+                                    console.log('🧹 Setting formData directly:', newData)
+                                    return newData
+                                  })
+                                  // DON'T clear existingLogoUrl - it's needed for comparison to detect changes!
+                                  console.log('🧹 Keeping existingLogoUrl for comparison:', existingLogoUrl)
+                                  
+                                  console.log('🧹 After clearing - formData.logo should be null')
+                                  console.log('🧹 After clearing - formData.logoUrl should be null')
+                                  console.log('🧹 After clearing - existingLogoUrl should be null')
+                                }}
+                                className="p-0 hover:text-foreground rounded transition-colors text-muted-foreground"
+                                title="Clear logo"
+                                tabIndex={-1}
+                              >
+                                <IconX className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       }
                     />
@@ -1894,24 +2342,20 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                                                         onClick={async () => {
                                       const newSelected = new Set(selectedAgents)
                                       newSelected.delete(agent.user_id)
-                                      setSelectedAgents(newSelected)
                                       
-                                      // Also remove from selectedAgentsData immediately
+                                      // Update local state immediately for responsive UI
+                                      setSelectedAgents(newSelected)
                                       setSelectedAgentsData(prev => prev.filter(a => a.user_id !== agent.user_id))
                                       
-                                      // Trigger Redis save for agent removal
-                                      if (companyToEdit?.id && redisKey) {
-                                        // Use the updated selection state directly
-                                        const newData = { 
-                                          ...formData,
-                                          selectedAgentIds: Array.from(newSelected),
-                                          selectedAgentsData: selectedAgentsData.filter(a => a.user_id !== agent.user_id)
+                                      // Real-time database update
+                                      if (companyToEdit?.id) {
+                                        try {
+                                          await updateAssignmentRealTime(agent.user_id, false, 'agent')
+                                          console.log(`✅ Real-time agent unassigned: ${agent.user_id}`)
+                                        } catch (error) {
+                                          console.error('❌ Real-time agent unassignment failed:', error)
+                                          // Error handling is done in updateAssignmentRealTime
                                         }
-                                        
-                                        // Database update will happen when save button is clicked
-                                        console.log(`📝 Agent ${agent.user_id} deselected from local state (will be saved when you click Save Changes)`)
-                                        
-                                        // Auto-save removed - user must click save button
                                       }
                                     }}
                                     className="absolute -top-2 -right-2 w-5 h-5 text-white rounded-full flex items-center justify-center transition-colors duration-200 flex-shrink-0 shadow-sm hover:shadow-md"
@@ -2030,24 +2474,20 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                     onClick={async () => {
                                       const newSelected = new Set(selectedClients)
                                       newSelected.delete(client.user_id)
-                                      setSelectedClients(newSelected)
                                       
-                                      // Also remove from selectedClientsData immediately
+                                      // Update local state immediately for responsive UI
+                                      setSelectedClients(newSelected)
                                       setSelectedClientsData(prev => prev.filter(c => c.user_id !== client.user_id))
                                       
-                                      // Trigger Redis save for client removal
-                                      if (companyToEdit?.id && redisKey) {
-                                        // Use the updated selection state directly
-                                        const newData = { 
-                                          ...formData,
-                                          selectedClientIds: Array.from(newSelected),
-                                          selectedClientsData: selectedClientsData.filter(c => c.user_id !== client.user_id)
+                                      // Real-time database update
+                                      if (companyToEdit?.id) {
+                                        try {
+                                          await updateAssignmentRealTime(client.user_id, false, 'client')
+                                          console.log(`✅ Real-time client unassigned: ${client.user_id}`)
+                                        } catch (error) {
+                                          console.error('❌ Real-time client unassignment failed:', error)
+                                          // Error handling is done in updateAssignmentRealTime
                                         }
-                                        
-                                        // Database update will happen when save button is clicked
-                                        console.log(`📝 Client ${client.user_id} deselected from local state (will be saved when you click Save Changes)`)
-                                        
-                                        // Auto-save removed - user must click save button // Reduced delay since we're using the updated state directly
                                       }
                                     }}
                                     className="absolute -top-2 -right-2 w-5 h-5 text-white rounded-full flex items-center justify-center transition-colors duration-200 flex-shrink-0 shadow-sm hover:shadow-md"
@@ -2076,25 +2516,26 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             {/* Actions Footer */}
             <div className="flex items-center justify-between px-6 py-4 border-t bg-sidebar">
               <div className="flex items-center gap-3">
-                {!companyToEdit && (
-                  <Button type="submit" form="add-company-form" disabled={isSubmitting || !isFormValid()}>
+                {/* Show Save button only when adding a new company (not editing) AND modal is open */}
+                {isOpen && !companyToEdit?.id && (
+                  <Button type="submit" form="add-company-form" disabled={isSubmitting || !isFormValid()} size="sm">
                     {isSubmitting ? 'Saving...' : 'Save'}
                   </Button>
                 )}
 
-                {companyToEdit && (
+                {/* Show Delete button only when editing an existing company AND modal is open */}
+                {isOpen && companyToEdit?.id && (
                   <Button 
                     type="button" 
                     variant="destructive" 
                     onClick={handleDeleteClick}
                     disabled={isDeleting}
+                    size="sm"
                   >
                     {isDeleting ? 'Deleting...' : 'Delete'}
                   </Button>
                 )}
               </div>
-              
-
             </div>
           </div>
 
@@ -2191,7 +2632,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                     if (agent.member_company && agent.member_company !== companyToEdit?.company) return
                                     
                                     const newSelected = new Set(selectedAgents)
-                                    if (newSelected.has(agent.user_id)) {
+                                    const wasSelected = newSelected.has(agent.user_id)
+                                    
+                                    if (wasSelected) {
                                       newSelected.delete(agent.user_id)
                                       // Remove from selectedAgentsData when unselecting
                                       setSelectedAgentsData(prev => prev.filter(a => a.user_id !== agent.user_id))
@@ -2205,27 +2648,19 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                         return [...prev, agent]
                                       })
                                     }
+                                    
+                                    // Update local state immediately for responsive UI
                                     setSelectedAgents(newSelected)
                                     
-                                    // Trigger Redis save for agent selection changes
-                                    if (companyToEdit?.id && redisKey) {
-                                      // Use the updated selection state directly
-                                      const newData = { 
-                                        ...formData,
-                                        selectedAgentIds: Array.from(newSelected),
-                                        selectedAgentsData: newSelected.has(agent.user_id) 
-                                          ? [...selectedAgentsData, agent].filter((a, index, arr) => 
-                                              arr.findIndex(item => item.user_id === a.user_id) === index
-                                            )
-                                          : selectedAgentsData.filter(a => a.user_id !== agent.user_id)
+                                    // Real-time database update
+                                    if (companyToEdit?.id) {
+                                      try {
+                                        await updateAssignmentRealTime(agent.user_id, !wasSelected, 'agent')
+                                        console.log(`✅ Real-time agent assignment updated: ${agent.user_id} ${!wasSelected ? 'assigned' : 'unassigned'}`)
+                                      } catch (error) {
+                                        console.error('❌ Real-time agent update failed:', error)
+                                        // Error handling is done in updateAssignmentRealTime
                                       }
-                                      
-                                      // Database update will happen when save button is clicked
-                                      if (!newSelected.has(agent.user_id)) {
-                                        console.log(`📝 Agent ${agent.user_id} deselected from local state (will be saved when you click Save Changes)`)
-                                      }
-                                      
-                                      // Auto-save removed - user must click save button
                                     }
                                   }}
                             >
@@ -2428,12 +2863,14 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                         : 'hover:border-primary/50 hover:bg-primary/5'
                                     }`
                               }`}
-                              onClick={() => {
+                              onClick={async () => {
                                 // Disable selection for clients assigned to other companies
                                 if (client.member_company && client.member_company !== companyToEdit?.company) return
                                 
                                 const newSelected = new Set(selectedClients)
-                                if (newSelected.has(client.user_id)) {
+                                const wasSelected = newSelected.has(client.user_id)
+                                
+                                if (wasSelected) {
                                   newSelected.delete(client.user_id)
                                   // Remove from selectedClientsData when unselecting
                                   setSelectedClientsData(prev => prev.filter(c => c.user_id !== client.user_id))
@@ -2447,21 +2884,19 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                     return [...prev, client]
                                   })
                                 }
+                                
+                                // Update local state immediately for responsive UI
                                 setSelectedClients(newSelected)
                                 
-                                // Trigger Redis save for client selection changes
-                                if (companyToEdit?.id && redisKey) {
-                                  // Use the updated selection state directly
-                                  const newData = { 
-                                    ...formData,
-                                    selectedClientIds: Array.from(newSelected),
-                                    selectedClientsData: newSelected.has(client.user_id) 
-                                      ? [...selectedClientsData, client].filter((c, index, arr) => 
-                                          arr.findIndex(item => item.user_id === c.user_id) === index
-                                        )
-                                      : selectedClientsData.filter(c => c.user_id !== client.user_id)
+                                // Real-time database update
+                                if (companyToEdit?.id) {
+                                  try {
+                                    await updateAssignmentRealTime(client.user_id, !wasSelected, 'client')
+                                    console.log(`✅ Real-time client assignment updated: ${client.user_id} ${!wasSelected ? 'assigned' : 'unassigned'}`)
+                                  } catch (error) {
+                                    console.error('❌ Real-time client update failed:', error)
+                                    // Error handling is done in updateAssignmentRealTime
                                   }
-                                  // Auto-save removed - user must click save button
                                 }
                               }}
                             >
@@ -2499,19 +2934,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                     {client.member_company === companyToEdit?.company ? 'Currently Assigned' : (client.member_company || 'No Member')}
                                   </span>
                                 </div>
-                                {client.member_company && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="text-xs px-2 py-0.5 border flex-shrink-0"
-                                    style={
-                                      theme === 'dark'
-                                        ? { backgroundColor: '#44464880', borderColor: '#444648', color: '#ffffff' }
-                                        : { backgroundColor: '#44464814', borderColor: '#a5a5a540', color: '#444648' }
-                                    }
-                                  >
-                                    {client.member_company}
-                                  </Badge>
-                                )}
+
                               </div>
                             </div>
                           ))}
@@ -2587,58 +3010,78 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                 <div className="space-y-4">
                   {companyToEdit?.id ? (
                     <MembersActivityLog 
+                      key={activityRefreshKey}
                       memberId={companyToEdit.id} 
                       companyName={companyToEdit.company || 'Unknown Company'} 
+                      onRefresh={() => {
+                        // This will be called when activities are refreshed
+                        // You can add any additional logic here if needed
+                      }}
                     />
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
-                      <p className="text-sm">Activity log will appear here when editing a company</p>
+                      <p className="text-sm">No Activities Found</p>
                     </div>
                   )}
                 </div>
               )}
+
+
             </div>
+
+
 
             {/* Comment Input Section - Outside main content */}
             {!showAgentSelection && !showClientSelection && (
               <div className="px-3 pb-3 bg-[#ebebeb] dark:bg-[#0a0a0a]">
-                <div className="flex gap-3 bg-sidebar rounded-lg p-3 border">
-                  <Avatar className="h-8 w-8 flex-shrink-0">
-                    <AvatarImage src="" alt="Current User" />
-                    <AvatarFallback className="text-xs">
-                      CU
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <form onSubmit={handleCommentSubmit}>
-                      <Input 
-                        placeholder="Write a comment..." 
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        className="text-sm h-9"
-                        disabled={isSubmittingComment}
-                      />
-                    </form>
-                  </div>
-                  <Button 
-                    size="sm" 
-                    className="rounded-lg bg-teal-600 hover:bg-teal-700 hover:border-teal-700 h-9 px-3" 
-                    onClick={handleCommentSubmit}
-                    disabled={!comment.trim() || isSubmittingComment}
-                    type="submit"
-                  >
-                    {isSubmittingComment ? (
-                      <>
-                        <IconClock className="h-4 w-4 mr-1 animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <IconSend className="h-4 w-4 mr-1" />
-                        Send
-                      </>
-                    )}
-                  </Button>
+                <div className="flex gap-2">
+                                      <div className="flex-1">
+                      <form onSubmit={handleCommentSubmit}>
+                        <div className={`border rounded-lg bg-sidebar overflow-hidden transition-all duration-300 ease-in-out [&>*]:border-none [&>*]:outline-none [&>textarea]:transition-all [&>textarea]:duration-300 [&>textarea]:ease-in-out ${
+                          isCommentFocused || comment.trim() 
+                            ? 'border-muted-foreground' 
+                            : 'border-border'
+                        }`}>
+                          <textarea 
+                            placeholder="Write a comment..." 
+                            value={comment}
+                            onChange={(e) => {
+                              setComment(e.target.value)
+                              // Auto-resize the textarea
+                              e.target.style.height = 'auto'
+                              e.target.style.height = e.target.scrollHeight + 'px'
+                            }}
+                            onFocus={(e) => {
+                              setIsCommentFocused(true)
+                            }}
+                            onBlur={(e) => {
+                              setIsCommentFocused(false)
+                            }}
+                            className="w-full resize-none border-0 bg-transparent text-foreground px-3 py-2 shadow-none text-sm focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:text-foreground placeholder:text-muted-foreground align-middle transition-all duration-300 ease-in-out min-h-[36px] overflow-hidden"
+                            disabled={isSubmittingComment}
+                            rows={1}
+                          />
+                          
+                          {/* Send button - only show when expanded, inside the textarea container */}
+                          {(isCommentFocused || comment.trim()) && (
+                            <div className="p-1 flex justify-end animate-in fade-in duration-300">
+                              <button
+                                type="submit"
+                                onClick={handleCommentSubmit}
+                                disabled={!comment.trim() || isSubmittingComment}
+                                className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                              >
+                                {isSubmittingComment ? (
+                                  <IconClock className="h-3 w-3 text-muted-foreground animate-spin" />
+                                  ) : (
+                                  <SendHorizontal className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </form>
+                    </div>
                 </div>
               </div>
             )}

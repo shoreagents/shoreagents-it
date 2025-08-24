@@ -1888,11 +1888,12 @@ export interface NewCompanyInput {
   website: string[]
   logo: string | null
   badge_color?: string
-  status: 'Current Client' | 'Lost Client'
+  status?: 'Current Client' | 'Lost Client'
+  created_by?: number
 }
 
 export async function createMemberCompany(input: NewCompanyInput) {
-  const insertColumns = ['company', 'address', 'phone', 'country', 'service', 'website', 'logo', 'status', 'company_id']
+  const insertColumns = ['company', 'address', 'phone', 'country', 'service', 'website', 'logo', 'company_id', 'badge_color', 'status']
   const companyId = (globalThis.crypto?.randomUUID?.() || undefined) as unknown as string || Math.random().toString(36).slice(2)
   const insertValues: any[] = [
     input.company,
@@ -1902,13 +1903,17 @@ export async function createMemberCompany(input: NewCompanyInput) {
     input.service,
     input.website,
     input.logo,
-    input.status,
     companyId,
+    input.badge_color, // Use the form's badge color (including default)
+    input.status, // Use the form's status (including default)
   ]
-  if (input.badge_color && input.badge_color.trim() !== '') {
-    insertColumns.push('badge_color')
-    insertValues.push(input.badge_color)
+  
+  // Add created_by if provided
+  if (input.created_by) {
+    insertColumns.push('created_by')
+    insertValues.push(input.created_by)
   }
+  
   const placeholders = insertValues.map((_, i) => `$${i + 1}`).join(', ')
   const result = await pool.query(
     `INSERT INTO public.members (${insertColumns.join(', ')}) VALUES (${placeholders}) RETURNING *`,
@@ -2536,7 +2541,7 @@ export async function getClientsForModal(
   memberId?: string,
   sortField: string = 'first_name',
   sortDirection: 'asc' | 'desc' = 'asc'
-): Promise<{ agents: any[], pagination: { totalCount: number, totalPages: number, currentPage: number } }> {
+): Promise<{ clients: any[], pagination: { totalCount: number, totalPages: number, currentPage: number } }> {
   const offset = (page - 1) * limit
   const params: any[] = []
   let paramIndex = 1
@@ -2557,11 +2562,11 @@ export async function getClientsForModal(
     const term = `%${search.trim()}%`
     params.push(term)
     const t = `$${paramIndex++}`
-    whereParts.push(
-      `(
-        COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
-      )`
-    )
+          whereParts.push(
+        `(
+          COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
+        )`
+      )
   }
   
   const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : ''
@@ -2576,7 +2581,7 @@ export async function getClientsForModal(
   `
   
   const countResult = await pool.query(countQuery, params)
-  const totalCount = parseInt(countResult.rows[0]?.total || '0', 10)
+  const totalCount = parseInt(countResult.rows[0].total || '0', 10)
   const totalPages = Math.ceil(totalCount / limit)
   
   // Get paginated results - only essential fields for modal selection
@@ -2600,7 +2605,7 @@ export async function getClientsForModal(
   const result = await pool.query(dataQuery, params)
   
   return {
-    agents: result.rows,
+    clients: result.rows,
     pagination: {
       totalCount,
       totalPages,
