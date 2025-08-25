@@ -7,13 +7,15 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconVideo, IconCash, IconClockHour4, IconExternalLink, IconSun, IconMoon } from "@tabler/icons-react"
+import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconVideo, IconCash, IconClockHour4, IconExternalLink, IconSun, IconMoon, IconAward, IconCode } from "@tabler/icons-react"
 import { Input } from "@/components/ui/input"
 import { EditableField, DataFieldRow } from "@/components/ui/fields"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useTheme } from "next-themes"
 import { useRealtimeApplicants } from "@/hooks/use-realtime-applicants"
+import { AnimatedTabs } from "@/components/ui/animated-tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 
 interface ApplicantsDetailModalProps {
   applicant: Applicant | null
@@ -212,11 +214,12 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
   const [isLoadingComments, setIsLoadingComments] = useState(false)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [activeTab, setActiveTab] = useState("information")
   
   // Editable input values
   const [inputValues, setInputValues] = useState<Record<string, string>>({})
   const [isSaving, setIsSaving] = useState(false)
-  // Store original values for change detection
+  // Store original values for change detection 
   const [originalValues, setOriginalValues] = useState<Record<string, string>>({})
   
   // Check if there are unsaved changes
@@ -711,11 +714,11 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                 <Separator />
               </div>
 
-              {/* Applicant Details */}
+              {/* Applicant Details with Tabs */}
               <div className="flex-1 px-6 py-5 overflow-y-auto min-h-0">
-                <div className="space-y-6 flex flex-col min-h-full">
-                  {/* Job Application Section */}
-                  <div className="flex flex-col">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-1 flex flex-col min-h-0">
+                  {/* Job Application Section - Always Visible */}
+                  <div className="flex flex-col mb-6">
                     <h3 className="text-lg font-medium mb-2 text-muted-foreground">Job Application</h3>
                     <div className="rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border">
                       <div className="flex flex-col gap-3">
@@ -730,108 +733,35 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                       {jobTitle}
                                     </h4>
                                     {(() => {
-                                                                              const status = applicant.all_job_statuses?.[index] || applicant.status;
-                                        const showStatus = ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
-                                        
-                                        // Show status badge if job has final status
-                                        if (showStatus) {
-                                          // Make badge clickable only when main status is "passed"
-                                          if (applicant.status.toLowerCase() === 'passed') {
-                                            return (
-                                              <Popover>
-                                                <PopoverTrigger asChild>
-                                                  <Badge 
-                                                    variant="outline" 
-                                                    className={`${getStatusColor(status)} px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:opacity-80 transition-opacity`}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                  >
-                                                    {getStatusLabel(status)}
-                                                  </Badge>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
-                                                  <div className="space-y-1">
-                                                    {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
-                                                      <div 
-                                                        key={statusOption}
-                                                        className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                                          status.toLowerCase() === statusOption 
-                                                            ? 'bg-primary/10 text-primary border border-primary/20 pointer-events-none cursor-default' 
-                                                            : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
-                                                        }`}
-                                                                                                                  onClick={async () => {
-                                                            try {
-                                                              console.log(`Updating BPOC job ${index} status to:`, statusOption);
-                                                              
-                                                              const response = await fetch('/api/bpoc/update-job-status/', {
-                                                                method: 'PATCH',
-                                                                headers: {
-                                                                  'Content-Type': 'application/json',
-                                                                },
-                                                                body: JSON.stringify({
-                                                                  applicantId: applicant.id,
-                                                                  jobIndex: index,
-                                                                  newStatus: statusOption
-                                                                })
-                                                              });
-                                                              
-                                                              if (response.ok) {
-                                                                const result = await response.json();
-                                                                console.log('✅ BPOC job status updated successfully:', result);
-                                                                
-                                                                // Update parent state if callback is provided
-                                                                if (onStatusUpdate) {
-                                                                  onStatusUpdate(applicant.id, index, statusOption);
-                                                                }
-                                                              } else {
-                                                                const error = await response.json();
-                                                                console.error('❌ Failed to update BPOC job status:', error);
-                                                              }
-                                                            } catch (error) {
-                                                              console.error('❌ Error updating BPOC job status:', error);
-                                                            }
-                                                          }}
-                                                      >
-                                                        {getStatusIcon(statusOption)}
-                                                        <span className="text-sm font-medium">{getStatusLabel(statusOption)}</span>
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                </PopoverContent>
-                                              </Popover>
-                                            );
-                                          }
-                                          
-                                          // Non-clickable badge when main status is not "passed"
-                                          return (
-                                            <Badge variant="outline" className={`${getStatusColor(status)} px-2 py-0.5 text-xs font-medium rounded-md`}>
-                                              {getStatusLabel(status)}
-                                            </Badge>
-                                          );
-                                        }
-                                        
-                                        // Show "Set Status" button when main status is "passed"
+                                      const status = applicant.all_job_statuses?.[index] || applicant.status;
+                                      const showStatus = ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
+                                      
+                                      // Show status badge if job has final status
+                                      if (showStatus) {
+                                        // Make badge clickable only when main status is "passed"
                                         if (applicant.status.toLowerCase() === 'passed') {
                                           return (
                                             <Popover>
                                               <PopoverTrigger asChild>
                                                 <Badge 
                                                   variant="outline" 
-                                                  className="px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all duration-200 border-dashed text-muted-foreground border-muted-foreground/30"
+                                                  className={`${getStatusColor(status)} px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:opacity-80 transition-opacity`}
                                                   onClick={(e) => e.stopPropagation()}
                                                 >
-                                                  Set Status
+                                                  {getStatusLabel(status)}
                                                 </Badge>
                                               </PopoverTrigger>
                                               <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
                                                 <div className="space-y-1">
-
                                                   {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
                                                     <div 
                                                       key={statusOption}
-                                                      className="flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground"
+                                                      className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
+                                                        status.toLowerCase() === statusOption 
+                                                          ? 'bg-primary/10 text-primary border border-primary/20 pointer-events-none cursor-default' 
+                                                          : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
+                                                      }`}
                                                       onClick={async () => {
-                                                        const current = (applicant.all_job_statuses?.[index] || applicant.status).toLowerCase();
-                                                        if (current === statusOption) return;
                                                         try {
                                                           console.log(`Updating BPOC job ${index} status to:`, statusOption);
                                                           
@@ -874,169 +804,140 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                           );
                                         }
                                         
-                                        return null;
+                                        // Non-clickable badge when main status is not "passed"
+                                        return (
+                                          <Badge variant="outline" className={`${getStatusColor(status)} px-2 py-0.5 text-xs font-medium rounded-md`}>
+                                            {getStatusLabel(status)}
+                                          </Badge>
+                                        );
+                                      }
+                                      
+                                      return null;
                                     })()}
                                   </div>
-                                  <div className="flex items-center justify-between">
-                                    {applicant.all_companies && applicant.all_companies[index] ? (
-                                      <div className="flex items-center gap-1">
-                                        <IconBuilding className="w-3 h-3 text-muted-foreground" />
-                                        <p className="text-xs text-muted-foreground font-medium">
-                                          {applicant.all_companies[index]}
-                                        </p>
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center gap-1">
-                                        <IconBuilding className="w-3 h-3 text-muted-foreground/50" />
-                                        <p className="text-xs text-muted-foreground/50 italic">
-                                          Company not specified
-                                        </p>
-                                      </div>
-                                    )}
-                                    {applicant.all_job_timestamps && applicant.all_job_timestamps[index] && (
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <div className="cursor-pointer">
-                                              <IconCalendar className="h-4 w-4 text-muted-foreground/70 hover:text-muted-foreground transition-colors" />
-                                            </div>
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            <div className="flex items-center gap-0 text-xs">
-                                              <span>
-                                                {new Date(applicant.all_job_timestamps[index]).toLocaleDateString('en-US', { 
-                                                  month: 'short', 
-                                                  day: 'numeric',
-                                                  year: 'numeric'
-                                                })}
-                                              </span>
-                                              <span className="text-muted-foreground/50 mx-1">•</span>
-                                              <span>
-                                                {new Date(applicant.all_job_timestamps[index]).toLocaleTimeString('en-US', {
-                                                  hour: '2-digit',
-                                                  minute: '2-digit',
-                                                  hour12: true
-                                                })}
-                                              </span>
-                                            </div>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    )}
-                                  </div>
+                                  
+                                  {applicant.all_companies && applicant.all_companies[index] && (
+                                    <div className="flex items-center gap-1">
+                                      <svg className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                      </svg>
+                                      <p className="text-xs text-muted-foreground font-medium">
+                                        {applicant.all_companies[index]}
+                                      </p>
+                                    </div>
+                                  )}
+                                  
+                                  {applicant.all_job_timestamps && applicant.all_job_timestamps[index] && (
+                                    <div className="flex items-center gap-1 mt-1">
+                                      <IconCalendar className="h-3 w-3 text-muted-foreground/70" />
+                                      <p className="text-xs text-muted-foreground">
+                                        Applied: {new Date(applicant.all_job_timestamps[index]).toLocaleDateString('en-US', { 
+                                          month: 'short', 
+                                          day: 'numeric',
+                                          year: 'numeric'
+                                        })}
+                                      </p>
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
                           </>
                         ) : (
-                          <>
-                            <span className="text-xs font-medium text-muted-foreground/70">Applied for:</span>
-                            <div className="rounded-lg p-3 bg-gray-100 dark:bg-[#1a1a1a] hover:shadow-sm transition-all duration-200">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-semibold text-sm text-primary leading-tight break-words flex-1">
-                                  {applicant.job_title || applicant.concern}
-                                </h4>
-                                {(() => {
-                                                                      const status = applicant.all_job_statuses?.[0] || applicant.status;
-                                    const showStatus = ['withdrawn', 'failed', 'final interview', 'hired'].includes(status.toLowerCase());
-                                    
-                                    // If BPOC recruits status is "passed", show popover for status selection
-                                    if (applicant.status.toLowerCase() === 'passed') {
-                                      return (
-                                        <Popover>
-                                          <PopoverTrigger asChild>
-                                            <Button 
-                                              variant="ghost" 
-                                              className="h-auto p-0 hover:bg-muted/50 active:bg-muted/70 transition-colors"
-                                            >
-                                              <Badge variant="outline" className={`${getStatusColor(status)} px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:opacity-80 transition-opacity`}>
-                                                {getStatusLabel(status)}
-                                              </Badge>
-                                            </Button>
-                                          </PopoverTrigger>
-                                          <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
-                                            <div className="space-y-1">
-                                              {['withdrawn', 'failed', 'final interview', 'hired'].map((statusOption) => (
-                                                <div 
-                                                  key={statusOption}
-                                                  className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                                    status.toLowerCase() === statusOption 
-                                                      ? 'bg-primary/10 text-primary border border-primary/20 pointer-events-none cursor-default' 
-                                                      : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
-                                                  }`}
-                                                  onClick={() => {
-                                                    // TODO: Implement status update for individual job
-                                                    console.log(`Update job 0 status to:`, statusOption);
-                                                  }}
-                                                >
-                                                  {getStatusIcon(statusOption)}
-                                                  <span className="text-sm font-medium">{getStatusLabel(statusOption)}</span>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </PopoverContent>
-                                        </Popover>
-                                      );
-                                    }
-                                    
-                                    // Otherwise, show regular badge if status should be shown
-                                    return showStatus ? (
-                                      <Badge variant="outline" className={`${getStatusColor(status)} px-2 py-0.5 text-xs font-medium rounded-md`}>
-                                        {getStatusLabel(status)}
-                                      </Badge>
-                                    ) : null;
-                                })()}
-                              </div>
-                              <div className="flex items-center justify-between">
-                                {applicant.company_name && (
-                                  <div className="flex items-center gap-1">
-                                    <IconBuilding className="w-3 h-3 text-muted-foreground" />
-                                    <p className="text-xs text-muted-foreground font-medium">
-                                      {applicant.company_name}
-                                    </p>
-                                  </div>
-                                )}
-                                {applicant.all_job_timestamps && applicant.all_job_timestamps[0] && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="cursor-pointer">
-                                          <IconCalendar className="h-4 w-4 text-muted-foreground/70 hover:text-muted-foreground transition-colors" />
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <div className="flex items-center gap-0 text-xs">
-                                          <span>
-                                            {new Date(applicant.all_job_timestamps[0]).toLocaleDateString('en-US', { 
-                                              month: 'short', 
-                                              day: 'numeric',
-                                              year: 'numeric'
-                                            })}
-                                          </span>
-                                          <span className="text-muted-foreground/50 mx-1">•</span>
-                                          <span>
-                                            {new Date(applicant.all_job_timestamps[0]).toLocaleTimeString('en-US', {
-                                              hour: '2-digit',
-                                              minute: '2-digit',
-                                              hour12: true
-                                            })}
-                                          </span>
-                                        </div>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </div>
-                          </>
+                          <div className="text-center py-4 text-muted-foreground">
+                            <IconBriefcase className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">No job applications found</p>
+                            <p className="text-xs">This applicant hasn't applied for any specific positions yet.</p>
+                          </div>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* BPOC Recruits Database Information Section */}
-                  <div className="flex-1 flex flex-col min-h-0">
-                    <div className="rounded-lg border border-[#cecece99] dark:border-border">
+                  <div className="mb-6 flex-shrink-0">
+                    <div className={`rounded-xl p-1 w-fit ${
+                      theme === 'dark' 
+                        ? 'bg-white/5 border border-white/10' 
+                        : 'bg-gray-100/80 border border-gray-200'
+                    }`}>
+                      <AnimatedTabs
+                        tabs={[
+                          { title: "About", value: "information" },
+                          { title: "AI Analysis", value: "ai-analysis" }
+                        ]}
+                        containerClassName="grid grid-cols-2 w-fit"
+                        activeTabClassName={`rounded-xl ${
+                          theme === 'dark' 
+                            ? 'bg-zinc-800' 
+                            : 'bg-[#ebebeb]'
+                        }`}
+                        onTabChange={(tab) => setActiveTab(tab.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Information Tab */}
+                  <TabsContent value="information" className="space-y-6 overflow-y-auto flex-1 min-h-0">
+                    <div className="space-y-6 flex flex-col min-h-full">
+                      {/* Summary Section */}
+                      <div>
+                        <h3 className="text-lg font-medium mb-2 text-muted-foreground">Summary</h3>
+                        <div className="rounded-lg p-6 text-sm leading-relaxed min-h-[120px] border">
+                          {applicant.details || "No description provided."}
+                        </div>
+                      </div>
+
+                      {/* Skills and Resume Section - 2 Columns */}
+                      <div className="grid grid-cols-2 gap-6 items-start">
+                        {/* Skills Section */}
+                        <div className="h-full">
+                          <h3 className="text-lg font-medium mb-2 text-muted-foreground">Skills</h3>
+                          <div className="rounded-lg p-6 min-h-[200px] border h-full flex flex-col">
+                            <div className="space-y-4 flex-1">
+                              {/* For applicants, we can show skills from their profile or job applications */}
+                              <div>
+                                <h4 className="text-sm font-medium text-muted-foreground mb-2">Applied Positions</h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {applicant.all_job_titles && applicant.all_job_titles.length > 0 ? (
+                                    applicant.all_job_titles.map((jobTitle, index) => (
+                                      <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                        {jobTitle}
+                                      </Badge>
+                                    ))
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">No positions applied for</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Resume Container */}
+                        <div className="h-full">
+                          <h3 className="text-lg font-medium mb-2 text-muted-foreground">Resume</h3>
+                          <div className="rounded-lg p-6 min-h-[200px] border bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-950/20 dark:to-indigo-950/20 hover:from-blue-100 hover:to-indigo-200 dark:hover:from-blue-900/30 dark:hover:to-indigo-900/30 transition-all duration-200 cursor-pointer h-full flex flex-col"
+                               onClick={() => applicant.resume_slug && window.open(`https://www.bpoc.io/${applicant.resume_slug}`, '_blank')}>
+                            <div className="flex flex-col items-center justify-center flex-1 text-center">
+                              <div className="mb-3">
+                                <div className="w-12 h-12 rounded-full bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center mb-2">
+                                  <IconFile className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                                </div>
+                              </div>
+                              <p className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+                                View Resume
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Click to open resume
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* BPOC Recruits Database Information Section */}
+                      <div className="flex-1 flex flex-col min-h-0">
+                        <div className="rounded-lg border border-[#cecece99] dark:border-border">
 
                       
 
@@ -1154,9 +1055,21 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                       </div>
                     </div>
                   )}
-
-
                 </div>
+                  </TabsContent>
+
+                  {/* AI Analysis Tab */}
+                  <TabsContent value="ai-analysis" className="space-y-6 overflow-y-auto flex-1 min-h-0">
+                    <div className="space-y-6">
+                      <div>
+                        <h3 className="text-lg font-medium mb-2 text-muted-foreground">AI Analysis</h3>
+                        <div className="rounded-lg p-6 text-sm leading-relaxed min-h-[120px] border">
+                          <p className="text-muted-foreground">AI analysis features coming soon...</p>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             </div>
 

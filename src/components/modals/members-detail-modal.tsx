@@ -64,6 +64,32 @@ const serviceOptions = [
   { value: 'workforce', label: 'Workforce' }
 ]
 
+// Badge helper functions (matching the main companies page)
+const getServiceBadgeClass = (service: string | null): string => {
+  const s = (service || '').toLowerCase()
+  if (s === 'workforce') {
+    return 'bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800'
+  }
+  if (s === 'one agent') {
+    return 'bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800'
+  }
+  if (s === 'team') {
+    return 'bg-yellow-100 text-yellow-800 border border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-200 dark:border-yellow-800'
+  }
+  return 'bg-gray-100 text-gray-800 border border-gray-200 dark:bg-gray-900/30 dark:text-gray-200 dark:border-gray-800'
+}
+
+const getStatusBadgeClass = (status: string | null): string => {
+  const s = (status || '').toLowerCase()
+  if (s === 'current client') {
+    return 'bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-800'
+  }
+  if (s === 'lost client') {
+    return 'bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800'
+  }
+  return 'bg-gray-100 text-gray-800 border border-gray-200 dark:bg-gray-900/30 dark:text-gray-200 dark:border-gray-800'
+}
+
 const countryOptions = [
   'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cabo Verde', 'Cambodia', 'Cameroon', 'Canada', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros', 'Congo', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Democratic Republic of the Congo', 'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic', 'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia', 'Fiji', 'Finland', 'France', 'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana', 'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy', 'Ivory Coast', 'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'Kuwait', 'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico', 'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway', 'Oman', 'Pakistan', 'Palau', 'Palestine', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia', 'Rwanda', 'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe', 'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia', 'South Africa', 'South Korea', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu', 'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe'
 ]
@@ -937,11 +963,15 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
 
 
   const handleInputChange = (field: keyof CompanyData, value: string | File | null) => {
+    console.log(`🔄 handleInputChange called with field: ${field}, value:`, value)
+    console.log(`🔍 Current formData.${field}:`, formData[field])
+    
     const newData = {
       ...formData,
       [field]: value
     }
     
+    console.log(`📝 Setting new formData for ${field}:`, newData[field])
     setFormData(newData)
     
     // No more auto-save timer - user must click save button
@@ -2047,8 +2077,152 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
 
             </div>
 
+            {/* Company Header */}
+            <div className="px-6 py-5">
+              {/* Company Name - Editable Title */}
+              <Input
+                type="text"
+                value={formData.company || ''}
+                onChange={(e) => handleInputChange('company', e.target.value)}
+                placeholder="Company Name"
+                className="text-2xl font-semibold mb-4 h-auto px-3 py-0 !border !border-transparent dark:!border-transparent !bg-transparent hover:!bg-[#ebebeb] dark:hover:!bg-[#0a0a0a] focus:!bg-[#ebebeb] dark:focus:!bg-[#0a0a0a] focus:!border-sidebar-border dark:focus:!border-border rounded-lg transition-colors duration-200 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
+                style={{ minHeight: '2.5rem', backgroundColor: 'transparent' }}
+              />
+              
+              {/* Company Metadata Grid */}
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                {/* Service */}
+                <div className="flex items-center gap-2">
+                  <IconBriefcase className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Service:</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Badge 
+                        variant="secondary" 
+                        className={`text-xs h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity ${
+                          formData.service ? getServiceBadgeClass(formData.service) : 'bg-gray-100 text-gray-800 border border-gray-200 dark:bg-gray-900/30 dark:text-gray-200 dark:border-gray-800'
+                        }`}
+                      >
+                        {formData.service ? serviceOptions.find(opt => opt.value === formData.service)?.label || formData.service : 'Choose Service'}
+                      </Badge>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-2">
+                      <div className="space-y-1">
+                        {serviceOptions.map((option) => {
+                          const isCurrentService = formData.service === option.value;
+                          return (
+                            <div 
+                              key={option.value}
+                              className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
+                                isCurrentService 
+                                  ? 'bg-primary/10 text-primary border border-primary/20 cursor-default' 
+                                  : 'hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground cursor-pointer'
+                              }`}
+                              onClick={isCurrentService ? undefined : () => handleInputChange('service', option.value)}
+                            >
+                              {option.value === 'workforce' ? (
+                                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                              ) : option.value === 'one agent' ? (
+                                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                              ) : option.value === 'team' ? (
+                                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                              ) : (
+                                <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                              )}
+                              <span className="text-sm font-medium">{option.label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                {/* Status */}
+                <div className="flex items-center gap-2">
+                  {formData.status === 'Current Client' ? (
+                    <IconCircle className="h-4 w-4 fill-green-500 stroke-none" />
+                  ) : formData.status === 'Lost Client' ? (
+                    <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
+                  ) : (
+                    <IconCircle className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="text-muted-foreground">Status:</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Badge 
+                        variant="secondary" 
+                        className={`text-xs h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity ${
+                          formData.status ? getStatusBadgeClass(formData.status) : 'bg-gray-100 text-gray-800 border border-gray-200 dark:bg-gray-900/30 dark:text-gray-200 dark:border-gray-800'
+                        }`}
+                      >
+                        {formData.status || 'Set Status'}
+                      </Badge>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-2">
+                      <div className="space-y-1">
+                        {[
+                          { value: 'Current Client' },
+                          { value: 'Lost Client' }
+                        ].map((statusOption) => {
+                          const isCurrentStatus = formData.status === statusOption.value;
+                          return (
+                            <div 
+                              key={statusOption.value}
+                              className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
+                                isCurrentStatus 
+                                  ? 'bg-primary/10 text-primary border border-primary/20 cursor-default' 
+                                  : 'hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground cursor-pointer'
+                              }`}
+                              onClick={isCurrentStatus ? undefined : () => handleInputChange('status', statusOption.value)}
+                            >
+                              {statusOption.value === 'Current Client' ? (
+                                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                              ) : statusOption.value === 'Lost Client' ? (
+                                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                              ) : (
+                                <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                              )}
+                              <span className="text-sm font-medium">{statusOption.value}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Badge Color */}
+                <div className="flex items-center gap-2">
+                  <IconTag className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Badge Color:</span>
+                  <div className="flex items-center gap-2">
+                    <ColorPicker
+                      color={formData.badge_color}
+                      onChange={(color) => handleInputChange('badge_color', color)}
+                      open={isColorPickerOpen}
+                      onOpenChange={setIsColorPickerOpen}
+                    >
+                      <div 
+                        className="w-5 h-5 rounded-full border border-border cursor-pointer shadow-sm flex-shrink-0" 
+                        style={{ backgroundColor: formData.badge_color || '#0EA5E9' }}
+                        title="Click to open color picker"
+                      />
+                    </ColorPicker>
+                    <span className="text-xs font-mono text-muted-foreground leading-none">
+                      {formData.badge_color || '#0EA5E9'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="px-6">
+              <Separator />
+            </div>
+
             {/* Scrollable Form Content */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 min-h-0">
+            <div className="flex-1 px-6 py-5 overflow-y-auto min-h-0">
               {isLoadingCompany ? (
                 <div className="space-y-6">
                   {/* Information Section Skeleton */}
@@ -2119,67 +2293,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
               ) : (
                 <form id="add-company-form" onSubmit={handleSubmit} className="space-y-6">
                   {/* Information Section */}
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-medium text-muted-foreground">Information</h3>
+                  <div>
+                    <div className="flex items-center justify-between min-h-[40px]">
+                      <h3 className="text-lg font-medium text-muted-foreground">Information</h3>
+                    </div>
                     {/* Company Information Container */}
                     <div className="rounded-lg border border-[#cecece99] dark:border-border overflow-hidden">
-                    {/* Company Name */}
-                    <DataFieldRow
-                      icon={<IconBuilding className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                      label="Name *"
-                      fieldName="company"
-                      value={formData.company || ''}
-                      onSave={(fieldName, value) => handleInputChange(fieldName as keyof CompanyData, value)}
-                      placeholder="-"
-                    />
-
-                    {/* Service */}
-                    <DataFieldRow
-                      icon={<IconBriefcase className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                      label="Service"
-                      fieldName="service"
-                      value={formData.service || ''}
-                      onSave={(fieldName, value) => handleInputChange(fieldName as keyof CompanyData, value)}
-                      placeholder="-"
-                      customInput={
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <div 
-                              className={`h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none justify-start text-left font-normal cursor-pointer select-none flex items-center ${
-                                formData.service ? 'text-foreground' : 'text-muted-foreground'
-                              }`}
-                              style={{ backgroundColor: 'transparent' }}
-                              tabIndex={0}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault()
-                                }
-                              }}
-                            >
-                              {formData.service ? serviceOptions.find(opt => opt.value === formData.service)?.label || formData.service : '-'}
-                            </div>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
-                            <div className="space-y-1">
-                              {serviceOptions.map((option) => (
-                                <div 
-                                  key={option.value}
-                                  className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                    formData.service === option.value 
-                                      ? 'bg-primary/10 text-primary border border-primary/20 pointer-events-none cursor-default' 
-                                      : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
-                                  }`}
-                                  onClick={() => handleInputChange('service', option.value)}
-                                >
-                                  <span className="text-sm font-medium">{option.label}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      }
-                    />
-
                     {/* Address */}
                     <DataFieldRow
                       icon={<IconMapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
@@ -2275,89 +2394,6 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                   </div>
                                 ))}
                               </div>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      }
-                    />
-
-                    {/* Badge Color */}
-                    <DataFieldRow
-                      icon={<IconTag className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                      label="Badge Color"
-                      fieldName="badge_color"
-                      value={formData.badge_color || ''}
-                      onSave={(fieldName, value) => handleInputChange(fieldName as keyof CompanyData, value)}
-                      placeholder="-"
-                      customInput={
-                        <div className="flex items-center gap-2 w-full">
-                          <ColorPicker
-                            color={formData.badge_color}
-                            onChange={(color) => handleInputChange('badge_color', color)}
-                            open={isColorPickerOpen}
-                            onOpenChange={setIsColorPickerOpen}
-                          >
-                            <div 
-                              className="w-5 h-5 rounded-full border border-border cursor-pointer shadow-sm flex-shrink-0" 
-                              style={{ backgroundColor: formData.badge_color || '#0EA5E9' }}
-                              title="Click to open color picker"
-                            />
-                          </ColorPicker>
-                          <Input
-                            id="badge_color"
-                            placeholder="-"
-                            value={formData.badge_color || ''}
-                            onChange={(e) => handleInputChange('badge_color', e.target.value)}
-                            className="h-[33px] flex-1 text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none placeholder:text-muted-foreground"
-                          />
-                        </div>
-                      }
-                    />
-
-                    {/* Status */}
-                    <DataFieldRow
-                      icon={<IconCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                      label="Status"
-                      fieldName="status"
-                      value={formData.status || ''}
-                      onSave={(fieldName, value) => handleInputChange(fieldName as keyof CompanyData, value)}
-                      placeholder="-"
-                      customInput={
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <div 
-                              className={`h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none justify-start text-left font-normal cursor-pointer select-none flex items-center ${
-                                formData.status ? 'text-foreground' : 'text-muted-foreground'
-                              }`}
-                              style={{ backgroundColor: 'transparent' }}
-                              tabIndex={0}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault()
-                                }
-                              }}
-                            >
-                              {formData.status || '-'}
-                            </div>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
-                            <div className="space-y-1">
-                              {[
-                                { value: 'Current Client' },
-                                { value: 'Lost Client' }
-                              ].map((statusOption) => (
-                                <div 
-                                  key={statusOption.value}
-                                  className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                    formData.status === statusOption.value 
-                                      ? 'bg-primary/10 text-primary border border-primary/20 pointer-events-none cursor-default' 
-                                      : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
-                                  }`}
-                                  onClick={() => handleInputChange('status', statusOption.value)}
-                                >
-                                  <span className="text-sm font-medium">{statusOption.value}</span>
-                                </div>
-                              ))}
                             </div>
                           </PopoverContent>
                         </Popover>
@@ -2471,7 +2507,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                 </div>
 
                                   {/* Agents Section */}
-                  <div className="space-y-2">
+                  <div>
                     <div className="flex items-center justify-between min-h-[40px]">
                       <h3 className="text-lg font-medium text-muted-foreground">
                         Agents
@@ -2605,7 +2641,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                 </div>
 
                 {/* Clients Section */}
-                <div className="space-y-2">
+                <div>
                   <div className="flex items-center justify-between min-h-[40px]">
                     <h3 className="text-lg font-medium text-muted-foreground">
                       Clients

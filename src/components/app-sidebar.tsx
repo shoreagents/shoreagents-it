@@ -234,7 +234,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   icon: FileTextIcon,
                   items: [
                     { title: "BPOC", url: "/admin/bpoc-applicants", badge: newApplicantsCount > 0 ? newApplicantsCount : undefined },
-                    { title: "Forms", url: "/admin/forms" },
+                    { title: "Records", url: "/admin/applicants-records" },
                   ]
                 },
                 { title: "Talent Pool", url: "/admin/talent-pool", icon: SparklesIcon },

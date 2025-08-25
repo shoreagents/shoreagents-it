@@ -16,6 +16,7 @@ import { useTheme } from "next-themes"
 import { motion, AnimatePresence } from "framer-motion"
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { Comment, CommentData } from "@/components/ui/comment"
 
 interface TalentsDetailModalProps {
   talent: TalentProfile | null
@@ -66,13 +67,7 @@ interface Project {
   url?: string
 }
 
-interface Comment {
-  id: string
-  comment: string
-  created_at: string
-  updated_at?: string
-  user_id?: string
-  user_name: string
+interface Comment extends CommentData {
   user_role: string
 }
 
@@ -118,29 +113,7 @@ const getStatusIcon = (status: string) => {
   }
 }
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString)
-  return {
-    date: date.toLocaleDateString('en-US', { 
-      year: 'numeric',
-      month: 'long', 
-      day: 'numeric'
-    }),
-    time: date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    }),
-    full: date.toLocaleDateString('en-US', { 
-      year: 'numeric',
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    })
-  }
-}
+
 
 export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailModalProps) {
   const { theme } = useTheme()
@@ -148,7 +121,7 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
   const [isSubmittingComment, setIsSubmittingComment] = React.useState(false)
   const [deletingId, setDeletingId] = React.useState<string | null>(null)
   const [commentsList, setCommentsList] = React.useState<Comment[]>(talent?.comments || [])
-  const [hoveredComment, setHoveredComment] = React.useState<string | null>(null)
+
   const [showDeleteModal, setShowDeleteModal] = React.useState(false)
   const [commentToDelete, setCommentToDelete] = React.useState<string | null>(null)
   const [activeTab, setActiveTab] = React.useState("information")
@@ -263,38 +236,6 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
 
     loadChatData()
   }, [isOpen, talent?.id, activityTab, conversationStarters.length])
-
-  // Prevent body scroll when modal is open
-  React.useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-      document.body.style.paddingRight = '0px'
-      document.documentElement.style.overflow = 'hidden'
-      document.body.classList.add('overflow-hidden')
-      document.body.style.cssText += '; overflow: hidden !important; position: fixed; width: 100%;'
-    } else {
-      document.body.style.overflow = 'unset'
-      document.body.style.paddingRight = ''
-      document.documentElement.style.overflow = ''
-      document.body.classList.remove('overflow-hidden')
-      document.body.style.position = ''
-      document.body.style.width = ''
-      document.body.style.cssText = document.body.style.cssText.replace(/overflow:\s*hidden\s*!important;?\s*/g, '')
-    }
-  }, [isOpen])
-
-  // Cleanup function to restore scroll when component unmounts
-  React.useEffect(() => {
-    return () => {
-      document.body.style.overflow = 'unset'
-      document.body.style.paddingRight = ''
-      document.documentElement.style.overflow = ''
-      document.body.classList.remove('overflow-hidden')
-      document.body.style.position = ''
-      document.body.style.width = ''
-      document.body.style.cssText = document.body.style.cssText.replace(/overflow:\s*hidden\s*!important;?\s*/g, '')
-    }
-  }, [])
 
   if (!talent) return null
 
@@ -515,23 +456,32 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
               </div>
 
                              {/* Talent Content - Tabbed View */}
-               <div className="flex-1 px-6 py-5 overflow-y-auto">
-                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                                       <div className="mb-6">
-                      <AnimatedTabs
-                        tabs={[
-                          { title: "About", value: "information" },
-                          { title: "AI Analysis", value: "ai-analysis" }
-                        ]}
-                        containerClassName="grid w-full grid-cols-2"
-                        activeTabClassName="bg-sidebar border"
-                        tabClassName="text-sm font-medium px-4 py-2 rounded-lg"
-                        onTabChange={(tab) => setActiveTab(tab.value)}
-                      />
+               <div className="flex-1 flex flex-col px-6 py-5 min-h-0">
+                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-1 flex flex-col min-h-0">
+                                       <div className="mb-6 flex-shrink-0">
+                                             <div className={`rounded-xl p-1 w-fit ${
+                         theme === 'dark' 
+                           ? 'bg-white/5 border border-white/10' 
+                           : 'bg-gray-100/80 border border-gray-200'
+                       }`}>
+                                                 <AnimatedTabs
+                           tabs={[
+                             { title: "About", value: "information" },
+                             { title: "AI Analysis", value: "ai-analysis" }
+                           ]}
+                           containerClassName="grid grid-cols-2 w-fit"
+                           activeTabClassName={`rounded-xl ${
+                             theme === 'dark' 
+                               ? 'bg-zinc-800' 
+                               : 'bg-[#ebebeb]'
+                           }`}
+                           onTabChange={(tab) => setActiveTab(tab.value)}
+                         />
+                      </div>
                     </div>
 
                    {/* Information Tab */}
-                   <TabsContent value="information" className="space-y-6">
+                   <TabsContent value="information" className="space-y-6 overflow-y-auto flex-1 min-h-0">
                                            {/* Summary Section */}
                       <div>
                         <h3 className="text-lg font-medium mb-2 text-muted-foreground">Summary</h3>
@@ -567,7 +517,7 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
                                         </h4>
                                         <div className="flex flex-wrap gap-2">
                                           {originalSkillsData[category].map((skill: string, index: number) => (
-                                            <Badge key={index} className="text-xs">
+                                            <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
                                               {skill}
                                             </Badge>
                                           ))}
@@ -584,7 +534,7 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
                                       <h4 className="text-sm font-medium text-muted-foreground mb-2">All Skills</h4>
                                       <div className="flex flex-wrap gap-2">
                                         {talent.skills.map((skill: string, index: number) => (
-                                          <Badge key={index} className="text-xs">
+                                          <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
                                             {skill}
                                           </Badge>
                                         ))}
@@ -702,7 +652,7 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
                    </TabsContent>
 
                    {/* AI Analysis Tab */}
-                   <TabsContent value="ai-analysis" className="space-y-6">
+                   <TabsContent value="ai-analysis" className="space-y-6 overflow-y-auto flex-1 min-h-0">
                      {isLoadingAi ? (
                        <div className="space-y-4">
                          <div className="h-8 w-56 bg-muted animate-pulse rounded" />
@@ -880,92 +830,14 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
                 {activityTab === 'comments' && (
                   <div className="space-y-4">
                     {commentsList && commentsList.length > 0 ? (
-                      commentsList.map((comment) => {
-                        const commentDate = formatDate(comment.created_at)
-                        
-                        return (
-                          <motion.div 
-                            key={comment.id} 
-                            className="rounded-lg p-4 bg-sidebar border"
-                            onHoverStart={() => setHoveredComment(comment.id)}
-                            onHoverEnd={() => setHoveredComment(null)}
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8 flex-shrink-0">
-                                  <AvatarFallback>{comment.user_name?.charAt(0) || 'U'}</AvatarFallback>
-                                </Avatar>
-                                <span className="text-sm font-medium">{comment.user_name}</span>
-                              </div>
-                              
-                              <div className="relative">
-                                <AnimatePresence mode="wait">
-                                   {hoveredComment !== comment.id ? (
-                                     <motion.div 
-                                       key="date-time"
-                                       className="flex items-center gap-2 text-xs text-muted-foreground"
-                                       initial={{ opacity: 0, x: 20 }}
-                                       animate={{ opacity: 1, x: 0 }}
-                                       exit={{ opacity: 0, x: 20 }}
-                                       transition={{ duration: 0.2 }}
-                                     >
-                                       <span>{commentDate.date}</span>
-                                       <span className="inline-block w-1 h-1 rounded-full bg-current opacity-60" />
-                                       <span>{commentDate.time}</span>
-                                     </motion.div>
-                                   ) : (
-                                     <motion.div
-                                        key="clock-icon"
-                                        initial={{ opacity: 0, x: -20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: -20 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="flex items-center gap-1"
-                                      >
-                                        <TooltipProvider>
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <div className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer">
-                                                <IconClock className="h-4 w-4 text-muted-foreground" />
-                                              </div>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top" className="p-2">
-                                               <div className="text-center">
-                                                 <p className="text-xs font-medium">{commentDate.date}</p>
-                                                 <p className="text-xs text-muted-foreground">{commentDate.time}</p>
-                                               </div>
-                                             </TooltipContent>
-                                          </Tooltip>
-                                        </TooltipProvider>
-                                        
-                                        <TooltipProvider>
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <div 
-                                                 className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                                                 onClick={() => handleDeleteComment(comment.id)}
-                                               >
-                                                 <IconTrash className="h-4 w-4 text-red-400" />
-                                               </div>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top" className="p-2">
-                                              <div className="text-center">
-                                                <p className="text-sm font-medium text-red-400">Delete</p>
-                                              </div>
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        </TooltipProvider>
-                                      </motion.div>
-                                  )}
-                                </AnimatePresence>
-                              </div>
-                            </div>
-                            <div className="text-sm text-foreground leading-relaxed">
-                               {comment.comment}
-                             </div>
-                          </motion.div>
-                       )
-                     })
+                      commentsList.map((comment) => (
+                        <Comment
+                          key={comment.id}
+                          comment={comment}
+                          onDelete={handleDeleteComment}
+                          showDeleteButton={true}
+                        />
+                      ))
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
                         <IconMessage className="h-12 w-12 mx-auto mb-2 opacity-50" />
@@ -1168,7 +1040,7 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
 
                {/* Delete Confirmation Modal */}
         <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-          <DialogContent className="max-w-sm">
+          <DialogContent className="max-w-sm" hideClose>
             <DialogHeader>
               <DialogTitle>
                 Delete Comment

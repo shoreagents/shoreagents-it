@@ -63,7 +63,7 @@ export const DataFieldRow = ({
     <div className={`grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden ${
       isLast ? '' : 'border-b border-[#cecece99] dark:border-border'
     }`}>
-      <div className="flex items-center gap-3 min-w-0 px-2">
+      <div className="flex items-center gap-3 min-w-0 px-4">
         {icon}
         <span className="text-sm text-foreground truncate">{label}</span>
       </div>

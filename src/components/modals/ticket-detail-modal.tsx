@@ -81,22 +81,22 @@ type TicketStatus = 'For Approval' | 'On Hold' | 'In Progress' | 'New' | 'Approv
 const getStatusColor = (status: TicketStatus) => {
   switch (status) {
     case "For Approval":
-      return "text-yellow-700 dark:text-white bg-yellow-50 dark:bg-yellow-600/20"
+      return "text-yellow-700 dark:text-white border-yellow-600/20 bg-yellow-50 dark:bg-yellow-600/20"
     case "On Hold":
-      return "text-gray-700 dark:text-white bg-gray-50 dark:bg-gray-600/20"
+      return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
     case "In Progress":
-      return "text-orange-700 dark:text-white bg-orange-50 dark:bg-orange-600/20"
+      return "text-orange-700 dark:text-white border-orange-600/20 bg-orange-50 dark:bg-orange-600/20"
     case "New":
     case "Approved":
-      return "text-blue-700 dark:text-white bg-blue-50 dark:bg-blue-600/20"
+      return "text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20"
     case "Stuck":
-      return "text-red-700 dark:text-white bg-red-50 dark:bg-red-600/20"
+      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
     case "Actioned":
-      return "text-purple-700 dark:text-white bg-purple-50 dark:bg-purple-600/20"
+      return "text-purple-700 dark:text-white border-purple-600/20 bg-purple-50 dark:bg-purple-600/20"
     case "Closed":
-      return "text-green-700 dark:text-white bg-green-50 dark:bg-green-600/20"
+      return "text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20"
     default:
-      return "text-gray-700 dark:text-white bg-gray-50 dark:bg-gray-600/20"
+      return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
   }
 }
 
@@ -437,7 +437,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                       <div className="flex items-center gap-2">
                         <IconTag className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Category:</span>
-                        <Badge variant="secondary" className={`text-xs h-6 flex items-center ${categoryBadge.color}`}>
+                        <Badge variant="secondary" className={`text-xs h-6 flex items-center justify-center ${categoryBadge.color}`}>
                           {categoryBadge.name}
                         </Badge>
                       </div>
@@ -449,8 +449,8 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                         <Popover>
                           <PopoverTrigger asChild>
                             <Badge 
-                              variant="secondary" 
-                              className={`${getStatusColor(currentStatus || ticket.status)} text-xs h-6 flex items-center px-2 cursor-pointer hover:opacity-80 transition-opacity`}
+                              variant="outline" 
+                              className={`${getStatusColor(currentStatus || ticket.status)} px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center`}
                             >
                               {getDisplayStatus(currentStatus || ticket.status, isAdmin)}
                             </Badge>
