@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useEffect } from 'react'
+
 import { useAuth } from '@/contexts/auth-context'
 import { Comment } from '@/components/ui/comment'
+import { useRealtimeActivityLogs, createMembersConfig } from '@/hooks/use-realtime-activity-logs'
 
 interface ActivityLogEntry {
   id: string
@@ -36,106 +37,120 @@ interface ActivityLogProps {
 
 export function MembersActivityLog({ memberId, companyName, onRefresh }: ActivityLogProps) {
   const { user: currentUser, loading: authLoading } = useAuth()
-  const [entries, setEntries] = useState<ActivityLogItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
-  const [totalCount, setTotalCount] = useState(0)
+  
+  // Use realtime hook for activity logs and comments
+  const {
+    allEntries,
+    loading,
+    error,
+    isConnected,
+    addComment,
+    deleteComment,
+    refreshData
+  } = useRealtimeActivityLogs(createMembersConfig(memberId))
+  
+  // Convert allEntries to the expected format
+  const entries: ActivityLogItem[] = allEntries.map(entry => {
+    // Debug each entry during mapping
+    console.log('🔍 Mapping entry:', {
+      id: entry.id,
+      entryType: entry.entryType,
+      created_at: entry.created_at,
+      created_at_type: typeof entry.created_at,
+      has_created_at: !!entry.created_at
+    })
+    
+    // Use created_at field from realtime hook
+    const createdAt = entry.created_at
+    
+    if (entry.entryType === 'comment') {
+      const mappedEntry = {
+        id: entry.id.toString(),
+        type: 'comment' as const,
+        comment: entry.comment,
+        createdAt: createdAt,
+        userName: entry.user_name || 'Unknown User',
+        userId: entry.user_id
+      }
+      console.log('🔍 Mapped comment entry:', mappedEntry)
+      return mappedEntry
+    } else {
+      const mappedEntry = {
+        id: entry.id.toString(),
+        type: 'activity' as const,
+        action: entry.action,
+        fieldName: entry.fieldName,
+        oldValue: entry.oldValue,
+        newValue: entry.newValue,
+        createdAt: createdAt,
+        userName: entry.user_name || 'Unknown User',
+        userId: entry.user_id
+      }
+      console.log('🔍 Mapped activity entry:', mappedEntry)
+      return mappedEntry
+    }
+  })
+  
+  // Debug: Log realtime hook state
+  console.log('🔍 Realtime hook state:', {
+    allEntries: allEntries,
+    allEntriesLength: allEntries?.length,
+    loading: loading,
+    error: error,
+    isConnected: isConnected,
+    entries: entries,
+    entriesLength: entries?.length
+  });
+  
+  // Debug: Log raw allEntries structure
+  if (allEntries && allEntries.length > 0) {
+    console.log('🔍 Raw allEntries structure:', allEntries[0])
+    console.log('🔍 Raw allEntries keys:', Object.keys(allEntries[0] || {}))
+    console.log('🔍 Raw allEntries created_at value:', allEntries[0]?.created_at)
+    console.log('🔍 Raw allEntries created_at type:', typeof allEntries[0]?.created_at)
+    console.log('🔍 Raw allEntries entryType:', allEntries[0]?.entryType)
+    console.log('🔍 Raw allEntries user_name:', allEntries[0]?.user_name)
+    console.log('🔍 Raw allEntries user_id:', allEntries[0]?.user_id)
+  }
+  
+  // Debug: Log date values from realtime hook
+  if (allEntries && allEntries.length > 0) {
+    console.log('🔍 Date values from realtime hook:', allEntries.slice(0, 3).map(entry => ({
+      id: entry.id,
+      entryType: entry.entryType,
+      created_at: entry.created_at,
+      created_at_type: typeof entry.created_at,
+      created_at_valid: entry.created_at ? !isNaN(new Date(entry.created_at).getTime()) : false
+    })))
+  }
+  
+  // Initial load and refresh handling
+  useEffect(() => {
+    if (onRefresh) {
+      onRefresh()
+    }
+  }, [onRefresh])
+  
+  // Auto-refresh when realtime connection is established
+  useEffect(() => {
+    if (isConnected && onRefresh) {
+      onRefresh()
+    }
+  }, [isConnected, onRefresh])
   
   // Debug: Log auth context state
   console.log('🔍 Auth context state:', {
     currentUser: currentUser,
     currentUserId: currentUser?.id,
-    currentUserType: typeof currentUser?.id,
-    authLoading: authLoading
+    currentUserType: typeof currentUser?.id
   });
 
-  const fetchActivities = async (pageNum: number = 1, append: boolean = false) => {
-    try {
-      if (pageNum === 1) {
-        setLoading(true)
-      } else {
-        setLoadingMore(true)
-      }
-      setError(null)
-      
-      const params = new URLSearchParams({
-        page: pageNum.toString(),
-        limit: '20'
-      })
-      
-      const response = await fetch(`/api/members/${memberId}/activity?${params}`)
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch activity log')
-      }
-      
-      const data = await response.json()
-      
-      if (append) {
-        // Append new entries to existing ones
-        setEntries(prev => [...prev, ...(data.entries || [])])
-      } else {
-        // Replace entries for first page
-        setEntries(data.entries || [])
-      }
-      
-      setTotalCount(data.pagination?.totalCount || 0)
-      setCurrentPage(pageNum)
-      setHasMore(pageNum < (data.pagination?.totalPages || 1))
-      
-      // Call onRefresh callback if provided (only for first page)
-      if (onRefresh && pageNum === 1) {
-        onRefresh()
-      }
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch activity log')
-    } finally {
-      setLoading(false)
-      setLoadingMore(false)
-    }
-  }
-
-  // Load more activities when scrolling
+  // Load more activities when scrolling (for realtime, we'll use refreshData)
   const loadMoreActivities = () => {
-    console.log('loadMoreActivities called:', { hasMore, loadingMore, currentPage })
-    if (hasMore && !loadingMore) {
-      console.log('Fetching next page:', currentPage + 1)
-      fetchActivities(currentPage + 1, true)
-    } else {
-      console.log('Cannot load more:', { hasMore, loadingMore })
-    }
+    console.log('loadMoreActivities called - refreshing data')
+    refreshData()
   }
 
-  // Check if more content is needed for scrolling
-  const checkAndLoadMoreIfNeeded = async () => {
-    const container = document.querySelector('[data-activity-list]') as HTMLElement
-    if (!container) return
-    
-    const { scrollHeight, clientHeight } = container
-    const needsMoreContent = scrollHeight <= clientHeight + 100 // Add 100px buffer
-    
-    console.log('Activity scroll check:', {
-      scrollHeight,
-      clientHeight,
-      needsMoreContent,
-      hasMore,
-      loadingMore
-    })
-    
-    if (needsMoreContent && hasMore && !loadingMore) {
-      console.log('Activity content too short, auto-loading more...')
-      await fetchActivities(currentPage + 1, true)
-    }
-  }
-
-  useEffect(() => {
-    fetchActivities(1)
-  }, [memberId])
-  
   // Debug: Monitor auth context changes
   useEffect(() => {
     console.log('🔍 Auth context changed:', {
@@ -144,26 +159,6 @@ export function MembersActivityLog({ memberId, companyName, onRefresh }: Activit
       currentUserType: typeof currentUser?.id
     });
   }, [currentUser]);
-
-  // Auto-refresh every 30 seconds when component is mounted
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (entries.length > 0) {
-        fetchActivities(1) // Refresh first page to get latest entries
-      }
-    }, 30000) // 30 seconds
-
-    return () => clearInterval(interval)
-  }, [entries.length])
-
-  // Auto-load more pages if content height is too short for scrolling
-  useEffect(() => {
-    if (entries.length > 0 && hasMore && !loadingMore) {
-      setTimeout(() => {
-        checkAndLoadMoreIfNeeded()
-      }, 300)
-    }
-  }, [entries.length, hasMore, loadingMore])
 
   // Scroll to bottom when new entries are added (for chronological order)
   useEffect(() => {
@@ -176,22 +171,45 @@ export function MembersActivityLog({ memberId, companyName, onRefresh }: Activit
     }
   }, [entries.length])
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    
-    // Convert to Manila timezone (Asia/Manila)
-    const manilaDate = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Manila"}))
-    
-    const datePart = manilaDate.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
+  const formatDate = (dateString: string | null | undefined) => {
+    // Debug the incoming date string
+    console.log('🔍 formatDate called with:', {
+      dateString,
+      type: typeof dateString,
+      isValid: dateString ? !isNaN(new Date(dateString).getTime()) : false
     })
-    const timePart = manilaDate.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'Asia/Manila'
-    })
-    return `${datePart} • ${timePart}`
+    
+    if (!dateString) {
+      console.warn('⚠️ formatDate received null/undefined dateString')
+      return 'Invalid Date • Invalid Date'
+    }
+    
+    try {
+      const date = new Date(dateString)
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.warn('⚠️ formatDate received invalid date string:', dateString)
+        return 'Invalid Date • Invalid Date'
+      }
+      
+      // Convert to Manila timezone (Asia/Manila)
+      const manilaDate = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Manila"}))
+      
+      const datePart = manilaDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      })
+      const timePart = manilaDate.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Manila'
+      })
+      return `${datePart} • ${timePart}`
+    } catch (error) {
+      console.error('❌ Error in formatDate:', error, 'for dateString:', dateString)
+      return 'Invalid Date • Invalid Date'
+    }
   }
 
   const renderActivityText = (activity: ActivityLogEntry) => {
@@ -330,20 +348,27 @@ export function MembersActivityLog({ memberId, companyName, onRefresh }: Activit
           scrollHeight,
           clientHeight,
           threshold: scrollHeight * 0.8,
-          shouldLoad: scrollTop + clientHeight >= scrollHeight * 0.8,
-          hasMore,
-          loadingMore
+          shouldLoad: scrollTop + clientHeight >= scrollHeight * 0.8
         })
         
-        // Load more when user scrolls to top (for chronological order - oldest first)
-        if (scrollTop <= scrollHeight * 0.2 && hasMore && !loadingMore) {
-          console.log('Loading more entries...')
+        // For realtime, we can refresh data when scrolling to top
+        if (scrollTop <= scrollHeight * 0.2) {
+          console.log('Refreshing data from scroll...')
           loadMoreActivities()
         }
       }}
     >
       {/* Entries List */}
       {entries.map((entry) => {
+        // Debug each entry being rendered
+        console.log('🔍 Rendering entry:', {
+          id: entry.id,
+          type: entry.type,
+          createdAt: entry.createdAt,
+          createdAtType: typeof entry.createdAt,
+          hasCreatedAt: !!entry.createdAt
+        })
+        
         if (entry.type === 'activity') {
           const activity = entry as ActivityLogEntry
           return (
@@ -390,23 +415,18 @@ export function MembersActivityLog({ memberId, companyName, onRefresh }: Activit
         }
       })}
       
-      {/* Loading more indicator */}
-      {loadingMore && (
-        <div className="text-center pt-2">
-          <div className="text-xs text-muted-foreground">
-            Loading more entries...
+      {/* Loading indicator */}
+      {loading && (
+        <div className="text-center py-4">
+          <div className="flex items-center justify-center space-x-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0s' }} />
+            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.2s' }} />
+            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.4s' }} />
           </div>
         </div>
       )}
       
-      {/* End of entries indicator */}
-      {!hasMore && entries.length > 0 && (
-        <div className="text-center pt-2">
-          <div className="text-xs text-muted-foreground">
-            All Activities Loaded
-          </div>
-        </div>
-      )}
+
     </div>
   )
 }

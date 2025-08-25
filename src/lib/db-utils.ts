@@ -1348,7 +1348,7 @@ export async function getMembersPaginated({
   const params: any[] = []
   let paramIndex = 1
 
-  const whereParts: string[] = ["COALESCE(m.status::text, '') <> 'Lost Client'"]
+  const whereParts: string[] = []
   if (search && search.trim()) {
     const term = `%${search.trim()}%`
     params.push(term)

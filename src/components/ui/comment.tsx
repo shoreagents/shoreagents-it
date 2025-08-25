@@ -86,7 +86,7 @@ export function Comment({ comment, onDelete, showDeleteButton = false, className
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
-                className="flex items-center gap-0.5"
+                className="flex items-center gap-0"
               >
                 <TooltipProvider>
                   <Tooltip>

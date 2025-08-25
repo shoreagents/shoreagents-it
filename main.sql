@@ -394,8 +394,8 @@ CREATE TABLE public.inventory_medical_categories (
 	id serial4 NOT NULL,
 	item_type public."item_type_medical" NOT NULL,
 	"name" varchar(100) NOT NULL,
-	created_at timestamptz DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamptz DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT inventory_medical_categories_item_type_name_key UNIQUE (item_type, name),
 	CONSTRAINT inventory_medical_categories_pkey PRIMARY KEY (id)
 );
@@ -417,8 +417,8 @@ update
 CREATE TABLE public.inventory_medical_suppliers (
 	id serial4 NOT NULL,
 	"name" varchar(255) NOT NULL,
-	created_at timestamptz DEFAULT CURRENT_TIMESTAMP NULL,
-	updated_at timestamptz DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT now() NULL,
+	updated_at timestamptz DEFAULT now() NULL,
 	CONSTRAINT inventory_medical_suppliers_name_key UNIQUE (name),
 	CONSTRAINT inventory_medical_suppliers_pkey PRIMARY KEY (id)
 );
@@ -732,7 +732,7 @@ CREATE TABLE public.personal_info (
 	CONSTRAINT personal_info_user_id_key UNIQUE (user_id),
 	CONSTRAINT personal_info_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
-CREATE INDEX idx_personal_info_user_names ON public.personal_info USING btree (user_id, first_name, last_name);
+CREATE INDEX idx_personal_info_user_id ON public.personal_info USING btree (user_id);
 
 -- Table Triggers
 
@@ -844,13 +844,24 @@ CREATE TABLE public.tickets (
 	supporting_files _text DEFAULT '{}'::text[] NULL,
 	file_count int4 DEFAULT 0 NULL,
 	role_id int4 NULL,
+	clear bool DEFAULT false NOT NULL,
 	CONSTRAINT check_file_count CHECK (((file_count = array_length(supporting_files, 1)) OR ((file_count = 0) AND (supporting_files = '{}'::text[])))),
 	CONSTRAINT tickets_pkey PRIMARY KEY (id),
 	CONSTRAINT tickets_ticket_id_key UNIQUE (ticket_id),
 	CONSTRAINT tickets_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.ticket_categories(id) ON DELETE SET NULL,
+	CONSTRAINT tickets_resolved_by_fkey FOREIGN KEY (resolved_by) REFERENCES public.users(id) ON DELETE SET NULL,
 	CONSTRAINT tickets_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(id) ON DELETE SET NULL,
 	CONSTRAINT tickets_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
+CREATE INDEX idx_tickets_active ON public.tickets USING btree (status, "position") WHERE (status <> 'Closed'::ticket_status_enum);
+CREATE INDEX idx_tickets_clear_status ON public.tickets USING btree (clear, status);
+CREATE INDEX idx_tickets_closed_clear ON public.tickets USING btree (resolved_at, clear) WHERE (status = 'Closed'::ticket_status_enum);
+CREATE INDEX idx_tickets_created_at ON public.tickets USING btree (created_at);
+CREATE INDEX idx_tickets_resolved_at ON public.tickets USING btree (resolved_at);
+CREATE INDEX idx_tickets_status ON public.tickets USING btree (status);
+CREATE INDEX idx_tickets_status_clear ON public.tickets USING btree (status, clear);
+CREATE INDEX idx_tickets_status_role ON public.tickets USING btree (status, role_id);
+CREATE INDEX idx_tickets_user_id ON public.tickets USING btree (user_id);
 
 -- Table Triggers
 
@@ -1036,7 +1047,27 @@ CREATE TABLE public.member_comments (
 );
 CREATE INDEX idx_member_comments_created_at ON public.member_comments USING btree (created_at);
 CREATE INDEX idx_member_comments_member_id ON public.member_comments USING btree (member_id);
+CREATE INDEX idx_member_comments_member_id_created_at ON public.member_comments USING btree (member_id, created_at DESC);
 CREATE INDEX idx_member_comments_user_id ON public.member_comments USING btree (user_id);
+
+-- Table Triggers
+
+create trigger notify_member_comment_insert after
+insert
+    on
+    public.member_comments for each row execute function notify_member_comment_changes();
+create trigger notify_member_comment_update after
+update
+    on
+    public.member_comments for each row execute function notify_member_comment_changes();
+create trigger notify_member_comment_delete after
+delete
+    on
+    public.member_comments for each row execute function notify_member_comment_changes();
+create trigger update_member_comments_updated_at before
+update
+    on
+    public.member_comments for each row execute function update_updated_at_column();
 
 
 -- public.recruits_comments definition
@@ -1305,18 +1336,18 @@ CREATE OR REPLACE FUNCTION public.decrypt_iv(bytea, bytea, bytea, text)
 AS '$libdir/pgcrypto', $function$pg_decrypt_iv$function$
 ;
 
--- DROP FUNCTION public.digest(bytea, text);
+-- DROP FUNCTION public.digest(text, text);
 
-CREATE OR REPLACE FUNCTION public.digest(bytea, text)
+CREATE OR REPLACE FUNCTION public.digest(text, text)
  RETURNS bytea
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
 AS '$libdir/pgcrypto', $function$pg_digest$function$
 ;
 
--- DROP FUNCTION public.digest(text, text);
+-- DROP FUNCTION public.digest(bytea, text);
 
-CREATE OR REPLACE FUNCTION public.digest(text, text)
+CREATE OR REPLACE FUNCTION public.digest(bytea, text)
  RETURNS bytea
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1588,6 +1619,29 @@ END;
 $function$
 ;
 
+-- DROP FUNCTION public.notify_member_comment_changes();
+
+CREATE OR REPLACE FUNCTION public.notify_member_comment_changes()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  -- Send notification when comments change
+  PERFORM pg_notify(
+    'member_comment_changes',
+    json_build_object(
+      'table', TG_TABLE_NAME,
+      'action', TG_OP,
+      'record', CASE WHEN TG_OP = 'DELETE' THEN NULL ELSE row_to_json(NEW) END,
+      'old_record', CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN row_to_json(OLD) ELSE NULL END,
+      'timestamp', now()
+    )::text
+  );
+  RETURN COALESCE(NEW, OLD);
+END;
+$function$
+;
+
 -- DROP FUNCTION public.notify_ticket_change();
 
 CREATE OR REPLACE FUNCTION public.notify_ticket_change()
@@ -1696,18 +1750,18 @@ CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea, text)
 AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_bytea$function$
 ;
 
--- DROP FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea, text, text);
+-- DROP FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea);
 
-CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea, text, text)
+CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea)
  RETURNS bytea
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
 AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_bytea$function$
 ;
 
--- DROP FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea);
+-- DROP FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea, text, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea)
+CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt_bytea(bytea, bytea, text, text)
  RETURNS bytea
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1750,18 +1804,18 @@ CREATE OR REPLACE FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea)
 AS '$libdir/pgcrypto', $function$pgp_pub_encrypt_bytea$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_decrypt(bytea, text);
+-- DROP FUNCTION public.pgp_sym_decrypt(bytea, text, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt(bytea, text)
+CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt(bytea, text, text)
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
 AS '$libdir/pgcrypto', $function$pgp_sym_decrypt_text$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_decrypt(bytea, text, text);
+-- DROP FUNCTION public.pgp_sym_decrypt(bytea, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt(bytea, text, text)
+CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt(bytea, text)
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT

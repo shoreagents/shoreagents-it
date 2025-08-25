@@ -64,13 +64,17 @@ export function NavMain({
                       <>
                         {/* Full badge for expanded sidebar */}
                         <div className="ml-auto flex items-center gap-1 group-data-[collapsible=icon]:hidden">
-                          <span className="text-xs font-medium text-red-500">New</span>
-                          <Badge className="bg-red-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center p-0 min-w-0">
+                          <span className="text-xs font-medium" style={{ color: 'rgb(239 68 68)' }}>New</span>
+                          <Badge 
+                            variant="outline" 
+                            className="text-xs w-5 h-5 rounded-full flex items-center justify-center p-0 min-w-0 border-0" 
+                            style={{ backgroundColor: 'rgb(239 68 68)', color: 'white' }}
+                          >
                             {item.badge > 99 ? '99+' : item.badge}
                           </Badge>
                         </div>
                         {/* Small circle badge for collapsed sidebar */}
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 rounded-full flex items-center justify-center group-data-[collapsible=icon]:flex hidden">
+                        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center group-data-[collapsible=icon]:flex hidden" style={{ backgroundColor: 'rgb(239 68 68)' }}>
                           <span className="text-[10px] text-white font-bold">
                             {item.badge > 99 ? '99+' : item.badge}
                           </span>

@@ -6,12 +6,12 @@ import type { HTMLAttributes } from 'react';
 import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
-export interface GripIconHandle {
+export interface GripDashboardIconHandle {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface GripIconProps extends HTMLAttributes<HTMLDivElement> {
+interface GripDashboardIconProps extends HTMLAttributes<HTMLDivElement> {
   size?: number;
 }
 
@@ -27,8 +27,8 @@ const CIRCLES = [
   { cx: 5, cy: 19 }, // Bottom left
 ];
 
-const GripIcon = forwardRef<GripIconHandle, GripIconProps>(
-  ({ onMouseEnter, onMouseLeave, className, size = 28, ...props }, ref) => {
+const GripDashboardIcon = forwardRef<GripDashboardIconHandle, GripDashboardIconProps>(
+  ({ onMouseEnter, onMouseLeave, className, size = 20, ...props }, ref) => {
     const [isHovered, setIsHovered] = useState(false);
     const controls = useAnimation();
     const isControlledRef = useRef(false);
@@ -130,6 +130,6 @@ const GripIcon = forwardRef<GripIconHandle, GripIconProps>(
   }
 );
 
-GripIcon.displayName = 'GripIcon';
+GripDashboardIcon.displayName = 'GripDashboardIcon';
 
-export { GripIcon };
+export { GripDashboardIcon };

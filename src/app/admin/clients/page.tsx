@@ -148,17 +148,14 @@ export default function ClientsPage() {
                       onChange={(e) => setSearch(e.target.value)}
                     />
                   </div>
-                  <div className="w-40">
+                  <div className="w-56">
                     <Select value={memberId} onValueChange={(v: string) => { setMemberId(v); setCurrentPage(1) }}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Filter by member" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>Clients</SelectLabel>
-                          <SelectItem value="all">All Clients</SelectItem>
-                          <SelectItem value="none">No Assigned Members</SelectItem>
-                        </SelectGroup>
+                        <SelectItem value="all">All Clients</SelectItem>
+                        <SelectItem value="none">No Assigned Members</SelectItem>
                         <SelectSeparator className="bg-border mx-2" />
                         <SelectGroup>
                           <SelectLabel className="text-muted-foreground">Members</SelectLabel>

@@ -42,6 +42,12 @@ async function startListening() {
     // Listen for member/company changes
     await notificationClient.query('LISTEN member_detail_changes')
     
+    // Listen for member comment changes
+    await notificationClient.query('LISTEN member_comment_changes')
+    
+    // Listen for member activity changes
+    await notificationClient.query('LISTEN member_activity_changes')
+    
     // Listen for agent member changes
     await notificationClient.query('LISTEN agent_assignment_changes')
     
@@ -59,6 +65,10 @@ async function startListening() {
           messageType = 'applicant_update'
         } else if (msg.channel === 'member_detail_changes') {
           messageType = 'member_update'
+        } else if (msg.channel === 'member_comment_changes') {
+          messageType = 'member_comment_update' // Separate message type for comments
+        } else if (msg.channel === 'member_activity_changes') {
+          messageType = 'member_activity_update' // Separate message type for activity logs
         } else if (msg.channel === 'agent_assignment_changes') {
           messageType = 'agent_update'
         } else if (msg.channel === 'client_assignment_changes') {
@@ -88,7 +98,7 @@ async function startListening() {
     })
     
     isListening = true
-    console.log('Started listening for PostgreSQL notifications (tickets, applicants, members, agents & clients)')
+    console.log('Started listening for PostgreSQL notifications (tickets, applicants, members, member comments, member activities, agents & clients)')
   } catch (error) {
     console.error('Error starting notification listener:', error)
   }

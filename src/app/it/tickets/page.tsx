@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 
-import { IconSearch, IconFilter, IconGripVertical, IconCalendar, IconClock, IconEye, IconMessage, IconDots } from "@tabler/icons-react"
+import { IconSearch, IconFilter, IconGripVertical, IconCalendar, IconClock, IconEye, IconMessage, IconDots, IconTrash } from "@tabler/icons-react"
 import { useRealtimeTickets } from "@/hooks/use-realtime-tickets"
 import {
   DndContext,
@@ -1144,22 +1144,25 @@ export default function TicketsPage() {
                                   <Popover>
                                     <PopoverTrigger asChild>
                                       <button 
-                                        className="text-xs h-7 w-7 p-0 text-muted-foreground border-0 bg-transparent hover:bg-transparent focus:outline-none focus:ring-0"
+                                        className="text-xs h-7 w-7 p-0 text-muted-foreground border-0 bg-transparent hover:bg-sidebar-accent focus:outline-none focus:ring-0 rounded-md transition-colors flex items-center justify-center group"
                                       >
-                                        <IconDots className="h-5 w-5 hover:text-gray-800 dark:hover:text-gray-200 transition-colors" />
+                                        <IconDots className="h-5 w-5 text-muted-foreground group-hover:text-sidebar-accent-foreground transition-colors" />
                                       </button>
                                     </PopoverTrigger>
                                     <PopoverContent align="end" className="w-32 p-1" onOpenAutoFocus={(e) => e.preventDefault()}>
-                                      <button
-                                        className="relative w-full text-left text-sm py-1.5 pl-2 pr-8 rounded-lg transition-colors flex items-center hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent/90 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                                        onClick={(e) => { 
-                                          e.preventDefault(); 
-                                          e.stopPropagation(); 
-                                          showClearConfirmationModal(status);
-                                        }}
-                                      >
-                                        Clear All
-                                      </button>
+                                      <div>
+                                        <button
+                                          className="clear-all-button relative w-full text-left text-sm py-1.5 pl-2 pr-8 rounded-lg transition-colors flex items-center hover:bg-sidebar-accent active:bg-sidebar-accent/90"
+                                          onClick={(e) => { 
+                                            e.preventDefault(); 
+                                            e.stopPropagation(); 
+                                            showClearConfirmationModal(status);
+                                          }}
+                                        >
+                                          <IconTrash className="h-4 w-4 mr-2" />
+                                          Clear All
+                                        </button>
+                                      </div>
                                     </PopoverContent>
                                   </Popover>
                                 )}

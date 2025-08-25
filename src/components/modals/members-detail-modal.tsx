@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
 import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus } from "@tabler/icons-react"
+import { useRealtimeMembers } from '@/hooks/use-realtime-members'
 import { SendHorizontal } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
@@ -71,6 +72,237 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   const { theme } = useTheme()
   const { user } = useAuth()
   
+  // Real-time updates for member changes
+  const { isConnected } = useRealtimeMembers({
+    autoConnect: true,
+    onMemberUpdated: (updatedMember, oldMember) => {
+      if (companyToEdit?.id && updatedMember.id === companyToEdit.id) {
+        console.log('🔄 Real-time member update received:', updatedMember)
+        console.log('🔍 Old member data:', oldMember)
+        console.log('🔍 New member data:', updatedMember)
+        
+        // Update the company data with real-time changes
+        // Handle null values properly by checking if the field exists in the update
+        setFormData(prev => ({
+          ...prev,
+          company: updatedMember.hasOwnProperty('company') ? updatedMember.company : prev.company,
+          address: updatedMember.hasOwnProperty('address') ? updatedMember.address : prev.address,
+          phone: updatedMember.hasOwnProperty('phone') ? updatedMember.phone : prev.phone,
+          country: updatedMember.hasOwnProperty('country') ? updatedMember.country : prev.country,
+          service: updatedMember.hasOwnProperty('service') ? updatedMember.service : prev.service,
+          website: updatedMember.hasOwnProperty('website') ? updatedMember.website : prev.website,
+          badge_color: updatedMember.hasOwnProperty('badge_color') ? updatedMember.badge_color : prev.badge_color,
+          status: updatedMember.hasOwnProperty('status') ? updatedMember.status : prev.status
+        }))
+      }
+    },
+    onAgentMemberChanged: (agent, oldAgent) => {
+      console.log('🔍 Agent member change detected:', { agent, oldAgent, companyToEditId: companyToEdit?.id })
+      
+      if (companyToEdit?.id && agent.member_id === companyToEdit.id) {
+        console.log('🔄 Real-time agent assignment change:', agent)
+        // Agent was assigned to this member
+        setSelectedAgents(prev => {
+          const newSet = new Set(prev)
+          newSet.add(agent.user_id)
+          console.log('✅ Updated selected agents:', Array.from(newSet))
+          return newSet
+        })
+        
+        // Fetch complete agent data to ensure we have all user information
+        fetchSelectedAgentsData([agent.user_id])
+      } else if (companyToEdit?.id && oldAgent?.member_id === companyToEdit.id && agent.member_id !== companyToEdit.id) {
+        console.log('🔄 Real-time agent unassignment:', agent)
+        // Agent was unassigned from this member
+        setSelectedAgents(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(agent.user_id)
+          console.log('✅ Updated selected agents after unassignment:', Array.from(newSet))
+          return newSet
+        })
+        setSelectedAgentsData(prev => {
+          const filtered = prev.filter(a => a.user_id !== agent.user_id)
+          console.log('✅ Updated selected agents data after unassignment:', filtered)
+          return filtered
+        })
+      } else {
+        console.log('❌ Agent change not relevant for current company:', {
+          agentMemberId: agent.member_id,
+          oldAgentMemberId: oldAgent?.member_id,
+          companyToEditId: companyToEdit?.id
+        })
+      }
+    },
+    onClientMemberChanged: (client, oldClient) => {
+      console.log('🔍 Client member change detected:', { client, oldClient, companyToEditId: companyToEdit?.id })
+      
+      if (companyToEdit?.id && client.member_id === companyToEdit.id) {
+        console.log('🔄 Real-time client assignment change:', client)
+        // Client was assigned to this member
+        setSelectedClients(prev => {
+          const newSet = new Set(prev)
+          newSet.add(client.user_id)
+          console.log('✅ Updated selected clients:', Array.from(newSet))
+          return newSet
+        })
+        // Fetch complete client data to ensure we have all user information
+        // Since we don't have a fetchSelectedClientsData function, we'll fetch from the clients API
+        fetch(`/api/clients/modal?memberId=${companyToEdit.id}&limit=1000`)
+          .then(response => response.json())
+          .then(data => {
+            const companyClients = data.clients || []
+            setSelectedClientsData(companyClients)
+            console.log('✅ Updated selected clients data with complete information:', companyClients)
+          })
+          .catch(error => {
+            console.error('❌ Failed to fetch complete client data:', error)
+          })
+      } else if (companyToEdit?.id && oldClient?.member_id === companyToEdit.id && client.member_id !== companyToEdit.id) {
+        console.log('🔄 Real-time client unassignment:', client)
+        // Client was unassigned from this member
+        setSelectedClients(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(client.user_id)
+          console.log('✅ Updated selected clients after unassignment:', Array.from(newSet))
+          return newSet
+        })
+        setSelectedClientsData(prev => {
+          const filtered = prev.filter(c => c.user_id !== client.user_id)
+          console.log('✅ Updated selected clients data after unassignment:', filtered)
+          return filtered
+        })
+      } else {
+        console.log('❌ Client change not relevant for current company:', {
+          clientMemberId: client.member_id,
+          oldClientMemberId: oldClient?.member_id,
+          companyToEditId: companyToEdit?.id
+        })
+      }
+    }
+  })
+
+  // Real-time comment and activity updates via WebSocket
+  React.useEffect(() => {
+    if (!companyToEdit?.id || !isConnected) return
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const wsUrl = `${protocol}//${window.location.host}/ws`
+    
+    const ws = new WebSocket(wsUrl)
+    
+    ws.onopen = () => {
+      console.log('✅ WebSocket connected for real-time updates in modal')
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data)
+        console.log('🔍 WebSocket message received:', message)
+        
+        // Handle member comment updates
+        if (message.type === 'member_comment_update') {
+          const { action, record, old_record } = message.data
+          console.log('🔍 Processing comment update:', { action, record, old_record, companyToEditId: companyToEdit.id })
+          
+          if (record && record.member_id === companyToEdit.id) {
+            console.log('🔄 Real-time comment update received:', { action, record })
+            
+            setCommentsList(prevComments => {
+              console.log('🔍 Previous comments:', prevComments)
+              let newComments
+              
+              switch (action) {
+                case 'INSERT':
+                  // Add new comment
+                  const newComment = {
+                    id: record.id.toString(),
+                    comment: record.comment,
+                    user_name: record.user_name || 'Unknown User',
+                    created_at: record.created_at
+                  }
+                  newComments = [newComment, ...prevComments]
+                  console.log('✅ Added new comment:', newComment)
+                  break
+                  
+                case 'UPDATE':
+                  // Update existing comment
+                  newComments = prevComments.map(comment => 
+                    comment.id === record.id.toString()
+                      ? {
+                          ...comment,
+                          comment: record.comment,
+                          created_at: record.updated_at || record.created_at
+                        }
+                      : comment
+                  )
+                  console.log('✅ Updated comment:', record)
+                  break
+                  
+                case 'DELETE':
+                  // Remove deleted comment
+                  newComments = prevComments.filter(comment => comment.id !== old_record.id.toString())
+                  console.log('✅ Deleted comment:', old_record.id)
+                  break
+                  
+                default:
+                  newComments = prevComments
+                  console.log('❌ Unknown comment action:', action)
+              }
+              
+              console.log('🔍 New comments list:', newComments)
+              return newComments
+            })
+          } else {
+            console.log('❌ Comment update not relevant for current company:', {
+              recordMemberId: record?.member_id,
+              companyToEditId: companyToEdit.id
+            })
+          }
+        }
+        
+        // Handle member activity updates
+        if (message.type === 'member_activity_update') {
+          const { action, record, old_record } = message.data
+          console.log('🔍 Processing activity update:', { action, record, old_record, companyToEditId: companyToEdit.id })
+          
+          if (record && record.member_id === companyToEdit.id) {
+            console.log('🔄 Real-time activity update received:', { action, record })
+            
+            // Real-time updates will automatically refresh the activity log
+            // The MembersActivityLog component will receive live updates
+          } else {
+            console.log('❌ Activity update not relevant for current company:', {
+              recordMemberId: record?.member_id,
+              companyToEditId: companyToEdit.id
+            })
+          }
+        }
+        
+        // Log any other message types for debugging
+        if (message.type !== 'member_comment_update' && message.type !== 'member_activity_update') {
+          console.log('🔍 Other WebSocket message type:', message.type, message)
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message for real-time updates:', error)
+        console.error('Raw message data:', event.data)
+      }
+    }
+
+    ws.onclose = () => {
+      console.log('❌ WebSocket disconnected for real-time updates in modal')
+    }
+
+    ws.onerror = (error) => {
+      console.error('❌ WebSocket error for real-time updates in modal:', error)
+    }
+
+    return () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close()
+      }
+    }
+  }, [companyToEdit?.id, isConnected])
+  
   // Add custom scrollbar styles for the popover
   React.useEffect(() => {
     const style = document.createElement('style')
@@ -120,8 +352,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       
       console.log('✅ Auto-save completed successfully')
       
-      // Refresh activity log to show the latest changes
-      setActivityRefreshKey(prev => prev + 1)
+      // Real-time updates will automatically refresh the activity log
       
       return true
     } catch (error) {
@@ -207,7 +438,6 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   const [isLoadingMoreClients, setIsLoadingMoreClients] = React.useState(false)
   const [currentClientPage, setCurrentClientPage] = React.useState(1)
   const [totalClientCount, setTotalClientCount] = React.useState(0)
-  const [activityRefreshKey, setActivityRefreshKey] = React.useState(0)
   
   // Database sync state
   const [lastDatabaseSync, setLastDatabaseSync] = React.useState<Date | null>(null)
@@ -279,8 +509,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       
       console.log('✅ Manual save completed successfully')
       
-      // Refresh activity log to show the latest changes
-      setActivityRefreshKey(prev => prev + 1)
+      // Real-time updates will automatically refresh the activity log
       
       // Call the callback if provided (same as add company)
       if (onCompanyAdded) {
@@ -1454,10 +1683,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         setInputWidth(fileInputRef.current.offsetWidth);
       }
       
-      // Refresh activity log when modal opens
-      if (companyToEdit?.id) {
-        setActivityRefreshKey(prev => prev + 1)
-      }
+      // Real-time updates will automatically refresh the activity log
       
       // If editing a company, populate the form
       if (companyToEdit) {
@@ -2371,7 +2597,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                           </div>
                         ) : (
                           <div className="text-center py-6 text-muted-foreground">
-                            <p className="text-sm">No Agents Added Yet</p>
+                            <p className="text-sm">No Agents Added</p>
                           </div>
                         )}
                       </div>
@@ -2466,9 +2692,6 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                         : client.first_name || client.last_name || 'Unknown Name'
                                       }
                                     </h4>
-                                    <span className="text-xs text-muted-foreground truncate block">
-                                      {client.member_company || 'No Member'}
-                                    </span>
                                   </div>
                                   <button
                                     onClick={async () => {
@@ -2503,7 +2726,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                         </div>
                       ) : (
                         <div className="text-center py-6 text-muted-foreground">
-                          <p className="text-sm">No Clients Added Yet</p>
+                          <p className="text-sm">No Clients Added</p>
                         </div>
                       )}
                       </div>
@@ -2727,17 +2950,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                     </div>
                   )}
                   
-                  {/* End of List Indicator */}
-                  {!hasMore && agents.length > 0 && (
-                    <div className="text-center py-4 text-muted-foreground">
-                      <p className="text-xs">
-                        {agentSearch 
-                          ? `Showing ${displayAgents.length} of ${totalCount} Agents`
-                          : `All Agents Loaded (${totalCount} Total)`
-                        }
-                      </p>
-                    </div>
-                  )}
+
 
 
                       </>
@@ -2951,17 +3164,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                           </div>
                         )}
                         
-                        {/* End of List Indicator */}
-                        {!hasMoreClients && displayClients.length > 0 && (
-                          <div className="text-center py-4 text-muted-foreground">
-                            <p className="text-xs">
-                              {clientSearch 
-                                ? `Showing ${displayClients.length} of ${totalClientCount} Clients`
-                                : `All Clients Loaded (${totalClientCount} Total)`
-                              }
-                            </p>
-                          </div>
-                        )}
+
                       </>
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
@@ -3010,12 +3213,10 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                 <div className="space-y-4">
                   {companyToEdit?.id ? (
                     <MembersActivityLog 
-                      key={activityRefreshKey}
                       memberId={companyToEdit.id} 
                       companyName={companyToEdit.company || 'Unknown Company'} 
                       onRefresh={() => {
-                        // This will be called when activities are refreshed
-                        // You can add any additional logic here if needed
+                        // Real-time updates handle refresh automatically
                       }}
                     />
                   ) : (

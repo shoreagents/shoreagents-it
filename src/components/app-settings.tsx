@@ -25,9 +25,6 @@ export function AppSettingsPopover({ children }: { children: React.ReactNode }) 
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-foreground">Theme</label>
-                <p className="text-xs text-muted-foreground">
-                  Light or Dark Mode
-                </p>
               </div>
               <div className="relative flex items-center">
                 <button
@@ -35,6 +32,18 @@ export function AppSettingsPopover({ children }: { children: React.ReactNode }) 
                   className={`relative inline-flex h-6 w-11 items-center justify-center rounded-full transition-colors duration-200 ${
                     theme === 'dark' ? 'bg-teal-600' : 'bg-gray-200 dark:bg-gray-700'
                   }`}
+                  style={{
+                    backgroundColor: theme === 'dark' ? '#0d9486' : '#e5e7eb',
+                    '--tw-bg-opacity': '1'
+                  } as React.CSSProperties}
+                  onMouseEnter={(e) => {
+                    const target = e.currentTarget;
+                    if (theme === 'dark') {
+                      target.style.backgroundColor = '#0d9486';
+                    } else {
+                      target.style.backgroundColor = '#e5e7eb';
+                    }
+                  }}
                 >
                   <motion.div
                     className="absolute left-0.5 h-5 w-5 rounded-full bg-white shadow-md flex items-center justify-center"

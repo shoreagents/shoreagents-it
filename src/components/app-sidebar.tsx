@@ -4,24 +4,28 @@ import * as React from "react"
 import { usePathname } from "next/navigation"
 import { useRef } from "react"
 import {
-  LayoutDashboardIcon,
-  SettingsIcon,
-  UsersIcon,
   UserCircleIcon,
   Building2Icon,
-  HandshakeIcon,
   UserPlusIcon,
   StarIcon,
-  FileTextIcon,
 } from "lucide-react"
 import { ScanTextIcon } from "@/components/icons/scan-text-icon"
 import { IconFileText } from "@tabler/icons-react"
 import { HistoryIcon } from "@/components/ui/history"
+import { UserIcon } from "@/components/icons/user-icon"
+import { UsersIcon } from "@/components/icons/users-icon"
+import { UserCheckIcon } from "@/components/icons/user-check-icon"
+import { SettingsGearIcon } from "@/components/icons/settings-gear-icon"
+import { FileTextIcon } from "@/components/icons/file-text-icon"
+import { GripDashboardIcon } from "@/components/icons/grip-dashboard-icon"
+import { IdCardIcon } from "@/components/icons/id-card-icon"
+import { FilePenLineIcon } from "@/components/icons/file-pen-line-icon"
+import { SparklesIcon } from "@/components/icons/sparkles-icon"
+import { HomeIcon } from "@/components/icons/home-icon"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useNewTicketsCount } from "@/hooks/use-new-tickets-count"
-import { useNewApplicantsCount } from "@/hooks/use-new-applicants-count"
+import { useNewTicketsCount, useNewApplicantsCount } from "@/hooks/use-realtime-count"
 
 import { NavMain } from "@/components/nav/nav-main"
 import { NavMainWithSubgroups } from "@/components/nav/nav-main-with-subgroups"
@@ -70,14 +74,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {
           title: "Dashboard",
           url: "/admin/dashboard",
-          icon: LayoutDashboardIcon,
+          icon: GripDashboardIcon,
         },
       ]
     : [
         {
           title: "Dashboard",
           url: "/it/dashboard",
-          icon: LayoutDashboardIcon,
+          icon: GripDashboardIcon,
         },
       ]
 
@@ -91,7 +95,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {
           title: "Tickets",
           url: "/admin/tickets",
-          icon: ScanTextIcon,
+          icon: IdCardIcon,
           badge: newTicketsCount > 0 ? newTicketsCount : undefined,
         },
         {
@@ -104,7 +108,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {
           title: "Tickets",
           url: "/it/tickets",
-          icon: ScanTextIcon,
+          icon: IdCardIcon,
           badge: newTicketsCount > 0 ? newTicketsCount : undefined,
         },
         {
@@ -123,7 +127,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     {
       title: "Settings",
       url: "#",
-      icon: SettingsIcon,
+      icon: SettingsGearIcon,
     },
   ]
 
@@ -203,8 +207,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarGroupLabel>EMPLOYEES</SidebarGroupLabel>
             <NavMain
               items={[
+                { title: "Internal", url: "/admin/internal", icon: UserIcon },
                 { title: "Agents", url: "/admin/agents", icon: UsersIcon },
-                { title: "Internal", url: "/admin/internal", icon: UserCircleIcon },
               ]}
             />
           </SidebarGroup>
@@ -214,8 +218,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarGroupLabel>MEMBERS</SidebarGroupLabel>
             <NavMain
               items={[
-                { title: "Companies", url: "/admin/company", icon: Building2Icon },
-                { title: "Clients", url: "/admin/clients", icon: HandshakeIcon },
+                { title: "Companies", url: "/admin/company", icon: HomeIcon },
+                { title: "Clients", url: "/admin/clients", icon: UserCheckIcon },
               ]}
             />
           </SidebarGroup>
@@ -233,8 +237,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     { title: "Forms", url: "/admin/forms" },
                   ]
                 },
-                { title: "Talent Pool", url: "/admin/talent-pool", icon: StarIcon },
-                { title: "Jobs", url: "/admin/jobs", icon: Building2Icon }
+                { title: "Talent Pool", url: "/admin/talent-pool", icon: SparklesIcon },
+                { title: "Jobs", url: "/admin/jobs", icon: FilePenLineIcon }
               ]}
             />
           </SidebarGroup>

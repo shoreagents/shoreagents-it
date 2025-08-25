@@ -13,6 +13,7 @@ export async function GET(
         mc.comment,
         mc.created_at,
         mc.updated_at,
+        mc.user_id,
         pi.first_name,
         pi.last_name
       FROM public.member_comments mc
@@ -28,6 +29,7 @@ export async function GET(
       user_name: comment.first_name && comment.last_name 
         ? `${comment.first_name} ${comment.last_name}`.trim() 
         : comment.first_name || comment.last_name || 'Unknown User',
+      user_id: comment.user_id, // Add missing user_id field
       created_at: comment.created_at
     }))
 

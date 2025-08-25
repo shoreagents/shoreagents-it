@@ -199,6 +199,26 @@ body[data-scroll-locked] {
   color: hsl(var(--sidebar-accent-foreground));
 }
 
+/* Override for Clear All button to maintain red text color */
+.popover-surface .clear-all-button {
+  color: rgb(239 68 68) !important; /* red-500 - default */
+}
+
+.popover-surface .clear-all-button:hover,
+.popover-surface .clear-all-button:focus-visible {
+  color: rgb(239 68 68) !important; /* red-500 - hover */
+}
+
+/* Dark mode override for Clear All button */
+.dark .popover-surface .clear-all-button {
+  color: rgb(239 68 68) !important; /* red-500 - default */
+}
+
+.dark .popover-surface .clear-all-button:hover,
+.dark .popover-surface .clear-all-button:focus-visible {
+  color: rgb(239 68 68) !important; /* red-500 - hover */
+}
+
 .popover-surface button:active,
 .popover-surface a:active,
 .popover-surface [role="menuitem"]:active,

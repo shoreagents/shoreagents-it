@@ -8,7 +8,18 @@ import { cn } from "@/lib/utils"
 
 const Select = SelectPrimitive.Root
 
-const SelectGroup = SelectPrimitive.Group
+const SelectGroup = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Group>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Group>
+>(({ className, children, ...props }, ref) => (
+  <SelectPrimitive.Group
+    ref={ref}
+    className={cn("space-y-1", className)}
+    {...props}
+  >
+    {children}
+  </SelectPrimitive.Group>
+))
 
 const SelectValue = SelectPrimitive.Value
 

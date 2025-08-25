@@ -167,7 +167,7 @@ export default function AgentsPage() {
                       onChange={(e) => setSearch(e.target.value)}
                     />
                   </div>
-                                    <div className="w-40">
+                                    <div className="w-56">
                     <Select value={memberId} onValueChange={(v: string) => { setMemberId(v); setCurrentPage(1) }}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Filter by member" />
