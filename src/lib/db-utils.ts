@@ -520,7 +520,7 @@ export async function searchTickets(searchTerm: string): Promise<Ticket[]> {
     LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
     LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
     LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
-    WHERE (t.concern ILIKE $1 OR t.details ILIKE $1 OR t.ticket_id ILIKE $1) AND t.role_id = 1 AND t.status != 'For Approval' AND (t.status != 'Closed' OR t.resolved_at >= NOW() - INTERVAL '7 days')
+    WHERE (t.concern ILIKE $1 OR t.details ILIKE $1 OR t.ticket_id ILIKE $1) AND t.role_id = 1 AND t.status != 'For Approval'
     ORDER BY t.created_at DESC
   `, [`%${searchTerm}%`])
   return result.rows
@@ -548,7 +548,7 @@ export async function getTicketsByUser(userId: number): Promise<Ticket[]> {
     LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
     LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
     LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
-    WHERE t.user_id = $1 AND t.role_id = 1 AND (t.status != 'Closed' OR t.resolved_at >= NOW() - INTERVAL '7 days')
+    WHERE t.user_id = $1 AND t.role_id = 1
     ORDER BY t.created_at DESC
   `, [userId])
   return result.rows
@@ -2276,6 +2276,103 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
       const { rows } = await bpocPool.query(jobQuery, jobIds)
       jobData = rows
     }
+                // First, fetch skills data and summary for all applicants
+        const skillsMap = new Map<string, any>()
+        const originalSkillsMap = new Map<string, any>()
+        const summaryMap = new Map<string, string>()
+        const emailMap = new Map<string, string>()
+        const phoneMap = new Map<string, string>()
+        const addressMap = new Map<string, string>()
+        const aiAnalysisMap = new Map<string, any>() // Added for AI analysis
+        
+        if (bpocPool) {
+          try {
+            const userIds = enrichmentData
+              .map((e: any) => e.user_id)
+              .filter(Boolean)
+              .filter((id: string, index: number, arr: string[]) => arr.indexOf(id) === index) // unique IDs
+            
+            if (userIds.length > 0) {
+              const skillsResult = await bpocPool.query(
+                `SELECT rg.user_id, rg.generated_resume_data FROM resumes_generated rg WHERE rg.user_id = ANY($1::uuid[])`,
+                [userIds]
+              )
+              
+              for (const row of skillsResult.rows) {
+                const resumeData = row.generated_resume_data
+                originalSkillsMap.set(row.user_id, resumeData)
+                
+                // Extract summary from the resume data
+                if (resumeData.summary && typeof resumeData.summary === 'string') {
+                  summaryMap.set(row.user_id, resumeData.summary)
+                }
+                
+                // Extract skills from different formats
+                let allSkills: string[] = []
+                if (resumeData.skills && typeof resumeData.skills === 'object') {
+                  if (Array.isArray(resumeData.skills.technical)) allSkills = allSkills.concat(resumeData.skills.technical)
+                  if (Array.isArray(resumeData.skills.soft)) allSkills = allSkills.concat(resumeData.skills.soft)
+                  if (Array.isArray(resumeData.skills.languages)) allSkills = allSkills.concat(resumeData.skills.languages)
+                } else if (Array.isArray(resumeData.skills)) {
+                  allSkills = resumeData.skills
+                } else if (resumeData.sections && resumeData.sections.skills) {
+                  allSkills = resumeData.sections.skills
+                }
+                skillsMap.set(row.user_id, allSkills)
+              }
+              
+              // Fetch email, phone, and location data for all users
+              if (userIds.length > 0) {
+                const userResult = await bpocPool.query(
+                  `SELECT u.id, u.email, u.phone, u.location FROM users u WHERE u.id = ANY($1::uuid[])`,
+                  [userIds]
+                )
+                
+                for (const row of userResult.rows) {
+                  if (row.email) {
+                    emailMap.set(row.id, row.email)
+                  }
+                  if (row.phone) {
+                    phoneMap.set(row.id, row.phone)
+                  }
+                  if (row.location) {
+                    addressMap.set(row.id, row.location)
+                  }
+                }
+              }
+              
+              // Fetch AI analysis data for all users
+              if (userIds.length > 0) {
+                console.log('🔍 Fetching AI analysis for user IDs:', userIds)
+                const aiResult = await bpocPool.query(
+                  `SELECT user_id, overall_score, key_strengths, strengths_analysis, improvements, recommendations, improved_summary, salary_analysis, career_path, section_analysis FROM ai_analysis_results WHERE user_id = ANY($1::uuid[])`,
+                  [userIds]
+                )
+                
+                console.log('🔍 AI analysis query result:', aiResult.rows)
+                
+                for (const row of aiResult.rows) {
+                  aiAnalysisMap.set(row.user_id, {
+                    overall_score: row.overall_score,
+                    key_strengths: row.key_strengths,
+                    strengths_analysis: row.strengths_analysis,
+                    improvements: row.improvements,
+                    recommendations: row.recommendations,
+                    improved_summary: row.improved_summary,
+                    salary_analysis: row.salary_analysis,
+                    career_path: row.career_path,
+                    section_analysis: row.section_analysis
+                  })
+                }
+                
+                console.log('🔍 AI analysis map populated:', aiAnalysisMap)
+              }
+                    }
+          } catch (e) {
+            // Skills fetching failed, continue without skills
+          }
+        }
+    
     enrichedData = applicants.map((applicant: any) => {
       const applicantApplications = enrichmentData.filter((e: any) => applicant.bpoc_application_ids?.includes(e.id))
       const applicantJobs = jobData.filter((j: any) => applicant.job_ids?.includes(j.job_id))
@@ -2302,20 +2399,45 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
       const allCompanies = uniqueJobPairs.map(pair => pair.company_name)
       const allJobStatuses = uniqueJobPairs.map(pair => pair.application_status || 'submitted')
       const allJobTimestamps = uniqueJobPairs.map(pair => pair.application_created_at)
-      return {
-        ...applicant,
-        user_id: firstApplication?.user_id || applicant.applicant_id,
-        first_name: firstApplication?.first_name || null,
-        last_name: firstApplication?.last_name || null,
-        full_name: firstApplication?.full_name || null,
-        profile_picture: firstApplication?.avatar_url || null,
-        job_title: allJobTitles[0] || null,
-        company_name: allCompanies[0] || null,
-        all_job_titles: allJobTitles,
-        all_companies: allCompanies,
-        all_job_statuses: allJobStatuses,
-        all_job_timestamps: allJobTimestamps,
-      }
+      
+      // Get skills data, summary, email, phone, and address for this applicant 
+      const userId = firstApplication?.user_id || applicant.applicant_id
+      const skillsData = skillsMap.get(userId) || null
+      const originalSkillsData = originalSkillsMap.get(userId) || null
+      const summaryData = summaryMap.get(userId) || null
+      const emailData = emailMap.get(userId) || null
+      const phoneData = phoneMap.get(userId) || null
+      const addressData = addressMap.get(userId) || null
+      const aiAnalysisData = aiAnalysisMap.get(userId) || null // Added for AI analysis
+      
+      console.log('🔍 Applicant AI analysis data:', { 
+        applicantId: applicant.id, 
+        userId, 
+        aiAnalysisData,
+        aiAnalysisMapSize: aiAnalysisMap.size 
+      })
+      
+              return {
+          ...applicant,
+          user_id: userId,
+          first_name: firstApplication?.first_name || null,
+          last_name: firstApplication?.last_name || null,
+          full_name: firstApplication?.full_name || null,
+          profile_picture: firstApplication?.avatar_url || null,
+          email: emailData,
+          job_title: allJobTitles[0] || null,
+          company_name: allCompanies[0] || null,
+          all_job_titles: allJobTitles,
+          all_companies: allCompanies,
+          all_job_statuses: allJobStatuses,
+          all_job_timestamps: allJobTimestamps,
+          skills: skillsData,
+          originalSkillsData: originalSkillsData,
+          summary: summaryData,
+          phone: phoneData,
+          address: addressData,
+          aiAnalysis: aiAnalysisData, // Added AI analysis data
+        }
     })
   } catch (e) {
     // fall back to basic data

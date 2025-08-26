@@ -90,7 +90,7 @@ function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUs
         <span className="font-medium text-muted-foreground">{dateStr}</span>
         <span className="text-muted-foreground/70">•</span>
         <IconClock className="h-4 w-4 text-muted-foreground" />
-        <span className="font-mono text-muted-foreground">{timeStr}</span>
+        <span className="text-muted-foreground">{timeStr}</span>
       </div>
     )
   }
@@ -453,8 +453,7 @@ export default function PastTicketsPage() {
                       <div className="flex flex-col h-[75vh]">
                         <div className="text-center py-16 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-lg bg-muted/20 flex-1 flex items-center justify-center">
                           <div>
-                            <p className="text-sm font-medium">No Past Tickets</p>
-                            <p className="text-xs text-muted-foreground/70">{searchTerm ? 'No tickets match your search criteria' : ''}</p>
+                            <p className="text-sm font-medium">No Records Found</p>
                           </div>
                         </div>
                       </div>

@@ -70,6 +70,28 @@ interface Applicant {
   all_companies?: string[]
   all_job_statuses?: string[]
   all_job_timestamps?: string[]
+  // Skills data from BPOC database
+  skills?: string[]
+  originalSkillsData?: any
+  // Summary from BPOC database
+  summary?: string | null
+  // Email from BPOC database
+  email?: string | null
+  // Phone and address from BPOC database
+  phone?: string | null
+  address?: string | null
+  // AI analysis data from BPOC database
+  aiAnalysis?: {
+    overall_score?: number
+    key_strengths?: any[]
+    strengths_analysis?: any
+    improvements?: any[]
+    recommendations?: any[]
+    improved_summary?: string
+    salary_analysis?: any
+    career_path?: any
+    section_analysis?: any
+  } | null
 }
 
 function ApplicantsTable({ applicants, onSort, sortField, sortDirection, onRowClick }: { 
@@ -89,7 +111,7 @@ function ApplicantsTable({ applicants, onSort, sortField, sortDirection, onRowCl
         <span className="font-medium text-muted-foreground">{dateStr}</span>
         <span className="text-muted-foreground/70">•</span>
         <IconClock className="h-4 w-4 text-muted-foreground" />
-        <span className="font-mono text-muted-foreground">{timeStr}</span>
+        <span className="text-muted-foreground">{timeStr}</span>
       </div>
     )
   }
@@ -316,6 +338,18 @@ export default function ApplicantsRecordsPage() {
     all_companies: rawData.all_companies,
     all_job_statuses: rawData.all_job_statuses,
     all_job_timestamps: rawData.all_job_timestamps,
+             // Skills data from BPOC database
+         skills: rawData.skills,
+         originalSkillsData: rawData.originalSkillsData,
+         // Summary from BPOC database
+         summary: rawData.summary,
+         // Email from BPOC database
+         email: rawData.email,
+         // Phone and address from BPOC database
+         phone: rawData.phone,
+         address: rawData.address,
+         // AI analysis data from BPOC database
+         aiAnalysis: rawData.aiAnalysis,
   }), [])
 
   // Real-time updates for BPOC applications

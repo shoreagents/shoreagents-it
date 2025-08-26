@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus } from "@tabler/icons-react"
+import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck } from "@tabler/icons-react"
 import { useRealtimeMembers } from '@/hooks/use-realtime-members'
 import { SendHorizontal } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -64,30 +64,30 @@ const serviceOptions = [
   { value: 'workforce', label: 'Workforce' }
 ]
 
-// Badge helper functions (matching the main companies page)
+// Badge helper functions (matching the ticket modal color scheme)
 const getServiceBadgeClass = (service: string | null): string => {
   const s = (service || '').toLowerCase()
   if (s === 'workforce') {
-    return 'bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800'
+    return 'text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20'
   }
   if (s === 'one agent') {
-    return 'bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800'
+    return 'text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20'
   }
   if (s === 'team') {
-    return 'bg-yellow-100 text-yellow-800 border border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-200 dark:border-yellow-800'
+    return 'text-yellow-700 dark:text-white border-yellow-600/20 bg-yellow-50 dark:bg-yellow-600/20'
   }
-  return 'bg-gray-100 text-gray-800 border border-gray-200 dark:bg-gray-900/30 dark:text-gray-200 dark:border-gray-800'
+  return 'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20'
 }
 
 const getStatusBadgeClass = (status: string | null): string => {
   const s = (status || '').toLowerCase()
   if (s === 'current client') {
-    return 'bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-800'
+    return 'text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20'
   }
   if (s === 'lost client') {
-    return 'bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800'
+    return 'text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20'
   }
-  return 'bg-gray-100 text-gray-800 border border-gray-200 dark:bg-gray-900/30 dark:text-gray-200 dark:border-gray-800'
+  return 'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20'
 }
 
 const countryOptions = [
@@ -442,6 +442,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   const [isCommentFocused, setIsCommentFocused] = React.useState(false)
   const [isSubmittingComment, setIsSubmittingComment] = React.useState(false)
   const [commentsList, setCommentsList] = React.useState<Array<{id: string, comment: string, user_name: string, created_at: string}>>([])
+  const [isEditingCompany, setIsEditingCompany] = React.useState(false)
   const [agents, setAgents] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
   const [selectedAgents, setSelectedAgents] = React.useState<Set<number>>(new Set())
   const [selectedAgentsData, setSelectedAgentsData] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
@@ -500,6 +501,13 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl)
     }
   }, [logoPreviewUrl])
+
+  // Reset editing state when modal opens/closes
+  React.useEffect(() => {
+    if (isOpen) {
+      setIsEditingCompany(false)
+    }
+  }, [isOpen])
 
   // Debug effect to monitor logo changes
   React.useEffect(() => {
@@ -694,8 +702,8 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       // Update original IDs to reflect the change
       if (type === 'agent') {
         if (isSelected) {
-          setFormData(prev => ({
-            ...prev,
+    setFormData(prev => ({
+      ...prev,
             originalAgentIds: [...(prev.originalAgentIds || []), agentId]
           }))
         } else {
@@ -988,6 +996,19 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     }
   }
 
+  const handleCompanyEdit = () => {
+    setIsEditingCompany(true)
+  }
+
+  const handleCompanySave = (value: string) => {
+    handleInputChange('company', value)
+    setIsEditingCompany(false)
+  }
+
+  const handleCompanyCancel = () => {
+    setIsEditingCompany(false)
+  }
+
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null
     console.log('🖼️ Logo upload triggered:', file)
@@ -1264,22 +1285,22 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         console.log(`  ${key}: ${value}`)
       }
       
-      // Create new company
+        // Create new company
       const response = await fetch('/api/members', {
-        method: 'POST',
+          method: 'POST',
         headers: {
           'x-user-id': user?.id || ''
         },
-        body: formDataToSend
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to create company')
-      }
-      
+          body: formDataToSend
+        })
+        
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to create company')
+        }
+        
       const result = await response.json()
-      console.log('Company created successfully:', result.company)
+        console.log('Company created successfully:', result.company)
       
       // Update selected agents with the new member_id if any agents are selected
       if (selectedAgents.size > 0) {
@@ -1728,17 +1749,17 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           console.log('🔄 Loading fresh data from database')
           
           const freshData = {
-            company: companyToEdit.company || '',
-            address: companyToEdit.address || '',
-            phone: companyToEdit.phone || '',
-            country: companyToEdit.country || '',
-            service: companyToEdit.service || '',
-            website: Array.isArray(companyToEdit.website) && companyToEdit.website.length > 0 ? companyToEdit.website[0] : (companyToEdit.website as string) || '',
+          company: companyToEdit.company || '',
+          address: companyToEdit.address || '',
+          phone: companyToEdit.phone || '',
+          country: companyToEdit.country || '',
+          service: companyToEdit.service || '',
+          website: Array.isArray(companyToEdit.website) && companyToEdit.website.length > 0 ? companyToEdit.website[0] : (companyToEdit.website as string) || '',
             logo: null,
-            logoUrl: typeof companyToEdit.logo === 'string' ? companyToEdit.logo : companyToEdit.logoUrl,
-            badge_color: companyToEdit.badge_color || '#0EA5E9',
-            status: companyToEdit.status || 'Current Client',
-            id: companyToEdit.id,
+          logoUrl: typeof companyToEdit.logo === 'string' ? companyToEdit.logo : companyToEdit.logoUrl,
+          badge_color: companyToEdit.badge_color || '#0EA5E9',
+          status: companyToEdit.status || 'Current Client',
+          id: companyToEdit.id,
             originalAgentIds: [],
             originalClientIds: []
           }
@@ -1760,7 +1781,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           setLastDatabaseSync(new Date())
           
           // Fetch current assignments from database and set original IDs
-          if (companyToEdit.id) {
+        if (companyToEdit.id) {
             // Fetch agents and set original IDs
             const agentsResponse = await fetch(`/api/agents/modal?memberId=${companyToEdit.id}&limit=1000`)
             if (agentsResponse.ok) {
@@ -1803,7 +1824,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
               
               console.log('✅ Set original client IDs:', clientIds)
               console.log('✅ selectedClientsData set to:', companyClients)
-            } else {
+      } else {
               console.error('❌ Failed to fetch clients:', clientsResponse.status, clientsResponse.statusText)
             }
             
@@ -1835,10 +1856,10 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         })
         
         // Reset selections
-        setSelectedAgents(new Set())
-        setSelectedAgentsData([])
-        setSelectedClients(new Set())
-        setSelectedClientsData([])
+      setSelectedAgents(new Set())
+      setSelectedAgentsData([])
+      setSelectedClients(new Set())
+      setSelectedClientsData([])
         
         // Reset unsaved changes flag
         setHasUnsavedChanges(false)
@@ -2080,14 +2101,35 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             {/* Company Header */}
             <div className="px-6 py-5">
               {/* Company Name - Editable Title */}
-              <Input
-                type="text"
-                value={formData.company || ''}
-                onChange={(e) => handleInputChange('company', e.target.value)}
-                placeholder="Company Name"
-                className="text-2xl font-semibold mb-4 h-auto px-3 py-0 !border !border-transparent dark:!border-transparent !bg-transparent hover:!bg-[#ebebeb] dark:hover:!bg-[#0a0a0a] focus:!bg-[#ebebeb] dark:focus:!bg-[#0a0a0a] focus:!border-sidebar-border dark:focus:!border-border rounded-lg transition-colors duration-200 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
-                style={{ minHeight: '2.5rem', backgroundColor: 'transparent' }}
-              />
+              {isEditingCompany ? (
+                <div className="mb-4">
+                  <Input
+                    type="text"
+                    value={formData.company || ''}
+                    onChange={(e) => handleInputChange('company', e.target.value)}
+                    placeholder="Company Name"
+                    className="text-2xl font-semibold h-auto px-3 py-0 !border !border-sidebar-border dark:!border-border !bg-[#ebebeb] dark:!bg-[#0a0a0a] rounded-lg transition-colors duration-200 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
+                    style={{ minHeight: '2.5rem' }}
+                    autoFocus
+                    onBlur={() => handleCompanySave(formData.company || '')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleCompanySave(formData.company || '')
+                      } else if (e.key === 'Escape') {
+                        handleCompanyCancel()
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <div 
+                  className="text-2xl font-semibold mb-4 px-3 py-0 cursor-pointer hover:bg-[#ebebeb] dark:hover:bg-[#0a0a0a] rounded-lg transition-colors duration-200 flex items-center border border-transparent"
+                  style={{ minHeight: '2.5rem' }}
+                  onClick={handleCompanyEdit}
+                >
+                  {formData.company || 'Click to add company name'}
+                </div>
+              )}
               
               {/* Company Metadata Grid */}
               <div className="grid grid-cols-3 gap-4 text-sm">
@@ -2098,9 +2140,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                   <Popover>
                     <PopoverTrigger asChild>
                       <Badge 
-                        variant="secondary" 
-                        className={`text-xs h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity ${
-                          formData.service ? getServiceBadgeClass(formData.service) : 'bg-gray-100 text-gray-800 border border-gray-200 dark:bg-gray-900/30 dark:text-gray-200 dark:border-gray-800'
+                        variant="outline" 
+                        className={`px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center ${
+                          formData.service ? getServiceBadgeClass(formData.service) : 'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20'
                         }`}
                       >
                         {formData.service ? serviceOptions.find(opt => opt.value === formData.service)?.label || formData.service : 'Choose Service'}
@@ -2151,9 +2193,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                   <Popover>
                     <PopoverTrigger asChild>
                       <Badge 
-                        variant="secondary" 
-                        className={`text-xs h-6 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity ${
-                          formData.status ? getStatusBadgeClass(formData.status) : 'bg-gray-100 text-gray-800 border border-gray-200 dark:bg-gray-900/30 dark:text-gray-200 dark:border-gray-800'
+                        variant="outline" 
+                        className={`px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center ${
+                          formData.status ? getStatusBadgeClass(formData.status) : 'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20'
                         }`}
                       >
                         {formData.status || 'Set Status'}
@@ -2209,7 +2251,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                         title="Click to open color picker"
                       />
                     </ColorPicker>
-                    <span className="text-xs font-mono text-muted-foreground leading-none">
+                    <span className="text-xs text-muted-foreground leading-none">
                       {formData.badge_color || '#0EA5E9'}
                     </span>
                   </div>
@@ -2271,9 +2313,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                     <div className="flex items-center justify-between min-h-[40px]">
                       <Skeleton className="h-6 w-16" />
                       <Skeleton className="h-9 w-24" />
-                    </div>
+                </div>
                     <div className="rounded-lg border border-[#cecece99] dark:border-border p-4">
-                      <div className="space-y-2">
+                  <div className="space-y-2">
                         <div className="flex flex-wrap gap-2">
                           {[...Array(3)].map((_, index) => (
                             <div key={index} className="flex items-center gap-2 p-2 bg-primary/5 border border-primary/20 rounded-lg">
@@ -2281,11 +2323,11 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                               <div className="flex-1 min-w-0">
                                 <Skeleton className="h-3 w-20 mb-1" />
                                 <Skeleton className="h-2 w-14" />
-                              </div>
-                              <Skeleton className="w-3 h-3" />
                             </div>
-                          ))}
-                        </div>
+                              <Skeleton className="w-3 h-3" />
+                                </div>
+                              ))}
+                            </div>
                       </div>
                     </div>
                   </div>
@@ -2316,20 +2358,26 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       fieldName="phone"
                       value={formData.phone || ''}
                       onSave={(fieldName, value) => {
-                        // Only allow numbers, spaces, dashes, and parentheses
+                            // Only allow numbers, spaces, dashes, and parentheses
                         const cleanValue = value.replace(/[^0-9\s\-\(\)]/g, '')
                         handleInputChange(fieldName as keyof CompanyData, cleanValue)
-                      }}
+                          }}
                       placeholder="-"
-                      onKeyDown={(e) => {
-                        // Allow: backspace, delete, tab, escape, enter, and navigation keys
-                        if ([8, 9, 27, 13, 46, 37, 38, 39, 40].includes(e.keyCode) ||
-                            // Allow: numbers, space, dash, parentheses
-                            /[0-9\s\-\(\)]/.test(e.key)) {
+                          onKeyDown={(e) => {
+                        // Allow all navigation and editing keys
+                        if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Tab' || 
+                            e.key === 'Escape' || e.key === 'Enter' || e.key === 'ArrowLeft' || 
+                            e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown' ||
+                            e.key === 'Home' || e.key === 'End' || e.key === 'PageUp' || e.key === 'PageDown' ||
+                            e.ctrlKey || e.metaKey) {
                           return
                         }
-                        e.preventDefault()
-                      }}
+                                // Allow: numbers, space, dash, parentheses
+                        if (/[0-9\s\-\(\)]/.test(e.key)) {
+                              return
+                            }
+                            e.preventDefault()
+                          }}
                     />
 
                     {/* Country */}
@@ -2441,7 +2489,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                 <Input
                                   ref={fileInputRef}
                                   placeholder="-"
-                                  value={formData.logo ? formData.logo.name : (formData.logoUrl || '')}
+                                                                      value={formData.logo ? formData.logo.name : (formData.logoUrl || '')}
                                   readOnly
                                   className="h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none cursor-pointer"
                                   onClick={() => document.getElementById('logo')?.click()}
@@ -2454,7 +2502,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                 value=""
                                 readOnly
                                 className="h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none cursor-pointer"
-                                  onClick={() => document.getElementById('logo')?.click()}
+                                onClick={() => document.getElementById('logo')?.click()}
                               />
                             )}
                           </label>
@@ -2538,7 +2586,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                               transition={{ duration: 0.3, ease: "easeOut" }}
                               className="whitespace-nowrap overflow-hidden flex items-center"
                             >
-                              Add Agents
+                          Add Agents
                             </motion.span>
                           )}
                         </AnimatePresence>
@@ -2575,9 +2623,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                               </div>
                             ))}
                           </div>
-                                                  ) : selectedAgents.size > 0 ? (
-                            <div className="space-y-3">
-                              <div className="flex flex-wrap gap-2">
+                        ) : selectedAgents.size > 0 ? (
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
                               {selectedAgentsData.map((agent) => (
                                 <div key={agent.user_id} className="relative flex items-center gap-2 p-2 px-3 bg-primary/5 border border-primary/20 rounded-lg min-w-0">
                                   <Avatar className="w-6 h-6 flex-shrink-0">
@@ -2672,7 +2720,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                             transition={{ duration: 0.3, ease: "easeOut" }}
                             className="whitespace-nowrap overflow-hidden flex items-center"
                           >
-                            Add Clients
+                        Add Clients
                           </motion.span>
                           )}
                       </AnimatePresence>
@@ -2707,36 +2755,36 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                             </div>
                           ))}
                         </div>
-                                             ) : selectedClients.size > 0 ? (
-                         <div className="space-y-3">
-                           <div className="flex flex-wrap gap-2">
+                      ) : selectedClients.size > 0 ? (
+                        <div className="space-y-3">
+                          <div className="flex flex-wrap gap-2">
                             {selectedClientsData.map((client) => (
                                                               <div key={client.user_id} className="relative flex items-center gap-2 p-2 px-3 bg-primary/5 border border-primary/20 rounded-lg min-w-0">
-                                  <Avatar className="w-6 h-6 flex-shrink-0">
-                                    <AvatarImage src={client.profile_picture || undefined} alt={client.first_name || 'Client'} />
-                                    <AvatarFallback className="text-xs">
-                                      {client.first_name && client.last_name 
-                                        ? `${client.first_name.charAt(0)}${client.last_name.charAt(0)}`
-                                        : client.first_name?.charAt(0) || client.last_name?.charAt(0) || 'C'
-                                      }
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div className="min-w-0 max-w-[120px]">
-                                    <h4 className="text-xs truncate">
-                                      {client.first_name && client.last_name 
-                                        ? `${client.first_name} ${client.last_name}` 
-                                        : client.first_name || client.last_name || 'Unknown Name'
-                                      }
-                                    </h4>
-                                  </div>
-                                  <button
+                                <Avatar className="w-6 h-6 flex-shrink-0">
+                                  <AvatarImage src={client.profile_picture || undefined} alt={client.first_name || 'Client'} />
+                                  <AvatarFallback className="text-xs">
+                                    {client.first_name && client.last_name 
+                                      ? `${client.first_name.charAt(0)}${client.last_name.charAt(0)}`
+                                      : client.first_name?.charAt(0) || client.last_name?.charAt(0) || 'C'
+                                    }
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0 max-w-[120px]">
+                                  <h4 className="text-xs truncate">
+                                    {client.first_name && client.last_name 
+                                      ? `${client.first_name} ${client.last_name}` 
+                                      : client.first_name || client.last_name || 'Unknown Name'
+                                    }
+                                  </h4>
+                                </div>
+                                <button
                                     onClick={async () => {
-                                      const newSelected = new Set(selectedClients)
-                                      newSelected.delete(client.user_id)
-                                      
+                                    const newSelected = new Set(selectedClients)
+                                    newSelected.delete(client.user_id)
+                                    
                                       // Update local state immediately for responsive UI
                                       setSelectedClients(newSelected)
-                                      setSelectedClientsData(prev => prev.filter(c => c.user_id !== client.user_id))
+                                    setSelectedClientsData(prev => prev.filter(c => c.user_id !== client.user_id))
                                       
                                       // Real-time database update
                                       if (companyToEdit?.id) {
@@ -2755,16 +2803,16 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#626262' : '#888787'}
                                   >
                                     <IconMinus className="h-3 w-3" />
-                                  </button>
-                                </div>
+                                </button>
+                              </div>
                             ))}
                           </div>
                         </div>
                       ) : (
                         <div className="text-center py-6 text-muted-foreground">
                           <p className="text-sm">No Clients Added</p>
-                        </div>
-                      )}
+                          </div>
+                        )}
                       </div>
                   </div>
                 </div>
@@ -2779,7 +2827,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                 {isOpen && !companyToEdit?.id && (
                   <Button type="submit" form="add-company-form" disabled={isSubmitting || !isFormValid()} size="sm">
                     {isSubmitting ? 'Saving...' : 'Save'}
-                  </Button>
+              </Button>
                 )}
 
                 {/* Show Delete button only when editing an existing company AND modal is open */}
@@ -2792,7 +2840,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                     size="sm"
                   >
                     {isDeleting ? 'Deleting...' : 'Delete'}
-                  </Button>
+              </Button>
                 )}
               </div>
             </div>
@@ -2887,29 +2935,29 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                     }`
                               }`}
                                                                 onClick={async () => {
-                                    // Disable selection for agents assigned to other companies
-                                    if (agent.member_company && agent.member_company !== companyToEdit?.company) return
-                                    
-                                    const newSelected = new Set(selectedAgents)
+                                // Disable selection for agents assigned to other companies
+                                if (agent.member_company && agent.member_company !== companyToEdit?.company) return
+                                
+                                const newSelected = new Set(selectedAgents)
                                     const wasSelected = newSelected.has(agent.user_id)
                                     
                                     if (wasSelected) {
-                                      newSelected.delete(agent.user_id)
-                                      // Remove from selectedAgentsData when unselecting
-                                      setSelectedAgentsData(prev => prev.filter(a => a.user_id !== agent.user_id))
-                                    } else {
-                                      newSelected.add(agent.user_id)
-                                      // Only add if not already in selectedAgentsData
-                                      setSelectedAgentsData(prev => {
-                                        if (prev.some(a => a.user_id === agent.user_id)) {
-                                          return prev
-                                        }
-                                        return [...prev, agent]
-                                      })
+                                  newSelected.delete(agent.user_id)
+                                  // Remove from selectedAgentsData when unselecting
+                                  setSelectedAgentsData(prev => prev.filter(a => a.user_id !== agent.user_id))
+                                } else {
+                                  newSelected.add(agent.user_id)
+                                  // Only add if not already in selectedAgentsData
+                                  setSelectedAgentsData(prev => {
+                                    if (prev.some(a => a.user_id === agent.user_id)) {
+                                      return prev
                                     }
+                                    return [...prev, agent]
+                                  })
+                                }
                                     
                                     // Update local state immediately for responsive UI
-                                    setSelectedAgents(newSelected)
+                                setSelectedAgents(newSelected)
                                     
                                     // Real-time database update
                                     if (companyToEdit?.id) {
@@ -2921,7 +2969,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                         // Error handling is done in updateAssignmentRealTime
                                       }
                                     }
-                                  }}
+                              }}
                             >
                               <div className="grid grid-cols-[auto_1fr_auto] items-start gap-3">
                                 <div className="relative">
@@ -2993,7 +3041,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                     ) : (
                                               <div className="text-center py-8 text-muted-foreground">
                         <p className="text-sm font-medium">No Agents Found</p>
-                      </div>
+                        </div>
                     )}
                   </div>
 
@@ -3258,13 +3306,13 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <p className="text-sm">No Activities Found</p>
-                    </div>
+                        </div>
                   )}
-                </div>
+                      </div>
               )}
 
 
-            </div>
+                        </div>
 
 
 
@@ -3314,16 +3362,16 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                   <SendHorizontal className="h-4 w-4 text-muted-foreground" />
                                 )}
                               </button>
-                            </div>
-                          )}
                         </div>
+                          )}
+                      </div>
                       </form>
-                    </div>
+                        </div>
+                        </div>
+                        </div>
+                      )}
+                      </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
       </DialogContent>
 
       {/* Delete Confirmation Dialog */}
@@ -3331,7 +3379,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         <DialogContent className="sm:max-w-[380px] w-[90vw] rounded-xl [&>button]:hidden">
           <div className="flex flex-col space-y-1.5 text-center sm:text-center">
             <h2 className="text-lg font-semibold leading-none tracking-tight">Delete</h2>
-          </div>
+            </div>
           <div className="text-sm space-y-2">
             <p className="text-muted-foreground">Are you sure you want to delete this company? This action cannot be undone and will remove all associated data.</p>
           </div>
@@ -3349,8 +3397,8 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             >
               {isDeleting ? 'Deleting...' : 'Yes'}
             </Button>
-          </div>
-        </DialogContent>
+        </div>
+      </DialogContent>
       </Dialog>
     </Dialog>
   )

@@ -217,15 +217,15 @@ export default function CompaniesPage() {
   const getServiceBadgeClass = (service: string | null): string => {
     const s = (service || '').toLowerCase()
     if (s === 'workforce') {
-      return 'bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800'
+      return 'text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20'
     }
     if (s === 'one agent') {
-      return 'bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800'
+      return 'text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20'
     }
     if (s === 'team') {
-      return 'bg-yellow-100 text-yellow-800 border border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-200 dark:border-yellow-800'
+      return 'text-yellow-700 dark:text-white border-yellow-600/20 bg-yellow-50 dark:bg-yellow-600/20'
     }
-    return 'bg-gray-100 text-gray-800 border border-gray-200 dark:bg-gray-900/30 dark:text-gray-200 dark:border-gray-800'
+    return 'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20'
   }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -393,9 +393,12 @@ export default function CompaniesPage() {
                                  <div className="font-medium truncate max-w-[14rem]">{m.company}</div>
                                </div>
                               {m.service && (
-                                <span className={`inline-block rounded-md px-2 py-1 text-xs font-medium ${getServiceBadgeClass(m.service)}`}>
+                                <Badge 
+                                  variant="outline" 
+                                  className={`px-3 py-1 font-medium ${getServiceBadgeClass(m.service)}`}
+                                >
                                   {m.service}
-                                </span>
+                                </Badge>
                               )}
                             </div>
                             <div className="mt-3 space-y-2 text-sm">

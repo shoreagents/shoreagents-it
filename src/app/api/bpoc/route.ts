@@ -37,7 +37,7 @@ export async function PATCH(request: Request) {
     }
 
     // Validate status against the enum
-    const validStatuses = ['submitted', 'qualified', 'for verification', 'verified', 'initial interview', 'final interview', 'not qualified', 'passed']
+    const validStatuses = ['reject', 'submitted', 'for verification', 'verified', 'initial interview', 'passed', 'failed', 'withdrawn']
     if (!validStatuses.includes(status)) {
       console.log('❌ Invalid status value:', status)
       return NextResponse.json({ error: 'Invalid status value' }, { status: 400 })

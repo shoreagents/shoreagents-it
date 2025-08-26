@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconVideo, IconCash, IconClockHour4, IconExternalLink, IconSun, IconMoon, IconAward, IconCode } from "@tabler/icons-react"
+import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconVideo, IconCash, IconClockHour4, IconExternalLink, IconSun, IconMoon, IconAward, IconCode, IconSparkles } from "@tabler/icons-react"
 import { Input } from "@/components/ui/input"
 import { EditableField, DataFieldRow } from "@/components/ui/fields"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -78,6 +79,28 @@ interface Applicant {
   all_companies?: string[]
   all_job_statuses?: string[]
   all_job_timestamps?: string[]
+  // Skills data from BPOC database
+  skills?: string[]
+  originalSkillsData?: any
+  // Summary from BPOC database
+  summary?: string | null
+  // Email from BPOC database
+  email?: string | null
+  // Phone and address from BPOC database
+  phone?: string | null
+  address?: string | null
+  // AI analysis data from BPOC database
+  aiAnalysis?: {
+    overall_score?: number
+    key_strengths?: any[]
+    strengths_analysis?: any
+    improvements?: any[]
+    recommendations?: any[]
+    improved_summary?: string
+    salary_analysis?: any
+    career_path?: any
+    section_analysis?: any
+  } | null
 }
 
 interface Comment {
@@ -94,6 +117,8 @@ interface Comment {
 
 const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
+    case "reject":
+      return "text-rose-700 dark:text-white border-rose-600/20 bg-rose-50 dark:bg-rose-600/20"
     case "submitted":
       return "text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20"
     case "qualified":
@@ -126,6 +151,8 @@ const getStatusColor = (status: string) => {
 
 const getStatusIcon = (status: string) => {
   switch (status.toLowerCase()) {
+    case "reject":
+      return <IconCircle className="h-4 w-4 fill-rose-500 stroke-none" />
     case "submitted":
       return <IconCircle className="h-4 w-4 fill-blue-500 stroke-none" />
     case "qualified":
@@ -150,7 +177,7 @@ const getStatusIcon = (status: string) => {
     case "withdrawn":
       return <IconCircle className="h-4 w-4 fill-gray-500 stroke-none" />
     case "hired":
-      return <IconCircle className="h-4 w-4 fill-orange-500 stroke-none" />
+      return <IconCircle className="h-4 w-4 fill-amber-500 stroke-none" />
     default:
       return <IconCircle className="h-4 w-4 fill-gray-500 stroke-none" />
   }
@@ -159,22 +186,13 @@ const getStatusIcon = (status: string) => {
 // Get status display label based on status value
 const getStatusLabel = (status: string) => {
   const statusOptions = [
+    { value: 'reject', label: 'Reject' },
     { value: 'submitted', label: 'New' },
-          { value: 'qualified', label: 'Qualified' },
     { value: 'for verification', label: 'For Verification' },
     { value: 'verified', label: 'Verified' },
     { value: 'initial interview', label: 'Initial Interview' },
-    { value: 'final interview', label: 'Final Interview' },
-    { value: 'failed', label: 'Not Qualified' },
-          { value: 'not qualified', label: 'Not Qualified' },
-    { value: 'passed', label: 'Ready for Sale' },
-    // Additional possible BPOC status values
-    { value: 'pending', label: 'Pending' },
-    { value: 'reviewing', label: 'Reviewing' },
-    { value: 'approved', label: 'Approved' },
-    { value: 'rejected', label: 'Rejected' },
-    { value: 'interview', label: 'Interview' },
-    { value: 'hired', label: 'Hired' },
+    { value: 'passed', label: 'Ready For Sale' },
+    { value: 'failed', label: 'Failed' },
     { value: 'withdrawn', label: 'Withdrawn' }
   ]
   const statusOption = statusOptions.find(option => option.value === status.toLowerCase())
@@ -213,8 +231,12 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
   const [comments, setComments] = useState<Comment[]>([])
   const [isLoadingComments, setIsLoadingComments] = useState(false)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+
   const [activeTab, setActiveTab] = useState("information")
+  const [selectedJob, setSelectedJob] = useState<any>(null)
+  const [isJobSheetOpen, setIsJobSheetOpen] = useState(false)
+  
+
   
   // Editable input values
   const [inputValues, setInputValues] = useState<Record<string, string>>({})
@@ -298,17 +320,55 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
 
 
 
+  // Handle job click to show job details
+  const handleJobClick = async (jobIndex: number) => {
+    try {
+      // Get job ID from the applicant's job_ids array
+      const jobId = applicant?.job_ids?.[jobIndex]
+      
+      if (!jobId) {
+        console.error('No job ID found for index:', jobIndex)
+        return
+      }
+
+      // Fetch detailed job data from BPOC database
+      const response = await fetch(`/api/bpoc/job-details/${jobId}`)
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch job details: ${response.statusText}`)
+      }
+
+      const jobData = await response.json()
+      
+      setSelectedJob(jobData)
+      setIsJobSheetOpen(true)
+    } catch (error) {
+      console.error('Error fetching job details:', error)
+      
+      // Fallback to basic data if API fails
+      const fallbackData = {
+        title: applicant?.all_job_titles?.[jobIndex],
+        company: applicant?.all_companies?.[jobIndex],
+        status: applicant?.all_job_statuses?.[jobIndex],
+        appliedDate: applicant?.all_job_timestamps?.[jobIndex],
+      }
+      
+      setSelectedJob(fallbackData)
+      setIsJobSheetOpen(true)
+    }
+  }
+
   // Define status options for applicants
   const getStatusOptions = (): StatusOption[] => {
     return [
+      { value: 'reject', label: 'Reject', icon: 'rose', color: 'rose' },
       { value: 'submitted', label: 'New', icon: 'blue', color: 'blue' },
-              { value: 'qualified', label: 'Qualified', icon: 'orange', color: 'orange' },
       { value: 'for verification', label: 'For Verification', icon: 'teal', color: 'teal' },
       { value: 'verified', label: 'Verified', icon: 'purple', color: 'purple' },
       { value: 'initial interview', label: 'Initial Interview', icon: 'indigo', color: 'indigo' },
-      { value: 'final interview', label: 'Final Interview', icon: 'violet', color: 'violet' },
-        { value: 'not qualified', label: 'Not Qualified', icon: 'red', color: 'red' },
-      { value: 'passed', label: 'Ready for Sale', icon: 'green', color: 'green' }
+              { value: 'passed', label: 'Ready For Sale', icon: 'green', color: 'green' },
+      { value: 'failed', label: 'Failed', icon: 'red', color: 'red' },
+      { value: 'withdrawn', label: 'Withdrawn', icon: 'gray', color: 'gray' }
     ]
   }
 
@@ -460,20 +520,20 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
 
   const handleStatusChange = async (newStatus: string) => {
     try {
-      setIsUpdatingStatus(true)
       setCurrentStatus(newStatus)
       
-              // Call API to update status in both BPOC and main database
-        const response = await fetch(`/api/bpoc`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            id: applicant.id, // Use the primary key ID
-            status: newStatus
-          })
+      // Call API to update status in both BPOC and main database
+      const response = await fetch(`/api/bpoc`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: applicant.id, // Use the primary key ID
+          status: newStatus,
+          previousStatus: applicant.status
         })
+      })
 
       if (!response.ok) {
         throw new Error(`Failed to update status: ${response.statusText}`)
@@ -482,16 +542,16 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
       const result = await response.json()
       console.log('✅ Status updated successfully:', result)
       
-      // Optionally refresh the applicant data or show success message
-      // You could also trigger a refresh of the parent component
+      // Call the onStatusUpdate callback if provided to sync with parent component
+      if (onStatusUpdate) {
+        onStatusUpdate(applicant.id, 0, newStatus) // jobIndex 0 for main status
+      }
       
     } catch (error) {
       console.error('❌ Error updating status:', error)
       // Revert the local state change on error
       setCurrentStatus(applicant.status)
       // You could show an error toast here
-    } finally {
-      setIsUpdatingStatus(false)
     }
   }
 
@@ -668,41 +728,81 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                     <span className="text-muted-foreground">Status:</span>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          className="h-auto p-0 hover:bg-muted/50 active:bg-muted/70 transition-colors"
-                          disabled={isUpdatingStatus}
+                        <Badge 
+                          variant="outline" 
+                          className={`${getStatusColor(currentStatus || applicant.status)} px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center`}
                         >
-                          <Badge variant="outline" className={`${getStatusColor(currentStatus || applicant.status)} px-2 py-1 text-xs cursor-pointer hover:opacity-80 transition-opacity ${isUpdatingStatus ? 'opacity-50' : ''}`}>
-                            {isUpdatingStatus ? 'Updating...' : getStatusLabel(currentStatus || applicant.status)}
-                          </Badge>
-                        </Button>
+                          {getStatusLabel(currentStatus || applicant.status)}
+                        </Badge>
                       </PopoverTrigger>
-                      <PopoverContent className="w-56 p-2" align="start" side="bottom" sideOffset={4}>
+                      <PopoverContent className="w-56 p-2">
                         <div className="space-y-1">
-                          {statusOptions.map((option) => (
-                            <div 
-                              key={option.value}
-                              className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                (currentStatus || applicant.status) === option.value 
-                                  ? 'bg-primary/10 text-primary border border-primary/20 pointer-events-none cursor-default' 
-                                  : isUpdatingStatus 
-                                  ? 'opacity-50 cursor-not-allowed text-muted-foreground'
-                                  : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
-                              }`}
-                              onClick={() => !isUpdatingStatus && handleStatusChange(option.value)}
-                            >
-                              {getStatusIcon(option.value)}
-                              <span className="text-sm font-medium">{option.label}</span>
-                            </div>
-                          ))}
+                          {statusOptions.map((option) => {
+                            const isCurrentStatus = (currentStatus || applicant.status) === option.value;
+                            return (
+                              <div 
+                                key={option.value}
+                                className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
+                                  isCurrentStatus 
+                                    ? 'bg-primary/10 text-primary border border-primary/20 cursor-default' 
+                                    : 'hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground cursor-pointer'
+                                }`}
+                                onClick={isCurrentStatus ? undefined : () => handleStatusChange(option.value)}
+                              >
+                                {option.icon === 'rose' ? (
+                                  <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                                ) : option.icon === 'blue' ? (
+                                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                                ) : option.icon === 'teal' ? (
+                                  <div className="w-3 h-3 rounded-full bg-teal-500"></div>
+                                ) : option.icon === 'purple' ? (
+                                  <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                                ) : option.icon === 'indigo' ? (
+                                  <div className="w-3 h-3 rounded-full bg-indigo-500"></div>
+                                ) : option.icon === 'green' ? (
+                                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                ) : option.icon === 'red' ? (
+                                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                ) : option.icon === 'gray' ? (
+                                  <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                                ) : (
+                                  <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                                )}
+                                <span className="text-sm font-medium">{option.label}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </PopoverContent>
                     </Popover>
                   </div>
                   
-
+                  {/* Email */}
+                  {applicant.email && (
+                    <div className="flex items-center gap-2">
+                      <IconMail className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Email:</span>
+                      <span className="font-medium">{applicant.email}</span>
+                    </div>
+                  )}
                   
+                  {/* Phone */}
+                  {applicant.phone && (
+                    <div className="flex items-center gap-2">
+                      <IconPhone className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Phone:</span>
+                      <span className="font-medium">{applicant.phone}</span>
+                    </div>
+                  )}
+                  
+                  {/* Address */}
+                  {applicant.address && (
+                    <div className="flex items-center gap-2">
+                      <IconMapPin className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Address:</span>
+                      <span className="font-medium">{applicant.address}</span>
+                    </div>
+                  )}
 
                   
 
@@ -715,21 +815,24 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
               </div>
 
               {/* Applicant Details with Tabs */}
-              <div className="flex-1 px-6 py-5 overflow-y-auto min-h-0">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-1 flex flex-col min-h-0">
+              <div className="px-6 py-5 overflow-y-auto flex-1 min-h-0">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col">
                   {/* Job Application Section - Always Visible */}
                   <div className="flex flex-col mb-6">
-                    <h3 className="text-lg font-medium mb-2 text-muted-foreground">Job Application</h3>
-                    <div className="rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border">
-                      <div className="flex flex-col gap-3">
+                    <h3 className="text-lg font-medium mb-4 text-muted-foreground">Job Application</h3>
+                    <div className="rounded-lg border p-6 shadow-sm">
+                      <div className="space-y-2">
                         {applicant.all_job_titles && applicant.all_job_titles.length > 0 ? (
                           <>
-                            <span className="text-xs font-medium text-muted-foreground/70">Applied for:</span>
-                            <div className="flex flex-col gap-2">
                               {applicant.all_job_titles.map((jobTitle, index) => (
-                                <div key={index} className="rounded-lg p-3 bg-gray-100 dark:bg-[#1a1a1a] hover:shadow-sm transition-all duration-200">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <h4 className="font-semibold text-sm text-primary leading-tight break-words flex-1">
+                              <div 
+                                key={index} 
+                                className="rounded-lg p-4 border bg-card cursor-pointer hover:bg-accent/50 transition-colors"
+                                onClick={() => handleJobClick(index)}
+                              >
+                                <div className="flex items-start justify-between">
+                                  <div className="flex items-center gap-2 flex-1">
+                                    <h4 className="font-medium text-foreground">
                                       {jobTitle}
                                     </h4>
                                     {(() => {
@@ -738,77 +841,67 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                       
                                       // Show status badge if job has final status
                                       if (showStatus) {
-                                        // Make badge clickable only when main status is "passed"
-                                        if (applicant.status.toLowerCase() === 'passed') {
-                                          return (
-                                            <Popover>
-                                              <PopoverTrigger asChild>
-                                                <Badge 
-                                                  variant="outline" 
-                                                  className={`${getStatusColor(status)} px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:opacity-80 transition-opacity`}
-                                                  onClick={(e) => e.stopPropagation()}
-                                                >
-                                                  {getStatusLabel(status)}
-                                                </Badge>
-                                              </PopoverTrigger>
-                                              <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
-                                                <div className="space-y-1">
-                                                  {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
-                                                    <div 
-                                                      key={statusOption}
-                                                      className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                                        status.toLowerCase() === statusOption 
-                                                          ? 'bg-primary/10 text-primary border border-primary/20 pointer-events-none cursor-default' 
-                                                          : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
-                                                      }`}
-                                                      onClick={async () => {
-                                                        try {
-                                                          console.log(`Updating BPOC job ${index} status to:`, statusOption);
-                                                          
-                                                          const response = await fetch('/api/bpoc/update-job-status/', {
-                                                            method: 'PATCH',
-                                                            headers: {
-                                                              'Content-Type': 'application/json',
-                                                            },
-                                                            body: JSON.stringify({
-                                                              applicantId: applicant.id,
-                                                              jobIndex: index,
-                                                              newStatus: statusOption
-                                                            })
-                                                          });
-                                                          
-                                                          if (response.ok) {
-                                                            const result = await response.json();
-                                                            console.log('✅ BPOC job status updated successfully:', result);
-                                                            
-                                                            // Update parent state if callback is provided
-                                                            if (onStatusUpdate) {
-                                                              onStatusUpdate(applicant.id, index, statusOption);
-                                                            }
-                                                          } else {
-                                                            const error = await response.json();
-                                                            console.error('❌ Failed to update BPOC job status:', error);
-                                                          }
-                                                        } catch (error) {
-                                                          console.error('❌ Error updating BPOC job status:', error);
-                                                        }
-                                                      }}
-                                                    >
-                                                      {getStatusIcon(statusOption)}
-                                                      <span className="text-sm font-medium">{getStatusLabel(statusOption)}</span>
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              </PopoverContent>
-                                            </Popover>
-                                          );
-                                        }
-                                        
-                                        // Non-clickable badge when main status is not "passed"
                                         return (
-                                          <Badge variant="outline" className={`${getStatusColor(status)} px-2 py-0.5 text-xs font-medium rounded-md`}>
-                                            {getStatusLabel(status)}
-                                          </Badge>
+                                          <Popover>
+                                            <PopoverTrigger asChild>
+                                              <Badge 
+                                                variant="outline" 
+                                                className={`${getStatusColor(status)} px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:opacity-80 transition-opacity`}
+                                                onClick={(e) => e.stopPropagation()}
+                                              >
+                                                {getStatusLabel(status)}
+                                              </Badge>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
+                                              <div className="space-y-1">
+                                                {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
+                                                  <div 
+                                                    key={statusOption}
+                                                    className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
+                                                      status.toLowerCase() === statusOption 
+                                                        ? 'bg-primary/10 text-primary border border-primary/20 pointer-events-none cursor-default' 
+                                                        : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
+                                                    }`}
+                                                    onClick={async () => {
+                                                      try {
+                                                        console.log(`Updating BPOC job ${index} status to:`, statusOption);
+                                                        
+                                                        const response = await fetch('/api/bpoc/update-job-status/', {
+                                                          method: 'PATCH',
+                                                          headers: {
+                                                            'Content-Type': 'application/json',
+                                                          },
+                                                          body: JSON.stringify({
+                                                            applicantId: applicant.id,
+                                                            jobIndex: index,
+                                                            newStatus: statusOption
+                                                          })
+                                                        });
+                                                        
+                                                        if (response.ok) {
+                                                          const result = await response.json();
+                                                          console.log('✅ BPOC job status updated successfully:', result);
+                                                          
+                                                          // Update parent state if callback is provided
+                                                          if (onStatusUpdate) {
+                                                            onStatusUpdate(applicant.id, index, statusOption);
+                                                          }
+                                                        } else {
+                                                          const error = await response.json();
+                                                          console.error('❌ Failed to update BPOC job status:', error);
+                                                        }
+                                                      } catch (error) {
+                                                        console.error('❌ Error updating BPOC job status:', error);
+                                                      }
+                                                    }}
+                                                  >
+                                                    {getStatusIcon(statusOption)}
+                                                    <span className="text-sm font-medium">{getStatusLabel(statusOption)}</span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </PopoverContent>
+                                          </Popover>
                                         );
                                       }
                                       
@@ -816,32 +909,39 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                     })()}
                                   </div>
                                   
-                                  {applicant.all_companies && applicant.all_companies[index] && (
-                                    <div className="flex items-center gap-1">
-                                      <svg className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                      </svg>
-                                      <p className="text-xs text-muted-foreground font-medium">
-                                        {applicant.all_companies[index]}
-                                      </p>
-                                    </div>
-                                  )}
-                                  
+                                    {/* Applied Date - Top Right */}
                                   {applicant.all_job_timestamps && applicant.all_job_timestamps[index] && (
-                                    <div className="flex items-center gap-1 mt-1">
-                                      <IconCalendar className="h-3 w-3 text-muted-foreground/70" />
-                                      <p className="text-xs text-muted-foreground">
-                                        Applied: {new Date(applicant.all_job_timestamps[index]).toLocaleDateString('en-US', { 
+                                      <div className="flex items-center gap-1 text-right flex-shrink-0">
+                                        <IconCalendar className="h-4 w-4 text-muted-foreground" />
+                                        <span className="font-medium text-muted-foreground text-xs">
+                                          {new Date(applicant.all_job_timestamps[index]).toLocaleDateString('en-US', { 
                                           month: 'short', 
                                           day: 'numeric',
-                                          year: 'numeric'
-                                        })}
-                                      </p>
+                                            timeZone: 'Asia/Manila'
+                                          })}
+                                        </span>
+                                        <span className="text-muted-foreground/70 text-xs">•</span>
+                                        <IconClock className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-muted-foreground text-xs">
+                                          {new Date(applicant.all_job_timestamps[index]).toLocaleTimeString('en-US', { 
+                                            hour: '2-digit', 
+                                            minute: '2-digit', 
+                                            hour12: true, 
+                                            timeZone: 'Asia/Manila'
+                                          })}
+                                        </span>
                                     </div>
                                   )}
                                 </div>
-                              ))}
+                                  
+                                                                    {/* Company Name */}
+                                  {applicant.all_companies && applicant.all_companies[index] && (
+                                    <div>
+                                      <p className="text-sm text-muted-foreground">{applicant.all_companies[index]}</p>
                             </div>
+                                  )}
+                                </div>
+                              ))}
                           </>
                         ) : (
                           <div className="text-center py-4 text-muted-foreground">
@@ -862,7 +962,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                     }`}>
                       <AnimatedTabs
                         tabs={[
-                          { title: "About", value: "information" },
+                          { title: "Summary", value: "information" },
                           { title: "AI Analysis", value: "ai-analysis" }
                         ]}
                         containerClassName="grid grid-cols-2 w-fit"
@@ -877,197 +977,608 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                   </div>
 
                   {/* Information Tab */}
-                  <TabsContent value="information" className="space-y-6 overflow-y-auto flex-1 min-h-0">
-                    <div className="space-y-6 flex flex-col min-h-full">
-                      {/* Summary Section */}
+                  <TabsContent value="information" className="space-y-6">
+                                          {/* Bio Section */}
                       <div>
-                        <h3 className="text-lg font-medium mb-2 text-muted-foreground">Summary</h3>
-                        <div className="rounded-lg p-6 text-sm leading-relaxed min-h-[120px] border">
-                          {applicant.details || "No description provided."}
+                        <h3 className="text-lg font-medium mb-2 text-muted-foreground">Bio</h3>
+                        <div className="rounded-lg p-6 text-sm leading-relaxed border shadow-sm">
+                          {applicant.summary || applicant.details || "No summary provided."}
                         </div>
                       </div>
 
-                      {/* Skills and Resume Section - 2 Columns */}
-                      <div className="grid grid-cols-2 gap-6 items-start">
-                        {/* Skills Section */}
-                        <div className="h-full">
-                          <h3 className="text-lg font-medium mb-2 text-muted-foreground">Skills</h3>
-                          <div className="rounded-lg p-6 min-h-[200px] border h-full flex flex-col">
-                            <div className="space-y-4 flex-1">
-                              {/* For applicants, we can show skills from their profile or job applications */}
-                              <div>
-                                <h4 className="text-sm font-medium text-muted-foreground mb-2">Applied Positions</h4>
-                                <div className="flex flex-wrap gap-2">
-                                  {applicant.all_job_titles && applicant.all_job_titles.length > 0 ? (
-                                    applicant.all_job_titles.map((jobTitle, index) => (
-                                      <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
-                                        {jobTitle}
-                                      </Badge>
-                                    ))
-                                  ) : (
-                                    <span className="text-sm text-muted-foreground">No positions applied for</span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Resume Container */}
-                        <div className="h-full">
-                          <h3 className="text-lg font-medium mb-2 text-muted-foreground">Resume</h3>
-                          <div className="rounded-lg p-6 min-h-[200px] border bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-950/20 dark:to-indigo-950/20 hover:from-blue-100 hover:to-indigo-200 dark:hover:from-blue-900/30 dark:hover:to-indigo-900/30 transition-all duration-200 cursor-pointer h-full flex flex-col"
-                               onClick={() => applicant.resume_slug && window.open(`https://www.bpoc.io/${applicant.resume_slug}`, '_blank')}>
-                            <div className="flex flex-col items-center justify-center flex-1 text-center">
-                              <div className="mb-3">
-                                <div className="w-12 h-12 rounded-full bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center mb-2">
-                                  <IconFile className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                                </div>
-                              </div>
-                              <p className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
-                                View Resume
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Click to open resume
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* BPOC Recruits Database Information Section */}
-                      <div className="flex-1 flex flex-col min-h-0">
+                      {/* Additional Information Section */}
+                      <div className="mt-6">
+                        <h3 className="text-lg font-medium mb-4 text-muted-foreground">Additional Information</h3>
                         <div className="rounded-lg border border-[#cecece99] dark:border-border">
-
-                      
-
-
-                      {/* Shift */}
-                      <DataFieldRow
-                        icon={<IconClockHour4 className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                        label="Shift"
-                        fieldName="shift"
-                        value={inputValues.shift || ''}
-                        onSave={() => {}}
-                        customInput={
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <div 
-                                className="h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none justify-start text-left font-normal cursor-pointer select-none flex items-center"
-                                style={{ backgroundColor: 'transparent' }}
-                                tabIndex={0}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault()
-                                  }
-                                }}
-                              >
-                                {inputValues.shift || '-'}
-                              </div>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-32 p-1" align="start" side="bottom" sideOffset={4}>
-                              <div className="space-y-1">
-                                {[
-                                  { value: 'Day', icon: <IconSun className="h-4 w-4 text-muted-foreground" /> },
-                                  { value: 'Night', icon: <IconMoon className="h-4 w-4 text-muted-foreground" /> }
-                                ].map((shiftOption) => (
+                          {/* Shift */}
+                          <DataFieldRow
+                            icon={<IconClockHour4 className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                            label="Shift"
+                            fieldName="shift"
+                            value={inputValues.shift || ''}
+                            onSave={() => {}}
+                            customInput={
+                              <Popover>
+                                <PopoverTrigger asChild>
                                   <div 
-                                    key={shiftOption.value}
-                                    className={`flex items-center gap-2 p-2 rounded-md transition-all duration-200 ${
-                                      inputValues.shift === shiftOption.value 
-                                        ? 'bg-primary/10 text-primary border border-primary/20 cursor-default opacity-75' 
-                                        : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
-                                    }`}
-                                    onClick={() => {
-                                      // Only allow clicking if it's a different value
-                                      if (inputValues.shift !== shiftOption.value) {
-                                        console.log(`🔄 Shift changing from "${inputValues.shift}" to "${shiftOption.value}"`)
-                                        console.log(`🔍 Original value: "${originalValues.shift}"`)
-                                        console.log(`🔍 Current value: "${inputValues.shift}"`)
-                                        console.log(`🔍 New value: "${shiftOption.value}"`)
-                                        
-                                        // Update the input values first
-                                        setInputValues(prev => ({ ...prev, shift: shiftOption.value }))
-                                        
-                                        // Save immediately with the new value
-                                        const newValue = shiftOption.value
-                                        console.log(`💾 Saving shift with new value: "${newValue}"`)
-                                        
-
-                                        
-
-                                      } else {
-                                        console.log(`⏭️ Shift value unchanged: "${shiftOption.value}"`)
+                                    className="h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none justify-start text-left font-normal cursor-pointer select-none flex items-center"
+                                    style={{ backgroundColor: 'transparent' }}
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault()
                                       }
                                     }}
                                   >
-                                    <span className="text-sm">{shiftOption.icon}</span>
-                                    <span className="text-sm font-medium">{shiftOption.value}</span>
+                                    {inputValues.shift || '-'}
                                   </div>
-                                ))}
+                                </PopoverTrigger>
+                                <PopoverContent className="w-32 p-1" align="start" side="bottom" sideOffset={4}>
+                                  <div className="space-y-1">
+                                    {[
+                                      { value: 'Day', icon: <IconSun className="h-4 w-4 text-muted-foreground" /> },
+                                      { value: 'Night', icon: <IconMoon className="h-4 w-4 text-muted-foreground" /> }
+                                    ].map((shiftOption) => (
+                                      <div 
+                                        key={shiftOption.value}
+                                        className={`flex items-center gap-2 p-2 rounded-md transition-all duration-200 ${
+                                          inputValues.shift === shiftOption.value 
+                                            ? 'bg-primary/10 text-primary border border-primary/20 cursor-default opacity-75' 
+                                            : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
+                                        }`}
+                                        onClick={() => {
+                                          // Only allow clicking if it's a different value
+                                          if (inputValues.shift !== shiftOption.value) {
+                                            console.log(`🔄 Shift changing from "${inputValues.shift}" to "${shiftOption.value}"`)
+                                            console.log(`🔍 Original value: "${originalValues.shift}"`)
+                                            console.log(`🔍 Current value: "${inputValues.shift}"`)
+                                            console.log(`🔍 New value: "${shiftOption.value}"`)
+                                            
+                                            // Update the input values first
+                                            setInputValues(prev => ({ ...prev, shift: shiftOption.value }))
+                                            
+                                            // Save immediately with the new value
+                                            const newValue = shiftOption.value
+                                            console.log(`💾 Saving shift with new value: "${newValue}"`)
+                                          } else {
+                                            console.log(`⏭️ Shift value unchanged: "${shiftOption.value}"`)
+                                          }
+                                        }}
+                                      >
+                                        <span className="text-sm">{shiftOption.icon}</span>
+                                        <span className="text-sm font-medium">{shiftOption.value}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            }
+                          />
+                          
+                          {/* Current Salary */}
+                          <DataFieldRow
+                            icon={<IconCash className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                            label="Current Salary"
+                            fieldName="current_salary"
+                            value={formatNumber(inputValues.current_salary)}
+                            onSave={handleInputChange}
+                          />
+                          
+                          {/* Expected Salary */}
+                          <DataFieldRow
+                            icon={<IconCash className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                            label="Expected Salary"
+                            fieldName="expected_monthly_salary"
+                            value={formatNumber(inputValues.expected_monthly_salary)}
+                            onSave={handleInputChange}
+                          />
+                          
+                          {/* Video Introduction */}
+                          <DataFieldRow
+                            icon={<IconVideo className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                            label="Video Introduction"
+                            fieldName="video_introduction_url"
+                            value={inputValues.video_introduction_url || ''}
+                            onSave={handleInputChange}
+                            isLast={true}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Skills and BPOC Section - 2 Columns */}
+                      <div className="mt-8 grid grid-cols-2 gap-6">
+                        {/* Skills Section */}
+                        <div className="flex flex-col">
+                          <h3 className="text-lg font-medium mb-4 text-muted-foreground">Skills</h3>
+                          <div className="rounded-lg p-6 border flex-1 shadow-sm">
+                            <div className="space-y-4">
+                              {/* Dynamic Skills Categories */}
+                              {(() => {
+                                // First priority: Check if we have structured skills data with categories
+                                const originalSkillsData = (applicant as any).originalSkillsData
+                                if (originalSkillsData && typeof originalSkillsData === 'object' && !Array.isArray(originalSkillsData)) {
+                                  // Check if we have a skills object with categories (like your sample data)
+                                  if (originalSkillsData.skills && typeof originalSkillsData.skills === 'object') {
+                                    const skillsCategories = originalSkillsData.skills
+                                    const validCategories = Object.keys(skillsCategories).filter(cat => 
+                                      Array.isArray(skillsCategories[cat]) && skillsCategories[cat].length > 0
+                                  )
+                                  
+                                  if (validCategories.length > 0) {
+                                    return validCategories.map((category) => (
+                                      <div key={category}>
+                                        <h4 className="text-sm font-medium text-muted-foreground mb-2">
+                   {category.charAt(0).toUpperCase() + category.slice(1)}
+                                        </h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {skillsCategories[category].map((skill: string, index: number) => (
+                                            <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                              {skill}
+                                            </Badge>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ))
+                                  }
+                                }
+                                
+                                  // Fallback: Look for individual skills arrays
+                                  const skillsData = originalSkillsData.skills || originalSkillsData.technical_skills || originalSkillsData.soft_skills || originalSkillsData.languages
+                                  
+                                  if (skillsData && Array.isArray(skillsData) && skillsData.length > 0) {
+                                    return (
+                                      <div>
+                                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Skills</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                          {skillsData.map((skill: string, index: number) => (
+                                            <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                              {skill}
+                                            </Badge>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )
+                                  }
+                                  
+                                  // If no skills array found, try to find any array data that might be skills
+                                  const arrayKeys = Object.keys(originalSkillsData).filter(key => 
+                                    Array.isArray(originalSkillsData[key]) && 
+                                    originalSkillsData[key].length > 0 &&
+                                    typeof originalSkillsData[key][0] === 'string'
+                                  )
+                                  
+                                  if (arrayKeys.length > 0) {
+                                    return arrayKeys.map((key) => (
+                                      <div key={key}>
+                                        <h4 className="text-sm font-medium text-muted-foreground mb-2">
+                                          {key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')}
+                                        </h4>
+                                        <div className="flex flex-wrap gap-2">
+                                          {originalSkillsData[key].map((skill: string, index: number) => (
+                                            <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                              {skill}
+                                            </Badge>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ))
+                                  }
+                                }
+                                
+                                // Second priority: Use the extracted skills array if no structured data found
+                                if (Array.isArray(applicant.skills) && applicant.skills.length > 0) {
+                                  return (
+                                    <div>
+                                      <h4 className="text-sm font-medium text-muted-foreground mb-2">All Skills</h4>
+                                      <div className="flex flex-wrap gap-2">
+                                        {applicant.skills.map((skill: string, index: number) => (
+                                          <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                            {skill}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )
+                                }
+                                
+                                // Applied Positions fallback
+                                if (applicant.all_job_titles && applicant.all_job_titles.length > 0) {
+                                  return (
+                                    <div>
+                                      <h4 className="text-sm font-medium text-muted-foreground mb-2">Applied Positions</h4>
+                                      <div className="flex flex-wrap gap-2">
+                                        {applicant.all_job_titles.map((jobTitle, index) => (
+                                          <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
+                                            {jobTitle}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )
+                                }
+                                
+                                // No skills fallback
+                                return (
+                                  <span className="text-sm text-muted-foreground">No skills data available</span>
+                                )
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+
+                                                {/* Resume Score Container */}
+                        <div className="flex flex-col">
+                          <h3 className="text-lg font-medium mb-4 text-muted-foreground">Resume Score</h3>
+                          <div className="rounded-lg p-6 border flex-1 shadow-sm">
+                            {/* Overall Resume Score with View Resume Button */}
+                            {applicant.aiAnalysis?.overall_score ? (
+                              <div className="space-y-4">
+                                <div className="text-3xl font-bold text-foreground">
+                                  {applicant.aiAnalysis.overall_score}/100
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  AI-powered resume quality assessment
+                                </p>
+                                
+                                {/* View Resume Button */}
+                                {applicant.resume_slug && (
+                                  <div className="mt-4">
+                                    <Button 
+                                      onClick={() => window.open(`https://www.bpoc.io/${applicant.resume_slug}`, '_blank')}
+                                      className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white border-0"
+                                      size="sm"
+                                    >
+                                      <IconFile className="h-4 w-4 mr-2" />
+                                      View Resume
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
-                            </PopoverContent>
-                          </Popover>
-                        }
-                      />
-                      
-                      {/* Current Salary */}
-                      <DataFieldRow
-                        icon={<IconCash className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                        label="Current Salary"
-                        fieldName="current_salary"
-                        value={formatNumber(inputValues.current_salary)}
-                        onSave={handleInputChange}
-                        
-                      />
-                      
-                      {/* Expected Salary */}
-                      <DataFieldRow
-                        icon={<IconCash className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                        label="Expected Salary"
-                        fieldName="expected_monthly_salary"
-                        value={formatNumber(inputValues.expected_monthly_salary)}
-                        onSave={handleInputChange}
-                        
-                      />
-                      
-                      {/* Video Introduction */}
-                      <DataFieldRow
-                        icon={<IconVideo className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                        label="Video Introduction"
-                        fieldName="video_introduction_url"
-                        value={inputValues.video_introduction_url || ''}
-                        onSave={handleInputChange}
-                        
-                        isLast={true}
-                      />
-                    </div>
-                  </div>
+                            ) : (
+                              <div className="text-center py-4 text-muted-foreground">
+                                <p className="text-sm">No resume score available</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Work Experience, Education, and Projects Section */}
+                      <div className="mt-8 space-y-6">
+                                                {/* Work Experience Section */}
+                        {(() => {
+                          const originalSkillsData = (applicant as any).originalSkillsData
+                          if (originalSkillsData?.experience && Array.isArray(originalSkillsData.experience) && originalSkillsData.experience.length > 0) {
+                            return (
+                              <div>
+                                <h3 className="text-lg font-medium mb-4 text-muted-foreground">Work Experience</h3>
+                                <div className="rounded-lg p-6 border flex-1 shadow-sm">
+                                  <div>
+                                    {originalSkillsData.experience.map((exp: any, index: number) => (
+                                      <div key={index}>
+                                        <div className="space-y-2">
+                                          <div className="flex items-start justify-between">
+                                            <div>
+                                              <h4 className="font-medium text-foreground">{exp.title}</h4>
+                                              <p className="text-sm text-muted-foreground">{exp.company}</p>
+                                            </div>
+                                            <Badge variant="outline" className="text-xs">
+                                              {exp.duration}
+                                            </Badge>
+                                          </div>
+                                          {exp.achievements && Array.isArray(exp.achievements) && exp.achievements.length > 0 && (
+                                            <div className="mt-3">
+                                              <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                                                <IconAward className="h-4 w-4" />
+                                                Key Achievements:
+                                              </p>
+                                              <ul className="space-y-1">
+                                                {exp.achievements.map((achievement: string, achievementIndex: number) => (
+                                                  <li key={achievementIndex} className="text-sm text-foreground flex items-center gap-2">
+                                                    <span className="text-primary flex-shrink-0">•</span>
+                                                    <span>{achievement}</span>
+                                                  </li>
+                                                ))}
+                                              </ul>
+                                            </div>
+                                          )}
+                                        </div>
+                                        {index < originalSkillsData.experience.length - 1 && (
+                                          <div className="mt-4 pt-4 border-t border-border/50" />
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          }
+                          return null
+                        })()}
+
+                        {/* Education Section */}
+                        {(() => {
+                          const originalSkillsData = (applicant as any).originalSkillsData
+                          if (originalSkillsData?.education && Array.isArray(originalSkillsData.education) && originalSkillsData.education.length > 0) {
+                            return (
+                              <div>
+                                <h3 className="text-lg font-medium mb-4 text-muted-foreground">Education</h3>
+                                <div className="rounded-lg p-6 border flex-1 shadow-sm">
+                                  <div>
+                                    {originalSkillsData.education.map((edu: any, index: number) => (
+                                      <div key={index}>
+                                        <div className="space-y-2">
+                                          <div className="flex items-start justify-between">
+                                            <div>
+                                              <h4 className="font-medium text-foreground">{edu.degree}</h4>
+                                              <p className="text-sm text-muted-foreground">{edu.institution}</p>
+                                            </div>
+                                            <Badge variant="outline" className="text-xs">
+                                              {edu.year}
+                                            </Badge>
+                                          </div>
+                                          {edu.highlights && Array.isArray(edu.highlights) && edu.highlights.length > 0 && (
+                                            <div className="mt-3">
+                                              <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                                                <IconSparkles className="h-4 w-4" />
+                                                Highlights:
+                                              </p>
+                                              <ul className="space-y-1">
+                                                {edu.highlights.map((highlight: string, highlightIndex: number) => (
+                                                  <li key={highlightIndex} className="text-sm text-foreground flex items-center gap-2">
+                                                    <span className="text-primary flex-shrink-0">•</span>
+                                                    <span>{highlight}</span>
+                                                  </li>
+                                                ))}
+                                              </ul>
+                                            </div>
+                                          )}
+                                        </div>
+                                        {index < originalSkillsData.education.length - 1 && (
+                                          <div className="mt-4 pt-4 border-t border-border/50" />
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          }
+                          return null
+                        })()}
+
+                        {/* Projects Section */}
+                        {(() => {
+                          const originalSkillsData = (applicant as any).originalSkillsData
+                          if (originalSkillsData?.projects && Array.isArray(originalSkillsData.projects) && originalSkillsData.projects.length > 0) {
+                            return (
+                              <div>
+                                <h3 className="text-lg font-medium mb-4 text-muted-foreground">Projects</h3>
+                                <div className="rounded-lg p-6 border flex-1 shadow-sm">
+                                  <div>
+                                    {originalSkillsData.projects.map((project: any, index: number) => (
+                                      <div key={index}>
+                                        <div className="space-y-2">
+                                          <div className="mb-2">
+                                            <h4 className="font-medium text-foreground">{project.title}</h4>
+                                            {project.description && (
+                                              <p className="text-sm text-muted-foreground mt-1">{project.description}</p>
+                                            )}
+                                          </div>
+                                          {project.technologies && Array.isArray(project.technologies) && project.technologies.length > 0 && (
+                                            <div className="mt-3">
+                                              <p className="text-sm font-medium text-muted-foreground mb-2">Technologies:</p>
+                                              <div className="flex flex-wrap gap-2">
+                                                {project.technologies.map((tech: string, techIndex: number) => (
+                                                  <Badge key={techIndex} variant="secondary" className="text-xs">
+                                                    {tech}
+                                                  </Badge>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+                                          {project.impact && (
+                                            <div className="mt-3">
+                                              <p className="text-sm font-medium text-muted-foreground mb-2">Impact:</p>
+                                              <p className="text-sm text-foreground">{project.impact}</p>
+                                            </div>
+                                          )}
+                                        </div>
+                                        {index < originalSkillsData.projects.length - 1 && (
+                                          <div className="mt-4 pt-4 border-t border-border/50" />
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          }
+                          return null
+                        })()}
+                      </div>
 
                   {/* Additional Details Section */}
                   {applicant.details && (
-                    <div className="flex-1 flex flex-col min-h-0">
+                    <div>
                       <h3 className="text-lg font-medium mb-2 text-muted-foreground">Additional Details</h3>
-                      <div className="rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border flex-1 min-h-0">
+                      <div className="rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border">
                         <p className="text-foreground leading-relaxed whitespace-pre-wrap break-words">
                           {applicant.details}
                         </p>
                       </div>
                     </div>
                   )}
-                </div>
                   </TabsContent>
 
                   {/* AI Analysis Tab */}
                   <TabsContent value="ai-analysis" className="space-y-6 overflow-y-auto flex-1 min-h-0">
-                    <div className="space-y-6">
-                      <div>
-                        <h3 className="text-lg font-medium mb-2 text-muted-foreground">AI Analysis</h3>
-                        <div className="rounded-lg p-6 text-sm leading-relaxed min-h-[120px] border">
-                          <p className="text-muted-foreground">AI analysis features coming soon...</p>
+                    {(() => {
+                      // Debug: Check what data we have
+                      console.log('🔍 AI Analysis Debug:', { 
+                        applicantId: applicant?.id, 
+                        hasAiAnalysis: !!applicant?.aiAnalysis, 
+                        aiAnalysisData: applicant?.aiAnalysis 
+                      })
+                      return null
+                    })()}
+                    
+                    {!applicant?.aiAnalysis ? (
+                      // No analysis state
+                      <div className="flex flex-col h-full">
+                        <div className="text-center py-16 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-lg bg-muted/20 flex-1 flex items-center justify-center">
+                          <div>
+                            <p className="text-sm font-medium">No AI Analysis</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      // Analysis results display
+                      <div className="space-y-6">
+                                                
+
+                        {/* All Analysis Cards in Single Grid */}
+                        {(() => {
+                          const strengths = applicant.aiAnalysis?.strengths_analysis
+                          if (!strengths) return null
+                          
+                          const categories = [
+                            { key: 'topStrengths', label: 'Top Strengths', icon: '⭐' },
+                            { key: 'coreStrengths', label: 'Core Strengths', icon: '💪' },
+                            { key: 'technicalStrengths', label: 'Technical Strengths', icon: '⚙️' },
+                            { key: 'achievements', label: 'Notable Achievements', icon: '🏆' },
+                            { key: 'marketAdvantage', label: 'Market Advantages', icon: '📈' },
+                            { key: 'uniqueValue', label: 'Unique Value Proposition', icon: '💎' },
+                            { key: 'areasToHighlight', label: 'Areas to Highlight', icon: '✨' }
+                          ]
+                          
+                          // Get data for special cards
+                          const topStrengthsData = strengths.topStrengths
+                          const keyStrengthsData = applicant.aiAnalysis?.key_strengths
+                          const aiEnhancedSummary = applicant.aiAnalysis?.improved_summary
+                          
+                          return (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                              {/* AI-Enhanced Summary Card - First, spans full width */}
+                                {aiEnhancedSummary && (
+                                  <Card className="h-full col-span-2 border bg-transparent">
+                                    <CardHeader className="pb-2">
+                                      <CardTitle className="text-base text-muted-foreground flex items-center gap-2">
+                                        <span>✍️</span>
+                                        AI-Enhanced Summary
+                                      </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="text-sm text-foreground/90">
+                                      <p className="leading-relaxed">{aiEnhancedSummary}</p>
+                                    </CardContent>
+                                  </Card>
+                                )}
+                                
+                                {/* Top Strengths Card */}
+                                {topStrengthsData && (
+                                  <Card className="h-full border bg-transparent">
+                                    <CardHeader className="pb-2">
+                                      <CardTitle className="text-base text-muted-foreground flex items-center gap-2">
+                                        <span>⭐</span>
+                                        Top Strengths
+                                      </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="text-sm text-foreground/90">
+                                      {Array.isArray(topStrengthsData) ? (
+                                        <ol className="list-decimal ml-4 space-y-1">
+                                          {topStrengthsData.map((item: any, idx: number) => (
+                                            <li key={idx}>
+                                              {typeof item === 'string' ? item : item?.title || item?.name || item?.description || 'Item'}
+                                            </li>
+                                          ))}
+                                        </ol>
+                                      ) : typeof topStrengthsData === 'string' ? (
+                                        <ol className="list-decimal ml-4 space-y-1">
+                                          <li>{topStrengthsData}</li>
+                                        </ol>
+                                      ) : (
+                                        <ol className="list-decimal ml-4 space-y-1">
+                                          <li>{JSON.stringify(topStrengthsData)}</li>
+                                        </ol>
+                                      )}
+                                    </CardContent>
+                                  </Card>
+                                )}
+                                
+                                {/* Key Strengths Card */}
+                                {Array.isArray(keyStrengthsData) && keyStrengthsData.length > 0 && (
+                                  <Card className="h-full border bg-transparent">
+                                    <CardHeader className="pb-2">
+                                      <CardTitle className="text-base text-muted-foreground flex items-center gap-2">
+                                        <span>🎯</span>
+                                        Key Strengths
+                                      </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="text-sm text-foreground/90">
+                                      <ol className="list-decimal ml-4 space-y-1">
+                                        {keyStrengthsData.map((strength: any, idx: number) => (
+                                          <li key={idx}>
+                                            {typeof strength === 'string' ? strength : strength?.title || strength?.name || 'Strength'}
+                                          </li>
+                                        ))}
+                                      </ol>
+                                    </CardContent>
+                                  </Card>
+                                )}
+                                
+                                {/* Other categories */}
+                                {categories.filter(({ key }) => key !== 'topStrengths').map(({ key, label, icon }) => {
+                                  const data = strengths[key]
+                                  if (!data) return null
+                                  
+                                  let displayValue = ''
+                                  if (Array.isArray(data)) {
+                                    displayValue = data.map((item: any) => 
+                                      typeof item === 'string' ? item : item?.title || item?.name || item?.description || 'Item'
+                                    ).join(', ')
+                                  } else if (typeof data === 'string') {
+                                    displayValue = data
+                                  } else {
+                                    return null
+                                  }
+                                  
+                                  if (!displayValue.trim()) return null
+                                  
+                                  return (
+                                    <Card key={key} className="h-full border bg-transparent">
+                                      <CardHeader className="pb-2">
+                                        <CardTitle className="text-base text-muted-foreground flex items-center gap-2">
+                                          <span>{icon}</span>
+                                          {label}
+                                        </CardTitle>
+                                      </CardHeader>
+                                      <CardContent className="text-sm text-foreground/90">
+                                        {Array.isArray(data) ? (
+                                          <ol className="list-decimal ml-4 space-y-1">
+                                            {data.map((item: any, idx: number) => (
+                                              <li key={idx}>
+                                                {typeof item === 'string' ? item : item?.title || item?.name || item?.description || 'Item'}
+                                              </li>
+                                            ))}
+                                          </ol>
+                                        ) : typeof data === 'string' ? (
+                                          <ol className="list-decimal ml-4 space-y-1">
+                                            <li>{data}</li>
+                                          </ol>
+                                        ) : (
+                                          <ol className="list-decimal ml-4 space-y-1">
+                                            <li>{JSON.stringify(data)}</li>
+                                          </ol>
+                                        )}
+                                      </CardContent>
+                                    </Card>
+                                  )
+                                }).filter(Boolean)}
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    )}
                   </TabsContent>
                 </Tabs>
               </div>
@@ -1150,6 +1661,222 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Job Details Sheet */}
+      <Sheet open={isJobSheetOpen} onOpenChange={setIsJobSheetOpen}>
+        <SheetContent side="right" className="w-96">
+          <SheetHeader>
+            <SheetTitle>Job Details</SheetTitle>
+          </SheetHeader>
+          {selectedJob && (
+            <div className="mt-6 space-y-4">
+              {/* Job Title */}
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-2">Position</h3>
+                <p className="text-lg font-semibold text-foreground">{selectedJob.job_title || selectedJob.title}</p>
+              </div>
+
+              {/* Company */}
+              {selectedJob.company_name && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Company</h3>
+                  <p className="text-foreground">{selectedJob.company_name}</p>
+                </div>
+              )}
+
+              {/* Work Arrangement */}
+              {selectedJob.work_arrangement && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Work Arrangement</h3>
+                  <Badge variant="outline" className="text-xs capitalize">
+                    {selectedJob.work_arrangement}
+                  </Badge>
+                </div>
+              )}
+
+              {/* Experience Level */}
+              {selectedJob.experience_level && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Experience Level</h3>
+                  <Badge variant="outline" className="text-xs capitalize">
+                    {selectedJob.experience_level}
+                  </Badge>
+                </div>
+              )}
+
+              {/* Salary Range */}
+              {(selectedJob.salary_min || selectedJob.salary_max) && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Salary Range</h3>
+                  <p className="text-foreground">
+                    {selectedJob.salary_min && selectedJob.salary_max 
+                      ? `${selectedJob.currency || 'PHP'} ${selectedJob.salary_min.toLocaleString()} - ${selectedJob.salary_max.toLocaleString()} ${selectedJob.salary_type || 'monthly'}`
+                      : selectedJob.salary_min 
+                        ? `From ${selectedJob.currency || 'PHP'} ${selectedJob.salary_min.toLocaleString()} ${selectedJob.salary_type || 'monthly'}`
+                        : `Up to ${selectedJob.currency || 'PHP'} ${selectedJob.salary_max.toLocaleString()} ${selectedJob.salary_type || 'monthly'}`
+                    }
+                  </p>
+                </div>
+              )}
+
+              {/* Shift */}
+              {selectedJob.shift && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Shift</h3>
+                  <Badge variant="outline" className="text-xs capitalize">
+                    {selectedJob.shift}
+                  </Badge>
+                </div>
+              )}
+
+              {/* Priority */}
+              {selectedJob.priority && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Priority</h3>
+                  <Badge variant="outline" className="text-xs capitalize">
+                    {selectedJob.priority}
+                  </Badge>
+                </div>
+              )}
+
+              {/* Industry */}
+              {selectedJob.industry && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Industry</h3>
+                  <p className="text-foreground">{selectedJob.industry}</p>
+                </div>
+              )}
+
+              {/* Department */}
+              {selectedJob.department && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Department</h3>
+                  <p className="text-foreground">{selectedJob.department}</p>
+                </div>
+              )}
+
+              {/* Application Deadline */}
+              {selectedJob.application_deadline && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Application Deadline</h3>
+                  <div className="flex items-center gap-2">
+                    <IconCalendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-foreground">
+                      {new Date(selectedJob.application_deadline).toLocaleDateString('en-US', { 
+                        month: 'long', 
+                        day: 'numeric',
+                        year: 'numeric',
+                        timeZone: 'Asia/Manila'
+                      })}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Job Description */}
+              {selectedJob.job_description && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Job Description</h3>
+                  <p className="text-sm text-foreground leading-relaxed">{selectedJob.job_description}</p>
+                </div>
+              )}
+
+              {/* Requirements */}
+              {selectedJob.requirements && Array.isArray(selectedJob.requirements) && selectedJob.requirements.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Requirements</h3>
+                  <ul className="space-y-1">
+                    {selectedJob.requirements.map((req: string, index: number) => (
+                      <li key={index} className="text-sm text-foreground flex items-center gap-2">
+                        <span className="text-primary flex-shrink-0">•</span>
+                        <span>{req}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Responsibilities */}
+              {selectedJob.responsibilities && Array.isArray(selectedJob.responsibilities) && selectedJob.responsibilities.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Responsibilities</h3>
+                  <ul className="space-y-1">
+                    {selectedJob.responsibilities.map((resp: string, index: number) => (
+                      <li key={index} className="text-sm text-foreground flex items-center gap-2">
+                        <span className="text-primary flex-shrink-0">•</span>
+                        <span>{resp}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Benefits */}
+              {selectedJob.benefits && Array.isArray(selectedJob.benefits) && selectedJob.benefits.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Benefits</h3>
+                  <ul className="space-y-1">
+                    {selectedJob.benefits.map((benefit: string, index: number) => (
+                      <li key={index} className="text-sm text-foreground flex items-center gap-2">
+                        <span className="text-primary flex-shrink-0">•</span>
+                        <span>{benefit}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Skills */}
+              {selectedJob.skills && Array.isArray(selectedJob.skills) && selectedJob.skills.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Required Skills</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedJob.skills.map((skill: string, index: number) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Views and Applicants */}
+              <div className="grid grid-cols-2 gap-4">
+                {selectedJob.views !== undefined && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-1">Views</h3>
+                    <p className="text-foreground font-medium">{selectedJob.views}</p>
+                  </div>
+                )}
+                {selectedJob.applicants !== undefined && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-1">Applicants</h3>
+                    <p className="text-foreground font-medium">{selectedJob.applicants}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Created Date */}
+              {selectedJob.created_at && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Posted Date</h3>
+                  <div className="flex items-center gap-2">
+                    <IconCalendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-foreground">
+                      {new Date(selectedJob.created_at).toLocaleDateString('en-US', { 
+                        month: 'long', 
+                        day: 'numeric',
+                        year: 'numeric',
+                        timeZone: 'Asia/Manila'
+                      })}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </TooltipProvider>
   )
 }

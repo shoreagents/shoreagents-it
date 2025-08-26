@@ -421,7 +421,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                       <div className="flex items-center gap-2">
                         <IconId className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Ticket ID:</span>
-                        <span className="font-mono font-medium text-primary">
+                        <span className="font-medium text-primary">
                           {ticket.ticket_id}
                         </span>
                       </div>

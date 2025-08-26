@@ -204,11 +204,11 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
       } else {
         const err = await res.json().catch(() => ({}))
         console.error('Assign role failed', err)
+        }
+      } catch (e) {
+        console.error('Assign role error', e)
       }
-    } catch (e) {
-      console.error('Assign role error', e)
-    }
-  }, [ticket.user_id])
+    }, [ticket.user_id])
 
 
 
@@ -365,18 +365,25 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
       </AnimatePresence>
       <div className="pt-3 mt-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground/70 truncate">
-            Filed at: <span className="text-foreground font-medium">
+          <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground/70 truncate">
+            <span>Filed at:</span>
+            <IconCalendar className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-muted-foreground">
               {new Date(ticket.created_at).toLocaleDateString('en-US', { 
                 month: 'short', 
                 day: 'numeric'
-              })} • {new Date(ticket.created_at).toLocaleTimeString('en-US', {
+              })}
+            </span>
+            <span className="text-muted-foreground/70">•</span>
+            <IconClock className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">
+              {new Date(ticket.created_at).toLocaleTimeString('en-US', {
                 hour: '2-digit',
                 minute: '2-digit',
                 hour12: true
               })}
             </span>
-          </span>
+          </div>
           {ticket.status === 'Closed' && ticket.resolved_at && (
             <span className="text-xs font-medium text-muted-foreground/70 truncate">
               Resolved by: <span className="text-foreground font-medium">{ticket.resolved_by === parseInt(user?.id || '0') ? 'You' : (ticket.resolver_first_name && ticket.resolver_last_name ? `${ticket.resolver_first_name}` : (ticket.resolved_by ? `User ${ticket.resolved_by}` : 'Unknown'))}</span>
@@ -465,7 +472,7 @@ function DraggingTicket({ ticket, isExpanded, roleNameById, user }: { ticket: Ti
                 <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-[6px] h-6 flex items-center">
                   {ticket.ticket_id}
                 </span>
-                <Badge variant="secondary" className={`text-xs h-6 flex items-center ${categoryBadge?.color || 'bg-gray-100 text-gray-800'}`}> 
+                <Badge variant="secondary" className={`text-xs h-6 flex items-center ${categoryBadge?.color || 'bg-gray-100 text-gray-800'}`}>
                   {categoryBadge?.name || 'General'}
                 </Badge>
               </div>
@@ -522,26 +529,33 @@ function DraggingTicket({ ticket, isExpanded, roleNameById, user }: { ticket: Ti
               >
                 <IconEye className="h-4 w-4 mr-px" />
                 <span>View All</span>
-              </Button>
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      
-      <div className="pt-3 mt-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground/70 truncate">
-            Filed at: <span className="text-foreground font-medium">
-              {new Date(ticket.created_at).toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric'
-              })} • {new Date(ticket.created_at).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-              })}
-            </span>
-          </span>
+        )}
+        
+        <div className="pt-3 mt-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground/70 truncate">
+              <span>Filed at:</span>
+              <IconCalendar className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-muted-foreground">
+                {new Date(ticket.created_at).toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric'
+                })}
+              </span>
+              <span className="text-muted-foreground/70">•</span>
+              <IconClock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">
+                {new Date(ticket.created_at).toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true
+                })}
+              </span>
+            </div>
           {ticket.status === 'Closed' && ticket.resolved_at && (
             <span className="text-xs font-medium text-muted-foreground/70 truncate">
               Resolved by: <span className="text-foreground font-medium">{ticket.resolved_by === parseInt(user?.id || '0') ? 'You' : (ticket.resolver_first_name && ticket.resolver_last_name ? `${ticket.resolver_first_name}` : (ticket.resolved_by ? `User ${ticket.resolved_by}` : 'Unknown'))}</span>
