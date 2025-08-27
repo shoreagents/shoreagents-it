@@ -564,7 +564,7 @@ const getStatusDisplayLabel = (status: string) => {
     'for verification': 'For Verification',
     'verified': 'Verified',
     'initial interview': 'Initial Interview',
-    'passed': 'Ready for Sale'
+    'passed': 'For Sale'
   }
   return statusMap[status.toLowerCase()] || status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
 }

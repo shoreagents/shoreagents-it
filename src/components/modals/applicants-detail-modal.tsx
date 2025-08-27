@@ -22,7 +22,7 @@ interface ApplicantsDetailModalProps {
   isOpen: boolean
   onClose: () => void
   onStatusUpdate?: (applicantId: string, jobIndex: number, newStatus: string) => void
-  pageContext?: 'talent-pool' | 'bpoc-recruits'
+  pageContext?: 'talent-pool' | 'bpoc-recruits' | 'applicants-records'
 }
 
 interface StatusOption {
@@ -135,6 +135,12 @@ const getStatusColor = (status: string) => {
       return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
     case "withdrawn":
       return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
+    case "qualified":
+      return "text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20"
+    case "final interview":
+      return "text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20"
+    case "not qualified":
+      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
     default:
       return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
   }
@@ -173,10 +179,13 @@ const getStatusLabel = (status: string) => {
     { value: 'for verification', label: 'For Verification' },
     { value: 'verified', label: 'Verified' },
     { value: 'initial interview', label: 'Initial Interview' },
-    { value: 'passed', label: 'Ready For Sale' },
+    { value: 'passed', label: 'For Sale' },
     { value: 'hired', label: 'Hired' },
     { value: 'failed', label: 'Failed' },
-    { value: 'withdrawn', label: 'Withdrawn' }
+    { value: 'withdrawn', label: 'Withdrawn' },
+    { value: 'qualified', label: 'Qualified' },
+    { value: 'final interview', label: 'Client Interview' },
+    { value: 'not qualified', label: 'Not Qualified' }
   ]
   const statusOption = statusOptions.find(option => option.value === status.toLowerCase())
   return statusOption ? statusOption.label : status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
@@ -233,6 +242,13 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     expected_monthly_salary: '',
     video_introduction_url: ''
   })
+  
+  // Status change tracking
+  const [pendingStatusChanges, setPendingStatusChanges] = useState<{
+    mainStatus?: string;
+    jobStatuses?: Record<number, string>;
+  }>({})
+  
   const [hasChanges, setHasChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
@@ -242,7 +258,8 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
   const hasUnsavedChanges = useMemo(() => {
     if (!localApplicant) return false
     
-    return Object.keys(inputValues).some(fieldName => {
+    // Check for field changes
+    const hasFieldChanges = Object.keys(inputValues).some(fieldName => {
       const currentValue = inputValues[fieldName]
       const originalValue = originalValues[fieldName]
       
@@ -256,7 +273,13 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
         return currentValue !== originalValue
       }
     })
-  }, [inputValues, originalValues, localApplicant])
+    
+    // Check for status changes
+    const hasStatusChanges = pendingStatusChanges.mainStatus !== undefined || 
+                           (pendingStatusChanges.jobStatuses && Object.keys(pendingStatusChanges.jobStatuses).length > 0)
+    
+    return hasFieldChanges || hasStatusChanges
+  }, [inputValues, originalValues, localApplicant, pendingStatusChanges])
   
   // Real-time updates for applicant data
   const { isConnected: isRealtimeConnected } = useRealtimeApplicants({
@@ -337,6 +360,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
       setInputValues(initialValues)
       setOriginalValues(initialValues)
       setCurrentStatus(applicant.status)
+      setPendingStatusChanges({}) // Reset pending status changes
       setHasChanges(false)
     }
   }, [applicant])
@@ -371,6 +395,20 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
         return
       }
 
+      // Debug: Log the mapping to verify accuracy
+      console.log('🔍 Job Click Debug:', {
+        jobIndex,
+        jobId,
+        jobTitle: localApplicant?.all_job_titles?.[jobIndex],
+        company: localApplicant?.all_companies?.[jobIndex],
+        status: localApplicant?.all_job_statuses?.[jobIndex],
+        timestamp: localApplicant?.all_job_timestamps?.[jobIndex],
+        allJobIds: localApplicant?.job_ids,
+        allJobTitles: localApplicant?.all_job_titles,
+        allCompanies: localApplicant?.all_companies,
+        allJobStatuses: localApplicant?.all_job_statuses
+      })
+
       // Fetch detailed job data from BPOC database first
       const response = await fetch(`/api/bpoc/job-details/${jobId}`)
       
@@ -400,19 +438,42 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     }
   }
 
-  // Define status options for applicants with proper database mapping
+  // Define status options for applicants based on page context
   const getStatusOptions = (): StatusOption[] => {
-    return [
-      { value: 'rejected', label: 'Reject', icon: 'rose', color: 'rose' },
-      { value: 'submitted', label: 'New', icon: 'blue', color: 'blue' },
-      { value: 'for verification', label: 'For Verification', icon: 'teal', color: 'teal' },
-      { value: 'verified', label: 'Verified', icon: 'purple', color: 'purple' },
-      { value: 'initial interview', label: 'Initial Interview', icon: 'amber', color: 'amber' },
-      { value: 'passed', label: 'Ready For Sale', icon: 'green', color: 'green' },
-      { value: 'hired', label: 'Hired', icon: 'pink', color: 'pink' },
-      { value: 'failed', label: 'Failed', icon: 'red', color: 'red' },
-      { value: 'withdrawn', label: 'Withdrawn', icon: 'gray', color: 'gray' }
-    ]
+    if (pageContext === 'talent-pool') {
+      // Talent pool page - limited status options
+      return [
+        { value: 'rejected', label: 'Reject', icon: 'rose', color: 'rose' },
+        { value: 'passed', label: 'For Sale', icon: 'green', color: 'green' },
+        { value: 'hired', label: 'Hired', icon: 'pink', color: 'pink' },
+        { value: 'withdrawn', label: 'Withdrawn', icon: 'gray', color: 'gray' }
+      ]
+    } else if (pageContext === 'applicants-records') {
+      // Applicants records page - full status options including Hired
+      return [
+        { value: 'rejected', label: 'Reject', icon: 'rose', color: 'rose' },
+        { value: 'submitted', label: 'New', icon: 'blue', color: 'blue' },
+        { value: 'for verification', label: 'For Verification', icon: 'teal', color: 'teal' },
+        { value: 'verified', label: 'Verified', icon: 'purple', color: 'purple' },
+        { value: 'initial interview', label: 'Initial Interview', icon: 'amber', color: 'amber' },
+        { value: 'passed', label: 'For Sale', icon: 'green', color: 'green' },
+        { value: 'hired', label: 'Hired', icon: 'pink', color: 'pink' },
+        { value: 'failed', label: 'Failed', icon: 'red', color: 'red' },
+        { value: 'withdrawn', label: 'Withdrawn', icon: 'gray', color: 'gray' }
+      ]
+    } else {
+      // BPOC recruits page - full status options (NO Hired status)
+      return [
+        { value: 'rejected', label: 'Reject', icon: 'rose', color: 'rose' },
+        { value: 'submitted', label: 'New', icon: 'blue', color: 'blue' },
+        { value: 'for verification', label: 'For Verification', icon: 'teal', color: 'teal' },
+        { value: 'verified', label: 'Verified', icon: 'purple', color: 'purple' },
+        { value: 'initial interview', label: 'Initial Interview', icon: 'amber', color: 'amber' },
+        { value: 'passed', label: 'For Sale', icon: 'green', color: 'green' },
+        { value: 'failed', label: 'Failed', icon: 'red', color: 'red' },
+        { value: 'withdrawn', label: 'Withdrawn', icon: 'gray', color: 'gray' }
+      ]
+    }
   }
 
   React.useEffect(() => {
@@ -459,51 +520,24 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     setComments([])
   }
 
-  // Handle status updates for both main and BPOC databases
-  const handleStatusUpdate = async (newStatus: string) => {
-    try {
-      console.log(`🔄 Updating applicant status to:`, newStatus);
-      
-      // Update main database first
-      const mainResponse = await fetch('/api/bpoc', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: localApplicant?.id,
-          status: newStatus,
-          previousStatus: localApplicant?.status
-        })
-      });
-      
-      if (!mainResponse.ok) {
-        const error = await mainResponse.json();
-        console.error('❌ Failed to update main database status:', error);
-        throw new Error('Failed to update main database status');
-      }
-      
-      console.log('✅ Main database status updated successfully');
-      
-      // Update local state
-      if (localApplicant) {
-        setLocalApplicant(prev => prev ? { ...prev, status: newStatus } : null);
-        setCurrentStatus(newStatus);
-      }
-      
-      // Call parent callback if provided
-      if (onStatusUpdate) {
-        onStatusUpdate(localApplicant?.id || '', 0, newStatus);
-      }
-      
-    } catch (error) {
-      console.error('❌ Error updating status:', error);
-      // Revert local state on error
-      if (localApplicant) {
-        setCurrentStatus(localApplicant.status);
-      }
+  // Handle status updates - store locally, don't update database yet
+  const handleStatusUpdate = (newStatus: string) => {
+    console.log(`🔄 Storing status change locally:`, newStatus);
+    
+    // Store the pending status change
+    setPendingStatusChanges(prev => ({
+      ...prev,
+      mainStatus: newStatus
+    }))
+    
+    // Update local state for immediate UI feedback
+    setCurrentStatus(newStatus)
+    
+    // Update local applicant state for immediate feedback
+    if (localApplicant) {
+      setLocalApplicant(prev => prev ? { ...prev, status: newStatus } : null)
     }
-  };
+  }
 
   // Handle input changes
   const handleInputChange = (fieldName: string, value: string) => {
@@ -597,42 +631,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     }, 1000)
   }
 
-  const handleStatusChange = async (newStatus: string) => {
-    try {
-      setCurrentStatus(newStatus)
-      
-      // Call API to update status in both BPOC and main database
-      const response = await fetch(`/api/bpoc`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: localApplicant.id, // Use the primary key ID
-          status: newStatus,
-          previousStatus: localApplicant.status
-        })
-      })
 
-      if (!response.ok) {
-        throw new Error(`Failed to update status: ${response.statusText}`)
-      }
-
-      const result = await response.json()
-      console.log('✅ Status updated successfully:', result)
-      
-      // Call the onStatusUpdate callback if provided to sync with parent component
-      if (onStatusUpdate) {
-        onStatusUpdate(localApplicant.id, 0, newStatus) // jobIndex 0 for main status
-      }
-      
-    } catch (error) {
-      console.error('❌ Error updating status:', error)
-      // Revert the local state change on error
-      setCurrentStatus(localApplicant.status)
-      // You could show an error toast here
-    }
-  }
 
   // Auto-save function that can be called before closing
   const autoSaveBeforeClose = async (): Promise<boolean> => {
@@ -677,30 +676,95 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
         }
       })
       
-      // Call API to update multiple fields at once
-      const response = await fetch(`/api/bpoc`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: localApplicant.id,
-          ...processedUpdates
+      // Handle status updates
+      if (pendingStatusChanges.mainStatus) {
+        console.log('🔄 Updating main status to:', pendingStatusChanges.mainStatus)
+        
+        // Update main database status
+        const statusResponse = await fetch('/api/bpoc', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: localApplicant.id,
+            status: pendingStatusChanges.mainStatus,
+            previousStatus: localApplicant.status
+          })
         })
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to update fields: ${response.statusText}`)
+        
+        if (!statusResponse.ok) {
+          throw new Error(`Failed to update main status: ${statusResponse.statusText}`)
+        }
+        
+        console.log('✅ Main status updated successfully')
+        
+        // Call parent callback if provided
+        if (onStatusUpdate) {
+          onStatusUpdate(localApplicant.id, 0, pendingStatusChanges.mainStatus)
+        }
       }
-
-      const result = await response.json()
-      console.log(`✅ Auto-save completed successfully:`, result)
       
-      // Update original values after successful save
-      setOriginalValues(prev => ({
-        ...prev,
-        ...changedFields
-      }))
+      // Handle job status updates
+      if (pendingStatusChanges.jobStatuses && Object.keys(pendingStatusChanges.jobStatuses).length > 0) {
+        console.log('🔄 Updating job statuses:', pendingStatusChanges.jobStatuses)
+        
+        // Update each job status
+        for (const [jobIndex, newStatus] of Object.entries(pendingStatusChanges.jobStatuses)) {
+          const response = await fetch('/api/bpoc/update-job-status/', {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              applicantId: localApplicant.id,
+              jobIndex: parseInt(jobIndex),
+              newStatus: newStatus
+            })
+          })
+          
+          if (!response.ok) {
+            throw new Error(`Failed to update job ${jobIndex} status: ${response.statusText}`)
+          }
+          
+          console.log(`✅ Job ${jobIndex} status updated successfully`)
+          
+          // Call parent callback if provided
+          if (onStatusUpdate) {
+            onStatusUpdate(localApplicant.id, parseInt(jobIndex), newStatus)
+          }
+        }
+      }
+      
+      // Call API to update multiple fields at once (only if there are field changes)
+      if (Object.keys(processedUpdates).length > 0) {
+        const response = await fetch(`/api/bpoc`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: localApplicant.id,
+            ...processedUpdates
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to update fields: ${response.statusText}`)
+        }
+
+        const result = await response.json()
+        console.log(`✅ Field updates completed successfully:`, result)
+        
+        // Update original values after successful save
+        setOriginalValues(prev => ({
+          ...prev,
+          ...changedFields
+        }))
+      }
+      
+      // Clear pending status changes after successful save
+      setPendingStatusChanges({})
       
       return true
     } catch (error) {
@@ -899,6 +963,11 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
               <div className="px-6 py-5 overflow-y-auto flex-1 min-h-0">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col">
                   {/* Job Application Section - Always Visible */}
+                  {/* 
+                    CRITICAL: The index here MUST correspond to localApplicant.job_ids[index]
+                    The arrays all_job_titles, all_companies, all_job_statuses, all_job_timestamps
+                    are mapped 1:1 with the job_ids array from the main database.
+                  */}
                   <div className="flex flex-col mb-6">
                     <h3 className="text-lg font-medium mb-4 text-muted-foreground">Job Application</h3>
                     <div className="rounded-lg border p-6 shadow-sm">
@@ -916,61 +985,70 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                     <h4 className="font-medium text-foreground">
                                       {jobTitle}
                                     </h4>
+                                    {/* Debug: Show job ID mapping */}
+                                    <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                      ID: {localApplicant?.job_ids?.[index]}
+                                    </span>
                                   </div>
                                   
-                                    {/* Applied Date - Top Right */}
+                                  {/* Applied Date and Time - Top Right */}
                                   {localApplicant.all_job_timestamps && localApplicant.all_job_timestamps[index] && (
-                                      <div className="flex items-center gap-1 text-right flex-shrink-0">
-                                        <IconCalendar className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-muted-foreground text-xs">
-                                          {new Date(localApplicant.all_job_timestamps[index]).toLocaleDateString('en-US', { 
+                                    <div className="flex items-center gap-1 text-right flex-shrink-0">
+                                      <IconCalendar className="h-4 w-4 text-muted-foreground" />
+                                      <span className="text-muted-foreground text-xs">
+                                        {new Date(localApplicant.all_job_timestamps[index]).toLocaleDateString('en-US', { 
                                           month: 'short', 
                                           day: 'numeric',
-                                            timeZone: 'Asia/Manila'
-                                          })}
-                                        </span>
-                                        <span className="text-muted-foreground/70 text-xs">•</span>
-                                        <IconClock className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-muted-foreground text-xs">
-                                          {new Date(localApplicant.all_job_timestamps[index]).toLocaleTimeString('en-US', { 
-                                            hour: '2-digit', 
-                                            minute: '2-digit', 
-                                            hour12: true, 
-                                            timeZone: 'Asia/Manila'
-                                          })}
-                                        </span>
+                                          timeZone: 'Asia/Manila'
+                                        })}
+                                      </span>
+                                      <span className="text-muted-foreground/70 text-xs">•</span>
+                                      <IconClock className="h-4 w-4 text-muted-foreground" />
+                                      <span className="text-muted-foreground text-xs">
+                                        {new Date(localApplicant.all_job_timestamps[index]).toLocaleTimeString('en-US', { 
+                                          hour: '2-digit', 
+                                          minute: '2-digit', 
+                                          hour12: true, 
+                                          timeZone: 'Asia/Manila'
+                                        })}
+                                      </span>
                                     </div>
                                   )}
                                 </div>
-                                  
-                                                                    {/* Company Name */}
-                                  {localApplicant.all_companies && localApplicant.all_companies[index] && (
-                                    <div>
+                                
+                                {/* Company Name and Status Badge Container */}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    {localApplicant.all_companies && localApplicant.all_companies[index] ? (
                                       <p className="text-sm text-muted-foreground">{localApplicant.all_companies[index]}</p>
-                                    </div>
-                                  )}
+                                    ) : (
+                                      <div className="h-5"></div>
+                                    )}
+                                  </div>
                                   
-                                  {/* Status Badge - Bottom Right */}
+                                  {/* Status Badge - Right side of company container */}
                                   {(() => {
                                     const status = localApplicant.all_job_statuses?.[index] || localApplicant.status;
                                     const showStatus = pageContext === 'talent-pool' || ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
                                     
                                     if (showStatus) {
                                       return (
-                                        <div className="absolute bottom-3 right-3">
+                                        <div className="flex-shrink-0">
                                           <Popover>
                                             <PopoverTrigger asChild>
                                               <Badge 
                                                 variant="outline" 
                                                 className={`${getStatusColor(status)} px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:opacity-80 transition-opacity`}
-                                                onClick={(e) => e.stopPropagation()}
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                }}
                                               >
                                                 {getStatusLabel(status)}
                                               </Badge>
                                             </PopoverTrigger>
-                                            <PopoverContent className="w-48 p-2" align="end" side="top" sideOffset={4}>
-                                              <div className="space-y-1">
-                                                {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
+                                                                                          <PopoverContent className="w-48 p-2" align="end" side="top" sideOffset={4}>
+                                                <div className="space-y-1">
+                                                  {['not qualified', 'qualified', 'final interview'].map((statusOption) => (
                                                   <div 
                                                     key={statusOption}
                                                     className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
@@ -978,40 +1056,37 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                                         ? 'bg-primary/10 text-primary border border-primary/20 pointer-events-none cursor-default' 
                                                         : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
                                                     }`}
-                                                    onClick={async () => {
-                                                      try {
-                                                        console.log(`Updating BPOC job ${index} status to:`, statusOption);
-                                                        
-                                                        const response = await fetch('/api/bpoc/update-job-status/', {
-                                                          method: 'PATCH',
-                                                          headers: {
-                                                            'Content-Type': 'application/json',
-                                                          },
-                                                          body: JSON.stringify({
-                                                            applicantId: localApplicant.id,
-                                                            jobIndex: index,
-                                                            newStatus: statusOption
-                                                          })
-                                                        });
-                                                        
-                                                        if (response.ok) {
-                                                          const result = await response.json();
-                                                          console.log('✅ BPOC job status updated successfully:', result);
-                                                          
-                                                          // Update parent state if callback is provided
-                                                          if (onStatusUpdate) {
-                                                            onStatusUpdate(localApplicant.id, index, statusOption);
-                                                          }
-                                                        } else {
-                                                          const error = await response.json();
-                                                          console.error('❌ Failed to update BPOC job status:', error);
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      console.log(`🔄 Storing job ${index} status change locally:`, statusOption);
+                                                      
+                                                      // Store the pending job status change
+                                                      setPendingStatusChanges(prev => ({
+                                                        ...prev,
+                                                        jobStatuses: {
+                                                          ...prev.jobStatuses,
+                                                          [index]: statusOption
                                                         }
-                                                      } catch (error) {
-                                                        console.error('❌ Error updating BPOC job status:', error);
+                                                      }))
+                                                      
+                                                      // Update local applicant state for immediate feedback
+                                                      if (localApplicant) {
+                                                        const updatedJobStatuses = [...(localApplicant.all_job_statuses || [])]
+                                                        updatedJobStatuses[index] = statusOption
+                                                        setLocalApplicant(prev => prev ? {
+                                                          ...prev,
+                                                          all_job_statuses: updatedJobStatuses
+                                                        } : null)
                                                       }
                                                     }}
                                                   >
-                                                    {getStatusIcon(statusOption)}
+                                                    {/* Colored status indicator */}
+                                                    <div className={`w-3 h-3 rounded-full ${
+                                                      statusOption === 'qualified' ? 'bg-green-500' :
+                                                      statusOption === 'final interview' ? 'bg-blue-500' :
+                                                      statusOption === 'not qualified' ? 'bg-red-500' :
+                                                      'bg-gray-500'
+                                                    }`}></div>
                                                     <span className="text-sm font-medium">{getStatusLabel(statusOption)}</span>
                                                   </div>
                                                 ))}
@@ -1025,7 +1100,8 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                     return null;
                                   })()}
                                 </div>
-                              ))}
+                              </div>
+                            ))}
                           </>
                         ) : (
                           <div className="text-center py-4 text-muted-foreground">

@@ -2617,9 +2617,12 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
     params.push(status)
   }
   applicantsQuery += ` ORDER BY COALESCE(r.position, 0), r.created_at DESC LIMIT 500`
-  const { rows: applicants } = await pool.query(applicantsQuery, params)
-  if (status) return applicants
-
+    const { rows: applicants } = await pool.query(applicantsQuery, params)
+  
+  console.log('🔍 getApplicants: Raw applicants from database:', applicants.length)
+  console.log('🔍 getApplicants: Sample applicant:', applicants[0])
+  console.log('🔍 getApplicants: BPOC pool available:', !!bpocPool)
+  
   let enrichedData = applicants
   if (diagnose) {
     enrichedData = enrichedData.map((app: any) => ({
@@ -2631,11 +2634,18 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
       }
     }))
   }
-  if (!bpocPool) return enrichedData
+  if (!bpocPool) {
+    console.log('🔍 getApplicants: No BPOC pool, returning basic data')
+    return enrichedData
+  }
 
   try {
     const applicationIds = applicants.flatMap((app: any) => app.bpoc_application_ids || []).filter(Boolean)
     const jobIds = applicants.flatMap((app: any) => app.job_ids || []).filter(Boolean)
+    
+    console.log('🔍 getApplicants: Application IDs for enrichment:', applicationIds)
+    console.log('🔍 getApplicants: Job IDs for enrichment:', jobIds)
+    
     let enrichmentData: any[] = []
     let jobData: any[] = []
     if (applicationIds.length > 0) {
@@ -2649,8 +2659,10 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
         LEFT JOIN public.members m ON m.company_id = p.company_id
         WHERE a.id IN (${applicationIds.map((_, i) => `$${i + 1}`).join(',')})
       `
+      console.log('🔍 getApplicants: Enrichment query:', enrichmentQuery)
       const { rows } = await bpocPool.query(enrichmentQuery, applicationIds)
       enrichmentData = rows
+      console.log('🔍 getApplicants: Enrichment data fetched:', enrichmentData.length)
     }
     if (jobIds.length > 0) {
       const jobQuery = `
@@ -2779,12 +2791,44 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
           application_status: 'submitted',
           application_created_at: null,
         }))
-      const allJobPairs = [...applicationJobPairs, ...directJobPairs]
-      const uniqueJobPairs = allJobPairs.filter((pair, index, self) => index === self.findIndex(p => p.job_title === pair.job_title && p.company_name === pair.company_name))
-      const allJobTitles = uniqueJobPairs.map(pair => pair.job_title)
-      const allCompanies = uniqueJobPairs.map(pair => pair.company_name)
-      const allJobStatuses = uniqueJobPairs.map(pair => pair.application_status || 'submitted')
-      const allJobTimestamps = uniqueJobPairs.map(pair => pair.application_created_at)
+      // CRITICAL: Maintain exact 1:1 mapping with main database arrays
+      // Map each job_id to its corresponding BPOC data, preserving order and length
+      const allJobTitles: string[] = []
+      const allCompanies: (string | null)[] = []
+      const allJobStatuses: string[] = []
+      const allJobTimestamps: (string | null)[] = []
+      
+      // Ensure arrays have the same length as job_ids array
+      if (applicant.job_ids && applicant.job_ids.length > 0) {
+        for (let i = 0; i < applicant.job_ids.length; i++) {
+          const jobId = applicant.job_ids[i]
+          
+          // Find corresponding job data
+          const matchingJob = jobData.find((j: any) => j.job_id === jobId)
+          
+          // Find corresponding application data (if exists)
+          const applicationData = applicantApplications.find(app => app.job_id === jobId)
+          
+          // Use application data if available, otherwise fall back to job data
+          if (applicationData) {
+            allJobTitles.push(applicationData.job_title || 'Unknown Job')
+            allCompanies.push(applicationData.company_name || null)
+            allJobStatuses.push(applicationData.application_status || 'submitted')
+            allJobTimestamps.push(applicationData.application_created_at)
+          } else if (matchingJob) {
+            allJobTitles.push(matchingJob.job_title || 'Unknown Job')
+            allCompanies.push(matchingJob.company_name || null)
+            allJobStatuses.push('submitted') // Default status for jobs without applications
+            allJobTimestamps.push(null)
+          } else {
+            // Fallback for missing data
+            allJobTitles.push('Unknown Job')
+            allCompanies.push(null)
+            allJobStatuses.push('submitted')
+            allJobTimestamps.push(null)
+          }
+        }
+      }
       
       // Get skills data, summary, email, phone, and address for this applicant 
       const userId = firstApplication?.user_id || applicant.applicant_id
@@ -2796,34 +2840,39 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
       const addressData = addressMap.get(userId) || null
       const aiAnalysisData = aiAnalysisMap.get(userId) || null // Added for AI analysis
       
-      console.log('🔍 Applicant AI analysis data:', { 
+      console.log('🔍 Applicant enrichment data:', { 
         applicantId: applicant.id, 
-        userId, 
-        aiAnalysisData,
+        userId,
+        hasSkills: !!skillsData,
+        hasSummary: !!summaryData,
+        hasEmail: !!emailData,
+        hasPhone: !!phoneData,
+        hasAddress: !!addressData,
+        hasAiAnalysis: !!aiAnalysisData,
         aiAnalysisMapSize: aiAnalysisMap.size 
       })
       
-              return {
-          ...applicant,
-          user_id: userId,
-          first_name: firstApplication?.first_name || null,
-          last_name: firstApplication?.last_name || null,
-          full_name: firstApplication?.full_name || null,
-          profile_picture: firstApplication?.avatar_url || null,
-          email: emailData,
-          job_title: allJobTitles[0] || null,
-          company_name: allCompanies[0] || null,
-          all_job_titles: allJobTitles,
-          all_companies: allCompanies,
-          all_job_statuses: allJobStatuses,
-          all_job_timestamps: allJobTimestamps,
-          skills: skillsData,
-          originalSkillsData: originalSkillsData,
-          summary: summaryData,
-          phone: phoneData,
-          address: addressData,
-          aiAnalysis: aiAnalysisData, // Added AI analysis data
-        }
+      return {
+        ...applicant,
+        user_id: userId,
+        first_name: firstApplication?.first_name || null,
+        last_name: firstApplication?.last_name || null,
+        full_name: firstApplication?.full_name || null,
+        profile_picture: firstApplication?.avatar_url || null,
+        email: emailData,
+        job_title: allJobTitles[0] || null,
+        company_name: allCompanies[0] || null,
+        all_job_titles: allJobTitles,
+        all_companies: allCompanies,
+        all_job_statuses: allJobStatuses,
+        all_job_timestamps: allJobTimestamps,
+        skills: skillsData,
+        originalSkillsData: originalSkillsData,
+        summary: summaryData,
+        phone: phoneData,
+        address: addressData,
+        aiAnalysis: aiAnalysisData, // Added AI analysis data
+      }
     })
   } catch (e) {
     // fall back to basic data

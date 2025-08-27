@@ -223,10 +223,17 @@ export default function TalentPoolPage() {
     return rawData
   }, [])
 
-  // Real-time updates for BPOC applications (same as BPOC applicants page)
+  // Real-time updates for BPOC applications - ONLY for 'passed' status applicants
   const { isConnected: isRealtimeConnected } = useRealtimeApplicants({
     onApplicantCreated: async (newApplicant) => {
       console.log('🆕 Talent Pool Real-time: New applicant created:', newApplicant)
+      
+      // Only process applicants with 'passed' status
+      if (newApplicant.status !== 'passed') {
+        console.log('🆕 Talent Pool: Skipping non-passed applicant:', newApplicant.status)
+        return
+      }
+      
       // Enrich and map the raw data to Applicant format
       const enrichedData = await enrichApplicantData(newApplicant)
       const mappedApplicant = mapApplicantData(enrichedData)
@@ -243,6 +250,27 @@ export default function TalentPoolPage() {
       console.log('📝 Talent Pool Real-time: Applicant updated:', updatedApplicant, 'Old:', oldApplicant)
       console.log('📝 Talent Pool: Current applicants in state:', applicants.map(a => ({ id: a.id, type: typeof a.id })))
       console.log('📝 Talent Pool: Updated applicant ID:', { id: updatedApplicant.id, type: typeof updatedApplicant.id })
+      
+      // Handle status changes for talent pool
+      if (oldApplicant.status === 'passed' && updatedApplicant.status !== 'passed') {
+        // Applicant was removed from talent pool (status changed from 'passed')
+        console.log('📝 Talent Pool: Applicant removed from talent pool (status changed to:', updatedApplicant.status)
+        setApplicants(prev => prev.filter(applicant => String(applicant.id) !== String(updatedApplicant.id)))
+        
+        // Close modal if this applicant was selected
+        if (selectedTalent && String(selectedTalent.id) === String(updatedApplicant.id)) {
+          console.log('📝 Talent Pool: Closing modal for removed applicant')
+          setSelectedTalent(null)
+          setIsModalOpen(false)
+        }
+        return
+      }
+      
+      // Only process applicants with 'passed' status
+      if (updatedApplicant.status !== 'passed') {
+        console.log('📝 Talent Pool: Skipping non-passed applicant update:', updatedApplicant.status)
+        return
+      }
       
       // Enrich and map the raw data to Applicant format
       const enrichedData = await enrichApplicantData(updatedApplicant)
@@ -297,20 +325,26 @@ export default function TalentPoolPage() {
     }
   }, [applicants, isModalOpen, selectedTalent])
 
-  // Load BPOC applications from main database (bpoc_recruits table) - same as BPOC applicants page
+  // Load BPOC applications from main database (bpoc_recruits table) - ONLY with 'passed' status
+  // This ensures talent pool only shows applicants who have successfully passed recruitment
   const fetchApplicants = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
-      const res = await fetch('/api/bpoc')
+      // Only fetch applicants with 'passed' status from bpoc_recruits table
+      const res = await fetch('/api/bpoc?status=passed')
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || `Failed to fetch applicants (${res.status})`)
       }
       const data: any[] = await res.json()
       
+      console.log('🔍 Talent Pool: Raw API response data:', data)
+      console.log('🔍 Talent Pool: Sample applicant data structure:', data[0])
+      
       // Map BPOC applications from main database into board items with proper status mapping
       const mapped: Applicant[] = data.map((a) => mapApplicantData(a))
+      console.log('🔍 Talent Pool: Mapped applicant data:', mapped[0])
       setApplicants(mapped)
     } catch (e: any) {
       setError(e?.message || 'Failed to load applicants')
@@ -325,7 +359,8 @@ export default function TalentPoolPage() {
 
   // Filter and sort applicants based on search and category
   const filteredApplicants = useMemo(() => {
-    let filtered = applicants
+    // First, ensure we only show applicants with 'passed' status
+    let filtered = applicants.filter(applicant => applicant.status === 'passed')
 
     // Apply search filter
     if (searchQuery.trim()) {

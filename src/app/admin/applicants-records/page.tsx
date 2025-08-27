@@ -146,7 +146,7 @@ function ApplicantsTable({ applicants, onSort, sortField, sortDirection, onRowCl
       'failed': 'Failed',
       'withdrawn': 'Withdrawn',
       'rejected': 'Rejected',
-      'passed': 'Ready for Sale',
+      'passed': 'For Sale',
       'hired': 'Hired'
     }
     return statusMap[status.toLowerCase()] || status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
@@ -505,7 +505,7 @@ export default function ApplicantsRecordsPage() {
     { value: 'all', label: 'All Applicants' },
     { value: 'rejected', label: 'Rejected' },
     { value: 'withdrawn', label: 'Withdrawn' },
-    { value: 'passed', label: 'Ready for Sale' },
+    { value: 'passed', label: 'For Sale' },
     { value: 'hired', label: 'Hired' },
     { value: 'failed', label: 'Failed' }
   ]
@@ -653,6 +653,7 @@ export default function ApplicantsRecordsPage() {
         applicant={selectedApplicant}
         isOpen={isModalOpen}
         onClose={handleModalClose}
+        pageContext="applicants-records"
         onStatusUpdate={() => {
           // Refresh data after status update
           fetchApplicants()
