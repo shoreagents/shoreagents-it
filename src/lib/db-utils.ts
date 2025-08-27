@@ -1986,16 +1986,188 @@ export async function updateMember(id: number, updates: Partial<NewCompanyInput>
 
 // Delete a member by ID
 export async function deleteMember(id: number): Promise<void> {
-  // Get company_id before deletion for BPOC sync
+  // Get company_id and company name before deletion for BPOC sync and storage cleanup
   let companyId: string | null = null
-  if (bpocPool) {
+  let companyName: string | null = null
+  
+  try {
+    const companyResult = await pool.query('SELECT company_id, company FROM public.members WHERE id = $1', [id])
+    if (companyResult.rows.length > 0) {
+      companyId = companyResult.rows[0].company_id
+      companyName = companyResult.rows[0].company
+    }
+  } catch (error) {
+    console.warn('Failed to get company info for cleanup:', error)
+  }
+
+  // Clean up Supabase storage files if company name exists
+  if (companyName) {
     try {
-      const companyIdResult = await pool.query('SELECT company_id FROM public.members WHERE id = $1', [id])
-      if (companyIdResult.rows.length > 0) {
-        companyId = companyIdResult.rows[0].company_id
+      const { createServiceClient } = await import('@/lib/supabase/server')
+      const supabase = createServiceClient()
+      
+      console.log(`🧹 Starting storage cleanup for company: ${companyName}`)
+      
+      // First, list the company folder to see what's inside
+      const { data: companyItems, error: listError } = await supabase.storage
+        .from('members')
+        .list(companyName)
+      
+      if (listError) {
+        console.warn(`Failed to list company folder ${companyName}:`, listError)
+        return
       }
-    } catch (error) {
-      console.warn('Failed to get company_id for BPOC sync:', error)
+      
+      if (companyItems && companyItems.length > 0) {
+        console.log(`📁 Found ${companyItems.length} items in company folder: ${companyName}`)
+        
+        const allFilePaths: string[] = []
+        
+        // Process each item in the company folder
+        for (const item of companyItems) {
+          // In Supabase, folders appear as "files" but we need to treat them as folders
+          // because they contain actual files
+          console.log(`📁 Processing item: ${item.name} (treating as folder)`)
+          
+          try {
+            // Try to list files inside this "folder" (even though it appears as a file)
+            const { data: subFiles, error: subListError } = await supabase.storage
+              .from('members')
+              .list(`${companyName}/${item.name}`)
+            
+            if (subListError) {
+              console.warn(`Failed to list files in ${item.name}:`, subListError)
+              // If we can't list it as a folder, treat it as a direct file
+              console.log(`📄 Treating ${item.name} as direct file`)
+              allFilePaths.push(`${companyName}/${item.name}`)
+            } else if (subFiles && subFiles.length > 0) {
+              console.log(`  📄 Found ${subFiles.length} files in ${item.name} folder`)
+              const subFilePaths = subFiles.map(subFile => `${companyName}/${item.name}/${subFile.name}`)
+              allFilePaths.push(...subFilePaths)
+              
+              subFiles.forEach(subFile => {
+                console.log(`    - ${subFile.name}`)
+              })
+            } else {
+              console.log(`  ℹ️ ${item.name} folder is empty`)
+            }
+          } catch (subFolderError) {
+            console.warn(`Error processing ${item.name}:`, subFolderError)
+            // Fallback: treat as direct file
+            allFilePaths.push(`${companyName}/${item.name}`)
+          }
+        }
+        
+        if (allFilePaths.length > 0) {
+          console.log(`🗑️ Deleting ${allFilePaths.length} storage files for company: ${companyName}`)
+          console.log('Files to delete:', allFilePaths)
+          
+          const { error: deleteError } = await supabase.storage
+            .from('members')
+            .remove(allFilePaths)
+          
+          if (deleteError) {
+            console.warn(`Failed to delete some storage files for company ${companyName}:`, deleteError)
+            
+            // Try to delete files individually if bulk delete fails
+            console.log('🔄 Attempting individual file deletion...')
+            let successCount = 0
+            let failCount = 0
+            
+            for (const filePath of allFilePaths) {
+              try {
+                const { error: singleDeleteError } = await supabase.storage
+                  .from('members')
+                  .remove([filePath])
+                
+                if (singleDeleteError) {
+                  console.warn(`Failed to delete file ${filePath}:`, singleDeleteError)
+                  failCount++
+                } else {
+                  successCount++
+                }
+              } catch (singleError) {
+                console.warn(`Error deleting file ${filePath}:`, singleError)
+                failCount++
+              }
+            }
+            
+            console.log(`📊 Individual deletion results: ${successCount} successful, ${failCount} failed`)
+          } else {
+            console.log(`✅ Successfully cleaned up all storage files for company: ${companyName}`)
+          }
+        } else {
+          console.log(`ℹ️ No storage files found to clean up for company: ${companyName}`)
+        }
+        
+        // Now delete the subfolders and company folder itself
+        console.log(`\n🗑️ Deleting folder structure for company: ${companyName}`)
+        
+        // Delete subfolders first (like "Logos")
+        const subfoldersToDelete = companyItems
+          .map(item => `${companyName}/${item.name}`)
+        
+        if (subfoldersToDelete.length > 0) {
+          console.log(`📁 Deleting ${subfoldersToDelete.length} subfolders:`, subfoldersToDelete)
+          
+          const { error: subfolderDeleteError } = await supabase.storage
+            .from('members')
+            .remove(subfoldersToDelete)
+          
+          if (subfolderDeleteError) {
+            console.warn(`Failed to delete some subfolders for company ${companyName}:`, subfolderDeleteError)
+            
+            // Try to delete subfolders individually
+            for (const subfolder of subfoldersToDelete) {
+              try {
+                const { error: singleSubfolderError } = await supabase.storage
+                  .from('members')
+                  .remove([subfolder])
+                
+                if (singleSubfolderError) {
+                  console.warn(`Failed to delete subfolder ${subfolder}:`, singleSubfolderError)
+                } else {
+                  console.log(`✅ Deleted subfolder: ${subfolder}`)
+                }
+              } catch (singleError) {
+                console.warn(`Error deleting subfolder ${subfolder}:`, singleError)
+              }
+            }
+          } else {
+            console.log(`✅ Successfully deleted all subfolders for company: ${companyName}`)
+          }
+        }
+        
+        // Finally, delete the company folder itself
+        console.log(`📁 Deleting company folder: ${companyName}`)
+        const { error: companyFolderDeleteError } = await supabase.storage
+          .from('members')
+          .remove([companyName])
+        
+        if (companyFolderDeleteError) {
+          console.warn(`Failed to delete company folder ${companyName}:`, companyFolderDeleteError)
+        } else {
+          console.log(`✅ Successfully deleted company folder: ${companyName}`)
+        }
+        
+      } else {
+        console.log(`ℹ️ No items found in company folder: ${companyName}`)
+        
+        // Even if no items, try to delete the company folder itself
+        console.log(`📁 Attempting to delete empty company folder: ${companyName}`)
+        const { error: emptyFolderDeleteError } = await supabase.storage
+          .from('members')
+          .remove([companyName])
+        
+        if (emptyFolderDeleteError) {
+          console.warn(`Failed to delete empty company folder ${companyName}:`, emptyFolderDeleteError)
+        } else {
+          console.log(`✅ Successfully deleted empty company folder: ${companyName}`)
+        }
+      }
+    } catch (storageError) {
+      console.warn(`Failed to clean up storage files for company ${companyName} (non-critical):`, storageError)
+      // Don't fail the deletion if storage cleanup fails
     }
   }
   
@@ -2548,245 +2720,4 @@ export async function getBpocDebugInfo() {
     },
     test: testRows[0],
   }
-}
-
-export async function getBpocApplicationsCount() {
-  if (!bpocPool) throw new Error('BPOC database is not configured')
-  const { rows } = await bpocPool.query('SELECT COUNT(*) as count FROM public.applications')
-  return parseInt(rows[0]?.count || '0', 10)
-}
-
-// Auth helpers
-export async function getInternalLoginUserByEmail(email: string) {
-  const { rows } = await pool.query(`
-    SELECT u.id, u.email, u.user_type, pi.first_name, pi.last_name, pi.profile_picture, ir.role_id
-    FROM public.users u
-    LEFT JOIN public.personal_info pi ON u.id = pi.user_id
-    LEFT JOIN public.internal i ON u.id = i.user_id
-    LEFT JOIN public.internal_roles ir ON i.user_id = ir.internal_user_id
-    WHERE u.email = $1 AND i.user_id IS NOT NULL AND (ir.role_id = 1 OR ir.role_id = (SELECT id FROM roles WHERE name = 'IT'))
-  `, [email])
-  return rows[0] || null
-}
-
-// Modal-specific search functions for quick selection (simplified search)
-export async function getAgentsForModal(
-  page: number = 1,
-  limit: number = 20,
-  search?: string,
-  memberId?: string,
-  sortField: string = 'first_name',
-  sortDirection: 'asc' | 'desc' = 'asc'
-): Promise<{ agents: any[], pagination: { totalCount: number, totalPages: number, currentPage: number } }> {
-  const offset = (page - 1) * limit
-  const params: any[] = []
-  let paramIndex = 1
-  const whereParts: string[] = []
-  
-  // Add member filter
-  if (memberId && memberId !== 'all') {
-    if (memberId === 'none') {
-      whereParts.push('a.member_id IS NULL')
-    } else {
-      params.push(parseInt(memberId))
-      whereParts.push(`a.member_id = $${paramIndex++}`)
-    }
-  }
-  
-  // Add simplified search filter for modal (name + employee ID only)
-  if (search && search.trim()) {
-    const term = `%${search.trim()}%`
-    params.push(term)
-    const t = `$${paramIndex++}`
-    whereParts.push(
-      `(
-        COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
-        OR COALESCE(ji.employee_id,'') ILIKE ${t}
-      )`
-    )
-  }
-  
-  const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : ''
-  
-  // Count total records
-  const countQuery = `
-    SELECT COUNT(*) as total
-    FROM public.agents a
-    LEFT JOIN public.personal_info pi ON a.user_id = pi.user_id
-    LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
-    LEFT JOIN public.members m ON a.member_id = m.id
-    ${whereClause}
-  `
-  
-  const countResult = await pool.query(countQuery, params)
-  const totalCount = parseInt(countResult.rows[0]?.total || '0', 10)
-  const totalPages = Math.ceil(totalCount / limit)
-  
-  // Get paginated results - only essential fields for modal selection
-  const dataQuery = `
-    SELECT 
-      a.user_id,
-      pi.first_name,
-      pi.last_name,
-      pi.profile_picture,
-      ji.employee_id,
-      ji.job_title,
-      m.company as member_company,
-      m.badge_color as member_badge_color
-    FROM public.agents a
-    LEFT JOIN public.personal_info pi ON a.user_id = pi.user_id
-    LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
-    LEFT JOIN public.members m ON a.member_id = m.id
-    ${whereClause}
-    ORDER BY ${sortField} ${sortDirection.toUpperCase()}
-    LIMIT $${paramIndex++} OFFSET $${paramIndex++}
-  `
-  
-  params.push(limit, offset)
-  const result = await pool.query(dataQuery, params)
-  
-  return {
-    agents: result.rows,
-    pagination: {
-      totalCount,
-      totalPages,
-      currentPage: page
-    }
-  }
-}
-
-export async function getClientsForModal(
-  page: number = 1,
-  limit: number = 20,
-  search?: string,
-  memberId?: string,
-  sortField: string = 'first_name',
-  sortDirection: 'asc' | 'desc' = 'asc'
-): Promise<{ clients: any[], pagination: { totalCount: number, totalPages: number, currentPage: number } }> {
-  const offset = (page - 1) * limit
-  const params: any[] = []
-  let paramIndex = 1
-  const whereParts: string[] = []
-  
-  // Add member filter
-  if (memberId && memberId !== 'all') {
-    if (memberId === 'none') {
-      whereParts.push('c.member_id IS NULL')
-    } else {
-      params.push(parseInt(memberId))
-      whereParts.push(`c.member_id = $${paramIndex++}`)
-    }
-  }
-  
-  // Add simplified search filter for modal (name only)
-  if (search && search.trim()) {
-    const term = `%${search.trim()}%`
-    params.push(term)
-    const t = `$${paramIndex++}`
-          whereParts.push(
-        `(
-          COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
-        )`
-      )
-  }
-  
-  const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : ''
-  
-  // Count total records
-  const countQuery = `
-    SELECT COUNT(*) as total
-    FROM public.clients c
-    LEFT JOIN public.personal_info pi ON c.user_id = pi.user_id
-    LEFT JOIN public.members m ON c.member_id = m.id
-    ${whereClause}
-  `
-  
-  const countResult = await pool.query(countQuery, params)
-  const totalCount = parseInt(countResult.rows[0].total || '0', 10)
-  const totalPages = Math.ceil(totalCount / limit)
-  
-  // Get paginated results - only essential fields for modal selection
-  const dataQuery = `
-    SELECT 
-      c.user_id,
-      pi.first_name,
-      pi.last_name,
-      pi.profile_picture,
-      m.company as member_company,
-      m.badge_color as member_badge_color
-    FROM public.clients c
-    LEFT JOIN public.personal_info pi ON c.user_id = pi.user_id
-    LEFT JOIN public.members m ON c.member_id = m.id
-    ${whereClause}
-    ORDER BY ${sortField} ${sortDirection.toUpperCase()}
-    LIMIT $${paramIndex++} OFFSET $${paramIndex++}
-  `
-  
-  params.push(limit, offset)
-  const result = await pool.query(dataQuery, params)
-  
-  return {
-    clients: result.rows,
-    pagination: {
-      totalCount,
-      totalPages,
-      currentPage: page
-    }
-  }
-}
-
-// Mark a ticket as cleared (hidden from main pages)
-export async function markTicketAsCleared(ticketId: number): Promise<void> {
-  await pool.query(`
-    UPDATE public.tickets 
-    SET clear = true 
-    WHERE id = $1 AND status = 'Closed'
-  `, [ticketId])
-}
-
-// Unmark a ticket as cleared (show on main pages again)
-export async function unmarkTicketAsCleared(ticketId: number): Promise<void> {
-  await pool.query(`
-    UPDATE public.tickets 
-    SET clear = false 
-    WHERE id = $1 AND status = 'Closed'
-  `, [ticketId])
-}
-
-// Get cleared tickets (for admin review)
-export async function getClearedTickets(): Promise<Ticket[]> {
-  const result = await pool.query(`
-    SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
-           t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
-           ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
-           u.user_type,
-           t.supporting_files, t.file_count,
-           CASE 
-             WHEN u.user_type = 'Internal' THEN 'Internal'
-             WHEN a.member_id IS NOT NULL THEN m.company
-             WHEN c.member_id IS NOT NULL THEN m.company
-             ELSE NULL
-           END as member_name,
-           CASE 
-             WHEN u.user_type = 'Internal' THEN NULL
-             WHEN a.member_id IS NOT NULL THEN m.badge_color
-             WHEN c.member_id IS NOT NULL THEN m.badge_color
-             ELSE NULL
-           END as member_color,
-           t.clear
-    FROM public.tickets t
-    LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
-    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
-    LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
-    LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
-    LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
-    LEFT JOIN public.users u ON t.user_id = u.id
-    LEFT JOIN public.agents a ON t.user_id = a.user_id
-    LEFT JOIN public.clients c ON t.user_id = c.user_id
-    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
-    WHERE t.status = 'Closed' AND t.clear = true
-    ORDER BY t.resolved_at DESC
-  `)
-  return result.rows
 }

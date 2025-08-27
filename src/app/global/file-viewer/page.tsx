@@ -3,7 +3,8 @@
 import * as React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { IconX, IconPhoto, IconDeviceFloppy, IconArrowsMaximize, IconZoomIn, IconZoomOut, IconMaximize } from "@tabler/icons-react"
+import { IconPhoto, IconDeviceFloppy, IconArrowsMaximize, IconZoomIn, IconZoomOut, IconMaximize } from "@tabler/icons-react"
+import { X } from "lucide-react"
 
 interface FileViewerPageProps {
   searchParams: {
@@ -265,7 +266,7 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
       {/* Draggable Header */}
              <div 
          className="flex items-center justify-between p-3 border-b border-border bg-sidebar cursor-move"
-         style={{ WebkitAppRegion: 'drag' }}
+         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
        >
          <div className="flex items-center gap-2 flex-1 min-w-0">
            <div className="min-w-0 flex-1">
@@ -274,15 +275,13 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
              </h1>
            </div>
          </div>
-         <Button
-           variant="ghost"
-           size="sm"
+         <button
            onClick={handleCloseWindow}
-           className="h-6 w-6 p-0 rounded-sm opacity-70 hover:opacity-100 transition-opacity flex-shrink-0"
+           className="h-6 w-6 p-0 rounded-sm opacity-70 hover:opacity-100 transition-opacity flex-shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground"
            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
          >
-           <IconX className="h-6 w-6" />
-         </Button>
+           <X className="h-6 w-6" />
+         </button>
        </div>
 
              {/* File Content */}
@@ -402,14 +401,14 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
        <div className="flex items-center justify-between px-6 py-3 bg-sidebar border-t border-border">
          {/* Left side - File info and actions */}
          <div className="flex items-center gap-4">
-           <IconPhoto className="h-4 w-4 text-muted-foreground" />
+           <IconPhoto className="h-5 w-5 text-muted-foreground" />
            {isImage && (
              <>
                <span className="text-xs text-muted-foreground">
                  {imageDimensions.width > 0 ? `${imageDimensions.width} x ${imageDimensions.height}` : 'Loading...'}
                </span>
                <IconDeviceFloppy 
-                 className="h-4 w-4 text-muted-foreground hover:text-primary cursor-pointer transition-colors" 
+                 className="h-5 w-5 text-muted-foreground hover:text-primary cursor-pointer transition-colors" 
                  onClick={handleSaveFile}
                />
                <span className="text-xs text-muted-foreground">{fileSize || 'Loading...'}</span>
@@ -420,16 +419,12 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
          {/* Right side - Zoom controls */}
          <div className="flex items-center gap-3">
            <div className="flex items-center gap-1">
-             <IconMaximize 
-               className="h-4 w-4 text-muted-foreground hover:text-primary cursor-pointer transition-colors" 
-               onClick={handleFitToContainer}
-             />
              <div className="flex items-center gap-1 bg-muted/50 rounded px-3 py-1.5">
                <span className="text-xs text-muted-foreground">{Math.round(zoom * 100)}%</span>
              </div>
            </div>
            <IconZoomOut 
-             className="h-4 w-4 text-muted-foreground hover:text-primary cursor-pointer transition-colors" 
+             className="h-5 w-5 text-muted-foreground hover:text-primary cursor-pointer transition-colors" 
              onClick={handleZoomOut}
            />
            <div 
@@ -446,12 +441,12 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
              ></div>
            </div>
            <IconZoomIn 
-             className="h-4 w-4 text-muted-foreground hover:text-primary cursor-pointer transition-colors" 
+             className="h-5 w-5 text-muted-foreground hover:text-primary cursor-pointer transition-colors" 
              onClick={handleZoomIn}
            />
            <div className="w-px h-4 bg-border mx-2"></div>
            <IconArrowsMaximize 
-             className="h-4 w-4 text-muted-foreground hover:text-primary cursor-pointer transition-colors" 
+             className="h-5 w-5 text-muted-foreground hover:text-primary cursor-pointer transition-colors" 
              onClick={handleMaximizeWindow}
            />
          </div>

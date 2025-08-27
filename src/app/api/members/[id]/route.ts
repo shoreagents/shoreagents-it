@@ -380,20 +380,15 @@ export async function DELETE(
     }
     
     // Delete the member from the database using db-utils function
-    console.log('API: Deleting member from database...')
+    // This will also clean up associated storage files
+    console.log('API: Deleting member from database and cleaning up storage...')
     await deleteMember(memberId)
     
-    console.log('API: Member deleted successfully from database:', memberId)
-    
-    // Note: Logo file deletion would require Supabase storage access
-    // For now, we'll just delete from the database
-    // TODO: Implement logo cleanup if needed
-    
-    console.log('API: Member deleted successfully:', memberId)
+    console.log('API: Member deleted successfully from database and storage:', memberId)
     
     return NextResponse.json({ 
       success: true, 
-      message: 'Member deleted successfully',
+      message: 'Member deleted successfully along with all associated files',
       deletedId: memberId
     })
 

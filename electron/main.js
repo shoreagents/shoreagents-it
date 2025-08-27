@@ -10,6 +10,8 @@ const chatWindows = new Map();
 const ticketDetailWindows = new Map();
 // Store references to file windows
 const fileWindows = new Map();
+// Store references to job detail windows
+const jobDetailWindows = new Map();
 
 function createWindow() {
   // Create the browser window.
@@ -203,6 +205,55 @@ function createFileWindow(fileUrl, fileName) {
   return fileWindow;
 }
 
+function createJobDetailWindow(jobId, jobData) {
+  // Check if job detail window already exists for this job
+  if (jobDetailWindows.has(jobId)) {
+    const existingWindow = jobDetailWindows.get(jobId);
+    if (!existingWindow.isDestroyed()) {
+      existingWindow.focus();
+      return existingWindow;
+    }
+  }
+
+  // Create new job detail window
+  const jobDetailWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    resizable: true,
+    maximizable: true,
+    fullscreenable: false,
+    frame: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+    icon: path.join(__dirname, '../public/icon.png'),
+    title: `Job Details - ${jobData.title || jobData.job_title || 'Unknown Job'}`,
+  });
+
+  // Load the job details React component
+  if (isDev) {
+    const encodedJobData = encodeURIComponent(JSON.stringify(jobData))
+    jobDetailWindow.loadURL(`http://localhost:3002/global/job-details?jobId=${jobId}&jobData=${encodedJobData}`)
+    jobDetailWindow.webContents.openDevTools()
+  } else {
+    // For production, we'll need to build and serve the static files
+    jobDetailWindow.loadFile(path.join(__dirname, `../out/global/job-details/index.html?jobId=${jobId}&jobData=${encodeURIComponent(JSON.stringify(jobData))}`))
+  }
+
+  // Store reference to job detail window
+  jobDetailWindows.set(jobId, jobDetailWindow);
+
+  // Handle job detail window closed
+  jobDetailWindow.on('closed', () => {
+    jobDetailWindows.delete(jobId);
+  });
+
+  return jobDetailWindow;
+}
+
 // Handle IPC messages
 ipcMain.handle('open-chat-window', async (event, ticketId, ticketData) => {
   try {
@@ -230,6 +281,16 @@ ipcMain.handle('open-file-window', async (event, fileUrl, fileName) => {
     return { success: true, windowId: fileWindow.id };
   } catch (error) {
     console.error('Error creating file window:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('open-job-detail-window', async (event, jobId, jobData) => {
+  try {
+    const jobDetailWindow = createJobDetailWindow(jobId, jobData);
+    return { success: true, windowId: jobDetailWindow.id };
+  } catch (error) {
+    console.error('Error creating job detail window:', error);
     return { success: false, error: error.message };
   }
 });

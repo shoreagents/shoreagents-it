@@ -259,75 +259,13 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                             const status = applicant.all_job_statuses?.[index] || applicant.status;
                             const showStatus = ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
                             
+                            // Don't show any status badges when main status is "passed"
+                            if (applicant.status.toLowerCase() === 'passed') {
+                              return null;
+                            }
+                            
                             // Show status badge if job has final status
                             if (showStatus) {
-                              // Make badge clickable only when main status is "passed"
-                              if (applicant.status.toLowerCase() === 'passed') {
-                                return (
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <Badge 
-                                        variant="outline" 
-                                        className={`${getStatusColor(status as ApplicantStatus)} px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:opacity-80 transition-opacity popover-trigger status-badge`}
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        {getStatusDisplayLabel(status)}
-                                      </Badge>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
-                                      <div className="space-y-1">
-                                        {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
-                                          <div 
-                                            key={statusOption}
-                                            className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                              status.toLowerCase() === statusOption 
-                                                ? 'bg-primary/10 text-primary border border-primary/20 pointer-events-none cursor-default' 
-                                                : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
-                                            }`}
-                                            onClick={async () => {
-                                              if (status.toLowerCase() === statusOption) return;
-                                              try {
-                                                console.log(`Updating BPOC job ${index} status to:`, statusOption);
-                                              console.log('Request payload:', { applicantId: applicant.id, jobIndex: index, newStatus: statusOption });
-                                                
-                                                const response = await fetch('/api/bpoc/update-job-status/', {
-                                                  method: 'PATCH',
-                                                  headers: {
-                                                    'Content-Type': 'application/json',
-                                                  },
-                                                  body: JSON.stringify({
-                                                    applicantId: applicant.id,
-                                                    jobIndex: index,
-                                                    newStatus: statusOption
-                                                  })
-                                                });
-                                                
-                                                if (response.ok) {
-                                                  const result = await response.json();
-                                                  console.log('✅ BPOC job status updated successfully:', result);
-                                                  
-                                                  // Immediately update the frontend state
-                                                  onStatusUpdate(applicant.id, index, statusOption);
-                                                } else {
-                                                  const error = await response.json();
-                                                  console.error('❌ Failed to update BPOC job status:', error);
-                                                }
-                                              } catch (error) {
-                                                console.error('❌ Error updating BPOC job status:', error);
-                                              }
-                                            }}
-                                          >
-                                            {getStatusIcon(statusOption)}
-                                            <span className="text-sm font-medium">{getStatusDisplayLabel(statusOption)}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </PopoverContent>
-                                  </Popover>
-                                );
-                              }
-                              
-                              // Non-clickable badge when main status is not "passed"
                               return (
                                 <Badge variant="outline" className={`${getStatusColor(status as ApplicantStatus)} px-2 py-0.5 text-xs font-medium rounded-md`}>
                                   {getStatusDisplayLabel(status)}
@@ -335,125 +273,17 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                               );
                             }
                             
-                            // Show "Set Status" button when main status is "passed"
-                            if (applicant.status.toLowerCase() === 'passed') {
-                              return (
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <Badge 
-                                      variant="outline" 
-                                      className="px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all duration-200 border-dashed text-muted-foreground border-muted-foreground/30 popover-trigger status-badge"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      Set Status
-                                    </Badge>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
-                                    <div className="space-y-1">
-
-                                      {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
-                                        <div 
-                                          key={statusOption}
-                                          className="flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground"
-                                          onClick={async () => {
-                                            const current = (applicant.all_job_statuses?.[index] || applicant.status).toLowerCase();
-                                            if (current === statusOption) return;
-                                            try {
-                                              console.log(`Updating BPOC job ${index} status to:`, statusOption);
-                                              console.log('Request payload:', { applicantId: applicant.id, jobIndex: index, newStatus: statusOption });
-                                              
-                                              const response = await fetch('/api/bpoc/update-job-status/', {
-                                                method: 'PATCH',
-                                                headers: {
-                                                  'Content-Type': 'application/json',
-                                                },
-                                                body: JSON.stringify({
-                                                  applicantId: applicant.id,
-                                                  jobIndex: index,
-                                                  newStatus: statusOption
-                                                })
-                                              });
-                                              
-                                              if (response.ok) {
-                                                const result = await response.json();
-                                                console.log('✅ BPOC job status updated successfully:', result);
-                                                
-                                                // Immediately update the frontend state
-                                                onStatusUpdate(applicant.id, index, statusOption);
-                                              } else {
-                                                const error = await response.json();
-                                                console.error('❌ Failed to update BPOC job status:', error);
-                                                console.error('❌ Response status:', response.status);
-                                                console.error('❌ Response headers:', Object.fromEntries(response.headers.entries()));
-                                              }
-                                            } catch (error) {
-                                              console.error('❌ Error updating BPOC job status:', error);
-                                            }
-                                          }}
-                                        >
-                                          {getStatusIcon(statusOption)}
-                                          <span className="text-sm font-medium">{getStatusDisplayLabel(statusOption)}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
-                              );
-                            }
-                            
                             return null;
                           })()}
                         </div>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center">
                           {applicant.all_companies && applicant.all_companies[index] ? (
-                            <div className="flex items-center gap-1">
-                              <svg className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                              </svg>
+                            <div className="flex items-center">
                               <p className="text-xs text-muted-foreground font-medium">
                                 {applicant.all_companies[index]}
                               </p>
-                  </div>
-                ) : (
-                            <div className="flex items-center gap-1">
-                              <svg className="w-3 h-3 text-muted-foreground/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <p className="text-xs text-muted-foreground/50 italic">
-                                Company not specified
-                              </p>
                             </div>
-                          )}
-                          {applicant.all_job_timestamps && applicant.all_job_timestamps[index] && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="cursor-pointer">
-                                    <IconCalendar className="h-4 w-4 text-muted-foreground/70 hover:text-muted-foreground transition-colors" />
-              </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <div className="flex items-center gap-0 text-xs">
-                                    <span>
-                                      {new Date(applicant.all_job_timestamps[index]).toLocaleDateString('en-US', { 
-                                        month: 'short', 
-                                        day: 'numeric',
-                                        year: 'numeric'
-                                      })}
-                                    </span>
-                                    <span className="text-muted-foreground/50 mx-1">•</span>
-                                    <span>
-                                      {new Date(applicant.all_job_timestamps[index]).toLocaleTimeString('en-US', {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        hour12: true
-                                      })}
-                                    </span>
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                       ))}
@@ -469,7 +299,7 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                     </h4>
                       {(() => {
                         const status = applicant.all_job_statuses?.[0] || applicant.status;
-                        const showStatus = ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
+                        const showStatus = ['withdrawn', 'qualified', 'failed', 'final interview', 'hired'].includes(status.toLowerCase());
                         return showStatus ? (
                           <Badge variant="outline" className={`${getStatusColor(status as ApplicantStatus)} px-2 py-0.5 text-xs font-medium rounded-md`}>
                             {getStatusDisplayLabel(status)}
@@ -477,46 +307,13 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                         ) : null;
                       })()}
                     </div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center">
                       {applicant.company_name && (
-                        <div className="flex items-center gap-1">
-                          <svg className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                          </svg>
+                        <div className="flex items-center">
                           <p className="text-xs text-muted-foreground font-medium">
                             {applicant.company_name}
                           </p>
                         </div>
-                      )}
-                      {applicant.all_job_timestamps && applicant.all_job_timestamps[0] && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="cursor-pointer">
-                                <IconCalendar className="h-4 w-4 text-muted-foreground/70 hover:text-muted-foreground transition-colors" />
-                </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="flex items-center gap-1 text-xs">
-                                <span>
-                                  {new Date(applicant.all_job_timestamps[0]).toLocaleDateString('en-US', { 
-                                    month: 'short', 
-                                    day: 'numeric',
-                                    year: 'numeric'
-                                  })}
-                                </span>
-                                <span className="text-muted-foreground/50 mx-1">•</span>
-                                <span>
-                                  {new Date(applicant.all_job_timestamps[0]).toLocaleTimeString('en-US', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    hour12: true
-                                  })}
-                                </span>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
                       )}
                     </div>
                   </div>
@@ -732,145 +529,17 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                             const status = applicant.all_job_statuses?.[index] || applicant.status;
                             const showStatus = ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
                             
+                            // Don't show any status badges when main status is "passed"
+                            if (applicant.status.toLowerCase() === 'passed') {
+                              return null;
+                            }
+                            
                             // Show status badge if job has final status
                             if (showStatus) {
-                              // Make badge clickable only when main status is "passed"
-                              if (applicant.status.toLowerCase() === 'passed') {
-                                return (
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <Badge 
-                                        variant="outline" 
-                                        className={`${getStatusColor(status as ApplicantStatus)} px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:opacity-80 transition-opacity popover-trigger status-badge`}
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        {getStatusDisplayLabel(status)}
-                                      </Badge>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
-                                      <div className="space-y-1">
-                                        {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
-                                          <div 
-                                            key={statusOption}
-                                            className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                              status.toLowerCase() === statusOption 
-                                                ? 'bg-primary/10 text-primary border border-primary/20 pointer-events-none cursor-default' 
-                                                : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
-                                            }`}
-                                            onClick={async () => {
-                                              if (status.toLowerCase() === statusOption) return;
-                                              try {
-                                                console.log(`Updating BPOC job ${index} status to:`, statusOption);
-                                              console.log('Request payload:', { applicantId: applicant.id, jobIndex: index, newStatus: statusOption });
-                                                
-                                                const response = await fetch('/api/bpoc/update-job-status/', {
-                                                  method: 'PATCH',
-                                                  headers: {
-                                                    'Content-Type': 'application/json',
-                                                  },
-                                                  body: JSON.stringify({
-                                                    applicantId: applicant.id,
-                                                    jobIndex: index,
-                                                    newStatus: statusOption
-                                                  })
-                                                });
-                                                
-                                                if (response.ok) {
-                                                  const result = await response.json();
-                                                  console.log('✅ BPOC job status updated successfully:', result);
-                                                  
-                                                  // Immediately update the frontend state
-                                                  onStatusUpdate(applicant.id, index, statusOption);
-                                                } else {
-                                                  const error = await response.json();
-                                                  console.error('❌ Failed to update BPOC job status:', error);
-                                                }
-                                              } catch (error) {
-                                                console.error('❌ Error updating BPOC job status:', error);
-                                              }
-                                            }}
-                                          >
-                                            {getStatusIcon(statusOption)}
-                                            <span className="text-sm font-medium">{getStatusDisplayLabel(statusOption)}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </PopoverContent>
-                                  </Popover>
-                                );
-                              }
-                              
-                              // Non-clickable badge when main status is not "passed"
                               return (
                                 <Badge variant="outline" className={`${getStatusColor(status as ApplicantStatus)} px-2 py-0.5 text-xs font-medium rounded-md`}>
                                   {getStatusDisplayLabel(status)}
                                 </Badge>
-                              );
-                            }
-                            
-                            // Show "Set Status" button when main status is "passed"
-                            if (applicant.status.toLowerCase() === 'passed') {
-                              return (
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <Badge 
-                                      variant="outline" 
-                                      className="px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all duration-200 border-dashed text-muted-foreground border-muted-foreground/30 popover-trigger status-badge"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      Set Status
-                                    </Badge>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
-                                    <div className="space-y-1">
-
-                                      {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
-                                        <div 
-                                          key={statusOption}
-                                          className="flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground"
-                                          onClick={async () => {
-                                            const current = (applicant.all_job_statuses?.[index] || applicant.status).toLowerCase();
-                                            if (current === statusOption) return;
-                                            try {
-                                              console.log(`Updating BPOC job ${index} status to:`, statusOption);
-                                              console.log('Request payload:', { applicantId: applicant.id, jobIndex: index, newStatus: statusOption });
-                                              
-                                              const response = await fetch('/api/bpoc/update-job-status/', {
-                                                method: 'PATCH',
-                                                headers: {
-                                                  'Content-Type': 'application/json',
-                                                },
-                                                body: JSON.stringify({
-                                                  applicantId: applicant.id,
-                                                  jobIndex: index,
-                                                  newStatus: statusOption
-                                                })
-                                              });
-                                              
-                                              if (response.ok) {
-                                                const result = await response.json();
-                                                console.log('✅ BPOC job status updated successfully:', result);
-                                                
-                                                // Immediately update the frontend state
-                                                onStatusUpdate(applicant.id, index, statusOption);
-                                              } else {
-                                                const error = await response.json();
-                                                console.error('❌ Failed to update BPOC job status:', error);
-                                                console.error('❌ Response status:', response.status);
-                                                console.error('❌ Response headers:', Object.fromEntries(response.headers.entries()));
-                                              }
-                                            } catch (error) {
-                                              console.error('❌ Error updating BPOC job status:', error);
-                                            }
-                                          }}
-                                        >
-                                          {getStatusIcon(statusOption)}
-                                          <span className="text-sm font-medium">{getStatusDisplayLabel(statusOption)}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
                               );
                             }
                             
@@ -880,53 +549,12 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                         <div className="flex items-center justify-between">
                           {applicant.all_companies && applicant.all_companies[index] ? (
                             <div className="flex items-center gap-1">
-                              <svg className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                              </svg>
                               <p className="text-xs text-muted-foreground font-medium">
                                 {applicant.all_companies[index]}
                               </p>
-                  </div>
-                ) : (
-                            <div className="flex items-center gap-1">
-                              <svg className="w-3 h-3 text-muted-foreground/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <p className="text-xs text-muted-foreground/50 italic">
-                                Company not specified
-                              </p>
                             </div>
-                          )}
-                          {applicant.all_job_timestamps && applicant.all_job_timestamps[index] && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="cursor-pointer">
-                                    <IconCalendar className="h-4 w-4 text-muted-foreground/70 hover:text-muted-foreground transition-colors" />
-              </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <div className="flex items-center gap-1 text-xs">
-                                    <span>
-                                      {new Date(applicant.all_job_timestamps[index]).toLocaleDateString('en-US', { 
-                                        month: 'short', 
-                                        day: 'numeric',
-                                        year: 'numeric'
-                                      })}
-                                    </span>
-                                    <span className="text-muted-foreground/50 mx-1">•</span>
-                                    <span>
-                                      {new Date(applicant.all_job_timestamps[index]).toLocaleTimeString('en-US', {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        hour12: true
-                                      })}
-                                    </span>
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
+                          ) : null}
+
                         </div>
                       </div>
                       ))}
@@ -952,45 +580,13 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                     </div>
                     <div className="flex items-center justify-between">
                       {applicant.company_name && (
-                        <div className="flex items-center gap-1">
-                          <svg className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                          </svg>
+                        <div className="flex items-center">
                           <p className="text-xs text-muted-foreground font-medium">
                             {applicant.company_name}
                           </p>
                         </div>
                       )}
-                      {applicant.all_job_timestamps && applicant.all_job_timestamps[0] && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="cursor-pointer">
-                                <IconCalendar className="h-4 w-4 text-muted-foreground/70 hover:text-muted-foreground transition-colors" />
-                </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="flex items-center gap-1 text-xs">
-                                <span>
-                                  {new Date(applicant.all_job_timestamps[0]).toLocaleDateString('en-US', { 
-                                    month: 'short', 
-                                    day: 'numeric',
-                                    year: 'numeric'
-                                  })}
-                                </span>
-                                <span className="text-muted-foreground/50 mx-1">•</span>
-                                <span>
-                                  {new Date(applicant.all_job_timestamps[0]).toLocaleTimeString('en-US', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    hour12: true
-                                  })}
-                                </span>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
+
                     </div>
                   </div>
                 </>

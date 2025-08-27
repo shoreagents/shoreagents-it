@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -226,23 +225,31 @@ const formatDate = (dateString: string) => {
 export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpdate }: ApplicantsDetailModalProps) {
   const { theme } = useTheme()
   const [comment, setComment] = useState("")
-  const [currentStatus, setCurrentStatus] = useState<string | null>(null)
+  const [currentStatus, setCurrentStatus] = useState<string>('')
   const [statusOptions, setStatusOptions] = useState<StatusOption[]>([])
   const [comments, setComments] = useState<Comment[]>([])
   const [isLoadingComments, setIsLoadingComments] = useState(false)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
 
   const [activeTab, setActiveTab] = useState("information")
-  const [selectedJob, setSelectedJob] = useState<any>(null)
-  const [isJobSheetOpen, setIsJobSheetOpen] = useState(false)
-  
-
   
   // Editable input values
-  const [inputValues, setInputValues] = useState<Record<string, string>>({})
+  const [inputValues, setInputValues] = useState<Record<string, string>>({
+    shift: '',
+    current_salary: '',
+    expected_monthly_salary: '',
+    video_introduction_url: ''
+  })
+  const [originalValues, setOriginalValues] = useState<Record<string, string>>({
+    shift: '',
+    current_salary: '',
+    expected_monthly_salary: '',
+    video_introduction_url: ''
+  })
+  const [hasChanges, setHasChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  // Store original values for change detection 
-  const [originalValues, setOriginalValues] = useState<Record<string, string>>({})
+  const [saveMessage, setSaveMessage] = useState('')
+  const [showSaveMessage, setShowSaveMessage] = useState(false)
   
   // Check if there are unsaved changes
   const hasUnsavedChanges = useMemo(() => {
@@ -331,7 +338,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
         return
       }
 
-      // Fetch detailed job data from BPOC database
+      // Fetch detailed job data from BPOC database first
       const response = await fetch(`/api/bpoc/job-details/${jobId}`)
       
       if (!response.ok) {
@@ -340,21 +347,23 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
 
       const jobData = await response.json()
       
-      setSelectedJob(jobData)
-      setIsJobSheetOpen(true)
-    } catch (error) {
-      console.error('Error fetching job details:', error)
-      
-      // Fallback to basic data if API fails
-      const fallbackData = {
-        title: applicant?.all_job_titles?.[jobIndex],
-        company: applicant?.all_companies?.[jobIndex],
-        status: applicant?.all_job_statuses?.[jobIndex],
-        appliedDate: applicant?.all_job_timestamps?.[jobIndex],
+      // Check if we're in Electron environment
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        // Open Electron window with real job data from the API
+        const result = await window.electronAPI.openJobDetailWindow(jobId, jobData)
+        if (result.success) {
+          console.log('✅ Job detail window opened successfully:', result)
+        } else {
+          console.error('❌ Failed to open job detail window:', result.error)
+        }
+      } else {
+        // Not in Electron environment - show error or fallback
+        console.error('❌ Electron environment not available')
+        alert('Job details can only be viewed in the desktop application.')
       }
-      
-      setSelectedJob(fallbackData)
-      setIsJobSheetOpen(true)
+    } catch (error) {
+      console.error('Error handling job click:', error)
+      alert('Failed to load job details. Please try again.')
     }
   }
 
@@ -1661,222 +1670,6 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Job Details Sheet */}
-      <Sheet open={isJobSheetOpen} onOpenChange={setIsJobSheetOpen}>
-        <SheetContent side="right" className="w-96">
-          <SheetHeader>
-            <SheetTitle>Job Details</SheetTitle>
-          </SheetHeader>
-          {selectedJob && (
-            <div className="mt-6 space-y-4">
-              {/* Job Title */}
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">Position</h3>
-                <p className="text-lg font-semibold text-foreground">{selectedJob.job_title || selectedJob.title}</p>
-              </div>
-
-              {/* Company */}
-              {selectedJob.company_name && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Company</h3>
-                  <p className="text-foreground">{selectedJob.company_name}</p>
-                </div>
-              )}
-
-              {/* Work Arrangement */}
-              {selectedJob.work_arrangement && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Work Arrangement</h3>
-                  <Badge variant="outline" className="text-xs capitalize">
-                    {selectedJob.work_arrangement}
-                  </Badge>
-                </div>
-              )}
-
-              {/* Experience Level */}
-              {selectedJob.experience_level && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Experience Level</h3>
-                  <Badge variant="outline" className="text-xs capitalize">
-                    {selectedJob.experience_level}
-                  </Badge>
-                </div>
-              )}
-
-              {/* Salary Range */}
-              {(selectedJob.salary_min || selectedJob.salary_max) && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Salary Range</h3>
-                  <p className="text-foreground">
-                    {selectedJob.salary_min && selectedJob.salary_max 
-                      ? `${selectedJob.currency || 'PHP'} ${selectedJob.salary_min.toLocaleString()} - ${selectedJob.salary_max.toLocaleString()} ${selectedJob.salary_type || 'monthly'}`
-                      : selectedJob.salary_min 
-                        ? `From ${selectedJob.currency || 'PHP'} ${selectedJob.salary_min.toLocaleString()} ${selectedJob.salary_type || 'monthly'}`
-                        : `Up to ${selectedJob.currency || 'PHP'} ${selectedJob.salary_max.toLocaleString()} ${selectedJob.salary_type || 'monthly'}`
-                    }
-                  </p>
-                </div>
-              )}
-
-              {/* Shift */}
-              {selectedJob.shift && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Shift</h3>
-                  <Badge variant="outline" className="text-xs capitalize">
-                    {selectedJob.shift}
-                  </Badge>
-                </div>
-              )}
-
-              {/* Priority */}
-              {selectedJob.priority && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Priority</h3>
-                  <Badge variant="outline" className="text-xs capitalize">
-                    {selectedJob.priority}
-                  </Badge>
-                </div>
-              )}
-
-              {/* Industry */}
-              {selectedJob.industry && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Industry</h3>
-                  <p className="text-foreground">{selectedJob.industry}</p>
-                </div>
-              )}
-
-              {/* Department */}
-              {selectedJob.department && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Department</h3>
-                  <p className="text-foreground">{selectedJob.department}</p>
-                </div>
-              )}
-
-              {/* Application Deadline */}
-              {selectedJob.application_deadline && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Application Deadline</h3>
-                  <div className="flex items-center gap-2">
-                    <IconCalendar className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-foreground">
-                      {new Date(selectedJob.application_deadline).toLocaleDateString('en-US', { 
-                        month: 'long', 
-                        day: 'numeric',
-                        year: 'numeric',
-                        timeZone: 'Asia/Manila'
-                      })}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Job Description */}
-              {selectedJob.job_description && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Job Description</h3>
-                  <p className="text-sm text-foreground leading-relaxed">{selectedJob.job_description}</p>
-                </div>
-              )}
-
-              {/* Requirements */}
-              {selectedJob.requirements && Array.isArray(selectedJob.requirements) && selectedJob.requirements.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Requirements</h3>
-                  <ul className="space-y-1">
-                    {selectedJob.requirements.map((req: string, index: number) => (
-                      <li key={index} className="text-sm text-foreground flex items-center gap-2">
-                        <span className="text-primary flex-shrink-0">•</span>
-                        <span>{req}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Responsibilities */}
-              {selectedJob.responsibilities && Array.isArray(selectedJob.responsibilities) && selectedJob.responsibilities.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Responsibilities</h3>
-                  <ul className="space-y-1">
-                    {selectedJob.responsibilities.map((resp: string, index: number) => (
-                      <li key={index} className="text-sm text-foreground flex items-center gap-2">
-                        <span className="text-primary flex-shrink-0">•</span>
-                        <span>{resp}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Benefits */}
-              {selectedJob.benefits && Array.isArray(selectedJob.benefits) && selectedJob.benefits.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Benefits</h3>
-                  <ul className="space-y-1">
-                    {selectedJob.benefits.map((benefit: string, index: number) => (
-                      <li key={index} className="text-sm text-foreground flex items-center gap-2">
-                        <span className="text-primary flex-shrink-0">•</span>
-                        <span>{benefit}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Skills */}
-              {selectedJob.skills && Array.isArray(selectedJob.skills) && selectedJob.skills.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Required Skills</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedJob.skills.map((skill: string, index: number) => (
-                      <Badge key={index} variant="secondary" className="text-xs">
-                        {skill}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Views and Applicants */}
-              <div className="grid grid-cols-2 gap-4">
-                {selectedJob.views !== undefined && (
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-1">Views</h3>
-                    <p className="text-foreground font-medium">{selectedJob.views}</p>
-                  </div>
-                )}
-                {selectedJob.applicants !== undefined && (
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-1">Applicants</h3>
-                    <p className="text-foreground font-medium">{selectedJob.applicants}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Created Date */}
-              {selectedJob.created_at && (
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Posted Date</h3>
-                  <div className="flex items-center gap-2">
-                    <IconCalendar className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-foreground">
-                      {new Date(selectedJob.created_at).toLocaleDateString('en-US', { 
-                        month: 'long', 
-                        day: 'numeric',
-                        year: 'numeric',
-                        timeZone: 'Asia/Manila'
-                      })}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
     </TooltipProvider>
   )
 }

@@ -505,9 +505,11 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   // Reset editing state when modal opens/closes
   React.useEffect(() => {
     if (isOpen) {
-      setIsEditingCompany(false)
+      // When opening for a new company, start in edit mode
+      // When opening for an existing company, start in view mode
+      setIsEditingCompany(!companyToEdit)
     }
-  }, [isOpen])
+  }, [isOpen, companyToEdit])
 
   // Debug effect to monitor logo changes
   React.useEffect(() => {
@@ -2101,7 +2103,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             {/* Company Header */}
             <div className="px-6 py-5">
               {/* Company Name - Editable Title */}
-              {isEditingCompany ? (
+              {(!companyToEdit && isEditingCompany) || (companyToEdit && isEditingCompany) ? (
                 <div className="mb-4">
                   <Input
                     type="text"
@@ -2111,12 +2113,29 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                     className="text-2xl font-semibold h-auto px-3 py-0 !border !border-sidebar-border dark:!border-border !bg-[#ebebeb] dark:!bg-[#0a0a0a] rounded-lg transition-colors duration-200 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
                     style={{ minHeight: '2.5rem' }}
                     autoFocus
-                    onBlur={() => handleCompanySave(formData.company || '')}
+                    onBlur={() => {
+                      if (companyToEdit) {
+                        handleCompanySave(formData.company || '')
+                      } else {
+                        // When adding new company, convert to text mode when losing focus
+                        setIsEditingCompany(false)
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        handleCompanySave(formData.company || '')
+                        if (companyToEdit) {
+                          handleCompanySave(formData.company || '')
+                        } else {
+                          // When adding new company, convert to text mode on Enter
+                          setIsEditingCompany(false)
+                        }
                       } else if (e.key === 'Escape') {
-                        handleCompanyCancel()
+                        if (companyToEdit) {
+                          handleCompanyCancel()
+                        } else {
+                          // When adding new company, convert to text mode on Escape
+                          setIsEditingCompany(false)
+                        }
                       }
                     }}
                   />
@@ -2125,9 +2144,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                 <div 
                   className="text-2xl font-semibold mb-4 px-3 py-0 cursor-pointer hover:bg-[#ebebeb] dark:hover:bg-[#0a0a0a] rounded-lg transition-colors duration-200 flex items-center border border-transparent"
                   style={{ minHeight: '2.5rem' }}
-                  onClick={handleCompanyEdit}
+                  onClick={() => {
+                    // Always allow editing when clicked
+                    setIsEditingCompany(true)
+                  }}
                 >
-                  {formData.company || 'Click to add company name'}
+                  {formData.company || 'Company Name'}
                 </div>
               )}
               

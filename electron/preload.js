@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openChatWindow: (ticketId, ticketData) => ipcRenderer.invoke('open-chat-window', ticketId, ticketData),
   openTicketDetailWindow: (ticketId, ticketData) => ipcRenderer.invoke('open-ticket-detail-window', ticketId, ticketData),
   openFileWindow: (fileUrl, fileName) => ipcRenderer.invoke('open-file-window', fileUrl, fileName),
+  openJobDetailWindow: (jobId, jobData) => ipcRenderer.invoke('open-job-detail-window', jobId, jobData),
   closeChatWindow: (ticketId) => ipcRenderer.invoke('close-chat-window', ticketId),
   closeCurrentWindow: () => ipcRenderer.invoke('close-current-window'),
   maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
