@@ -339,7 +339,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
       }
 
       // Fetch detailed job data from BPOC database first
-      const response = await fetch(`/api/bpoc/job-details/${jobId}`)
+      const response = await fetch(`/api/bpoc/jsob-details/${jobId}`)
       
       if (!response.ok) {
         throw new Error(`Failed to fetch job details: ${response.statusText}`)
