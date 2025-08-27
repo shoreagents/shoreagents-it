@@ -115,7 +115,12 @@ interface Comment {
   };
 }
 
-const getStatusColor = (status: string) => {
+const getStatusColor = (status: string, isJobStatus: boolean = false) => {
+  // For job statuses, "passed" should be gray
+  if (isJobStatus && status.toLowerCase() === 'passed') {
+    return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
+  }
+  
   switch (status.toLowerCase()) {
     case "rejected":
       return "text-rose-700 dark:text-white border-rose-600/20 bg-rose-50 dark:bg-rose-600/20"
@@ -172,7 +177,12 @@ const getStatusIcon = (status: string) => {
 }
 
 // Get status display label based on status value
-const getStatusLabel = (status: string) => {
+const getStatusLabel = (status: string, isJobStatus: boolean = false) => {
+  // For job statuses, "passed" should show as "Set Status"
+  if (isJobStatus && status.toLowerCase() === 'passed') {
+    return 'Set Status'
+  }
+  
   const statusOptions = [
     { value: 'rejected', label: 'Reject' },
     { value: 'submitted', label: 'New' },
@@ -1055,12 +1065,12 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                             <PopoverTrigger asChild>
                                               <Badge 
                                                 variant="outline" 
-                                                className={`${getStatusColor(status)} px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:opacity-80 transition-opacity`}
+                                                className={`${getStatusColor(status, true)} px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:opacity-80 transition-opacity`}
                                                 onClick={(e) => {
                                                   e.stopPropagation()
                                                 }}
                                               >
-                                                {getStatusLabel(status)}
+                                                {getStatusLabel(status, true)}
                                               </Badge>
                                             </PopoverTrigger>
                                                                                           <PopoverContent className="w-48 p-2" align="end" side="top" sideOffset={4}>
