@@ -2649,6 +2649,7 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
     let enrichmentData: any[] = []
     let jobData: any[] = []
     if (applicationIds.length > 0) {
+      // Fetch applications from bpoc_application_ids (original approach)
       const enrichmentQuery = `
         SELECT a.id::text, a.user_id::text, u.first_name, u.last_name, u.full_name, u.avatar_url,
                p.job_title, m.company AS company_name, a.job_id, a.status::text as application_status,
@@ -2673,6 +2674,29 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
       `
       const { rows } = await bpocPool.query(jobQuery, jobIds)
       jobData = rows
+    }
+    
+    // CRITICAL: Fetch current application statuses for all applicants to get accurate statuses
+    let currentJobStatuses: any[] = []
+    if (bpocPool) {
+      try {
+        // Get all applicant IDs
+        const applicantIds = applicants.map(a => a.applicant_id).filter(Boolean)
+        if (applicantIds.length > 0) {
+          const statusQuery = `
+            SELECT a.job_id, a.status::text as current_status, a.created_at, a.user_id
+            FROM public.applications a
+            WHERE a.user_id IN (${applicantIds.map((_, i) => `$${i + 1}`).join(',')})
+            ORDER BY a.created_at DESC
+          `
+          const { rows } = await bpocPool.query(statusQuery, applicantIds)
+          currentJobStatuses = rows
+          console.log('🔍 getApplicants: Current job statuses fetched by applicant ID:', currentJobStatuses.length)
+          console.log('🔍 getApplicants: Sample current statuses:', currentJobStatuses.slice(0, 3))
+        }
+      } catch (error) {
+        console.warn('Failed to fetch current job statuses:', error)
+      }
     }
                 // First, fetch skills data and summary for all applicants
         const skillsMap = new Map<string, any>()
@@ -2809,23 +2833,40 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
           // Find corresponding application data (if exists)
           const applicationData = applicantApplications.find(app => app.job_id === jobId)
           
+          // CRITICAL: Always check for current status from BPOC database FIRST
+          // Look for status by both job_id and user_id to ensure we get the right status
+          // Convert both to strings for comparison to handle type mismatches
+          console.log(`🔍 Looking for status for job ${jobId} (type: ${typeof jobId}) with applicant ${applicant.applicant_id}`)
+          console.log(`🔍 Available current statuses:`, currentJobStatuses.filter(s => s.user_id === applicant.applicant_id))
+          
+          const currentStatusData = currentJobStatuses.find(s => 
+            String(s.job_id) === String(jobId) && s.user_id === applicant.applicant_id
+          )
+          
+          if (currentStatusData) {
+            console.log(`🔍 Found current status for job ${jobId}:`, currentStatusData.current_status)
+            // Use current status from BPOC database
+            allJobStatuses.push(currentStatusData.current_status)
+            allJobTimestamps.push(currentStatusData.created_at)
+          } else {
+            console.log(`🔍 No current status found for job ${jobId}, using fallback:`, applicant.status)
+            // Fallback to main database status
+            const mainDbStatus = applicant.status || 'submitted'
+            allJobStatuses.push(mainDbStatus)
+            allJobTimestamps.push(null)
+          }
+          
           // Use application data if available, otherwise fall back to job data
           if (applicationData) {
             allJobTitles.push(applicationData.job_title || 'Unknown Job')
             allCompanies.push(applicationData.company_name || null)
-            allJobStatuses.push(applicationData.application_status || 'submitted')
-            allJobTimestamps.push(applicationData.application_created_at)
           } else if (matchingJob) {
             allJobTitles.push(matchingJob.job_title || 'Unknown Job')
             allCompanies.push(matchingJob.company_name || null)
-            allJobStatuses.push('submitted') // Default status for jobs without applications
-            allJobTimestamps.push(null)
           } else {
             // Fallback for missing data
             allJobTitles.push('Unknown Job')
             allCompanies.push(null)
-            allJobStatuses.push('submitted')
-            allJobTimestamps.push(null)
           }
         }
       }
@@ -2849,7 +2890,18 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
         hasPhone: !!phoneData,
         hasAddress: !!addressData,
         hasAiAnalysis: !!aiAnalysisData,
-        aiAnalysisMapSize: aiAnalysisMap.size 
+        aiAnalysisMapSize: aiAnalysisMap.size,
+        // Debug job status mapping
+        jobIds: applicant.job_ids,
+        bpocApplicationIds: applicant.bpoc_application_ids,
+        allJobTitles,
+        allJobStatuses,
+        enrichmentDataLength: enrichmentData.length,
+        applicationDataSample: enrichmentData.slice(0, 2),
+        currentJobStatusesCount: currentJobStatuses.length,
+        currentJobStatusesSample: currentJobStatuses.slice(0, 2),
+        // Debug current statuses for this applicant
+        applicantCurrentStatuses: currentJobStatuses.filter(s => s.user_id === applicant.applicant_id)
       })
       
       return {

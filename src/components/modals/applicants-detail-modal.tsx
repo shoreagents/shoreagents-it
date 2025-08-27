@@ -349,6 +349,16 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
   // Update local applicant when prop changes
   useEffect(() => {
     if (applicant) {
+      console.log('🔍 Modal Loading Applicant Data:', {
+        id: applicant.id,
+        status: applicant.status,
+        all_job_statuses: applicant.all_job_statuses,
+        all_job_titles: applicant.all_job_titles,
+        all_companies: applicant.all_companies,
+        job_ids: applicant.job_ids,
+        bpoc_application_ids: applicant.bpoc_application_ids
+      })
+      
       setLocalApplicant(applicant)
       // Reset input values when applicant changes
       const initialValues = {
@@ -985,10 +995,6 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                     <h4 className="font-medium text-foreground">
                                       {jobTitle}
                                     </h4>
-                                    {/* Debug: Show job ID mapping */}
-                                    <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                      ID: {localApplicant?.job_ids?.[index]}
-                                    </span>
                                   </div>
                                   
                                   {/* Applied Date and Time - Top Right */}
@@ -1030,6 +1036,17 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                   {(() => {
                                     const status = localApplicant.all_job_statuses?.[index] || localApplicant.status;
                                     const showStatus = pageContext === 'talent-pool' || ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
+                                    
+                                    // Debug: Log status for each job
+                                    console.log(`🔍 Job ${index} Status Debug:`, {
+                                      jobIndex: index,
+                                      jobTitle: localApplicant.all_job_titles?.[index],
+                                      company: localApplicant.all_companies?.[index],
+                                      jobStatus: localApplicant.all_job_statuses?.[index],
+                                      fallbackStatus: localApplicant.status,
+                                      finalStatus: status,
+                                      showStatus
+                                    })
                                     
                                     if (showStatus) {
                                       return (
