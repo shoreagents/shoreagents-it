@@ -124,11 +124,11 @@ function ApplicantsTable({ applicants, onSort, sortField, sortDirection, onRowCl
         case "withdrawn":
           return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
         case "rejected":
-          return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
+          return "text-rose-700 dark:text-white border-rose-600/20 bg-rose-50 dark:bg-rose-600/20"
         case "passed":
           return "text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20"
         case "hired":
-          return "text-orange-700 dark:text-white border-orange-600/20 bg-orange-50 dark:bg-orange-600/20"
+          return "text-pink-700 dark:text-white border-pink-600/20 bg-pink-50 dark:bg-pink-600/20"
         default:
           return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
       }

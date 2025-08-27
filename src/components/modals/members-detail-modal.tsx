@@ -127,6 +127,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       
       if (companyToEdit?.id && agent.member_id === companyToEdit.id) {
         console.log('🔄 Real-time agent assignment change:', agent)
+        console.log('🔍 Agent data fields available:', Object.keys(agent))
+        console.log('🔍 Company data available:', { company: companyToEdit.company, badge_color: companyToEdit.badge_color })
+        
         // Agent was assigned to this member
         setSelectedAgents(prev => {
           const newSet = new Set(prev)
@@ -135,8 +138,60 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           return newSet
         })
         
-        // Fetch complete agent data to ensure we have all user information
-        fetchSelectedAgentsData([agent.user_id])
+        // Add the agent data directly to selectedAgentsData
+        setSelectedAgentsData(prev => {
+          // Check if agent already exists to avoid duplicates
+          if (prev.some(a => a.user_id === agent.user_id)) {
+            console.log('✅ Agent already exists in selectedAgentsData:', agent.user_id)
+            return prev
+          }
+          
+          // Check if we have all required fields
+          const hasRequiredFields = agent.first_name && agent.last_name
+          
+          if (hasRequiredFields) {
+            // Create agent object with required fields
+            const agentData = {
+              user_id: agent.user_id,
+              first_name: agent.first_name,
+              last_name: agent.last_name,
+              profile_picture: agent.profile_picture || null,
+              employee_id: agent.employee_id || null,
+              job_title: agent.job_title || null,
+              member_company: companyToEdit.company || null,
+              member_badge_color: companyToEdit.badge_color || null
+            }
+            
+            console.log('✅ Adding new agent to selectedAgentsData with complete data:', agentData)
+            const newState = [...prev, agentData]
+            console.log('✅ Final selectedAgentsData state:', newState)
+            return newState
+          } else {
+            // If we don't have complete data, fetch it
+            console.log('⚠️ Agent data incomplete, fetching complete data for user_id:', agent.user_id)
+            fetch(`/api/agents/modal?memberId=${companyToEdit.id}&limit=1000`)
+              .then(response => response.json())
+              .then(data => {
+                const companyAgents = data.agents || []
+                const newAgent = companyAgents.find((a: any) => a.user_id === agent.user_id)
+                if (newAgent) {
+                  console.log('✅ Fetched complete agent data:', newAgent)
+                  setSelectedAgentsData(prev => {
+                    if (prev.some((a: any) => a.user_id === agent.user_id)) {
+                      return prev
+                    }
+                    return [...prev, newAgent]
+                  })
+                }
+              })
+              .catch(error => {
+                console.error('❌ Failed to fetch complete agent data:', error)
+              })
+            
+            // Return current state while fetching
+            return prev
+          }
+        })
       } else if (companyToEdit?.id && oldAgent?.member_id === companyToEdit.id && agent.member_id !== companyToEdit.id) {
         console.log('🔄 Real-time agent unassignment:', agent)
         // Agent was unassigned from this member
@@ -164,6 +219,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       
       if (companyToEdit?.id && client.member_id === companyToEdit.id) {
         console.log('🔄 Real-time client assignment change:', client)
+        console.log('🔍 Client data fields available:', Object.keys(client))
+        console.log('🔍 Company data available:', { company: companyToEdit.company, badge_color: companyToEdit.badge_color })
+        
         // Client was assigned to this member
         setSelectedClients(prev => {
           const newSet = new Set(prev)
@@ -171,18 +229,59 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           console.log('✅ Updated selected clients:', Array.from(newSet))
           return newSet
         })
-        // Fetch complete client data to ensure we have all user information
-        // Since we don't have a fetchSelectedClientsData function, we'll fetch from the clients API
-        fetch(`/api/clients/modal?memberId=${companyToEdit.id}&limit=1000`)
-          .then(response => response.json())
-          .then(data => {
-            const companyClients = data.clients || []
-            setSelectedClientsData(companyClients)
-            console.log('✅ Updated selected clients data with complete information:', companyClients)
-          })
-          .catch(error => {
-            console.error('❌ Failed to fetch complete client data:', error)
-          })
+        
+        // Add the client data directly to selectedClientsData
+        setSelectedClientsData(prev => {
+          // Check if client already exists to avoid duplicates
+          if (prev.some(c => c.user_id === client.user_id)) {
+            console.log('✅ Client already exists in selectedClientsData:', client.user_id)
+            return prev
+          }
+          
+          // Check if we have all required fields
+          const hasRequiredFields = client.first_name && client.last_name
+          
+          if (hasRequiredFields) {
+            // Create client object with required fields
+            const clientData = {
+              user_id: client.user_id,
+              first_name: client.first_name,
+              last_name: client.last_name,
+              profile_picture: client.profile_picture || null,
+              member_company: companyToEdit.company || null,
+              member_badge_color: companyToEdit.badge_color || null
+            }
+            
+            console.log('✅ Adding new client to selectedClientsData with complete data:', clientData)
+            const newState = [...prev, clientData]
+            console.log('✅ Final selectedClientsData state:', newState)
+            return newState
+          } else {
+            // If we don't have complete data, fetch it
+            console.log('⚠️ Client data incomplete, fetching complete data for user_id:', client.user_id)
+            fetch(`/api/clients/modal?memberId=${companyToEdit.id}&limit=1000`)
+              .then(response => response.json())
+              .then(data => {
+                const companyClients = data.clients || []
+                const newClient = companyClients.find((c: any) => c.user_id === client.user_id)
+                if (newClient) {
+                  console.log('✅ Fetched complete client data:', newClient)
+                  setSelectedClientsData(prev => {
+                    if (prev.some((c: any) => c.user_id === client.user_id)) {
+                      return prev
+                    }
+                    return [...prev, newClient]
+                  })
+                }
+              })
+              .catch(error => {
+                console.error('❌ Failed to fetch complete client data:', error)
+              })
+            
+            // Return current state while fetching
+            return prev
+          }
+        })
       } else if (companyToEdit?.id && oldClient?.member_id === companyToEdit.id && client.member_id !== companyToEdit.id) {
         console.log('🔄 Real-time client unassignment:', client)
         // Client was unassigned from this member
@@ -1064,7 +1163,15 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       
       if (response.ok) {
         const data = await response.json()
-        console.log('API response data:', data)
+        console.log('🔍 API response data:', data)
+        console.log('🔍 API response structure:', {
+          hasAgents: !!data.agents,
+          agentsLength: data.agents?.length || 0,
+          hasTotalCount: !!data.totalCount,
+          totalCount: data.totalCount,
+          hasPagination: !!data.pagination,
+          pagination: data.pagination
+        })
         
         if (append) {
           setAgents(prev => [...prev, ...(data.agents || [])])
@@ -1072,22 +1179,26 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           setAgents(data.agents || [])
         }
         
-        setTotalCount(data.pagination?.totalCount || 0)
+        setTotalCount(data.totalCount || 0)
         setCurrentPage(page)
-        setHasMore(page < (data.pagination?.totalPages || 1))
+        
+        // Calculate hasMore based on totalCount and current items loaded
+        const totalItems = data.totalCount || 0
+        const currentItems = append ? agents.length + (data.agents?.length || 0) : (data.agents?.length || 0)
+        setHasMore(currentItems < totalItems)
         
         console.log('Pagination Debug:', {
           page,
-          totalCount: data.pagination?.totalCount,
-          totalPages: data.pagination?.totalPages,
-          hasMore: page < (data.pagination?.totalPages || 1),
+          totalCount: data.totalCount,
+          currentItems,
+          hasMore: currentItems < totalItems,
           agentsInResponse: data.agents?.length || 0,
-          totalAgentsAfterUpdate: append ? agents.length + (data.agents?.length || 0) : (data.agents?.length || 0),
+          totalAgentsAfterUpdate: currentItems,
           searchQuery
         })
         
         // Auto-load more pages if content height is too short for scrolling
-        if (page === 1 && !searchQuery.trim() && data.pagination?.totalCount > 20) {
+        if (page === 1 && !searchQuery.trim() && data.totalCount > 20) {
           // Check if we need more content for scrolling
           setTimeout(() => {
             checkAndLoadMoreIfNeeded(searchQuery)
@@ -1134,12 +1245,23 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   }
 
   const loadMoreAgents = () => {
-    console.log('loadMoreAgents called:', { hasMore, isLoadingMore, currentPage, agentSearch })
+    console.log('🔍 loadMoreAgents called:', { 
+      hasMore, 
+      isLoadingMore, 
+      currentPage, 
+      agentSearch,
+      agentsLength: agents.length,
+      totalCount
+    })
     if (hasMore && !isLoadingMore) {
-      console.log('Fetching next page:', currentPage + 1)
+      console.log('✅ Fetching next page:', currentPage + 1)
       fetchAgents(currentPage + 1, true, agentSearch)
     } else {
-      console.log('Cannot load more:', { hasMore, isLoadingMore })
+      console.log('❌ Cannot load more:', { 
+        hasMore, 
+        isLoadingMore, 
+        reason: !hasMore ? 'hasMore is false' : 'isLoadingMore is true' 
+      })
     }
   }
 
@@ -1181,10 +1303,13 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
 
   const fetchCompanyAgents = async (memberId: number) => {
     try {
+      console.log('🔄 fetchCompanyAgents called with memberId:', memberId)
       setIsLoadingCompany(true)
-              const response = await fetch(`/api/agents/modal?memberId=${memberId}&limit=1000`)
+      const response = await fetch(`/api/agents/modal?memberId=${memberId}&limit=1000`)
+      console.log('🔄 fetchCompanyAgents response status:', response.status)
       if (response.ok) {
         const data = await response.json()
+        console.log('🔄 fetchCompanyAgents response data:', data)
         const companyAgents = data.agents || []
         
         // Set the selected agents
@@ -1202,23 +1327,27 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           }))
         }
         
-        console.log('Loaded company agents:', companyAgents)
+        console.log('✅ Loaded company agents:', companyAgents)
       } else {
-        console.error('Failed to fetch company agents')
+        console.error('❌ Failed to fetch company agents:', response.status, response.statusText)
       }
     } catch (error) {
-      console.error('Error fetching company agents:', error)
+      console.error('❌ Error fetching company agents:', error)
     } finally {
+      console.log('🔄 fetchCompanyAgents completed, setting isLoadingCompany to false')
       setIsLoadingCompany(false)
     }
   }
 
   const fetchCompanyClients = async (memberId: number) => {
     try {
+      console.log('🔄 fetchCompanyClients called with memberId:', memberId)
       // Use the utility function to get clients for the member
-              const response = await fetch(`/api/clients/modal?memberId=${memberId}&limit=1000`)
+      const response = await fetch(`/api/clients/modal?memberId=${memberId}&limit=1000`)
+      console.log('🔄 fetchCompanyClients response status:', response.status)
       if (response.ok) {
         const data = await response.json()
+        console.log('🔄 fetchCompanyClients response data:', data)
         const companyClients = data.clients || []
         
         // Set the selected clients
@@ -1235,12 +1364,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           }))
         }
         
-        console.log('Loaded company clients:', companyClients)
+        console.log('✅ Loaded company clients:', companyClients)
       } else {
-        console.error('Failed to fetch company clients')
+        console.error('❌ Failed to fetch company clients:', response.status, response.statusText)
       }
     } catch (error) {
-      console.error('Error fetching company clients:', error)
+      console.error('❌ Error fetching company clients:', error)
     }
   }
 
@@ -1642,6 +1771,16 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       const response = await fetch(`/api/clients/modal?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
+        console.log('🔍 Clients API response data:', data)
+        console.log('🔍 Clients API response structure:', {
+          hasClients: !!data.clients,
+          clientsLength: data.clients?.length || 0,
+          hasTotalCount: !!data.totalCount,
+          totalCount: data.totalCount,
+          hasPagination: !!data.pagination,
+          pagination: data.pagination
+        })
+        
         const newClients = data.clients || []
         
         if (page === 1) {
@@ -1652,12 +1791,16 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           setDisplayClients(prev => [...prev, ...newClients])
         }
         
-        setHasMoreClients(newClients.length === 20)
+        // Calculate hasMore based on totalCount and current items loaded
+        const totalItems = data.totalCount || 0
+        const currentItems = page === 1 ? newClients.length : clients.length + newClients.length
+        setHasMoreClients(currentItems < totalItems)
+        
         setCurrentClientPage(page)
-        setTotalClientCount(data.pagination?.totalCount || 0)
+        setTotalClientCount(data.totalCount || 0)
         
         // Auto-load more pages if content height is too short for scrolling
-        if (page === 1 && !search && data.pagination?.totalCount > 20) {
+        if (page === 1 && !search && data.totalCount > 20) {
           // Check if we need more content for scrolling
           setTimeout(() => {
             checkAndLoadMoreClientsIfNeeded(search)
@@ -1695,8 +1838,24 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   }
 
   const loadMoreClients = async () => {
-    if (isLoadingMoreClients || !hasMoreClients) return
+    console.log('🔍 loadMoreClients called:', { 
+      hasMoreClients, 
+      isLoadingMoreClients, 
+      currentClientPage, 
+      clientSearch,
+      clientsLength: clients.length,
+      totalClientCount
+    })
+    if (isLoadingMoreClients || !hasMoreClients) {
+      console.log('❌ Cannot load more clients:', { 
+        hasMoreClients, 
+        isLoadingMoreClients, 
+        reason: !hasMoreClients ? 'hasMoreClients is false' : 'isLoadingMoreClients is true' 
+      })
+      return
+    }
     
+    console.log('✅ Fetching next page of clients:', currentClientPage + 1)
     setIsLoadingMoreClients(true)
     await fetchClients(clientSearch, currentClientPage + 1)
   }
@@ -1714,11 +1873,13 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   const openAgentSelection = () => {
     setShowAgentSelection(true)
     setShowClientSelection(false) // Close client selection when opening agent selection
+    console.log('🔍 Agent selection opened:', true)
   }
 
   const openClientSelection = () => {
     setShowClientSelection(true)
     setShowAgentSelection(false) // Close agent selection when opening client selection
+    console.log('🔍 Client selection opened:', true)
   }
 
   const closeSelectionContainers = () => {
@@ -1744,6 +1905,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         console.log('🔄 companyToEdit full data:', companyToEdit)
         
         // Set loading state to show skeleton
+        console.log('🔄 Setting isLoadingCompany to true')
         setIsLoadingCompany(true)
         
         // Load data from database
@@ -1836,6 +1998,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         }
         
         loadCompanyData().finally(() => {
+          console.log('🔄 Company data loading completed, setting isLoadingCompany to false')
           setIsLoadingCompany(false)
         })
       } else {
@@ -1857,11 +2020,11 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           originalClientIds: []
         })
         
-        // Reset selections
-      setSelectedAgents(new Set())
-      setSelectedAgentsData([])
-      setSelectedClients(new Set())
-      setSelectedClientsData([])
+        // Reset selections - only when adding a new company, not when editing
+        setSelectedAgents(new Set())
+        setSelectedAgentsData([])
+        setSelectedClients(new Set())
+        setSelectedClientsData([])
         
         // Reset unsaved changes flag
         setHasUnsavedChanges(false)
@@ -1876,6 +2039,21 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   React.useEffect(() => {
     console.log('🔍 selectedClientsData changed:', selectedClientsData)
   }, [selectedClientsData])
+
+  // Debug: Monitor selectedAgents changes
+  React.useEffect(() => {
+    console.log('🔍 selectedAgents changed:', Array.from(selectedAgents))
+  }, [selectedAgents])
+
+  // Debug: Monitor selectedClients changes
+  React.useEffect(() => {
+    console.log('🔍 selectedClients changed:', Array.from(selectedClients))
+  }, [selectedClients])
+
+  // Debug: Monitor isLoadingCompany changes
+  React.useEffect(() => {
+    console.log('🔍 isLoadingCompany changed:', isLoadingCompany)
+  }, [isLoadingCompany])
 
   // Prevent body scroll when either modal or sheet is open
   React.useEffect(() => {
@@ -1904,6 +2082,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
 
   React.useEffect(() => {
     if (isAddAgentDrawerOpen || showAgentSelection) {
+      console.log('🔍 Agent selection opened - resetting pagination state')
       // Reset pagination state when sheet opens or agent selection is shown
       setCurrentPage(1)
       setHasMore(true)
@@ -1916,12 +2095,14 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       if (isAddAgentDrawerOpen) {
         setSelectedAgents(new Set())
       }
+      console.log('🔍 About to fetch agents with reset state')
       fetchAgents(1, false, '')
     }
   }, [isAddAgentDrawerOpen, showAgentSelection])
 
   React.useEffect(() => {
     if (showClientSelection) {
+      console.log('🔍 Client selection opened - resetting pagination state')
       // Reset pagination state when client selection is shown
       setCurrentClientPage(1)
       setHasMoreClients(true)
@@ -1929,6 +2110,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       // Reset search when opening client selection
       setClientSearch('')
       // Fetch clients on first load
+      console.log('🔍 About to fetch clients with reset state')
       fetchClients('', 1)
     }
   }, [showClientSelection])
@@ -2430,14 +2612,14 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                           </PopoverTrigger>
                           <PopoverContent className="w-64 p-2" align="start" side="bottom" sideOffset={4}>
                             <div className="space-y-1">
-                              <div className="sticky top-0 z-10 border-b px-0 py-0 mb-2">
+                              <div className="sticky top-0 z-10 border-b px-0 py-0">
                                 <div className="relative">
                                   <IconSearch className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                   <Input
                                     placeholder="Search countries..."
                                     value={countrySearch}
                                     onChange={(e) => setCountrySearch(e.target.value)}
-                                    className="bg-white/0 dark:bg-white/0 pl-8 border-0 focus:ring-0 shadow-none"
+                                    className="bg-white/0 dark:bg-white/0 pl-8 pt-0 border-0 focus:ring-0 shadow-none"
                                     onKeyDown={(e) => e.stopPropagation()}
                                     onClick={(e) => e.stopPropagation()}
                                   />
@@ -2909,19 +3091,21 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       const { scrollTop, scrollHeight, clientHeight } = target
                       
                       // Debug scroll values
-                      console.log('Scroll Debug:', {
+                      console.log('🔍 Agents Scroll Debug:', {
                         scrollTop,
                         scrollHeight,
                         clientHeight,
                         threshold: scrollHeight * 0.8,
                         shouldLoad: scrollTop + clientHeight >= scrollHeight * 0.8,
                         hasMore,
-                        isLoadingMore
+                        isLoadingMore,
+                        agentsLength: displayAgents.length,
+                        totalCount
                       })
                       
                       // Load more when user scrolls to 80% of the content
                       if (scrollTop + clientHeight >= scrollHeight * 0.8 && hasMore && !isLoadingMore) {
-                        console.log('Loading more agents...')
+                        console.log('🔄 Scroll triggered load more agents')
                         loadMoreAgents()
                       }
                     }}
@@ -3135,19 +3319,21 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       const { scrollTop, scrollHeight, clientHeight } = target
                       
                       // Debug scroll values
-                      console.log('Client Scroll Debug:', {
+                      console.log('🔍 Clients Scroll Debug:', {
                         scrollTop,
                         scrollHeight,
                         clientHeight,
                         threshold: scrollHeight * 0.8,
                         shouldLoad: scrollTop + clientHeight >= scrollHeight * 0.8,
                         hasMoreClients,
-                        isLoadingMoreClients
+                        isLoadingMoreClients,
+                        clientsLength: displayClients.length,
+                        totalClientCount
                       })
                       
                       // Load more when user scrolls to 80% of the content
                       if (scrollTop + clientHeight >= scrollHeight * 0.8 && hasMoreClients && !isLoadingMoreClients) {
-                        console.log('Loading more clients...')
+                        console.log('🔄 Scroll triggered load more clients')
                         loadMoreClients()
                       }
                     }}

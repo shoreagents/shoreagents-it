@@ -36,8 +36,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Missing required fields: id and status' }, { status: 400 })
     }
 
-    // Validate status against the enum
-    const validStatuses = ['reject', 'submitted', 'for verification', 'verified', 'initial interview', 'passed', 'failed', 'withdrawn']
+    // Validate status against the enum (matching your DDL)
+    const validStatuses = ['rejected', 'submitted', 'for verification', 'verified', 'initial interview', 'passed', 'hired', 'failed', 'withdrawn']
     if (!validStatuses.includes(status)) {
       console.log('❌ Invalid status value:', status)
       return NextResponse.json({ error: 'Invalid status value' }, { status: 400 })

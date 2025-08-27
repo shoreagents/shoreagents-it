@@ -131,12 +131,13 @@ export default function LoginPage() {
     setIsLoading(true)
 
     const result = await login(email, password)
+    console.log('Login result:', result)
     
     if (result.success) {
-      toast.success("Successfully signed in!")
+      toast.success("Successfully Signed In!")
       router.push('/it/dashboard')
     } else {
-      const errorMessage = result.error || 'Login failed'
+      const errorMessage = result.error || 'Login Failed'
       toast.error(errorMessage)
     }
     
@@ -147,11 +148,12 @@ export default function LoginPage() {
     e.preventDefault()
     setIsLoading(true)
     const result = await login(adminEmail, adminPassword, 'admin')
+    console.log('Admin login result:', result)
     if (result.success) {
-      toast.success("Successfully signed in as admin!")
+      toast.success("Successfully Signed In!")
       router.push('/admin/dashboard')
     } else {
-      const errorMessage = result.error || 'Login failed'
+      const errorMessage = result.error || 'Login Failed'
       toast.error(errorMessage)
     }
     setIsLoading(false)

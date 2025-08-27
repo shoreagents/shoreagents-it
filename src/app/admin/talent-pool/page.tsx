@@ -23,6 +23,7 @@ import {
   Users,
   DollarSign,
   Mail,
+  Phone,
   AlertCircle
 } from "lucide-react"
 
@@ -116,7 +117,22 @@ export default function TalentPoolPage() {
   const mapApplicantData = useCallback((rawData: any): Applicant => {
     const applicant = rawData.applicant || {}
     const skills = Array.isArray(rawData.applicant_skills) ? rawData.applicant_skills : []
-    const expected = Number(applicant.expected_monthly_salary ?? 0)
+    const expected = Number(rawData.expected_monthly_salary ?? 0)
+    
+    console.log('🔍 Talent Pool: Mapping applicant data:', {
+      rawData: {
+        id: rawData.id,
+        shift: rawData.shift,
+        current_salary: rawData.current_salary,
+        expected_monthly_salary: rawData.expected_monthly_salary,
+        video_introduction_url: rawData.video_introduction_url
+      },
+      mapped: {
+        shift: rawData.shift || null,
+        current_salary: rawData.current_salary || null,
+        expected_monthly_salary: isFinite(expected) ? expected : null
+      }
+    })
     
     return {
       id: String(rawData.id ?? rawData.applicant_id ?? crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)),
@@ -128,8 +144,8 @@ export default function TalentPoolPage() {
       category: rawData.category || '',
       category_id: rawData.category_id || null,
       category_name: rawData.category_name || '',
-      status: (applicant.status as ApplicantStatus) || 'submitted',
-      position: applicant.position || 0,
+      status: (rawData.status as ApplicantStatus) || 'submitted',
+      position: rawData.position || 0,
       resolved_by: rawData.resolved_by || null,
       resolved_at: rawData.resolved_at || null,
       created_at: rawData.created_at || '',
@@ -156,17 +172,17 @@ export default function TalentPoolPage() {
       created_at_recruits: rawData.created_at_recruits || null,
       updated_at_recruits: rawData.updated_at_recruits || null,
       video_introduction_url: rawData.video_introduction_url || null,
-      current_salary: applicant.current_salary || null,
+      current_salary: rawData.current_salary || null,
       expected_monthly_salary: isFinite(expected) ? expected : null,
-      shift: applicant.shift || null,
+      shift: rawData.shift || null,
       all_job_titles: rawData.all_job_titles || [],
       all_companies: rawData.all_companies || [],
       all_job_statuses: rawData.all_job_statuses || [],
       all_job_timestamps: rawData.all_job_timestamps || [],
       skills,
       originalSkillsData: rawData.originalSkillsData || null,
-      summary: rawData.applicant_summary || null,
-      email: rawData.applicant_email || null,
+      summary: rawData.summary || null,
+      email: rawData.email || null,
       phone: rawData.phone || null,
       address: rawData.address || null,
       aiAnalysis: rawData.aiAnalysis || null,
@@ -174,18 +190,34 @@ export default function TalentPoolPage() {
   }, [])
 
   // Data enrichment function (same as BPOC applicants page)
-  const enrichApplicantData = useCallback(async (rawData: any) => {
+  const enrichApplicantData = useCallback(async (rawData: any): Promise<any> => {
     try {
-      // If we have BPOC application IDs, fetch additional data
-      if (rawData.bpoc_application_ids && rawData.bpoc_application_ids.length > 0) {
-        const response = await fetch(`/api/bpoc/enrich?ids=${rawData.bpoc_application_ids.join(',')}`)
-        if (response.ok) {
-          const enrichedData = await response.json()
-          return { ...rawData, ...enrichedData }
+      console.log('🔍 Talent Pool: Enriching applicant data:', { id: rawData.id, type: typeof rawData.id })
+      
+      // Fetch enrichment data from the API for this specific applicant
+      const response = await fetch(`/api/bpoc?id=${rawData.id}`)
+      if (response.ok) {
+        const enrichedData = await response.json()
+        console.log('🔍 Talent Pool: Enrichment API response:', { count: enrichedData.length, ids: enrichedData.map((a: any) => a.id) })
+        
+        // Find the matching applicant in the enriched data
+        const enriched = enrichedData.find((app: any) => {
+          const match = String(app.id) === String(rawData.id)
+          console.log(`🔍 Talent Pool: Enrichment ID comparison: "${app.id}" === "${rawData.id}" = ${match}`)
+          return match
+        })
+        
+        if (enriched) {
+          console.log('🔍 Talent Pool: Found enriched data:', enriched)
+          return enriched
+        } else {
+          console.log('🔍 Talent Pool: No enriched data found, returning original')
         }
+      } else {
+        console.warn('⚠️ Talent Pool: Enrichment API failed:', response.status, response.statusText)
       }
     } catch (error) {
-      console.warn('Failed to enrich applicant data:', error)
+      console.warn('⚠️ Talent Pool: Failed to enrich real-time data:', error)
     }
     // Return original data if enrichment fails
     return rawData
@@ -194,27 +226,76 @@ export default function TalentPoolPage() {
   // Real-time updates for BPOC applications (same as BPOC applicants page)
   const { isConnected: isRealtimeConnected } = useRealtimeApplicants({
     onApplicantCreated: async (newApplicant) => {
-      console.log('🆕 Real-time: New applicant created:', newApplicant)
+      console.log('🆕 Talent Pool Real-time: New applicant created:', newApplicant)
       // Enrich and map the raw data to Applicant format
       const enrichedData = await enrichApplicantData(newApplicant)
       const mappedApplicant = mapApplicantData(enrichedData)
-      setApplicants(prev => [...prev, mappedApplicant])
+      console.log('🆕 Talent Pool: Mapped new applicant:', mappedApplicant)
+      
+      setApplicants(prev => {
+        console.log('🆕 Talent Pool: Adding new applicant to state. Previous count:', prev.length)
+        const updated = [...prev, mappedApplicant]
+        console.log('🆕 Talent Pool: New count:', updated.length)
+        return updated
+      })
     },
     onApplicantUpdated: async (updatedApplicant, oldApplicant) => {
-      console.log('📝 Real-time: Applicant updated:', updatedApplicant, 'Old:', oldApplicant)
+      console.log('📝 Talent Pool Real-time: Applicant updated:', updatedApplicant, 'Old:', oldApplicant)
+      console.log('📝 Talent Pool: Current applicants in state:', applicants.map(a => ({ id: a.id, type: typeof a.id })))
+      console.log('📝 Talent Pool: Updated applicant ID:', { id: updatedApplicant.id, type: typeof updatedApplicant.id })
+      
       // Enrich and map the raw data to Applicant format
       const enrichedData = await enrichApplicantData(updatedApplicant)
       const mappedApplicant = mapApplicantData(enrichedData)
-      setApplicants(prev => prev.map(applicant => 
-        applicant.id === updatedApplicant.id ? mappedApplicant : applicant
-      ))
+      console.log('📝 Talent Pool: Mapped updated applicant:', mappedApplicant)
+      
+      setApplicants(prev => {
+        const updated = prev.map(applicant => {
+          const match = String(applicant.id) === String(updatedApplicant.id)
+          console.log(`📝 Talent Pool: Comparing IDs: "${applicant.id}" (${typeof applicant.id}) === "${updatedApplicant.id}" (${typeof updatedApplicant.id}) = ${match}`)
+          return match ? mappedApplicant : applicant
+        })
+        console.log('📝 Talent Pool: Updated applicants state:', updated.length)
+        return updated
+      })
+      
+      // Also update selectedTalent if the modal is open for this applicant
+      if (selectedTalent && String(selectedTalent.id) === String(updatedApplicant.id)) {
+        console.log('📝 Talent Pool: Updating selectedTalent for modal realtime update')
+        const enrichedData = await enrichApplicantData(updatedApplicant)
+        const mappedApplicant = mapApplicantData(enrichedData)
+        setSelectedTalent(mappedApplicant)
+      }
     },
     onApplicantDeleted: (deletedApplicant) => {
-      console.log('🗑️ Real-time: Applicant deleted:', deletedApplicant)
+      console.log('🗑️ Talent Pool Real-time: Applicant deleted:', deletedApplicant)
       // Remove applicant from the list
       setApplicants(prev => prev.filter(applicant => applicant.id !== deletedApplicant.id))
+      
+      // Also close modal if the deleted applicant was selected
+      if (selectedTalent && String(selectedTalent.id) === String(deletedApplicant.id)) {
+        console.log('🗑️ Talent Pool: Closing modal for deleted applicant')
+        setSelectedTalent(null)
+        setIsModalOpen(false)
+      }
     }
   })
+
+  console.log('🔍 Talent Pool: Realtime connection status:', { isRealtimeConnected })
+  
+  // Debug: Log when applicants state changes
+  useEffect(() => {
+    console.log('🔍 Talent Pool: Applicants state changed:', { count: applicants.length, ids: applicants.map(a => a.id) })
+    
+    // If modal is open and we have a selected talent, ensure it has the latest data
+    if (isModalOpen && selectedTalent) {
+      const latestTalent = applicants.find(app => String(app.id) === String(selectedTalent.id))
+      if (latestTalent && latestTalent !== selectedTalent) {
+        console.log('🔍 Talent Pool: Updating selectedTalent with latest data from applicants state')
+        setSelectedTalent(latestTalent)
+      }
+    }
+  }, [applicants, isModalOpen, selectedTalent])
 
   // Load BPOC applications from main database (bpoc_recruits table) - same as BPOC applicants page
   const fetchApplicants = useCallback(async () => {
@@ -229,7 +310,7 @@ export default function TalentPoolPage() {
       const data: any[] = await res.json()
       
       // Map BPOC applications from main database into board items with proper status mapping
-      const mapped: Applicant[] = data.map((a, index) => mapApplicantData(a))
+      const mapped: Applicant[] = data.map((a) => mapApplicantData(a))
       setApplicants(mapped)
     } catch (e: any) {
       setError(e?.message || 'Failed to load applicants')
@@ -285,7 +366,16 @@ export default function TalentPoolPage() {
   }, [applicants, searchQuery, selectedCategory, sortBy])
 
   const handleTalentClick = (talent: Applicant) => {
-    setSelectedTalent(talent)
+    console.log('🔍 Talent Pool: Opening modal for talent:', { id: talent.id, name: talent.full_name })
+    // Ensure we have the latest data from the applicants state
+    const latestTalent = applicants.find(app => String(app.id) === String(talent.id))
+    if (latestTalent) {
+      console.log('🔍 Talent Pool: Using latest talent data for modal:', latestTalent)
+      setSelectedTalent(latestTalent)
+    } else {
+      console.log('🔍 Talent Pool: Using original talent data for modal:', talent)
+      setSelectedTalent(talent)
+    }
     setIsModalOpen(true)
   }
 
@@ -315,6 +405,12 @@ export default function TalentPoolPage() {
           ? { ...applicant, status: newStatus as ApplicantStatus }
           : applicant
       ))
+      
+      // Also update selectedTalent if the modal is open for this applicant
+      if (selectedTalent && String(selectedTalent.id) === String(applicantId)) {
+        console.log('🔄 Updating selectedTalent status in modal')
+        setSelectedTalent(prev => prev ? { ...prev, status: newStatus as ApplicantStatus } : null)
+      }
       
       console.log('✅ Status updated successfully')
     } catch (error) {
@@ -350,6 +446,21 @@ export default function TalentPoolPage() {
                         Live
                       </Badge>
                     )}
+                    {/* Debug button to test realtime updates */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (applicants.length > 0) {
+                          const firstApplicant = applicants[0]
+                          console.log('🧪 Test: Manually updating first applicant status for realtime test')
+                          handleStatusUpdate(firstApplicant.id, 0, 'qualified')
+                        }
+                      }}
+                      className="text-xs"
+                    >
+                      Test Realtime
+                    </Button>
                   </div>
                 </div>
 
@@ -485,20 +596,12 @@ export default function TalentPoolPage() {
                             </CardHeader>
                             <CardContent className="flex flex-col justify-between min-h-0 flex-1">
 
-                              <div className="space-y-4">
+                              <div className="space-y-4 flex-1">
                                 {/* Description */}
                                 <p className="text-sm text-muted-foreground line-clamp-3">
                                   {talent.summary || 'No description available'}
                                 </p>
                                 
-                                {/* Email */}
-                                {talent.email && (
-                                  <div className="flex items-center gap-2 text-sm text-foreground">
-                                    <Mail className="h-4 w-4" />
-                                    <span className="truncate">{talent.email}</span>
-                                  </div>
-                                )}
-
                                 {/* Skills */}
                                 <div className="flex flex-wrap gap-2">
                                   {(() => {
@@ -694,6 +797,26 @@ export default function TalentPoolPage() {
                                     return <span className="text-xs text-muted-foreground">No skills data available</span>
                                   })()}
                                 </div>
+
+                              </div>
+
+                              {/* Separator */}
+                              <div className="border-t border-border/50 my-3"></div>
+
+                              {/* Contact Information - Always at bottom */}
+                              <div className="space-y-1 mt-auto">
+                                <div className="flex items-center gap-2 text-sm text-foreground">
+                                  <Mail className="h-4 w-4" />
+                                  <span className="truncate">{talent.email || <span className="text-muted-foreground">Not Specified</span>}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-foreground">
+                                  <Phone className="h-4 w-4" />
+                                  <span className="truncate">{talent.phone || <span className="text-muted-foreground">Not Specified</span>}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-foreground">
+                                  <MapPin className="h-4 w-4" />
+                                  <span className="truncate">{talent.address || <span className="text-muted-foreground">Not Specified</span>}</span>
+                                </div>
                               </div>
 
                               {/* Action Button */}
@@ -751,6 +874,7 @@ export default function TalentPoolPage() {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onStatusUpdate={handleStatusUpdate}
+        pageContext="talent-pool"
       />
     </>
   )

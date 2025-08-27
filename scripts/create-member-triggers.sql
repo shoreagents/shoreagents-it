@@ -29,12 +29,27 @@ DECLARE
   new_company_id INTEGER;
   old_employee_count INTEGER;
   new_employee_count INTEGER;
+  agent_data JSON;
 BEGIN
   -- Only send notification if member_id changed (assignment change)
   IF TG_OP = 'UPDATE' AND (OLD.member_id IS DISTINCT FROM NEW.member_id) THEN
     -- Get old and new company IDs
     old_company_id := OLD.member_id;
     new_company_id := NEW.member_id;
+    
+    -- Get full agent data by joining with users table
+    SELECT json_build_object(
+      'user_id', u.id,
+      'first_name', u.first_name,
+      'last_name', u.last_name,
+      'profile_picture', u.profile_picture,
+      'employee_id', a.employee_id,
+      'job_title', a.job_title,
+      'member_id', a.member_id
+    ) INTO agent_data
+    FROM public.agents a
+    JOIN public.users u ON a.user_id = u.id
+    WHERE a.user_id = NEW.user_id;
     
     -- Calculate employee counts for old and new companies
     IF old_company_id IS NOT NULL THEN
@@ -58,7 +73,7 @@ BEGIN
       json_build_object(
         'table', TG_TABLE_NAME,
         'action', TG_OP,
-        'record', row_to_json(NEW),
+        'record', COALESCE(agent_data, row_to_json(NEW)),
         'old_record', row_to_json(OLD),
         'count_updates', json_build_object(
           'old_company_id', old_company_id,
@@ -82,12 +97,25 @@ DECLARE
   new_company_id INTEGER;
   old_client_count INTEGER;
   new_client_count INTEGER;
+  client_data JSON;
 BEGIN
   -- Only send notification if member_id changed (assignment change)
   IF TG_OP = 'UPDATE' AND (OLD.member_id IS DISTINCT FROM NEW.member_id) THEN
     -- Get old and new company IDs
     old_company_id := OLD.member_id;
     new_company_id := NEW.member_id;
+    
+    -- Get full client data by joining with users table
+    SELECT json_build_object(
+      'user_id', u.id,
+      'first_name', u.first_name,
+      'last_name', u.last_name,
+      'profile_picture', u.profile_picture,
+      'member_id', c.member_id
+    ) INTO client_data
+    FROM public.clients c
+    JOIN public.users u ON c.user_id = u.id
+    WHERE c.user_id = NEW.user_id;
     
     -- Calculate client counts for old and new companies
     IF old_company_id IS NOT NULL THEN
@@ -111,7 +139,7 @@ BEGIN
       json_build_object(
         'table', TG_TABLE_NAME,
         'action', TG_OP,
-        'record', row_to_json(NEW),
+        'record', COALESCE(client_data, row_to_json(NEW)),
         'old_record', row_to_json(OLD),
         'count_updates', json_build_object(
           'old_company_id', old_company_id,

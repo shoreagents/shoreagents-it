@@ -22,6 +22,7 @@ interface ApplicantsDetailModalProps {
   isOpen: boolean
   onClose: () => void
   onStatusUpdate?: (applicantId: string, jobIndex: number, newStatus: string) => void
+  pageContext?: 'talent-pool' | 'bpoc-recruits'
 }
 
 interface StatusOption {
@@ -116,33 +117,24 @@ interface Comment {
 
 const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
-    case "reject":
+    case "rejected":
       return "text-rose-700 dark:text-white border-rose-600/20 bg-rose-50 dark:bg-rose-600/20"
     case "submitted":
       return "text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20"
-    case "qualified":
-      return "text-yellow-700 dark:text-white border-yellow-600/20 bg-yellow-50 dark:bg-yellow-600/20"
     case "for verification":
       return "text-teal-700 dark:text-white border-teal-600/20 bg-teal-50 dark:bg-teal-600/20"
     case "verified":
       return "text-purple-700 dark:text-white border-purple-600/20 bg-purple-50 dark:bg-purple-600/20"
     case "initial interview":
       return "text-amber-700 dark:text-white border-amber-600/20 bg-amber-50 dark:bg-amber-600/20"
-    case "final interview":
-      return "text-pink-700 dark:text-white border-pink-600/20 bg-pink-50 dark:bg-pink-600/20"
-    case "not qualifies":
-      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
-    case "failed":
-      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
-    case "not qualified":
-      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
     case "passed":
       return "text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20"
-    // BPOC final statuses
+    case "hired":
+      return "text-pink-700 dark:text-white border-pink-600/20 bg-pink-50 dark:bg-pink-600/20"
+    case "failed":
+      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
     case "withdrawn":
       return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
-    case "hired":
-      return "text-orange-700 dark:text-white border-orange-600/20 bg-orange-50 dark:bg-orange-600/20"
     default:
       return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
   }
@@ -150,33 +142,24 @@ const getStatusColor = (status: string) => {
 
 const getStatusIcon = (status: string) => {
   switch (status.toLowerCase()) {
-    case "reject":
+    case "rejected":
       return <IconCircle className="h-4 w-4 fill-rose-500 stroke-none" />
     case "submitted":
       return <IconCircle className="h-4 w-4 fill-blue-500 stroke-none" />
-    case "qualified":
-      return <IconCircle className="h-4 w-4 fill-yellow-500 stroke-none" />
     case "for verification":
       return <IconCircle className="h-4 w-4 fill-teal-500 stroke-none" />
     case "verified":
       return <IconCircle className="h-4 w-4 fill-purple-500 stroke-none" />
     case "initial interview":
       return <IconCircle className="h-4 w-4 fill-amber-500 stroke-none" />
-    case "final interview":
-      return <IconCircle className="h-4 w-4 fill-pink-500 stroke-none" />
-    case "not qualifies":
-      return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
-    case "failed":
-      return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
-    case "not qualified":
-      return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
     case "passed":
       return <IconCircle className="h-4 w-4 fill-green-500 stroke-none" />
-    // BPOC final statuses
+    case "hired":
+      return <IconCircle className="h-4 w-4 fill-pink-500 stroke-none" />
+    case "failed":
+      return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
     case "withdrawn":
       return <IconCircle className="h-4 w-4 fill-gray-500 stroke-none" />
-    case "hired":
-      return <IconCircle className="h-4 w-4 fill-amber-500 stroke-none" />
     default:
       return <IconCircle className="h-4 w-4 fill-gray-500 stroke-none" />
   }
@@ -185,12 +168,13 @@ const getStatusIcon = (status: string) => {
 // Get status display label based on status value
 const getStatusLabel = (status: string) => {
   const statusOptions = [
-    { value: 'reject', label: 'Reject' },
+    { value: 'rejected', label: 'Reject' },
     { value: 'submitted', label: 'New' },
     { value: 'for verification', label: 'For Verification' },
     { value: 'verified', label: 'Verified' },
     { value: 'initial interview', label: 'Initial Interview' },
     { value: 'passed', label: 'Ready For Sale' },
+    { value: 'hired', label: 'Hired' },
     { value: 'failed', label: 'Failed' },
     { value: 'withdrawn', label: 'Withdrawn' }
   ]
@@ -222,7 +206,7 @@ const formatDate = (dateString: string) => {
   }
 }
 
-export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpdate }: ApplicantsDetailModalProps) {
+export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpdate, pageContext = 'bpoc-recruits' }: ApplicantsDetailModalProps) {
   const { theme } = useTheme()
   const [comment, setComment] = useState("")
   const [currentStatus, setCurrentStatus] = useState<string>('')
@@ -232,6 +216,9 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
 
   const [activeTab, setActiveTab] = useState("information")
+  
+  // Local state for applicant data to handle realtime updates
+  const [localApplicant, setLocalApplicant] = useState<Applicant | null>(null)
   
   // Editable input values
   const [inputValues, setInputValues] = useState<Record<string, string>>({
@@ -253,7 +240,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
   
   // Check if there are unsaved changes
   const hasUnsavedChanges = useMemo(() => {
-    if (!applicant) return false
+    if (!localApplicant) return false
     
     return Object.keys(inputValues).some(fieldName => {
       const currentValue = inputValues[fieldName]
@@ -269,22 +256,38 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
         return currentValue !== originalValue
       }
     })
-  }, [inputValues, originalValues, applicant])
+  }, [inputValues, originalValues, localApplicant])
   
   // Real-time updates for applicant data
   const { isConnected: isRealtimeConnected } = useRealtimeApplicants({
     onApplicantUpdated: (updatedApplicant, oldApplicant) => {
-      console.log('🔄 Real-time: Applicant update received in modal:', { updatedApplicant, oldApplicant, currentApplicantId: applicant?.id })
+      console.log('🔄 Real-time: Applicant update received in modal:', { 
+        updatedApplicant, 
+        oldApplicant, 
+        currentApplicantId: localApplicant?.id,
+        modalIsOpen: isOpen,
+        hasLocalApplicant: !!localApplicant
+      })
       
       // Only process updates for the current applicant
-      if (applicant && updatedApplicant.id === applicant.id) {
+      if (localApplicant && updatedApplicant.id === localApplicant.id) {
         console.log('🔄 Real-time: Processing update for current applicant:', updatedApplicant)
         
-        // Update the applicant object with new data
-        Object.keys(updatedApplicant).forEach(fieldName => {
-          if (fieldName in applicant) {
-            (applicant as any)[fieldName] = updatedApplicant[fieldName]
-          }
+        // Update the local applicant state with new data
+        setLocalApplicant(prevApplicant => {
+          if (!prevApplicant) return prevApplicant
+          
+          const updatedLocalApplicant = { ...prevApplicant }
+          
+          // Update all fields from the realtime update
+          Object.keys(updatedApplicant).forEach(fieldName => {
+            if (fieldName in updatedLocalApplicant) {
+              (updatedLocalApplicant as any)[fieldName] = updatedApplicant[fieldName]
+            }
+          })
+          
+          console.log('🔄 Updated local applicant:', updatedLocalApplicant)
+          return updatedLocalApplicant
         })
         
         // Update input values to reflect the new data
@@ -299,6 +302,13 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
         // Update input values immediately (no delay)
         setInputValues(newValues)
         
+        // Update original values to reflect the new data
+        setOriginalValues(newValues)
+        
+        // Update current status if it changed
+        if (updatedApplicant.status !== currentStatus) {
+          setCurrentStatus(updatedApplicant.status)
+        }
 
       } else {
         console.log('🔄 Real-time: Update not for current applicant, skipping')
@@ -306,7 +316,30 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     }
   })
 
-  console.log('🔍 Modal real-time hook initialized:', { isRealtimeConnected, applicantId: applicant?.id })
+  console.log('🔍 Modal real-time hook initialized:', { 
+    isRealtimeConnected, 
+    applicantId: localApplicant?.id,
+    hasLocalApplicant: !!localApplicant,
+    modalProps: { applicantId: applicant?.id, isOpen }
+  })
+
+  // Update local applicant when prop changes
+  useEffect(() => {
+    if (applicant) {
+      setLocalApplicant(applicant)
+      // Reset input values when applicant changes
+      const initialValues = {
+        shift: String(applicant.shift || ''),
+        current_salary: String(applicant.current_salary || ''),
+        expected_monthly_salary: String(applicant.expected_monthly_salary || ''),
+        video_introduction_url: String(applicant.video_introduction_url || '')
+      }
+      setInputValues(initialValues)
+      setOriginalValues(initialValues)
+      setCurrentStatus(applicant.status)
+      setHasChanges(false)
+    }
+  }, [applicant])
 
 
 
@@ -331,7 +364,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
   const handleJobClick = async (jobIndex: number) => {
     try {
       // Get job ID from the applicant's job_ids array
-      const jobId = applicant?.job_ids?.[jobIndex]
+      const jobId = localApplicant?.job_ids?.[jobIndex]
       
       if (!jobId) {
         console.error('No job ID found for index:', jobIndex)
@@ -367,40 +400,25 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     }
   }
 
-  // Define status options for applicants
+  // Define status options for applicants with proper database mapping
   const getStatusOptions = (): StatusOption[] => {
     return [
-      { value: 'reject', label: 'Reject', icon: 'rose', color: 'rose' },
+      { value: 'rejected', label: 'Reject', icon: 'rose', color: 'rose' },
       { value: 'submitted', label: 'New', icon: 'blue', color: 'blue' },
       { value: 'for verification', label: 'For Verification', icon: 'teal', color: 'teal' },
       { value: 'verified', label: 'Verified', icon: 'purple', color: 'purple' },
-      { value: 'initial interview', label: 'Initial Interview', icon: 'indigo', color: 'indigo' },
-              { value: 'passed', label: 'Ready For Sale', icon: 'green', color: 'green' },
+      { value: 'initial interview', label: 'Initial Interview', icon: 'amber', color: 'amber' },
+      { value: 'passed', label: 'Ready For Sale', icon: 'green', color: 'green' },
+      { value: 'hired', label: 'Hired', icon: 'pink', color: 'pink' },
       { value: 'failed', label: 'Failed', icon: 'red', color: 'red' },
       { value: 'withdrawn', label: 'Withdrawn', icon: 'gray', color: 'gray' }
     ]
   }
 
   React.useEffect(() => {
-    if (applicant) {
-      setCurrentStatus(applicant.status)
-      // Initialize input values
-      const initialValues = {
-        shift: String(applicant.shift || ''),
-        current_salary: String(applicant.current_salary || ''),
-        expected_monthly_salary: String(applicant.expected_monthly_salary || ''),
-        video_introduction_url: String(applicant.video_introduction_url || '')
-      }
-      setInputValues(initialValues)
-      
-      // Store original values for change detection
-      setOriginalValues(initialValues)
-      
-      // TODO: Fetch comments when API is ready
-      // fetchComments()
-    }
+    // Set status options when component mounts
     setStatusOptions(getStatusOptions())
-  }, [applicant])
+  }, [])
 
   // Prevent body scroll when modal is open
   React.useEffect(() => {
@@ -441,6 +459,52 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     setComments([])
   }
 
+  // Handle status updates for both main and BPOC databases
+  const handleStatusUpdate = async (newStatus: string) => {
+    try {
+      console.log(`🔄 Updating applicant status to:`, newStatus);
+      
+      // Update main database first
+      const mainResponse = await fetch('/api/bpoc', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: localApplicant?.id,
+          status: newStatus,
+          previousStatus: localApplicant?.status
+        })
+      });
+      
+      if (!mainResponse.ok) {
+        const error = await mainResponse.json();
+        console.error('❌ Failed to update main database status:', error);
+        throw new Error('Failed to update main database status');
+      }
+      
+      console.log('✅ Main database status updated successfully');
+      
+      // Update local state
+      if (localApplicant) {
+        setLocalApplicant(prev => prev ? { ...prev, status: newStatus } : null);
+        setCurrentStatus(newStatus);
+      }
+      
+      // Call parent callback if provided
+      if (onStatusUpdate) {
+        onStatusUpdate(localApplicant?.id || '', 0, newStatus);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error updating status:', error);
+      // Revert local state on error
+      if (localApplicant) {
+        setCurrentStatus(localApplicant.status);
+      }
+    }
+  };
+
   // Handle input changes
   const handleInputChange = (fieldName: string, value: string) => {
     console.log(`🔄 Input change for ${fieldName}:`, value)
@@ -469,17 +533,23 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
       setInputValues(prev => ({ ...prev, [fieldName]: numericValue }))
       console.log(`✅ Updated ${fieldName} to:`, numericValue)
       
-      // Also update the applicant object for instant feedback
-      if (applicant) {
-        (applicant as any)[fieldName] = numericValue
+      // Also update the local applicant state for instant feedback
+      if (localApplicant) {
+        setLocalApplicant(prev => ({
+          ...prev!,
+          [fieldName]: numericValue
+        }))
       }
     } else {
       // For non-salary fields, allow any input
     setInputValues(prev => ({ ...prev, [fieldName]: value }))
       
-      // Also update the applicant object for instant feedback
-      if (applicant) {
-        (applicant as any)[fieldName] = value
+      // Also update the local applicant state for instant feedback
+      if (localApplicant) {
+        setLocalApplicant(prev => ({
+          ...prev!,
+          [fieldName]: value
+        }))
       }
     }
     
@@ -506,10 +576,10 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     return formatted
   }
 
-  if (!applicant) return null
+  if (!localApplicant) return null
 
-  const createdDate = formatDate(applicant.created_at)
-  const updatedDate = applicant.updated_at && applicant.updated_at !== applicant.created_at ? formatDate(applicant.updated_at) : null
+  const createdDate = formatDate(localApplicant.created_at)
+  const updatedDate = localApplicant.updated_at && localApplicant.updated_at !== localApplicant.created_at ? formatDate(localApplicant.updated_at) : null
 
 
 
@@ -517,7 +587,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
 
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!comment.trim() || !applicant || isSubmittingComment) return
+    if (!comment.trim() || !localApplicant || isSubmittingComment) return
     
     // TODO: Implement comment submission when API is ready
     setIsSubmittingComment(true)
@@ -538,9 +608,9 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id: applicant.id, // Use the primary key ID
+          id: localApplicant.id, // Use the primary key ID
           status: newStatus,
-          previousStatus: applicant.status
+          previousStatus: localApplicant.status
         })
       })
 
@@ -553,20 +623,20 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
       
       // Call the onStatusUpdate callback if provided to sync with parent component
       if (onStatusUpdate) {
-        onStatusUpdate(applicant.id, 0, newStatus) // jobIndex 0 for main status
+        onStatusUpdate(localApplicant.id, 0, newStatus) // jobIndex 0 for main status
       }
       
     } catch (error) {
       console.error('❌ Error updating status:', error)
       // Revert the local state change on error
-      setCurrentStatus(applicant.status)
+      setCurrentStatus(localApplicant.status)
       // You could show an error toast here
     }
   }
 
   // Auto-save function that can be called before closing
   const autoSaveBeforeClose = async (): Promise<boolean> => {
-    if (!applicant || !hasUnsavedChanges) {
+    if (!localApplicant || !hasUnsavedChanges) {
       return true // No need to save, can close
     }
 
@@ -614,7 +684,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id: applicant.id,
+          id: localApplicant.id,
           ...processedUpdates
         })
       })
@@ -644,12 +714,12 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
   // Modified close handler with auto-save
   const handleClose = async () => {
     console.log('🔒 handleClose called:', { 
-      applicant: applicant?.id, 
+      applicant: localApplicant?.id, 
       hasUnsavedChanges, 
       isOpen
     })
     
-    if (applicant && hasUnsavedChanges) {
+    if (localApplicant && hasUnsavedChanges) {
       // Auto-save changes before closing
       try {
         console.log('🔄 Auto-saving changes before close...')
@@ -716,38 +786,38 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                     <span className="text-muted-foreground">Name:</span>
                     <div className="flex items-center gap-2">
                       <Avatar className="h-6 w-6">
-                        <AvatarImage src={applicant.profile_picture || ''} alt="Applicant" />
+                        <AvatarImage src={localApplicant.profile_picture || ''} alt="Applicant" />
                         <AvatarFallback className="text-xs">
-                          {applicant.first_name && applicant.last_name 
-                            ? `${applicant.first_name[0]}${applicant.last_name[0]}`
-                            : String(applicant.user_id).split(' ').map(n => n[0]).join('')}
+                          {localApplicant.first_name && localApplicant.last_name 
+                            ? `${localApplicant.first_name[0]}${localApplicant.last_name[0]}`
+                            : String(localApplicant.user_id).split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>
                       </Avatar>
                       <span className="font-medium">
-                        {applicant.full_name || (applicant.first_name && applicant.last_name 
-                          ? `${applicant.first_name} ${applicant.last_name}`
-                          : `User ${applicant.user_id}`)}
+                        {localApplicant.full_name || (localApplicant.first_name && localApplicant.last_name 
+                          ? `${localApplicant.first_name} ${localApplicant.last_name}`
+                          : `User ${localApplicant.user_id}`)}
                       </span>
                     </div>
                   </div>
                   
                   {/* Status */}
                   <div className="flex items-center gap-2">
-                    {getStatusIcon(currentStatus || applicant.status)}
+                    {getStatusIcon(currentStatus || localApplicant.status)}
                     <span className="text-muted-foreground">Status:</span>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Badge 
                           variant="outline" 
-                          className={`${getStatusColor(currentStatus || applicant.status)} px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center`}
+                          className={`${getStatusColor(currentStatus || localApplicant.status)} px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center`}
                         >
-                          {getStatusLabel(currentStatus || applicant.status)}
+                          {getStatusLabel(currentStatus || localApplicant.status)}
                         </Badge>
                       </PopoverTrigger>
                       <PopoverContent className="w-56 p-2">
                         <div className="space-y-1">
                           {statusOptions.map((option) => {
-                            const isCurrentStatus = (currentStatus || applicant.status) === option.value;
+                            const isCurrentStatus = (currentStatus || localApplicant.status) === option.value;
                             return (
                               <div 
                                 key={option.value}
@@ -756,7 +826,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                     ? 'bg-primary/10 text-primary border border-primary/20 cursor-default' 
                                     : 'hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground cursor-pointer'
                                 }`}
-                                onClick={isCurrentStatus ? undefined : () => handleStatusChange(option.value)}
+                                onClick={isCurrentStatus ? undefined : () => handleStatusUpdate(option.value)}
                               >
                                 {option.icon === 'rose' ? (
                                   <div className="w-3 h-3 rounded-full bg-rose-500"></div>
@@ -766,10 +836,12 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                   <div className="w-3 h-3 rounded-full bg-teal-500"></div>
                                 ) : option.icon === 'purple' ? (
                                   <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                                ) : option.icon === 'indigo' ? (
-                                  <div className="w-3 h-3 rounded-full bg-indigo-500"></div>
+                                ) : option.icon === 'amber' ? (
+                                  <div className="w-3 h-3 rounded-full bg-amber-500"></div>
                                 ) : option.icon === 'green' ? (
                                   <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                ) : option.icon === 'pink' ? (
+                                  <div className="w-3 h-3 rounded-full bg-pink-500"></div>
                                 ) : option.icon === 'red' ? (
                                   <div className="w-3 h-3 rounded-full bg-red-500"></div>
                                 ) : option.icon === 'gray' ? (
@@ -787,29 +859,29 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                   </div>
                   
                   {/* Email */}
-                  {applicant.email && (
+                  {localApplicant.email && (
                     <div className="flex items-center gap-2">
                       <IconMail className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">Email:</span>
-                      <span className="font-medium">{applicant.email}</span>
+                      <span className="font-medium">{localApplicant.email}</span>
                     </div>
                   )}
                   
                   {/* Phone */}
-                  {applicant.phone && (
+                  {localApplicant.phone && (
                     <div className="flex items-center gap-2">
                       <IconPhone className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">Phone:</span>
-                      <span className="font-medium">{applicant.phone}</span>
+                      <span className="font-medium">{localApplicant.phone}</span>
                     </div>
                   )}
                   
                   {/* Address */}
-                  {applicant.address && (
+                  {localApplicant.address && (
                     <div className="flex items-center gap-2">
                       <IconMapPin className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">Address:</span>
-                      <span className="font-medium">{applicant.address}</span>
+                      <span className="font-medium">{localApplicant.address}</span>
                     </div>
                   )}
 
@@ -831,26 +903,61 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                     <h3 className="text-lg font-medium mb-4 text-muted-foreground">Job Application</h3>
                     <div className="rounded-lg border p-6 shadow-sm">
                       <div className="space-y-2">
-                        {applicant.all_job_titles && applicant.all_job_titles.length > 0 ? (
+                        {localApplicant.all_job_titles && localApplicant.all_job_titles.length > 0 ? (
                           <>
-                              {applicant.all_job_titles.map((jobTitle, index) => (
+                              {localApplicant.all_job_titles.map((jobTitle, index) => (
                               <div 
                                 key={index} 
-                                className="rounded-lg p-4 border bg-card cursor-pointer hover:bg-accent/50 transition-colors"
+                                className="rounded-lg p-4 border bg-card cursor-pointer hover:bg-accent/50 transition-colors relative"
                                 onClick={() => handleJobClick(index)}
                               >
-                                <div className="flex items-start justify-between">
+                                <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2 flex-1">
                                     <h4 className="font-medium text-foreground">
                                       {jobTitle}
                                     </h4>
-                                    {(() => {
-                                      const status = applicant.all_job_statuses?.[index] || applicant.status;
-                                      const showStatus = ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
-                                      
-                                      // Show status badge if job has final status
-                                      if (showStatus) {
-                                        return (
+                                  </div>
+                                  
+                                    {/* Applied Date - Top Right */}
+                                  {localApplicant.all_job_timestamps && localApplicant.all_job_timestamps[index] && (
+                                      <div className="flex items-center gap-1 text-right flex-shrink-0">
+                                        <IconCalendar className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-muted-foreground text-xs">
+                                          {new Date(localApplicant.all_job_timestamps[index]).toLocaleDateString('en-US', { 
+                                          month: 'short', 
+                                          day: 'numeric',
+                                            timeZone: 'Asia/Manila'
+                                          })}
+                                        </span>
+                                        <span className="text-muted-foreground/70 text-xs">•</span>
+                                        <IconClock className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-muted-foreground text-xs">
+                                          {new Date(localApplicant.all_job_timestamps[index]).toLocaleTimeString('en-US', { 
+                                            hour: '2-digit', 
+                                            minute: '2-digit', 
+                                            hour12: true, 
+                                            timeZone: 'Asia/Manila'
+                                          })}
+                                        </span>
+                                    </div>
+                                  )}
+                                </div>
+                                  
+                                                                    {/* Company Name */}
+                                  {localApplicant.all_companies && localApplicant.all_companies[index] && (
+                                    <div>
+                                      <p className="text-sm text-muted-foreground">{localApplicant.all_companies[index]}</p>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Status Badge - Bottom Right */}
+                                  {(() => {
+                                    const status = localApplicant.all_job_statuses?.[index] || localApplicant.status;
+                                    const showStatus = pageContext === 'talent-pool' || ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
+                                    
+                                    if (showStatus) {
+                                      return (
+                                        <div className="absolute bottom-3 right-3">
                                           <Popover>
                                             <PopoverTrigger asChild>
                                               <Badge 
@@ -861,7 +968,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                                 {getStatusLabel(status)}
                                               </Badge>
                                             </PopoverTrigger>
-                                            <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
+                                            <PopoverContent className="w-48 p-2" align="end" side="top" sideOffset={4}>
                                               <div className="space-y-1">
                                                 {['withdrawn', 'not qualified', 'qualified', 'final interview', 'hired'].map((statusOption) => (
                                                   <div 
@@ -881,7 +988,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                                             'Content-Type': 'application/json',
                                                           },
                                                           body: JSON.stringify({
-                                                            applicantId: applicant.id,
+                                                            applicantId: localApplicant.id,
                                                             jobIndex: index,
                                                             newStatus: statusOption
                                                           })
@@ -893,7 +1000,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                                           
                                                           // Update parent state if callback is provided
                                                           if (onStatusUpdate) {
-                                                            onStatusUpdate(applicant.id, index, statusOption);
+                                                            onStatusUpdate(localApplicant.id, index, statusOption);
                                                           }
                                                         } else {
                                                           const error = await response.json();
@@ -911,44 +1018,12 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                               </div>
                                             </PopoverContent>
                                           </Popover>
-                                        );
-                                      }
-                                      
-                                      return null;
-                                    })()}
-                                  </div>
-                                  
-                                    {/* Applied Date - Top Right */}
-                                  {applicant.all_job_timestamps && applicant.all_job_timestamps[index] && (
-                                      <div className="flex items-center gap-1 text-right flex-shrink-0">
-                                        <IconCalendar className="h-4 w-4 text-muted-foreground" />
-                                        <span className="font-medium text-muted-foreground text-xs">
-                                          {new Date(applicant.all_job_timestamps[index]).toLocaleDateString('en-US', { 
-                                          month: 'short', 
-                                          day: 'numeric',
-                                            timeZone: 'Asia/Manila'
-                                          })}
-                                        </span>
-                                        <span className="text-muted-foreground/70 text-xs">•</span>
-                                        <IconClock className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-muted-foreground text-xs">
-                                          {new Date(applicant.all_job_timestamps[index]).toLocaleTimeString('en-US', { 
-                                            hour: '2-digit', 
-                                            minute: '2-digit', 
-                                            hour12: true, 
-                                            timeZone: 'Asia/Manila'
-                                          })}
-                                        </span>
-                                    </div>
-                                  )}
-                                </div>
-                                  
-                                                                    {/* Company Name */}
-                                  {applicant.all_companies && applicant.all_companies[index] && (
-                                    <div>
-                                      <p className="text-sm text-muted-foreground">{applicant.all_companies[index]}</p>
-                            </div>
-                                  )}
+                                        </div>
+                                      );
+                                    }
+                                    
+                                    return null;
+                                  })()}
                                 </div>
                               ))}
                           </>
@@ -991,7 +1066,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                       <div>
                         <h3 className="text-lg font-medium mb-2 text-muted-foreground">Bio</h3>
                         <div className="rounded-lg p-6 text-sm leading-relaxed border shadow-sm">
-                          {applicant.summary || applicant.details || "No summary provided."}
+                          {localApplicant.summary || localApplicant.details || "No summary provided."}
                         </div>
                       </div>
 
@@ -1104,7 +1179,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                               {/* Dynamic Skills Categories */}
                               {(() => {
                                 // First priority: Check if we have structured skills data with categories
-                                const originalSkillsData = (applicant as any).originalSkillsData
+                                const originalSkillsData = (localApplicant as any).originalSkillsData
                                 if (originalSkillsData && typeof originalSkillsData === 'object' && !Array.isArray(originalSkillsData)) {
                                   // Check if we have a skills object with categories (like your sample data)
                                   if (originalSkillsData.skills && typeof originalSkillsData.skills === 'object') {
@@ -1175,12 +1250,12 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                 }
                                 
                                 // Second priority: Use the extracted skills array if no structured data found
-                                if (Array.isArray(applicant.skills) && applicant.skills.length > 0) {
+                                if (Array.isArray(localApplicant.skills) && localApplicant.skills.length > 0) {
                                   return (
                                     <div>
                                       <h4 className="text-sm font-medium text-muted-foreground mb-2">All Skills</h4>
                                       <div className="flex flex-wrap gap-2">
-                                        {applicant.skills.map((skill: string, index: number) => (
+                                        {localApplicant.skills.map((skill: string, index: number) => (
                                           <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
                                             {skill}
                                           </Badge>
@@ -1191,12 +1266,12 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                 }
                                 
                                 // Applied Positions fallback
-                                if (applicant.all_job_titles && applicant.all_job_titles.length > 0) {
+                                if (localApplicant.all_job_titles && localApplicant.all_job_titles.length > 0) {
                                   return (
                                     <div>
                                       <h4 className="text-sm font-medium text-muted-foreground mb-2">Applied Positions</h4>
                                       <div className="flex flex-wrap gap-2">
-                                        {applicant.all_job_titles.map((jobTitle, index) => (
+                                        {localApplicant.all_job_titles.map((jobTitle, index) => (
                                           <Badge key={index} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
                                             {jobTitle}
                                           </Badge>
@@ -1220,20 +1295,20 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                           <h3 className="text-lg font-medium mb-4 text-muted-foreground">Resume Score</h3>
                           <div className="rounded-lg p-6 border flex-1 shadow-sm">
                             {/* Overall Resume Score with View Resume Button */}
-                            {applicant.aiAnalysis?.overall_score ? (
+                            {localApplicant.aiAnalysis?.overall_score ? (
                               <div className="space-y-4">
                                 <div className="text-3xl font-bold text-foreground">
-                                  {applicant.aiAnalysis.overall_score}/100
+                                  {localApplicant.aiAnalysis.overall_score}/100
                                 </div>
                                 <p className="text-sm text-muted-foreground">
                                   AI-powered resume quality assessment
                                 </p>
                                 
                                 {/* View Resume Button */}
-                                {applicant.resume_slug && (
+                                {localApplicant.resume_slug && (
                                   <div className="mt-4">
                                     <Button 
-                                      onClick={() => window.open(`https://www.bpoc.io/${applicant.resume_slug}`, '_blank')}
+                                      onClick={() => window.open(`https://www.bpoc.io/${localApplicant.resume_slug}`, '_blank')}
                                       className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white border-0"
                                       size="sm"
                                     >
@@ -1256,7 +1331,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                       <div className="mt-8 space-y-6">
                                                 {/* Work Experience Section */}
                         {(() => {
-                          const originalSkillsData = (applicant as any).originalSkillsData
+                          const originalSkillsData = (localApplicant as any).originalSkillsData
                           if (originalSkillsData?.experience && Array.isArray(originalSkillsData.experience) && originalSkillsData.experience.length > 0) {
                             return (
                               <div>
@@ -1307,7 +1382,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
 
                         {/* Education Section */}
                         {(() => {
-                          const originalSkillsData = (applicant as any).originalSkillsData
+                          const originalSkillsData = (localApplicant as any).originalSkillsData
                           if (originalSkillsData?.education && Array.isArray(originalSkillsData.education) && originalSkillsData.education.length > 0) {
                             return (
                               <div>
@@ -1358,7 +1433,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
 
                         {/* Projects Section */}
                         {(() => {
-                          const originalSkillsData = (applicant as any).originalSkillsData
+                          const originalSkillsData = (localApplicant as any).originalSkillsData
                           if (originalSkillsData?.projects && Array.isArray(originalSkillsData.projects) && originalSkillsData.projects.length > 0) {
                             return (
                               <div>
@@ -1408,12 +1483,12 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                       </div>
 
                   {/* Additional Details Section */}
-                  {applicant.details && (
+                  {localApplicant.details && (
                     <div>
                       <h3 className="text-lg font-medium mb-2 text-muted-foreground">Additional Details</h3>
                       <div className="rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border">
                         <p className="text-foreground leading-relaxed whitespace-pre-wrap break-words">
-                          {applicant.details}
+                          {localApplicant.details}
                         </p>
                       </div>
                     </div>
@@ -1425,14 +1500,14 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                     {(() => {
                       // Debug: Check what data we have
                       console.log('🔍 AI Analysis Debug:', { 
-                        applicantId: applicant?.id, 
-                        hasAiAnalysis: !!applicant?.aiAnalysis, 
-                        aiAnalysisData: applicant?.aiAnalysis 
+                        applicantId: localApplicant?.id, 
+                        hasAiAnalysis: !!localApplicant?.aiAnalysis, 
+                        aiAnalysisData: localApplicant?.aiAnalysis 
                       })
                       return null
                     })()}
                     
-                    {!applicant?.aiAnalysis ? (
+                    {!localApplicant?.aiAnalysis ? (
                       // No analysis state
                       <div className="flex flex-col h-full">
                         <div className="text-center py-16 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-lg bg-muted/20 flex-1 flex items-center justify-center">
@@ -1448,7 +1523,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
 
                         {/* All Analysis Cards in Single Grid */}
                         {(() => {
-                          const strengths = applicant.aiAnalysis?.strengths_analysis
+                          const strengths = localApplicant.aiAnalysis?.strengths_analysis
                           if (!strengths) return null
                           
                           const categories = [
@@ -1463,8 +1538,8 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                           
                           // Get data for special cards
                           const topStrengthsData = strengths.topStrengths
-                          const keyStrengthsData = applicant.aiAnalysis?.key_strengths
-                          const aiEnhancedSummary = applicant.aiAnalysis?.improved_summary
+                          const keyStrengthsData = localApplicant.aiAnalysis?.key_strengths
+                          const aiEnhancedSummary = localApplicant.aiAnalysis?.improved_summary
                           
                           return (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

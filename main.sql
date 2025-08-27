@@ -667,6 +667,10 @@ CREATE INDEX idx_members_status ON public.members USING btree (status);
 
 -- Table Triggers
 
+create trigger update_members_updated_at before
+update
+    on
+    public.members for each row execute function update_updated_at_column();
 create trigger trigger_member_changes after
 insert
     or
@@ -675,10 +679,6 @@ delete
 update
     on
     public.members for each row execute function notify_member_changes();
-create trigger update_members_updated_at before
-update
-    on
-    public.members for each row execute function update_updated_at_column();
 
 
 -- public.members_activity_log definition
@@ -705,6 +705,17 @@ CREATE INDEX idx_members_activity_log_action ON public.members_activity_log USIN
 CREATE INDEX idx_members_activity_log_created_at ON public.members_activity_log USING btree (created_at);
 CREATE INDEX idx_members_activity_log_member_id ON public.members_activity_log USING btree (member_id);
 CREATE INDEX idx_members_activity_log_user_id ON public.members_activity_log USING btree (user_id);
+
+-- Table Triggers
+
+create trigger notify_member_activity_changes after
+insert
+    or
+delete
+    or
+update
+    on
+    public.members_activity_log for each row execute function notify_member_activity_changes();
 
 
 -- public.personal_info definition
@@ -1137,14 +1148,14 @@ CREATE INDEX idx_agents_user_department ON public.agents USING btree (user_id, d
 
 -- Table Triggers
 
-create trigger update_agents_updated_at before
-update
-    on
-    public.agents for each row execute function update_updated_at_column();
 create trigger trigger_agent_member_changes after
 update
     on
     public.agents for each row execute function notify_agent_member_changes();
+create trigger update_agents_updated_at before
+update
+    on
+    public.agents for each row execute function update_updated_at_column();
 
 
 -- public.break_sessions definition
@@ -1193,14 +1204,14 @@ CREATE INDEX idx_clients_member_department ON public.clients USING btree (member
 
 -- Table Triggers
 
-create trigger update_clients_updated_at before
-update
-    on
-    public.clients for each row execute function update_updated_at_column();
 create trigger trigger_client_member_changes after
 update
     on
     public.clients for each row execute function notify_client_member_changes();
+create trigger update_clients_updated_at before
+update
+    on
+    public.clients for each row execute function update_updated_at_column();
 
 
 -- public.job_info definition
@@ -1450,12 +1461,29 @@ DECLARE
   new_company_id INTEGER;
   old_employee_count INTEGER;
   new_employee_count INTEGER;
+  agent_data JSON;
 BEGIN
   -- Only send notification if member_id changed (assignment change)
   IF TG_OP = 'UPDATE' AND (OLD.member_id IS DISTINCT FROM NEW.member_id) THEN
     -- Get old and new company IDs
     old_company_id := OLD.member_id;
     new_company_id := NEW.member_id;
+    
+    -- Get full agent data by joining with correct tables
+    SELECT json_build_object(
+      'user_id', u.id,
+      'first_name', pi.first_name,        -- ✅ From personal_info
+      'last_name', pi.last_name,          -- ✅ From personal_info
+      'profile_picture', pi.profile_picture, -- ✅ From personal_info
+      'employee_id', ji.employee_id,      -- ✅ From job_info
+      'job_title', ji.job_title,          -- ✅ From job_info
+      'member_id', a.member_id
+    ) INTO agent_data
+    FROM public.agents a
+    JOIN public.users u ON a.user_id = u.id
+    JOIN public.personal_info pi ON a.user_id = pi.user_id  -- ✅ JOIN personal_info
+    LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id  -- ✅ LEFT JOIN job_info
+    WHERE a.user_id = NEW.user_id;
     
     -- Calculate employee counts for old and new companies
     IF old_company_id IS NOT NULL THEN
@@ -1479,7 +1507,7 @@ BEGIN
       json_build_object(
         'table', TG_TABLE_NAME,
         'action', TG_OP,
-        'record', row_to_json(NEW),
+        'record', COALESCE(agent_data, row_to_json(NEW)),
         'old_record', row_to_json(OLD),
         'count_updates', json_build_object(
           'old_company_id', old_company_id,
@@ -1550,12 +1578,26 @@ DECLARE
   new_company_id INTEGER;
   old_client_count INTEGER;
   new_client_count INTEGER;
+  client_data JSON;
 BEGIN
   -- Only send notification if member_id changed (assignment change)
   IF TG_OP = 'UPDATE' AND (OLD.member_id IS DISTINCT FROM NEW.member_id) THEN
     -- Get old and new company IDs
     old_company_id := OLD.member_id;
     new_company_id := NEW.member_id;
+    
+    -- Get full client data by joining with correct tables
+    SELECT json_build_object(
+      'user_id', u.id,
+      'first_name', pi.first_name,        -- ✅ From personal_info
+      'last_name', pi.last_name,          -- ✅ From personal_info
+      'profile_picture', pi.profile_picture, -- ✅ From personal_info
+      'member_id', c.member_id
+    ) INTO client_data
+    FROM public.clients c
+    JOIN public.users u ON c.user_id = u.id
+    JOIN public.personal_info pi ON c.user_id = pi.user_id  -- ✅ JOIN personal_info
+    WHERE c.user_id = NEW.user_id;
     
     -- Calculate client counts for old and new companies
     IF old_company_id IS NOT NULL THEN
@@ -1579,7 +1621,7 @@ BEGIN
       json_build_object(
         'table', TG_TABLE_NAME,
         'action', TG_OP,
-        'record', row_to_json(NEW),
+        'record', COALESCE(client_data, row_to_json(NEW)),
         'old_record', row_to_json(OLD),
         'count_updates', json_build_object(
           'old_company_id', old_company_id,
@@ -1596,16 +1638,16 @@ END;
 $function$
 ;
 
--- DROP FUNCTION public.notify_member_changes();
+-- DROP FUNCTION public.notify_member_activity_changes();
 
-CREATE OR REPLACE FUNCTION public.notify_member_changes()
+CREATE OR REPLACE FUNCTION public.notify_member_activity_changes()
  RETURNS trigger
  LANGUAGE plpgsql
 AS $function$
 BEGIN
-  -- Send notification for member/company changes
+  -- Send notification when activity logs change
   PERFORM pg_notify(
-    'member_detail_changes',
+    'member_activity_changes',
     json_build_object(
       'table', TG_TABLE_NAME,
       'action', TG_OP,
@@ -1614,6 +1656,50 @@ BEGIN
       'timestamp', now()
     )::text
   );
+  RETURN COALESCE(NEW, OLD);
+END;
+$function$
+;
+
+-- DROP FUNCTION public.notify_member_changes();
+
+CREATE OR REPLACE FUNCTION public.notify_member_changes()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    PERFORM pg_notify(
+      'member_changes',
+      json_build_object(
+        'table', TG_TABLE_NAME,
+        'action', TG_OP,
+        'record', row_to_json(NEW),
+        'timestamp', now()
+      )::text
+    );
+  ELSIF TG_OP = 'UPDATE' THEN
+    PERFORM pg_notify(
+      'member_changes',
+      json_build_object(
+        'table', TG_TABLE_NAME,
+        'action', TG_OP,
+        'record', row_to_json(NEW),
+        'old_record', row_to_json(OLD),
+        'timestamp', now()
+      )::text
+    );
+  ELSIF TG_OP = 'DELETE' THEN
+    PERFORM pg_notify(
+      'member_changes',
+      json_build_object(
+        'table', TG_TABLE_NAME,
+        'action', TG_OP,
+        'old_record', row_to_json(OLD),
+        'timestamp', now()
+      )::text
+    );
+  END IF;
   RETURN COALESCE(NEW, OLD);
 END;
 $function$
@@ -1714,15 +1800,6 @@ CREATE OR REPLACE FUNCTION public.pgp_key_id(bytea)
 AS '$libdir/pgcrypto', $function$pgp_key_id_w$function$
 ;
 
--- DROP FUNCTION public.pgp_pub_decrypt(bytea, bytea, text);
-
-CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt(bytea, bytea, text)
- RETURNS text
- LANGUAGE c
- IMMUTABLE PARALLEL SAFE STRICT
-AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$
-;
-
 -- DROP FUNCTION public.pgp_pub_decrypt(bytea, bytea, text, text);
 
 CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt(bytea, bytea, text, text)
@@ -1735,6 +1812,15 @@ AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$
 -- DROP FUNCTION public.pgp_pub_decrypt(bytea, bytea);
 
 CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt(bytea, bytea)
+ RETURNS text
+ LANGUAGE c
+ IMMUTABLE PARALLEL SAFE STRICT
+AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$
+;
+
+-- DROP FUNCTION public.pgp_pub_decrypt(bytea, bytea, text);
+
+CREATE OR REPLACE FUNCTION public.pgp_pub_decrypt(bytea, bytea, text)
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1786,18 +1872,18 @@ CREATE OR REPLACE FUNCTION public.pgp_pub_encrypt(text, bytea, text)
 AS '$libdir/pgcrypto', $function$pgp_pub_encrypt_text$function$
 ;
 
--- DROP FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea, text);
+-- DROP FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea);
 
-CREATE OR REPLACE FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea, text)
+CREATE OR REPLACE FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT
 AS '$libdir/pgcrypto', $function$pgp_pub_encrypt_bytea$function$
 ;
 
--- DROP FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea);
+-- DROP FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea)
+CREATE OR REPLACE FUNCTION public.pgp_pub_encrypt_bytea(bytea, bytea, text)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT
@@ -1822,15 +1908,6 @@ CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt(bytea, text)
 AS '$libdir/pgcrypto', $function$pgp_sym_decrypt_text$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_decrypt_bytea(bytea, text, text);
-
-CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt_bytea(bytea, text, text)
- RETURNS bytea
- LANGUAGE c
- IMMUTABLE PARALLEL SAFE STRICT
-AS '$libdir/pgcrypto', $function$pgp_sym_decrypt_bytea$function$
-;
-
 -- DROP FUNCTION public.pgp_sym_decrypt_bytea(bytea, text);
 
 CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt_bytea(bytea, text)
@@ -1840,13 +1917,13 @@ CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt_bytea(bytea, text)
 AS '$libdir/pgcrypto', $function$pgp_sym_decrypt_bytea$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_encrypt(text, text, text);
+-- DROP FUNCTION public.pgp_sym_decrypt_bytea(bytea, text, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt(text, text, text)
+CREATE OR REPLACE FUNCTION public.pgp_sym_decrypt_bytea(bytea, text, text)
  RETURNS bytea
  LANGUAGE c
- PARALLEL SAFE STRICT
-AS '$libdir/pgcrypto', $function$pgp_sym_encrypt_text$function$
+ IMMUTABLE PARALLEL SAFE STRICT
+AS '$libdir/pgcrypto', $function$pgp_sym_decrypt_bytea$function$
 ;
 
 -- DROP FUNCTION public.pgp_sym_encrypt(text, text);
@@ -1858,18 +1935,27 @@ CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt(text, text)
 AS '$libdir/pgcrypto', $function$pgp_sym_encrypt_text$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_encrypt_bytea(bytea, text, text);
+-- DROP FUNCTION public.pgp_sym_encrypt(text, text, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt_bytea(bytea, text, text)
+CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt(text, text, text)
+ RETURNS bytea
+ LANGUAGE c
+ PARALLEL SAFE STRICT
+AS '$libdir/pgcrypto', $function$pgp_sym_encrypt_text$function$
+;
+
+-- DROP FUNCTION public.pgp_sym_encrypt_bytea(bytea, text);
+
+CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt_bytea(bytea, text)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT
 AS '$libdir/pgcrypto', $function$pgp_sym_encrypt_bytea$function$
 ;
 
--- DROP FUNCTION public.pgp_sym_encrypt_bytea(bytea, text);
+-- DROP FUNCTION public.pgp_sym_encrypt_bytea(bytea, text, text);
 
-CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt_bytea(bytea, text)
+CREATE OR REPLACE FUNCTION public.pgp_sym_encrypt_bytea(bytea, text, text)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT

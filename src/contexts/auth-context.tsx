@@ -73,7 +73,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.log('❌ Supabase auth error:', error.message)
-        return { success: false, error: error.message }
+        // Provide more user-friendly error messages
+        let userFriendlyError = 'Invalid Credentials'
+        if (error.message.includes('Invalid login credentials')) {
+          userFriendlyError = 'Invalid Email or Password'
+        } else if (error.message.includes('Email not confirmed')) {
+          userFriendlyError = 'Please verify your email address'
+        } else if (error.message.includes('Too many requests')) {
+          userFriendlyError = 'Too many login attempts. Please try again later'
+        }
+        return { success: false, error: userFriendlyError }
       }
 
       if (!data.user) {
@@ -90,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('❌ User not found in Railway database or role not authorized')
         // Logout from Supabase if user doesn't exist or role not authorized in our database
         await supabase.auth.signOut()
-        return { success: false, error: 'User not found or not authorized' }
+        return { success: false, error: 'Access Denied' }
       }
 
       const userData = await response.json()

@@ -1241,7 +1241,7 @@ export async function getClientsPaginated({
      LEFT JOIN public.personal_info pi ON u.id = pi.user_id
      LEFT JOIN public.members m ON c.member_id = m.id
      LEFT JOIN public.stations s ON u.id = s.assigned_user_id
-     LEFT JOIN public.job_info ji ON c.user_id = ji.agent_user_id -- may be null for clients
+     LEFT JOIN public.job_info ji ON c.user_id = ji.agent_user_id
      WHERE ${whereClause}
      ORDER BY ${getSortField(sortField)} ${sortDirection.toUpperCase()}
      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -1546,6 +1546,123 @@ export async function getAgentsByMember(memberId: number): Promise<{ user_id: nu
   return result.rows
 }
 
+// Get agents for modal with pagination, search, and member filtering
+export async function getAgentsForModal(
+  page: number = 1,
+  limit: number = 20,
+  search: string = '',
+  memberId: string = '',
+  sortField: string = 'first_name',
+  sortDirection: 'asc' | 'desc' = 'asc'
+): Promise<{ agents: any[]; totalCount: number }> {
+  try {
+    const offset = (Math.max(1, page) - 1) * Math.max(1, limit)
+    const params: any[] = []
+    let paramIndex = 1
+
+    const whereParts: string[] = ["u.user_type = 'Agent'"]
+
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`
+      params.push(term)
+      const t = `$${paramIndex++}`
+      whereParts.push(
+        `(
+          COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
+          OR COALESCE(ji.employee_id,'') ILIKE ${t}
+          OR COALESCE(ji.job_title,'') ILIKE ${t}
+          OR COALESCE(m.company,'') ILIKE ${t}
+          OR COALESCE(pi.phone,'') ILIKE ${t}
+          OR u.email ILIKE ${t}
+        )`
+      )
+    }
+
+    if (memberId && memberId !== 'none') {
+      const memberIdNum = parseInt(memberId, 10)
+      if (!Number.isNaN(memberIdNum)) {
+        params.push(memberIdNum)
+        const t = `$${paramIndex++}`
+        whereParts.push(`a.member_id = ${t}`)
+      }
+    } else if (memberId === 'none') {
+      whereParts.push('a.member_id IS NULL')
+    }
+
+    const whereClause = whereParts.join(' AND ')
+
+    const getSortField = (field: string): string => {
+      switch (field) {
+        case 'first_name':
+          return 'COALESCE(pi.first_name, \'\') ASC, COALESCE(pi.last_name, \'\')'
+        case 'job_title':
+          return 'COALESCE(ji.job_title, \'\')'
+        case 'member_company':
+          return 'COALESCE(m.company, \'\')'
+        case 'work_email':
+          return 'COALESCE(ji.work_email, u.email, \'\')'
+        default:
+          return 'COALESCE(pi.first_name, \'\') ASC, COALESCE(pi.last_name, \'\')'
+      }
+    }
+
+    // Count query
+    const countQuery = `
+      SELECT COUNT(*) AS count
+      FROM public.users u
+      INNER JOIN public.agents a ON u.id = a.user_id
+      LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+      LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
+      LEFT JOIN public.members m ON a.member_id = m.id
+      LEFT JOIN public.departments d ON a.department_id = d.id
+      LEFT JOIN public.stations s ON u.id = s.assigned_user_id
+      WHERE ${whereClause}
+    `
+    const countResult = await pool.query(countQuery, params)
+    const totalCount = parseInt(countResult.rows?.[0]?.count || '0', 10)
+
+    // Data query
+    const dataQuery = `
+      SELECT 
+          u.id AS user_id,
+          u.email,
+          u.user_type,
+          pi.first_name,
+          pi.last_name,
+          pi.profile_picture,
+          pi.phone,
+          ji.employee_id,
+          ji.job_title,
+          ji.work_email,
+          ji.start_date,
+          ji.exit_date,
+          m.id AS member_id,
+          m.company AS member_company,
+          m.badge_color AS member_badge_color,
+          d.id AS department_id,
+          d.name AS department_name,
+          s.station_id
+       FROM public.users u
+       INNER JOIN public.agents a ON u.id = a.user_id
+       LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+       LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
+       LEFT JOIN public.members m ON a.member_id = m.id
+       LEFT JOIN public.departments d ON a.department_id = d.id
+       LEFT JOIN public.stations s ON u.id = s.assigned_user_id
+       WHERE ${whereClause}
+       ORDER BY ${getSortField(sortField)} ${sortDirection.toUpperCase()}
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `
+    const dataParams = [...params, Math.max(1, limit), offset]
+    const dataResult = await pool.query(dataQuery, dataParams)
+
+    return { agents: dataResult.rows, totalCount }
+  } catch (error) {
+    console.error('Error in getAgentsForModal:', error)
+    throw error
+  }
+}
+
 // Fetch clients for a specific member (for avatar popovers)
 export async function getClientsByMember(memberId: number): Promise<{ user_id: number; first_name: string | null; last_name: string | null; profile_picture: string | null; employee_id: string | null }[]> {
   const query = `
@@ -1564,16 +1681,113 @@ export async function getClientsByMember(memberId: number): Promise<{ user_id: n
   return result.rows
 }
 
-// Get all clients for a specific member with full details
-export async function getClientsForMember(memberId: number): Promise<any[]> {
+// Get clients for modal with pagination, search, and member filtering
+export async function getClientsForModal(
+  page: number = 1,
+  limit: number = 20,
+  search: string = '',
+  memberId: string = '',
+  sortField: string = 'first_name',
+  sortDirection: 'asc' | 'desc' = 'asc'
+): Promise<{ clients: any[]; totalCount: number }> {
   try {
-    const { agents } = await getClientsPaginated({ 
-      memberId, 
-      limit: 1000 
-    })
-    return agents
+    const offset = (Math.max(1, page) - 1) * Math.max(1, limit)
+    const params: any[] = []
+    let paramIndex = 1
+
+    const whereParts: string[] = ["u.user_type = 'Client'"]
+
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`
+      params.push(term)
+      const t = `$${paramIndex++}`
+      whereParts.push(
+        `(
+          COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
+          OR COALESCE(m.company,'') ILIKE ${t}
+          OR u.email ILIKE ${t}
+          OR COALESCE(pi.phone,'') ILIKE ${t}
+        )`
+      )
+    }
+
+    if (memberId && memberId !== 'none') {
+      const memberIdNum = parseInt(memberId, 10)
+      if (!Number.isNaN(memberIdNum)) {
+        params.push(memberIdNum)
+        const t = `$${paramIndex++}`
+        whereParts.push(`c.member_id = ${t}`)
+      }
+    } else if (memberId === 'none') {
+      whereParts.push('c.member_id IS NULL')
+    }
+
+    const whereClause = whereParts.join(' AND ')
+
+    const getSortField = (field: string): string => {
+      switch (field) {
+        case 'first_name':
+          return "COALESCE(pi.first_name, '') ASC, COALESCE(pi.last_name, '')"
+        case 'job_title':
+          return "COALESCE(ji.job_title, '')"
+        case 'member_company':
+          return "COALESCE(m.company, '')"
+        case 'work_email':
+          return "COALESCE(ji.work_email, u.email, '')"
+        default:
+          return "COALESCE(pi.first_name, '') ASC, COALESCE(pi.last_name, '')"
+      }
+    }
+
+    const countQuery = `
+      SELECT COUNT(*) AS count
+      FROM public.users u
+      INNER JOIN public.clients c ON u.id = c.user_id
+      LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+      LEFT JOIN public.members m ON c.member_id = m.id
+      LEFT JOIN public.stations s ON u.id = s.assigned_user_id
+      LEFT JOIN public.job_info ji ON c.user_id = ji.agent_user_id -- may be null for clients
+      WHERE ${whereClause}
+    `
+    const countResult = await pool.query(countQuery, params)
+    const totalCount = parseInt(countResult.rows?.[0]?.count || '0', 10)
+
+    const dataQuery = `
+      SELECT 
+          u.id AS user_id,
+          u.email,
+          u.user_type,
+          pi.first_name,
+          pi.last_name,
+          pi.profile_picture,
+          pi.phone,
+          ji.employee_id,
+          ji.job_title,
+          ji.work_email,
+          NULL::date AS start_date,
+          NULL::date AS exit_date,
+          m.id AS member_id,
+          m.company AS member_company,
+          m.badge_color AS member_badge_color,
+          NULL::int AS department_id,
+          NULL::text AS department_name,
+          s.station_id
+       FROM public.users u
+       INNER JOIN public.clients c ON u.id = c.user_id
+       LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+       LEFT JOIN public.members m ON c.member_id = m.id
+       LEFT JOIN public.stations s ON u.id = s.assigned_user_id
+       LEFT JOIN public.job_info ji ON c.user_id = ji.agent_user_id
+       WHERE ${whereClause}
+       ORDER BY ${getSortField(sortField)} ${sortDirection.toUpperCase()}
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `
+    const dataParams = [...params, Math.max(1, limit), offset]
+    const dataResult = await pool.query(dataQuery, dataParams)
+
+    return { clients: dataResult.rows, totalCount }
   } catch (error) {
-    console.error('Error fetching clients for member:', error)
+    console.error('Error in getClientsForModal:', error)
     throw error
   }
 }
@@ -2619,7 +2833,7 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
 }
 
 export async function updateRecruitStatusAndSyncBpoc(id: number, status: string) {
-  const validStatuses = ['submitted', 'qualified', 'for verification', 'verified', 'initial interview', 'final interview', 'not qualified', 'passed']
+  const validStatuses = ['submitted', 'for verification', 'verified', 'initial interview', 'passed', 'hired', 'rejected', 'failed', 'withdrawn']
   if (!validStatuses.includes(status)) throw new Error('Invalid status value')
   const { rows } = await pool.query(`
     UPDATE public.bpoc_recruits SET status = $1, updated_at = now() WHERE id = $2 RETURNING id, status, updated_at, bpoc_application_ids
@@ -2631,12 +2845,20 @@ export async function updateRecruitStatusAndSyncBpoc(id: number, status: string)
       const statusCheck = await bpocPool.query(`
         SELECT id, status::text as current_status FROM public.applications WHERE id = ANY($1)
       `, [recruitRecord.bpoc_application_ids])
-      const finalBpocStatuses = ['withdrawn', 'final interview', 'hired', 'failed']
-      const applicationsToUpdate = statusCheck.rows.filter((row: any) => !finalBpocStatuses.includes(row.current_status.toLowerCase()))
+      // Allow updates from any current status - don't filter out "final" statuses
+      const applicationsToUpdate = statusCheck.rows
+      console.log(`🔄 Updating ${applicationsToUpdate.length} BPOC applications from status '${status}'`)
+      
       for (const application of applicationsToUpdate) {
+        // Map main database status to BPOC database status
+        let bpocStatus = status;
+        // Note: 'rejected' status maps to 'rejected' in BPOC database (not 'failed')
+        // Note: 'passed' status maps to 'passed' in BPOC database (not 'hired')
+        
+        console.log(`📝 Updating BPOC application ${application.id} from '${application.current_status}' to '${bpocStatus}'`)
         await bpocPool.query(`
           UPDATE public.applications SET status = $1::application_status_enum WHERE id = $2 RETURNING id
-        `, [status, application.id])
+        `, [bpocStatus, application.id])
       }
     } catch (e) {
       // fallback try to fetch ids from main db again
@@ -2644,7 +2866,12 @@ export async function updateRecruitStatusAndSyncBpoc(id: number, status: string)
         const { rows: r } = await pool.query(`SELECT bpoc_application_ids FROM public.bpoc_recruits WHERE id = $1`, [id])
         const ids: string[] = r[0]?.bpoc_application_ids || []
         for (const appId of ids) {
-          await bpocPool?.query(`UPDATE public.applications SET status = $1::application_status_enum WHERE id = $2 RETURNING id`, [status, appId])
+          // Map main database status to BPOC database status
+          let bpocStatus = status;
+          // Note: 'rejected' status maps to 'rejected' in BPOC database (not 'failed')
+          // Note: 'passed' status maps to 'passed' in BPOC database (not 'hired')
+          
+          await bpocPool?.query(`UPDATE public.applications SET status = $1::application_status_enum WHERE id = $2 RETURNING id`, [bpocStatus, appId])
         }
       } catch {}
     }
@@ -2719,5 +2946,19 @@ export async function getBpocDebugInfo() {
       members: membersTbl[0].table_exists,
     },
     test: testRows[0],
+  }
+}
+
+// Get all clients for a specific member with full details
+export async function getClientsForMember(memberId: number): Promise<any[]> {
+  try {
+    const { agents } = await getClientsPaginated({ 
+      memberId, 
+      limit: 1000 
+    })
+    return agents
+  } catch (error) {
+    console.error('Error fetching clients for member:', error)
+    throw error
   }
 }

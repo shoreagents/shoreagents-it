@@ -46,7 +46,7 @@ import { CSS } from "@dnd-kit/utilities"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
-type ApplicantStatus = 'submitted' | 'qualified' | 'for verification' | 'verified' | 'initial interview' | 'final interview' | 'not qualified' | 'not qualifies' | 'passed'
+type ApplicantStatus = 'submitted' | 'for verification' | 'verified' | 'initial interview' | 'passed' | 'hired' | 'rejected'
 
 interface Applicant {
   id: string
@@ -255,26 +255,6 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                           <h4 className="font-semibold text-sm text-primary leading-tight break-words flex-1">
                         {jobTitle}
                       </h4>
-                          {(() => {
-                            const status = applicant.all_job_statuses?.[index] || applicant.status;
-                            const showStatus = ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
-                            
-                            // Don't show any status badges when main status is "passed"
-                            if (applicant.status.toLowerCase() === 'passed') {
-                              return null;
-                            }
-                            
-                            // Show status badge if job has final status
-                            if (showStatus) {
-                              return (
-                                <Badge variant="outline" className={`${getStatusColor(status as ApplicantStatus)} px-2 py-0.5 text-xs font-medium rounded-md`}>
-                                  {getStatusDisplayLabel(status)}
-                                </Badge>
-                              );
-                            }
-                            
-                            return null;
-                          })()}
                         </div>
                         <div className="flex items-center">
                           {applicant.all_companies && applicant.all_companies[index] ? (
@@ -297,15 +277,7 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                       <h4 className="font-semibold text-sm text-primary leading-tight break-words flex-1">
                         {applicant.job_title || applicant.concern}
                     </h4>
-                      {(() => {
-                        const status = applicant.all_job_statuses?.[0] || applicant.status;
-                        const showStatus = ['withdrawn', 'qualified', 'failed', 'final interview', 'hired'].includes(status.toLowerCase());
-                        return showStatus ? (
-                          <Badge variant="outline" className={`${getStatusColor(status as ApplicantStatus)} px-2 py-0.5 text-xs font-medium rounded-md`}>
-                            {getStatusDisplayLabel(status)}
-                          </Badge>
-                        ) : null;
-                      })()}
+
                     </div>
                     <div className="flex items-center">
                       {applicant.company_name && (
@@ -379,29 +351,14 @@ const getStatusColor = (status: ApplicantStatus | string) => {
   switch (status.toLowerCase()) {
     case "submitted":
       return "text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20"
-    case "qualified":
-      return "text-yellow-700 dark:text-white border-yellow-600/20 bg-yellow-50 dark:bg-yellow-600/20"
     case "for verification":
       return "text-teal-700 dark:text-white border-teal-600/20 bg-teal-50 dark:bg-teal-600/20"
     case "verified":
       return "text-purple-700 dark:text-white border-purple-600/20 bg-purple-50 dark:bg-purple-600/20"
     case "initial interview":
       return "text-amber-700 dark:text-white border-amber-600/20 bg-amber-50 dark:bg-amber-600/20"
-    case "final interview":
-      return "text-pink-700 dark:text-white border-pink-600/20 bg-pink-50 dark:bg-pink-600/20"
-    case "failed":
-      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
-    case "not qualifies":
-      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
-    case "not qualified":
-      return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
     case "passed":
       return "text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20"
-    // BPOC final statuses
-    case "withdrawn":
-      return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
-    case "hired":
-      return "text-orange-700 dark:text-white border-orange-600/20 bg-orange-50 dark:bg-orange-600/20"
     default:
       return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
   }
@@ -432,20 +389,12 @@ const getCircleColor = (status: ApplicantStatus) => {
   switch (status) {
     case "submitted":
       return "bg-blue-600/20 dark:bg-blue-600/40 text-blue-700 dark:text-white"
-    case "qualified":
-      return "bg-yellow-600/20 dark:bg-yellow-600/40 text-yellow-700 dark:text-white"
     case "for verification":
       return "bg-teal-600/20 dark:bg-teal-600/40 text-teal-700 dark:text-white"
     case "verified":
       return "bg-purple-600/20 dark:bg-purple-600/40 text-purple-700 dark:text-white"
     case "initial interview":
       return "bg-amber-600/20 dark:bg-amber-600/40 text-amber-700 dark:text-white"
-    case "final interview":
-      return "bg-pink-600/20 dark:bg-pink-600/40 text-pink-700 dark:text-white"
-    case "not qualifies":
-      return "bg-red-600/20 dark:bg-red-600/40 text-red-700 dark:text-white"
-    case "not qualified":
-      return "bg-red-600/20 dark:bg-red-600/40 text-red-700 dark:text-white"
     case "passed":
       return "bg-green-600/20 dark:bg-green-600/40 text-green-700 dark:text-white"
     default:
@@ -525,26 +474,7 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                           <h4 className="font-semibold text-sm text-primary leading-tight break-words flex-1">
                         {jobTitle}
                       </h4>
-                          {(() => {
-                            const status = applicant.all_job_statuses?.[index] || applicant.status;
-                            const showStatus = ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
-                            
-                            // Don't show any status badges when main status is "passed"
-                            if (applicant.status.toLowerCase() === 'passed') {
-                              return null;
-                            }
-                            
-                            // Show status badge if job has final status
-                            if (showStatus) {
-                              return (
-                                <Badge variant="outline" className={`${getStatusColor(status as ApplicantStatus)} px-2 py-0.5 text-xs font-medium rounded-md`}>
-                                  {getStatusDisplayLabel(status)}
-                                </Badge>
-                              );
-                            }
-                            
-                            return null;
-                          })()}
+
                         </div>
                         <div className="flex items-center justify-between">
                           {applicant.all_companies && applicant.all_companies[index] ? (
@@ -568,15 +498,6 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                       <h4 className="font-semibold text-sm text-primary leading-tight break-words flex-1">
                         {applicant.job_title || applicant.concern}
                     </h4>
-                      {(() => {
-                        const status = applicant.all_job_statuses?.[0] || applicant.status;
-                        const showStatus = ['withdrawn', 'qualified', 'failed', 'final interview', 'hired'].includes(status.toLowerCase());
-                        return showStatus ? (
-                          <Badge variant="outline" className={`${getStatusColor(status as ApplicantStatus)} px-2 py-0.5 text-xs font-medium rounded-md`}>
-                            {getStatusDisplayLabel(status)}
-                          </Badge>
-                        ) : null;
-                      })()}
                     </div>
                     <div className="flex items-center justify-between">
                       {applicant.company_name && (
@@ -640,21 +561,10 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
 const getStatusDisplayLabel = (status: string) => {
   const statusMap: Record<string, string> = {
     'submitted': 'New',
-    'qualified': 'Qualified',
     'for verification': 'For Verification',
     'verified': 'Verified',
     'initial interview': 'Initial Interview',
-    'final interview': 'Final Interview',
-    'failed': 'Not Qualified',
-    'not qualified': 'Not Qualified',
-    'passed': 'Ready for Sale',
-    // Additional possible BPOC status values
-    'pending': 'Pending',
-    'reviewing': 'Reviewing',
-    'approved': 'Approved',
-    'rejected': 'Rejected',
-    'interview': 'Interview',
-    'hired': 'Hired'
+    'passed': 'Ready for Sale'
   }
   return statusMap[status.toLowerCase()] || status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
 }
@@ -670,7 +580,7 @@ function TicketsSkeleton() {
           msOverflowStyle: 'none'
         }}
       >
-        {["submitted", "for verification", "verified", "initial interview", "passed", "final interview", "not qualified"].map((status) => (
+        {["submitted", "for verification", "verified", "initial interview", "passed"].map((status) => (
           <div key={status} className="flex-shrink-0 w-[400px]">
             <div className="bg-card border border-border rounded-xl transition-all duration-200 flex flex-col shadow-sm min-h-[200px] max-h-[calc(94vh-200px)] status-cell">
               <div className="flex-shrink-0 p-4">
@@ -787,29 +697,59 @@ export default function BPOCApplicantsPage() {
          aiAnalysis: rawData.aiAnalysis,
   }), [])
 
-  // Helper function to update job status in local state
-  const updateJobStatusInLocalState = useCallback((applicantId: string, jobIndex: number, newStatus: string) => {
-    setApplicants(prev => prev.map(app => {
-      if (app.id === applicantId && app.all_job_statuses) {
-        const updatedStatuses = [...app.all_job_statuses];
-        updatedStatuses[jobIndex] = newStatus;
-        return {
-          ...app,
-          all_job_statuses: updatedStatuses
-        };
+  // Helper function to update job status in local state and both databases
+  const updateJobStatusInLocalState = useCallback(async (applicantId: string, jobIndex: number, newStatus: string) => {
+    try {
+      console.log(`🔄 Updating job status for applicant ${applicantId}, job ${jobIndex} to:`, newStatus);
+      
+      // Update main database first
+      const mainResponse = await fetch('/api/bpoc', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: applicantId,
+          status: newStatus
+        })
+      });
+      
+      if (!mainResponse.ok) {
+        const error = await mainResponse.json();
+        console.error('❌ Failed to update main database status:', error);
+        throw new Error('Failed to update main database status');
       }
-      return app;
-    }));
+      
+      console.log('✅ Main database status updated successfully');
+      
+      // Update local state
+      setApplicants(prev => prev.map(app => {
+        if (app.id === applicantId && app.all_job_statuses) {
+          const updatedStatuses = [...app.all_job_statuses];
+          updatedStatuses[jobIndex] = newStatus;
+          return {
+            ...app,
+            all_job_statuses: updatedStatuses
+          };
+        }
+        return app;
+      }));
 
-    // Also update the selectedApplicant shown in the modal (if open)
-    setSelectedApplicant(prev => {
-      if (prev && prev.id === applicantId && prev.all_job_statuses) {
-        const updatedStatuses = [...prev.all_job_statuses];
-        updatedStatuses[jobIndex] = newStatus;
-        return { ...prev, all_job_statuses: updatedStatuses };
-      }
-      return prev;
-    });
+      // Also update the selectedApplicant shown in the modal (if open)
+      setSelectedApplicant(prev => {
+        if (prev && prev.id === applicantId && prev.all_job_statuses) {
+          const updatedStatuses = [...prev.all_job_statuses];
+          updatedStatuses[jobIndex] = newStatus;
+          return { ...prev, all_job_statuses: updatedStatuses };
+        }
+        return prev;
+      });
+      
+    } catch (error) {
+      console.error('❌ Error updating job status:', error);
+      // Revert local state on error
+      // Note: In a production app, you might want to show a toast notification here
+    }
   }, []);
 
   // Helper function to enrich real-time data with BPOC information
@@ -1406,6 +1346,7 @@ export default function BPOCApplicantsPage() {
           setSelectedApplicant(null)
         }}
         onStatusUpdate={updateJobStatusInLocalState}
+        pageContext="bpoc-recruits"
       />
     </>
   )

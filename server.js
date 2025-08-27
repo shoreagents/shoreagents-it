@@ -40,7 +40,7 @@ async function startListening() {
     await notificationClient.query('LISTEN applicant_changes')
     
     // Listen for member/company changes
-    await notificationClient.query('LISTEN member_detail_changes')
+    await notificationClient.query('LISTEN member_changes')
     
     // Listen for member comment changes
     await notificationClient.query('LISTEN member_comment_changes')
@@ -63,6 +63,8 @@ async function startListening() {
         let messageType = 'ticket_update'
         if (msg.channel === 'applicant_changes') {
           messageType = 'applicant_update'
+        } else if (msg.channel === 'member_changes') {
+          messageType = 'member_update'
         } else if (msg.channel === 'member_detail_changes') {
           messageType = 'member_update'
         } else if (msg.channel === 'member_comment_changes') {
