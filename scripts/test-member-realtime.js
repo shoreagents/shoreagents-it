@@ -7,7 +7,7 @@ async function testMemberRealtime() {
 
   // Step 1: Connect to WebSocket
   console.log('📡 Step 1: Connecting to WebSocket...');
-  const ws = new WebSocket('ws://localhost:3002/ws');
+  const ws = new WebSocket('ws://localhost:3001/ws');
   
   let wsConnected = false;
   let messagesReceived = [];

@@ -49,7 +49,6 @@ export function useRealtimeCount(countType: CountType) {
         const fiveMinutes = 5 * 60 * 1000
         
         if (age < fiveMinutes) {
-          console.log(`useRealtimeCount: Using cached ${countType} count:`, storedCount)
           return parseInt(storedCount)
         }
       }
@@ -90,7 +89,6 @@ export function useRealtimeCount(countType: CountType) {
   // Fetch count from API
   const fetchCount = useCallback(async () => {
     if (!user?.id) {
-      console.log(`useRealtimeCount: No user ID, skipping fetch for ${countType}`)
       if (countType === 'tickets') {
         updateCount(0)
         setLoading(false)
@@ -114,15 +112,11 @@ export function useRealtimeCount(countType: CountType) {
         }
       }
       
-      console.log(`useRealtimeCount: Fetching ${countType} from:`, apiUrl)
-      
       const response = await fetch(apiUrl)
       
       if (response.ok) {
         const data = await response.json()
         const count = data.length
-        console.log(`useRealtimeCount: Received ${countType}:`, data)
-        console.log(`useRealtimeCount: Count:`, count)
         updateCount(count)
         setError(null)
       } else {
@@ -213,8 +207,6 @@ export function useRealtimeCount(countType: CountType) {
   // Initial fetch
   useEffect(() => {
     if (user?.id) {
-      console.log(`useRealtimeCount: User changed, fetching ${countType} count. User:`, user)
-      console.log(`useRealtimeCount: WebSocket connected:`, isConnected)
       fetchCount()
     }
   }, [user?.id, user?.roleName, fetchCount])
@@ -222,9 +214,9 @@ export function useRealtimeCount(countType: CountType) {
   // Real-time updates and polling fallback
   useEffect(() => {
     if (isConnected) {
-      console.log(`useRealtimeCount: WebSocket connected for ${countType}, using real-time updates`)
+      // WebSocket connected, using real-time updates
     } else {
-      console.log(`useRealtimeCount: WebSocket not connected for ${countType}, using polling fallback`)
+      // WebSocket not connected, using polling fallback
       const interval = setInterval(fetchCount, 30000)
       return () => clearInterval(interval)
     }
@@ -232,9 +224,7 @@ export function useRealtimeCount(countType: CountType) {
 
   // Cleanup when user changes
   useEffect(() => {
-    if (!user?.id) {
-      console.log(`useRealtimeCount: Cleaning up for ${countType}`)
-    }
+    // Cleanup logic handled automatically
   }, [user?.id, countType])
 
   return {

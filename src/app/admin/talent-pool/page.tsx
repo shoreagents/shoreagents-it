@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ApplicantsDetailModal } from "@/components/modals/applicants-detail-modal"
-import { useRealtimeApplicants } from "@/hooks/use-realtime-applicants"
+
 import { 
   Search, 
   Star, 
@@ -28,7 +28,7 @@ import {
 } from "lucide-react"
 
 // Use the same Applicant interface as BPOC applicants page
-type ApplicantStatus = 'submitted' | 'qualified' | 'for verification' | 'verified' | 'initial interview' | 'final interview' | 'not qualified' | 'not qualifies' | 'passed'
+type ApplicantStatus = 'submitted' | 'qualified' | 'for verification' | 'verified' | 'initial interview' | 'final interview' | 'not qualified' | 'passed'
 
 interface Applicant {
   id: string
@@ -113,26 +113,11 @@ export default function TalentPoolPage() {
   const [selectedTalent, setSelectedTalent] = useState<Applicant | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
-  // Data mapping function (same as BPOC applicants page)
+  // Data mapping function
   const mapApplicantData = useCallback((rawData: any): Applicant => {
     const applicant = rawData.applicant || {}
     const skills = Array.isArray(rawData.applicant_skills) ? rawData.applicant_skills : []
     const expected = Number(rawData.expected_monthly_salary ?? 0)
-    
-    console.log('🔍 Talent Pool: Mapping applicant data:', {
-      rawData: {
-        id: rawData.id,
-        shift: rawData.shift,
-        current_salary: rawData.current_salary,
-        expected_monthly_salary: rawData.expected_monthly_salary,
-        video_introduction_url: rawData.video_introduction_url
-      },
-      mapped: {
-        shift: rawData.shift || null,
-        current_salary: rawData.current_salary || null,
-        expected_monthly_salary: isFinite(expected) ? expected : null
-      }
-    })
     
     return {
       id: String(rawData.id ?? rawData.applicant_id ?? crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)),
@@ -189,137 +174,20 @@ export default function TalentPoolPage() {
     }
   }, [])
 
-  // Data enrichment function (same as BPOC applicants page)
-  const enrichApplicantData = useCallback(async (rawData: any): Promise<any> => {
-    try {
-      console.log('🔍 Talent Pool: Enriching applicant data:', { id: rawData.id, type: typeof rawData.id })
-      
-      // Fetch enrichment data from the API for this specific applicant
-      const response = await fetch(`/api/bpoc?id=${rawData.id}`)
-      if (response.ok) {
-        const enrichedData = await response.json()
-        console.log('🔍 Talent Pool: Enrichment API response:', { count: enrichedData.length, ids: enrichedData.map((a: any) => a.id) })
-        
-        // Find the matching applicant in the enriched data
-        const enriched = enrichedData.find((app: any) => {
-          const match = String(app.id) === String(rawData.id)
-          console.log(`🔍 Talent Pool: Enrichment ID comparison: "${app.id}" === "${rawData.id}" = ${match}`)
-          return match
-        })
-        
-        if (enriched) {
-          console.log('🔍 Talent Pool: Found enriched data:', enriched)
-          return enriched
-        } else {
-          console.log('🔍 Talent Pool: No enriched data found, returning original')
-        }
-      } else {
-        console.warn('⚠️ Talent Pool: Enrichment API failed:', response.status, response.statusText)
-      }
-    } catch (error) {
-      console.warn('⚠️ Talent Pool: Failed to enrich real-time data:', error)
-    }
-    // Return original data if enrichment fails
-    return rawData
-  }, [])
 
-  // Real-time updates for BPOC applications - ONLY for 'passed' status applicants
-  const { isConnected: isRealtimeConnected } = useRealtimeApplicants({
-    onApplicantCreated: async (newApplicant) => {
-      console.log('🆕 Talent Pool Real-time: New applicant created:', newApplicant)
-      
-      // Only process applicants with 'passed' status
-      if (newApplicant.status !== 'passed') {
-        console.log('🆕 Talent Pool: Skipping non-passed applicant:', newApplicant.status)
-        return
-      }
-      
-      // Enrich and map the raw data to Applicant format
-      const enrichedData = await enrichApplicantData(newApplicant)
-      const mappedApplicant = mapApplicantData(enrichedData)
-      console.log('🆕 Talent Pool: Mapped new applicant:', mappedApplicant)
-      
-      setApplicants(prev => {
-        console.log('🆕 Talent Pool: Adding new applicant to state. Previous count:', prev.length)
-        const updated = [...prev, mappedApplicant]
-        console.log('🆕 Talent Pool: New count:', updated.length)
-        return updated
-      })
-    },
-    onApplicantUpdated: async (updatedApplicant, oldApplicant) => {
-      console.log('📝 Talent Pool Real-time: Applicant updated:', updatedApplicant, 'Old:', oldApplicant)
-      console.log('📝 Talent Pool: Current applicants in state:', applicants.map(a => ({ id: a.id, type: typeof a.id })))
-      console.log('📝 Talent Pool: Updated applicant ID:', { id: updatedApplicant.id, type: typeof updatedApplicant.id })
-      
-      // Handle status changes for talent pool
-      if (oldApplicant.status === 'passed' && updatedApplicant.status !== 'passed') {
-        // Applicant was removed from talent pool (status changed from 'passed')
-        console.log('📝 Talent Pool: Applicant removed from talent pool (status changed to:', updatedApplicant.status)
-        setApplicants(prev => prev.filter(applicant => String(applicant.id) !== String(updatedApplicant.id)))
-        
-        // Close modal if this applicant was selected
-        if (selectedTalent && String(selectedTalent.id) === String(updatedApplicant.id)) {
-          console.log('📝 Talent Pool: Closing modal for removed applicant')
-          setSelectedTalent(null)
-          setIsModalOpen(false)
-        }
-        return
-      }
-      
-      // Only process applicants with 'passed' status
-      if (updatedApplicant.status !== 'passed') {
-        console.log('📝 Talent Pool: Skipping non-passed applicant update:', updatedApplicant.status)
-        return
-      }
-      
-      // Enrich and map the raw data to Applicant format
-      const enrichedData = await enrichApplicantData(updatedApplicant)
-      const mappedApplicant = mapApplicantData(enrichedData)
-      console.log('📝 Talent Pool: Mapped updated applicant:', mappedApplicant)
-      
-      setApplicants(prev => {
-        const updated = prev.map(applicant => {
-          const match = String(applicant.id) === String(updatedApplicant.id)
-          console.log(`📝 Talent Pool: Comparing IDs: "${applicant.id}" (${typeof applicant.id}) === "${updatedApplicant.id}" (${typeof updatedApplicant.id}) = ${match}`)
-          return match ? mappedApplicant : applicant
-        })
-        console.log('📝 Talent Pool: Updated applicants state:', updated.length)
-        return updated
-      })
-      
-      // Also update selectedTalent if the modal is open for this applicant
-      if (selectedTalent && String(selectedTalent.id) === String(updatedApplicant.id)) {
-        console.log('📝 Talent Pool: Updating selectedTalent for modal realtime update')
-        const enrichedData = await enrichApplicantData(updatedApplicant)
-        const mappedApplicant = mapApplicantData(enrichedData)
-        setSelectedTalent(mappedApplicant)
-      }
-    },
-    onApplicantDeleted: (deletedApplicant) => {
-      console.log('🗑️ Talent Pool Real-time: Applicant deleted:', deletedApplicant)
-      // Remove applicant from the list
-      setApplicants(prev => prev.filter(applicant => applicant.id !== deletedApplicant.id))
-      
-      // Also close modal if the deleted applicant was selected
-      if (selectedTalent && String(selectedTalent.id) === String(deletedApplicant.id)) {
-        console.log('🗑️ Talent Pool: Closing modal for deleted applicant')
-        setSelectedTalent(null)
-        setIsModalOpen(false)
-      }
-    }
-  })
 
-  console.log('🔍 Talent Pool: Realtime connection status:', { isRealtimeConnected })
+  // Real-time updates for BPOC applications (separate from job status updates)
+  // Removed useRealtimeApplicants hook
+
+
+  // Removed realtime functionality
   
-  // Debug: Log when applicants state changes
+  // Update selectedTalent when applicants state changes
   useEffect(() => {
-    console.log('🔍 Talent Pool: Applicants state changed:', { count: applicants.length, ids: applicants.map(a => a.id) })
-    
     // If modal is open and we have a selected talent, ensure it has the latest data
     if (isModalOpen && selectedTalent) {
       const latestTalent = applicants.find(app => String(app.id) === String(selectedTalent.id))
       if (latestTalent && latestTalent !== selectedTalent) {
-        console.log('🔍 Talent Pool: Updating selectedTalent with latest data from applicants state')
         setSelectedTalent(latestTalent)
       }
     }
@@ -339,18 +207,14 @@ export default function TalentPoolPage() {
       }
       const data: any[] = await res.json()
       
-      console.log('🔍 Talent Pool: Raw API response data:', data)
-      console.log('🔍 Talent Pool: Sample applicant data structure:', data[0])
-      
       // Map BPOC applications from main database into board items with proper status mapping
       const mapped: Applicant[] = data.map((a) => mapApplicantData(a))
-      console.log('🔍 Talent Pool: Mapped applicant data:', mapped[0])
       setApplicants(mapped)
     } catch (e: any) {
       setError(e?.message || 'Failed to load applicants')
-    } finally {
-      setLoading(false)
-    }
+      } finally {
+        setLoading(false)
+      }
   }, [mapApplicantData])
 
   useEffect(() => {
@@ -401,14 +265,11 @@ export default function TalentPoolPage() {
   }, [applicants, searchQuery, selectedCategory, sortBy])
 
   const handleTalentClick = (talent: Applicant) => {
-    console.log('🔍 Talent Pool: Opening modal for talent:', { id: talent.id, name: talent.full_name })
     // Ensure we have the latest data from the applicants state
     const latestTalent = applicants.find(app => String(app.id) === String(talent.id))
     if (latestTalent) {
-      console.log('🔍 Talent Pool: Using latest talent data for modal:', latestTalent)
       setSelectedTalent(latestTalent)
     } else {
-      console.log('🔍 Talent Pool: Using original talent data for modal:', talent)
       setSelectedTalent(talent)
     }
     setIsModalOpen(true)
@@ -419,11 +280,9 @@ export default function TalentPoolPage() {
     setSelectedTalent(null)
   }
 
-  // Handle status updates (same as BPOC applicants page)
+  // Handle status updates
   const handleStatusUpdate = useCallback(async (applicantId: string, jobIndex: number, newStatus: string) => {
     try {
-      console.log('🔄 Updating applicant status:', { applicantId, jobIndex, newStatus })
-      
       const response = await fetch('/api/bpoc', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -443,14 +302,10 @@ export default function TalentPoolPage() {
       
       // Also update selectedTalent if the modal is open for this applicant
       if (selectedTalent && String(selectedTalent.id) === String(applicantId)) {
-        console.log('🔄 Updating selectedTalent status in modal')
         setSelectedTalent(prev => prev ? { ...prev, status: newStatus as ApplicantStatus } : null)
       }
-      
-      console.log('✅ Status updated successfully')
     } catch (error) {
-      console.error('❌ Failed to update status:', error)
-      // You could add a toast notification here
+      console.error('Failed to update status:', error)
     }
   }, [])
 
@@ -475,27 +330,6 @@ export default function TalentPoolPage() {
                       <Users className="h-3 w-3" />
                       {(applicants?.length ?? 0)} talents
                     </Badge>
-                    {isRealtimeConnected && (
-                      <Badge variant="secondary" className="flex items-center gap-1 text-green-600">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        Live
-                      </Badge>
-                    )}
-                    {/* Debug button to test realtime updates */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (applicants.length > 0) {
-                          const firstApplicant = applicants[0]
-                          console.log('🧪 Test: Manually updating first applicant status for realtime test')
-                          handleStatusUpdate(firstApplicant.id, 0, 'qualified')
-                        }
-                      }}
-                      className="text-xs"
-                    >
-                      Test Realtime
-                    </Button>
                   </div>
                 </div>
 
@@ -594,7 +428,6 @@ export default function TalentPoolPage() {
                       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                         <Users className="h-12 w-12 mb-4" />
                         <h3 className="text-lg font-medium mb-2">No talents found</h3>
-                        <p className="text-sm">Try adjusting your search or filters</p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -636,7 +469,7 @@ export default function TalentPoolPage() {
                                 <p className="text-sm text-muted-foreground line-clamp-3">
                                   {talent.summary || 'No description available'}
                                 </p>
-                                
+
                                 {/* Skills */}
                                 <div className="flex flex-wrap gap-2">
                                   {(() => {
@@ -796,35 +629,35 @@ export default function TalentPoolPage() {
                                     // Second priority: Use the extracted skills array if no structured data found
                                     if (Array.isArray(talent.skills) && talent.skills.length > 0) {
                                       return (
-                                        <>
-                                          {talent.skills.slice(0, 8).map((skill: string, index: number) => (
-                                            <Badge key={index} className="text-xs">
-                                              {skill}
-                                            </Badge>
-                                          ))}
-                                          {talent.skills.length > 8 && (
-                                            <TooltipProvider>
-                                              <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                  <Badge className="text-xs cursor-pointer hover:opacity-80 transition-colors">
-                                                    +{talent.skills.length - 8} more
-                                                  </Badge>
-                                                </TooltipTrigger>
-                                                <TooltipContent side="top" className="p-3 max-w-xs">
-                                                  <div className="text-center">
-                                                    <div className="flex flex-wrap gap-2 justify-center">
-                                                      {talent.skills.slice(8).map((skill: string, index: number) => (
-                                                        <Badge key={index + 8} className="text-xs">
-                                                          {skill}
-                                                        </Badge>
-                                                      ))}
-                                                    </div>
-                                                  </div>
-                                                </TooltipContent>
-                                              </Tooltip>
-                                            </TooltipProvider>
-                                          )}
-                                        </>
+                                    <>
+                                      {talent.skills.slice(0, 8).map((skill: string, index: number) => (
+                                        <Badge key={index} className="text-xs">
+                                          {skill}
+                                        </Badge>
+                                      ))}
+                                      {talent.skills.length > 8 && (
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Badge className="text-xs cursor-pointer hover:opacity-80 transition-colors">
+                                                +{talent.skills.length - 8} more
+                                              </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top" className="p-3 max-w-xs">
+                                              <div className="text-center">
+                                                <div className="flex flex-wrap gap-2 justify-center">
+                                                  {talent.skills.slice(8).map((skill: string, index: number) => (
+                                                    <Badge key={index + 8} className="text-xs">
+                                                      {skill}
+                                                    </Badge>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      )}
+                                    </>
                                       )
                                     }
                                     

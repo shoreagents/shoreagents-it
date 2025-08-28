@@ -33,8 +33,8 @@ function createWindow() {
   // Load the app
   if (isDev) {
     // In development, load from the custom server
-    console.log('Loading from development server: http://localhost:3002');
-    mainWindow.loadURL('http://localhost:3002');
+    console.log('Loading from development server: http://localhost:3001');
+            mainWindow.loadURL('http://localhost:3001');
     // Open DevTools in development
     mainWindow.webContents.openDevTools();
     
@@ -43,7 +43,7 @@ function createWindow() {
       console.error('Failed to load:', errorCode, errorDescription);
       // Retry after a short delay
         setTimeout(() => {
-          mainWindow.loadURL('http://localhost:3002');
+          mainWindow.loadURL('http://localhost:3001');
       }, 2000);
     });
   } else {
@@ -88,7 +88,7 @@ function createChatWindow(ticketId, ticketData) {
 
   // Load chat page
   if (isDev) {
-    chatWindow.loadURL(`http://localhost:3002/global/chat/${ticketId}`);
+          chatWindow.loadURL(`http://localhost:3001/global/chat/${ticketId}`);
     chatWindow.webContents.openDevTools();
   } else {
     chatWindow.loadFile(path.join(__dirname, `../out/global/chat/${ticketId}/index.html`));
@@ -135,7 +135,7 @@ function createTicketDetailWindow(ticketId, ticketData) {
 
   // Load ticket detail page
   if (isDev) {
-    ticketDetailWindow.loadURL(`http://localhost:3002/ticket-detail/${ticketId}`);
+          ticketDetailWindow.loadURL(`http://localhost:3001/ticket-detail/${ticketId}`);
     ticketDetailWindow.webContents.openDevTools();
   } else {
     ticketDetailWindow.loadFile(path.join(__dirname, `../out/ticket-detail/${ticketId}/index.html`));
@@ -171,7 +171,7 @@ function createFileWindow(fileUrl, fileName) {
     height: 600,
     resizable: true,
     maximizable: true,
-    fullscreenable: false,
+    fullscreenable: true, // Enable fullscreen mode
     frame: false,
     webPreferences: {
       nodeIntegration: false,
@@ -188,7 +188,7 @@ function createFileWindow(fileUrl, fileName) {
   const encodedFileName = encodeURIComponent(fileName);
   
   if (isDev) {
-    fileWindow.loadURL(`http://localhost:3002/global/file-viewer?url=${encodedUrl}&filename=${encodedFileName}`);
+          fileWindow.loadURL(`http://localhost:3001/global/file-viewer?url=${encodedUrl}&filename=${encodedFileName}`);
     fileWindow.webContents.openDevTools();
   } else {
     fileWindow.loadFile(path.join(__dirname, `../out/global/file-viewer/index.html?url=${encodedUrl}&filename=${encodedFileName}`));
@@ -236,7 +236,7 @@ function createJobDetailWindow(jobId, jobData) {
   // Load the job details React component
   if (isDev) {
     const encodedJobData = encodeURIComponent(JSON.stringify(jobData))
-    jobDetailWindow.loadURL(`http://localhost:3002/global/job-details?jobId=${jobId}&jobData=${encodedJobData}`)
+    jobDetailWindow.loadURL(`http://localhost:3001/global/job-details?jobId=${jobId}&jobData=${encodedJobData}`)
     jobDetailWindow.webContents.openDevTools()
   } else {
     // For production, we'll need to build and serve the static files
@@ -335,6 +335,23 @@ ipcMain.handle('maximize-window', async (event) => {
     return { success: true };
   } catch (error) {
     console.error('Error maximizing window:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('toggle-fullscreen', async (event) => {
+  try {
+    const currentWindow = BrowserWindow.fromWebContents(event.sender);
+    if (currentWindow && !currentWindow.isDestroyed()) {
+      if (currentWindow.isFullScreen()) {
+        currentWindow.setFullScreen(false);
+      } else {
+        currentWindow.setFullScreen(true);
+      }
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error toggling fullscreen:', error);
     return { success: false, error: error.message };
   }
 });

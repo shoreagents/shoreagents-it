@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle } from "@tabler/icons-react"
 import { Input } from "@/components/ui/input"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -20,6 +21,7 @@ interface TicketDetailModalProps {
   ticket: Ticket | null
   isOpen: boolean
   onClose: () => void
+  isLoading?: boolean
 }
 
 interface StatusOption {
@@ -176,7 +178,7 @@ const getDisplayStatus = (status: string, isAdmin?: boolean) => {
   return status
 }
 
-export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModalProps) {
+export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: TicketDetailModalProps) {
   const { theme } = useTheme()
   const [comment, setComment] = React.useState("")
   const [currentStatus, setCurrentStatus] = React.useState<TicketStatus | null>(null)
@@ -290,17 +292,19 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
     }
   }
 
-  if (!ticket) return null
+  if (!ticket && !isLoading) return null
 
-  const categoryBadge = getCategoryBadge(ticket)
-  const createdDate = formatDate(ticket.created_at)
-  const updatedDate = ticket.updated_at && ticket.updated_at !== ticket.created_at ? formatDate(ticket.updated_at) : null
-  const resolvedDate = ticket.resolved_at ? formatDate(ticket.resolved_at) : null
+  const categoryBadge = ticket ? getCategoryBadge(ticket) : { name: '', color: '' }
+  const createdDate = ticket ? formatDate(ticket.created_at) : { date: '', time: '', full: '' }
+  const updatedDate = ticket && ticket.updated_at && ticket.updated_at !== ticket.created_at ? formatDate(ticket.updated_at) : null
+  const resolvedDate = ticket && ticket.resolved_at ? formatDate(ticket.resolved_at) : null
 
-  const hasAttachments = ticket.supporting_files && Array.isArray(ticket.supporting_files) && ticket.supporting_files.length > 0
+  const hasAttachments = ticket && ticket.supporting_files && Array.isArray(ticket.supporting_files) && ticket.supporting_files.length > 0
 
   const copyTicketId = () => {
-    navigator.clipboard.writeText(ticket.ticket_id)
+    if (ticket) {
+      navigator.clipboard.writeText(ticket.ticket_id)
+    }
   }
 
   const handleCommentSubmit = async (e: React.FormEvent) => {
@@ -356,12 +360,16 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
         const errorData = await response.json().catch(() => ({}))
         console.error('Failed to update ticket status from modal:', errorData)
         // Revert local status on failure
-        setCurrentStatus(ticket.status)
+        if (ticket) {
+          setCurrentStatus(ticket.status)
+        }
       }
     } catch (error) {
       console.error('Error updating ticket status from modal:', error)
       // Revert local status on error
-      setCurrentStatus(ticket.status)
+      if (ticket) {
+        setCurrentStatus(ticket.status)
+      }
     }
   }
 
@@ -388,9 +396,13 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                                                 {/* Task Header */}
                  <div className="px-6 py-5">
                    {/* Task Title */}
-                   <h1 className="text-2xl font-semibold mb-4">
-                     {ticket.concern}
-                   </h1>
+                   {isLoading ? (
+                     <Skeleton className="h-8 w-3/4 mb-4" />
+                   ) : (
+                     <h1 className="text-2xl font-semibold mb-4">
+                       {ticket.concern}
+                     </h1>
+                   )}
                    
                    {/* Metadata Grid */}
                     <div className="grid grid-cols-2 gap-4 text-sm">
@@ -398,55 +410,81 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                       <div className="flex items-center gap-2">
                         <IconUser className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Employee:</span>
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={ticket.profile_picture || ''} alt="User" />
-                            <AvatarFallback className="text-xs">
+                        {isLoading ? (
+                          <div className="flex items-center gap-2">
+                            <Skeleton className="h-6 w-6 rounded-full" />
+                            <Skeleton className="h-4 w-24" />
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-6 w-6">
+                              <AvatarImage src={ticket.profile_picture || ''} alt="User" />
+                              <AvatarFallback className="text-xs">
+                                {ticket.first_name && ticket.last_name 
+                                  ? `${ticket.first_name[0]}${ticket.last_name[0]}`
+                                  : 'U'
+                                }
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">
                               {ticket.first_name && ticket.last_name 
-                                ? `${ticket.first_name[0]}${ticket.last_name[0]}`
-                                : 'U'
+                                ? `${ticket.first_name} ${ticket.last_name}`
+                                : `User ${ticket.user_id}`
                               }
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">
-                            {ticket.first_name && ticket.last_name 
-                              ? `${ticket.first_name} ${ticket.last_name}`
-                              : `User ${ticket.user_id}`
-                            }
-                          </span>
-                        </div>
+                            </span>
+                          </div>
+                        )}
                       </div>
                       
                       {/* 2. Ticket ID */}
                       <div className="flex items-center gap-2">
                         <IconId className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Ticket ID:</span>
-                        <span className="font-medium text-primary">
-                          {ticket.ticket_id}
-                        </span>
+                        {isLoading ? (
+                          <Skeleton className="h-4 w-20" />
+                        ) : (
+                          <span className="font-medium text-primary">
+                            {ticket.ticket_id}
+                          </span>
+                        )}
                       </div>
                       
                       {/* 3. Filed at */}
                       <div className="flex items-center gap-2">
                         <IconCalendar className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Filed at:</span>
-                        <span className="font-medium">{createdDate.date} • {createdDate.time}</span>
+                        {isLoading ? (
+                          <Skeleton className="h-4 w-32" />
+                        ) : (
+                          <span className="font-medium">{createdDate.date} • {createdDate.time}</span>
+                        )}
                       </div>
                       
                       {/* 4. Category */}
                       <div className="flex items-center gap-2">
                         <IconTag className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Category:</span>
-                        <Badge variant="secondary" className={`text-xs h-6 flex items-center justify-center ${categoryBadge.color}`}>
-                          {categoryBadge.name}
-                        </Badge>
+                        {isLoading ? (
+                          <Skeleton className="h-6 w-20 rounded-full" />
+                        ) : (
+                          <Badge variant="secondary" className={`text-xs h-6 flex items-center justify-center ${categoryBadge.color}`}>
+                            {categoryBadge.name}
+                          </Badge>
+                        )}
                       </div>
                       
                       {/* 5. Status */}
                       <div className="flex items-center gap-2">
-                        {getStatusIcon(currentStatus || ticket.status)}
+                        {isLoading ? (
+                          <Skeleton className="h-4 w-4 rounded-full" />
+                        ) : (
+                          getStatusIcon(currentStatus || ticket.status)
+                        )}
                         <span className="text-muted-foreground">Status:</span>
-                        <Popover>
+                        {isLoading ? (
+                          <Skeleton className="h-6 w-20 rounded-full" />
+                        ) : (
+                          <Popover>
                           <PopoverTrigger asChild>
                             <Badge 
                               variant="outline" 
@@ -491,10 +529,11 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                             </div>
                           </PopoverContent>
                         </Popover>
+                        )}
                       </div>
                       
                       {/* 6. Resolved by */}
-                      {ticket.status === 'Closed' && ticket.resolved_by && (
+                      {!isLoading && ticket && ticket.status === 'Closed' && ticket.resolved_by && (
                         <div className="flex items-center gap-2">
                           <IconUser className="h-4 w-4 text-muted-foreground" />
                           <span className="text-muted-foreground">Resolved by:</span>
@@ -511,7 +550,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                       )}
                       
                       {/* 7. Resolved at */}
-                      {ticket.status === 'Closed' && ticket.resolved_at && (
+                      {!isLoading && ticket && ticket.status === 'Closed' && ticket.resolved_at && (
                         <div className="flex items-center gap-2">
                           <IconClock className="h-4 w-4 text-muted-foreground" />
                           <span className="text-muted-foreground">Resolved at:</span>
@@ -542,7 +581,15 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                   <div className="flex-1 flex flex-col min-h-0">
                     <h3 className="text-lg font-medium mb-2 text-muted-foreground">Additional Details</h3>
                     <div className="rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border flex-1 min-h-0">
-                      {ticket.details || "No additional details provided."}
+                      {isLoading ? (
+                        <div className="space-y-3">
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-3/4" />
+                          <Skeleton className="h-4 w-1/2" />
+                        </div>
+                      ) : (
+                        ticket.details || "No additional details provided."
+                      )}
                     </div>
                   </div>
 
@@ -552,7 +599,19 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
                   <div className="flex-1 flex flex-col min-h-0">
                     <h3 className="text-lg font-medium mb-2 text-muted-foreground">Attachments</h3>
                     <div className={`rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border flex-1 min-h-0 ${!hasAttachments ? 'flex items-center justify-center' : ''}`}> 
-                      {hasAttachments ? (
+                      {isLoading ? (
+                        <div className="grid grid-cols-4 gap-3">
+                          {[...Array(4)].map((_, index) => (
+                            <div key={index} className="rounded-lg overflow-hidden">
+                              <Skeleton className="w-full h-20" />
+                              <div className="p-2">
+                                <Skeleton className="h-3 w-20 mb-1" />
+                                <Skeleton className="h-3 w-16" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : hasAttachments ? (
                         <div className="grid grid-cols-4 gap-3">
                           {(ticket.supporting_files || []).map((file, index) => {
                             // Get proper Supabase Storage URL for full quality
@@ -678,8 +737,24 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
               <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-[#ebebeb] dark:bg-[#0a0a0a]">
                   <div className="space-y-4">
                     {isLoadingComments ? (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="text-sm text-muted-foreground">Loading comments...</div>
+                      <div className="space-y-4">
+                        {[...Array(3)].map((_, index) => (
+                          <div key={index} className="rounded-lg p-4 bg-sidebar border">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Skeleton className="w-8 h-8 rounded-full" />
+                                  <Skeleton className="h-4 w-24" />
+                                </div>
+                                <Skeleton className="h-3 w-16" />
+                              </div>
+                              <div className="mt-1 space-y-2">
+                                <Skeleton className="h-4 w-full" />
+                                <Skeleton className="h-4 w-3/4" />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ) : comments.length > 0 ? (
                       comments.map((comment) => {
@@ -734,55 +809,61 @@ export function TicketDetailModal({ ticket, isOpen, onClose }: TicketDetailModal
               <div className="px-3 pb-3 bg-[#ebebeb] dark:bg-[#0a0a0a]">
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <form onSubmit={handleCommentSubmit}>
-                      <div className={`border rounded-lg bg-sidebar overflow-hidden transition-all duration-300 ease-in-out [&>*]:border-none [&>*]:outline-none [&>textarea]:transition-all [&>textarea]:duration-300 [&>textarea]:ease-in-out ${
-                        (isCommentFocused || comment.trim()) 
-                          ? 'border-muted-foreground' 
-                          : 'border-border'
-                      }`}>
-                        <textarea 
-                          ref={commentTextareaRef}
-                          placeholder="Write a comment..." 
-                          value={comment}
-                          onChange={(e) => {
-                            setComment(e.target.value)
-                            // Auto-resize the textarea
-                            e.target.style.height = 'auto'
-                            e.target.style.height = e.target.scrollHeight + 'px'
-                          }}
-                          onFocus={(e) => {
-                            console.log('Comment focused, setting isCommentFocused to true')
-                            setIsCommentFocused(true)
-                          }}
-                          onBlur={(e) => {
-                            console.log('Comment blurred, setting isCommentFocused to false')
-                            setIsCommentFocused(false)
-                          }}
-                          className="w-full resize-none border-0 bg-transparent text-foreground px-3 py-2 shadow-none text-sm focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:text-foreground placeholder:text-muted-foreground align-middle transition-all duration-300 ease-in-out min-h-[36px] overflow-hidden"
-                          disabled={isSubmittingComment}
-                          rows={1}
-                          tabIndex={-1}
-                        />
-                        
-                        {/* Send button - only show when expanded, inside the textarea container */}
-                        {(isCommentFocused || comment.trim()) && (
-                          <div className="p-1 flex justify-end animate-in fade-in duration-300">
-                            <button
-                              type="submit"
-                              onClick={handleCommentSubmit}
-                              disabled={!comment.trim() || isSubmittingComment}
-                              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                            >
-                              {isSubmittingComment ? (
-                                <IconClock className="h-3 w-3 text-muted-foreground animate-spin" />
-                                ) : (
-                                <SendHorizontal className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </button>
-                          </div>
-                        )}
+                    {isLoading ? (
+                      <div className="border rounded-lg bg-sidebar p-3">
+                        <Skeleton className="h-6 w-full" />
                       </div>
-                    </form>
+                    ) : (
+                      <form onSubmit={handleCommentSubmit}>
+                        <div className={`border rounded-lg bg-sidebar overflow-hidden transition-all duration-300 ease-in-out [&>*]:border-none [&>*]:outline-none [&>textarea]:transition-all [&>textarea]:duration-300 [&>textarea]:ease-in-out ${
+                          (isCommentFocused || comment.trim()) 
+                            ? 'border-muted-foreground' 
+                            : 'border-border'
+                        }`}>
+                          <textarea 
+                            ref={commentTextareaRef}
+                            placeholder="Write a comment..." 
+                            value={comment}
+                            onChange={(e) => {
+                              setComment(e.target.value)
+                              // Auto-resize the textarea
+                              e.target.style.height = 'auto'
+                              e.target.style.height = e.target.scrollHeight + 'px'
+                            }}
+                            onFocus={(e) => {
+                              console.log('Comment focused, setting isCommentFocused to true')
+                              setIsCommentFocused(true)
+                            }}
+                            onBlur={(e) => {
+                              console.log('Comment blurred, setting isCommentFocused to false')
+                              setIsCommentFocused(false)
+                            }}
+                            className="w-full resize-none border-0 bg-transparent text-foreground px-3 py-2 shadow-none text-sm focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:text-foreground placeholder:text-muted-foreground align-middle transition-all duration-300 ease-in-out min-h-[36px] overflow-hidden"
+                            disabled={isSubmittingComment}
+                            rows={1}
+                            tabIndex={-1}
+                          />
+                          
+                          {/* Send button - only show when expanded, inside the textarea container */}
+                          {(isCommentFocused || comment.trim()) && (
+                            <div className="p-1 flex justify-end animate-in fade-in duration-300">
+                              <button
+                                type="submit"
+                                onClick={handleCommentSubmit}
+                                disabled={!comment.trim() || isSubmittingComment}
+                                className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                              >
+                                {isSubmittingComment ? (
+                                  <IconClock className="h-3 w-3 text-muted-foreground animate-spin" />
+                                  ) : (
+                                  <SendHorizontal className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </form>
+                    )}
                   </div>
                 </div>
               </div>

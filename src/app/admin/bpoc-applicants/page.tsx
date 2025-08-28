@@ -372,8 +372,6 @@ const getStatusIcon = (status: string) => {
       return <IconCircle className="h-4 w-4 fill-yellow-500 stroke-none" />
     case 'failed':
       return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
-    case 'not qualifies':
-      return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
     case 'not qualified':
       return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
     case 'final interview':

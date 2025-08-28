@@ -10,54 +10,56 @@ require('dotenv').config({ path: path.resolve(process.cwd(), '.env.local') })
 
 const dev = process.env.NODE_ENV !== 'production'
 const hostname = 'localhost'
-const port = process.env.PORT || 3002
+const port = process.env.PORT || 3001
 
 // Create Next.js app
 const app = next({ dev, hostname, port })
 const handle = app.getRequestHandler()
 
-// PostgreSQL notification client
+// PostgreSQL notification client for main database
 const notificationClient = new Client({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 })
+
+
 
 let wss = null
 let isListening = false
 
 // Start listening to PostgreSQL notifications
 async function startListening() {
-  if (isListening) return
+  console.log('🚀 startListening() function called!')
+  
+  if (isListening) {
+    console.log('⚠️ Already listening, returning early')
+    return
+  }
   
   try {
+    console.log('🔄 Starting notification listeners...')
+    console.log('🔍 NODE_ENV:', process.env.NODE_ENV)
+    console.log('🔍 BPOC_DATABASE_URL exists:', !!process.env.BPOC_DATABASE_URL)
+    
+    // Connect to main database
+    console.log('🔄 Connecting to main database...')
     await notificationClient.connect()
-    console.log('Connected to PostgreSQL for notifications')
+    console.log('✅ Connected to main PostgreSQL for notifications')
     
-    // Listen for ticket changes
+    // Listen for main database changes
     await notificationClient.query('LISTEN ticket_changes')
-    
-    // Listen for applicant changes
     await notificationClient.query('LISTEN applicant_changes')
-    
-    // Listen for member/company changes
     await notificationClient.query('LISTEN member_changes')
-    
-    // Listen for member comment changes
     await notificationClient.query('LISTEN member_comment_changes')
-    
-    // Listen for member activity changes
     await notificationClient.query('LISTEN member_activity_changes')
-    
-    // Listen for agent member changes
     await notificationClient.query('LISTEN agent_assignment_changes')
-    
-    // Listen for client member changes
     await notificationClient.query('LISTEN client_assignment_changes')
     
+    // Handle main database notifications
     notificationClient.on('notification', (msg) => {
       try {
         const payload = JSON.parse(msg.payload)
-        console.log('Received notification:', payload)
+        console.log('Received main database notification:', payload)
         
         // Determine message type based on channel
         let messageType = 'ticket_update'
@@ -68,9 +70,9 @@ async function startListening() {
         } else if (msg.channel === 'member_detail_changes') {
           messageType = 'member_update'
         } else if (msg.channel === 'member_comment_changes') {
-          messageType = 'member_comment_update' // Separate message type for comments
+          messageType = 'member_comment_update'
         } else if (msg.channel === 'member_activity_changes') {
-          messageType = 'member_activity_update' // Separate message type for activity logs
+          messageType = 'member_activity_update'
         } else if (msg.channel === 'agent_assignment_changes') {
           messageType = 'agent_update'
         } else if (msg.channel === 'client_assignment_changes') {
@@ -83,10 +85,7 @@ async function startListening() {
             type: messageType,
             data: payload
           })
-          console.log('Broadcasting WebSocket message:', message)
-          console.log('Message type:', messageType)
-          console.log('Channel:', msg.channel)
-          console.log('Connected clients:', wss.clients.size)
+          console.log('Broadcasting main database message:', message)
           
           wss.clients.forEach((client) => {
             if (client.readyState === 1) { // WebSocket.OPEN
@@ -95,18 +94,23 @@ async function startListening() {
           })
         }
       } catch (error) {
-        console.error('Error parsing notification:', error)
+        console.error('Error parsing main database notification:', error)
       }
     })
     
+    
+    
     isListening = true
-    console.log('Started listening for PostgreSQL notifications (tickets, applicants, members, member comments, member activities, agents & clients)')
+    console.log('✅ Started listening for PostgreSQL notifications (main database only)')
   } catch (error) {
     console.error('Error starting notification listener:', error)
+    console.log('⚠️ Continuing without database notifications - WebSocket server will still work')
   }
 }
 
 app.prepare().then(() => {
+  console.log('🚀 Next.js app prepared, starting server...')
+  
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true)
@@ -120,42 +124,66 @@ app.prepare().then(() => {
     }
   })
 
+  console.log('🔧 HTTP server created, initializing WebSocket...')
+
   // Initialize WebSocket server with path
-  wss = new WebSocketServer({ 
-    server,
-    path: '/ws'
-  })
+  try {
+    wss = new WebSocketServer({ 
+      server,
+      path: '/ws'
+    })
+    console.log('✅ WebSocket server initialized')
+    
+    wss.on('connection', (ws) => {
+      console.log('Client connected to WebSocket')
+      
+      // Send a ping every 30 seconds to keep connection alive
+      const pingInterval = setInterval(() => {
+        if (ws.readyState === 1) { // WebSocket.OPEN
+          ws.ping()
+        }
+      }, 30000)
+      
+      ws.on('pong', () => {
+        // Client responded to ping
+      })
+      
+      ws.on('close', () => {
+        console.log('Client disconnected from WebSocket')
+        clearInterval(pingInterval)
+      })
+      
+      ws.on('error', (error) => {
+        console.error('WebSocket error:', error)
+        clearInterval(pingInterval)
+      })
+    })
+    
+    console.log('✅ WebSocket event handlers attached')
+  } catch (wsError) {
+    console.error('❌ Error initializing WebSocket server:', wsError)
+  }
+
+  console.log('🔄 About to call startListening()...')
   
-  wss.on('connection', (ws) => {
-    console.log('Client connected to WebSocket')
-    
-    // Send a ping every 30 seconds to keep connection alive
-    const pingInterval = setInterval(() => {
-      if (ws.readyState === 1) { // WebSocket.OPEN
-        ws.ping()
-      }
-    }, 30000)
-    
-    ws.on('pong', () => {
-      // Client responded to ping
-    })
-    
-    ws.on('close', () => {
-      console.log('Client disconnected from WebSocket')
-      clearInterval(pingInterval)
-    })
-    
-    ws.on('error', (error) => {
-      console.error('WebSocket error:', error)
-      clearInterval(pingInterval)
-    })
-  })
-
   // Start listening to PostgreSQL notifications
-  startListening()
+  try {
+    startListening()
+    console.log('✅ startListening() called successfully')
+  } catch (startError) {
+    console.error('❌ Error calling startListening():', startError)
+  }
 
+  console.log(`🔄 About to start server listening on port ${port}...`)
+  
   server.listen(port, (err) => {
-    if (err) throw err
-    console.log(`> Ready on http://${hostname}:${port}`)
+    if (err) {
+      console.error('❌ Error starting server:', err)
+      throw err
+    }
+    console.log(`✅ Server listening on http://${hostname}:${port}`)
+    console.log('🎯 Server startup sequence completed!')
   })
+}).catch((error) => {
+  console.error('❌ Error in app.prepare():', error)
 }) 

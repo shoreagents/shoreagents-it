@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   closeChatWindow: (ticketId) => ipcRenderer.invoke('close-chat-window', ticketId),
   closeCurrentWindow: () => ipcRenderer.invoke('close-current-window'),
   maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
+  toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
   isElectron: true,
 }); 

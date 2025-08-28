@@ -11,6 +11,8 @@ interface ApplicantUpdate {
   }
 }
 
+
+
 interface UseRealtimeApplicantsOptions {
   onApplicantCreated?: (applicant: any) => void
   onApplicantUpdated?: (applicant: any, oldApplicant?: any) => void
@@ -56,7 +58,7 @@ function getOrCreateApplicantsWebSocket() {
       try {
         const message: ApplicantUpdate = JSON.parse(event.data)
         
-        // Only process applicant updates
+        // Process applicant updates
         if (message.type === 'applicant_update') {
           console.log('📨 Applicants WebSocket received:', message)
           
@@ -69,8 +71,10 @@ function getOrCreateApplicantsWebSocket() {
             }
           })
         }
+        
+
       } catch (error) {
-        console.error('Error parsing Applicants WebSocket message:', error)
+        console.error('Error parsing WebSocket message:', error)
       }
     }
 
@@ -157,6 +161,8 @@ export function useRealtimeApplicants(options: UseRealtimeApplicantsOptions = {}
       }
     }
   }, [autoConnect, createCallback])
+
+
 
   // Update local state when global state changes
   useEffect(() => {

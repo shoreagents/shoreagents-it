@@ -2209,8 +2209,8 @@ export async function deleteMember(id: number): Promise<void> {
     if (companyResult.rows.length > 0) {
       companyId = companyResult.rows[0].company_id
       companyName = companyResult.rows[0].company
-    }
-  } catch (error) {
+      }
+    } catch (error) {
     console.warn('Failed to get company info for cleanup:', error)
   }
 
@@ -2458,26 +2458,41 @@ export async function updateApplicantPositions(positions: { id: number; position
 
 // BPOC application status update
 export async function updateBpocApplicationStatus(applicantId: number, jobIndex: number, dbStatus: string) {
+  // Get the applicant data including job_ids array
   const applicantResult = await pool.query(`
-    SELECT bpoc_application_ids 
+    SELECT job_ids, bpoc_application_ids 
     FROM public.bpoc_recruits 
     WHERE id = $1
   `, [applicantId])
+  
   if (applicantResult.rows.length === 0) {
     throw new Error('Applicant not found')
   }
+  
+  const jobIds: number[] = applicantResult.rows[0].job_ids || []
   const bpocApplicationIds: string[] = applicantResult.rows[0].bpoc_application_ids || []
-  if (!bpocApplicationIds || jobIndex < 0 || jobIndex >= bpocApplicationIds.length) {
-    throw new Error('Invalid jobIndex or no applications')
+  
+  if (!jobIds || jobIndex < 0 || jobIndex >= jobIds.length) {
+    throw new Error('Invalid jobIndex or no jobs found')
   }
-  const targetApplicationId = bpocApplicationIds[jobIndex]
+  
+  // Get the job_id at the specified index
+  const targetJobId = jobIds[jobIndex]
+  
   if (!bpocPool) throw new Error('BPOC database is not configured')
+  
+  // Update the application status using the job_id instead of application_id
   const updateResult = await bpocPool.query(
-    `UPDATE public.applications SET status = $1::application_status_enum, updated_at = NOW() WHERE id = $2::uuid RETURNING id, status, updated_at`,
-    [dbStatus, targetApplicationId]
+    `UPDATE public.applications SET status = $1::application_status_enum, updated_at = NOW() WHERE job_id = $2 RETURNING id, status, updated_at, job_id`,
+    [dbStatus, targetJobId]
   )
+  
+  if (updateResult.rows.length === 0) {
+    throw new Error(`No application found for job_id: ${targetJobId}`)
+  }
+  
   const updated = updateResult.rows[0]
-  return { updated, targetApplicationId }
+  return { updated, targetApplicationId: updated.id }
 }
 
 export async function notifyApplicantChange(payload: any) {
@@ -2617,12 +2632,12 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
     params.push(status)
   }
   applicantsQuery += ` ORDER BY COALESCE(r.position, 0), r.created_at DESC LIMIT 500`
-    const { rows: applicants } = await pool.query(applicantsQuery, params)
+  const { rows: applicants } = await pool.query(applicantsQuery, params)
   
   console.log('🔍 getApplicants: Raw applicants from database:', applicants.length)
   console.log('🔍 getApplicants: Sample applicant:', applicants[0])
   console.log('🔍 getApplicants: BPOC pool available:', !!bpocPool)
-  
+
   let enrichedData = applicants
   if (diagnose) {
     enrichedData = enrichedData.map((app: any) => ({
@@ -2683,11 +2698,12 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
         // Get all applicant IDs
         const applicantIds = applicants.map(a => a.applicant_id).filter(Boolean)
         if (applicantIds.length > 0) {
+          // CRITICAL FIX: Fetch statuses by both user_id AND job_id to ensure proper mapping
           const statusQuery = `
-            SELECT a.job_id, a.status::text as current_status, a.created_at, a.user_id
+            SELECT a.job_id, a.status::text as current_status, a.created_at, a.user_id, a.id as application_id
             FROM public.applications a
             WHERE a.user_id IN (${applicantIds.map((_, i) => `$${i + 1}`).join(',')})
-            ORDER BY a.created_at DESC
+            ORDER BY a.user_id, a.created_at DESC
           `
           const { rows } = await bpocPool.query(statusQuery, applicantIds)
           currentJobStatuses = rows
@@ -2796,7 +2812,11 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
         }
     
     enrichedData = applicants.map((applicant: any) => {
-      const applicantApplications = enrichmentData.filter((e: any) => applicant.bpoc_application_ids?.includes(e.id))
+      // CRITICAL FIX: Filter applications by job_id, not by application ID
+      // The enrichmentData contains applications with job_id field, not application ID
+      const applicantApplications = enrichmentData.filter((e: any) => 
+        applicant.job_ids?.includes(e.job_id)
+      )
       const applicantJobs = jobData.filter((j: any) => applicant.job_ids?.includes(j.job_id))
       const firstApplication = applicantApplications[0] || enrichmentData.find((e: any) => e.user_id === applicant.applicant_id)
       const applicationJobPairs = applicantApplications
@@ -2822,10 +2842,29 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
       const allJobStatuses: string[] = []
       const allJobTimestamps: (string | null)[] = []
       
+      // CRITICAL: Create a map of job_id -> status for efficient lookup
+      const jobStatusMap = new Map<string, { status: string, timestamp: string | null }>()
+      if (currentJobStatuses.length > 0) {
+        currentJobStatuses.forEach(statusData => {
+          if (statusData.user_id === applicant.applicant_id) {
+            const key = String(statusData.job_id)
+            jobStatusMap.set(key, {
+              status: statusData.current_status,
+              timestamp: statusData.created_at
+            })
+          }
+        })
+      }
+      
+      console.log(`🔍 Created job status map for applicant ${applicant.applicant_id}:`, 
+        Array.from(jobStatusMap.entries()).map(([jobId, data]) => `${jobId}: ${data.status}`)
+      )
+      
       // Ensure arrays have the same length as job_ids array
       if (applicant.job_ids && applicant.job_ids.length > 0) {
         for (let i = 0; i < applicant.job_ids.length; i++) {
           const jobId = applicant.job_ids[i]
+          const jobIdString = String(jobId)
           
           // Find corresponding job data
           const matchingJob = jobData.find((j: any) => j.job_id === jobId)
@@ -2833,23 +2872,18 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
           // Find corresponding application data (if exists)
           const applicationData = applicantApplications.find(app => app.job_id === jobId)
           
-          // CRITICAL: Always check for current status from BPOC database FIRST
-          // Look for status by both job_id and user_id to ensure we get the right status
-          // Convert both to strings for comparison to handle type mismatches
-          console.log(`🔍 Looking for status for job ${jobId} (type: ${typeof jobId}) with applicant ${applicant.applicant_id}`)
-          console.log(`🔍 Available current statuses:`, currentJobStatuses.filter(s => s.user_id === applicant.applicant_id))
+          // CRITICAL FIX: Use the pre-built map for exact job_id matching
+          console.log(`🔍 Processing job ${i + 1}: ID ${jobId} (string: ${jobIdString})`)
           
-          const currentStatusData = currentJobStatuses.find(s => 
-            String(s.job_id) === String(jobId) && s.user_id === applicant.applicant_id
-          )
+          // Look up status in the map by exact job_id string match
+          const statusData = jobStatusMap.get(jobIdString)
           
-          if (currentStatusData) {
-            console.log(`🔍 Found current status for job ${jobId}:`, currentStatusData.current_status)
-            // Use current status from BPOC database
-            allJobStatuses.push(currentStatusData.current_status)
-            allJobTimestamps.push(currentStatusData.created_at)
+          if (statusData) {
+            console.log(`🔍 Found status for job ${jobId}:`, statusData.status)
+            allJobStatuses.push(statusData.status)
+            allJobTimestamps.push(statusData.timestamp)
           } else {
-            console.log(`🔍 No current status found for job ${jobId}, using fallback:`, applicant.status)
+            console.log(`🔍 No status found for job ${jobId}, using fallback:`, applicant.status)
             // Fallback to main database status
             const mainDbStatus = applicant.status || 'submitted'
             allJobStatuses.push(mainDbStatus)
@@ -2883,7 +2917,7 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
       
       console.log('🔍 Applicant enrichment data:', { 
         applicantId: applicant.id, 
-        userId,
+        userId, 
         hasSkills: !!skillsData,
         hasSummary: !!summaryData,
         hasEmail: !!emailData,
@@ -2896,35 +2930,59 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
         bpocApplicationIds: applicant.bpoc_application_ids,
         allJobTitles,
         allJobStatuses,
+        allJobTimestamps,
         enrichmentDataLength: enrichmentData.length,
         applicationDataSample: enrichmentData.slice(0, 2),
         currentJobStatusesCount: currentJobStatuses.length,
         currentJobStatusesSample: currentJobStatuses.slice(0, 2),
         // Debug current statuses for this applicant
-        applicantCurrentStatuses: currentJobStatuses.filter(s => s.user_id === applicant.applicant_id)
+        applicantCurrentStatuses: currentJobStatuses.filter(s => s.user_id === applicant.applicant_id),
+        // CRITICAL: Debug array alignment
+        arraysAligned: {
+          jobIdsLength: applicant.job_ids?.length || 0,
+          titlesLength: allJobTitles.length,
+          companiesLength: allCompanies.length,
+          statusesLength: allJobStatuses.length,
+          timestampsLength: allJobTimestamps.length,
+          allEqual: (applicant.job_ids?.length || 0) === allJobTitles.length && 
+                   allJobTitles.length === allCompanies.length && 
+                   allCompanies.length === allJobStatuses.length && 
+                   allJobStatuses.length === allJobTimestamps.length
+        },
+        // CRITICAL: Debug job status mapping accuracy
+        jobStatusMapping: {
+          jobStatusMapSize: jobStatusMap.size,
+          jobStatusMapEntries: Array.from(jobStatusMap.entries()),
+          mappedJobIds: applicant.job_ids?.map((id: number) => ({
+            jobId: id,
+            jobIdString: String(id),
+            hasStatus: jobStatusMap.has(String(id)),
+            status: jobStatusMap.get(String(id))?.status || 'fallback'
+          })) || []
+        }
       })
       
-      return {
-        ...applicant,
-        user_id: userId,
-        first_name: firstApplication?.first_name || null,
-        last_name: firstApplication?.last_name || null,
-        full_name: firstApplication?.full_name || null,
-        profile_picture: firstApplication?.avatar_url || null,
-        email: emailData,
-        job_title: allJobTitles[0] || null,
-        company_name: allCompanies[0] || null,
-        all_job_titles: allJobTitles,
-        all_companies: allCompanies,
-        all_job_statuses: allJobStatuses,
-        all_job_timestamps: allJobTimestamps,
-        skills: skillsData,
-        originalSkillsData: originalSkillsData,
-        summary: summaryData,
-        phone: phoneData,
-        address: addressData,
-        aiAnalysis: aiAnalysisData, // Added AI analysis data
-      }
+              return {
+          ...applicant,
+          user_id: userId,
+          first_name: firstApplication?.first_name || null,
+          last_name: firstApplication?.last_name || null,
+          full_name: firstApplication?.full_name || null,
+          profile_picture: firstApplication?.avatar_url || null,
+          email: emailData,
+          job_title: allJobTitles[0] || null,
+          company_name: allCompanies[0] || null,
+          all_job_titles: allJobTitles,
+          all_companies: allCompanies,
+          all_job_statuses: allJobStatuses,
+          all_job_timestamps: allJobTimestamps,
+          skills: skillsData,
+          originalSkillsData: originalSkillsData,
+          summary: summaryData,
+          phone: phoneData,
+          address: addressData,
+          aiAnalysis: aiAnalysisData, // Added AI analysis data
+        }
     })
   } catch (e) {
     // fall back to basic data

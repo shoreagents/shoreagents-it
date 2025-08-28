@@ -1254,6 +1254,7 @@ export default function TicketsPage() {
         ticket={selectedTicket as any}
         isOpen={isModalOpen}
         onClose={handleModalClose}
+        isLoading={loading}
       />
 
       {/* Clear All Confirmation Dialog */}

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPOC WebSocket Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .message { background-color: #d1ecf1; color: #0c5460; padding: 10px; margin: 5px 0; border-radius: 3px; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+        #messages { max-height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 BPOC WebSocket Test</h1>
+    
+    <div id="status" class="status disconnected">❌ Disconnected</div>
+    
+    <button onclick="connect()">🔌 Connect</button>
+    <button onclick="disconnect()">🔌 Disconnect</button>
+    <button onclick="clearMessages()">🗑️ Clear Messages</button>
+    
+    <h3>📨 Messages Received:</h3>
+    <div id="messages"></div>
+    
+    <script>
+        let ws = null;
+        let messageCount = 0;
+        
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                console.log('Already connected');
+                return;
+            }
+            
+            console.log('🔌 Connecting to BPOC WebSocket...');
+            ws = new WebSocket('ws://localhost:3001/ws');
+            
+            ws.onopen = function() {
+                console.log('✅ WebSocket connected');
+                document.getElementById('status').textContent = '✅ Connected to BPOC WebSocket';
+                document.getElementById('status').className = 'status connected';
+                addMessage('🔌 WebSocket connected successfully');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    console.log('📨 Message received:', message);
+                    
+                    if (message.type === 'bpoc_job_status_update') {
+                        addMessage(`🔄 BPOC Job Status Update: ${message.old_status} → ${message.new_status} (Job ID: ${message.job_id})`);
+                    } else if (message.type === 'applicant_update') {
+                        addMessage(`📝 Applicant Update: ${message.data.action} - ${message.data.record.id}`);
+                    } else {
+                        addMessage(`📨 Other message: ${message.type || 'unknown'}`);
+                    }
+                } catch (error) {
+                    console.error('Error parsing message:', error);
+                    addMessage(`❌ Error parsing message: ${error.message}`);
+                }
+            };
+            
+            ws.onclose = function(event) {
+                console.log('❌ WebSocket disconnected:', event.code, event.reason);
+                document.getElementById('status').textContent = '❌ Disconnected';
+                document.getElementById('status').className = 'status disconnected';
+                addMessage('🔌 WebSocket disconnected');
+            };
+            
+            ws.onerror = function(error) {
+                console.error('❌ WebSocket error:', error);
+                addMessage('❌ WebSocket error occurred');
+            };
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        function addMessage(text) {
+            messageCount++;
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `<strong>${messageCount}.</strong> ${text}`;
+            document.getElementById('messages').appendChild(messageDiv);
+            
+            // Auto-scroll to bottom
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+            messageCount = 0;
+        }
+        
+        // Auto-connect on page load
+        window.onload = function() {
+            addMessage('🚀 Page loaded, ready to test BPOC WebSocket');
+        };
+    </script>
+</body>
+</html>

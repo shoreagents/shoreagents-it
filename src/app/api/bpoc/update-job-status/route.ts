@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { updateBpocApplicationStatus, notifyApplicantChange } from '@/lib/db-utils'
+import { updateBpocApplicationStatus } from '@/lib/db-utils'
 
 export async function PATCH(request: Request) {
   try {
@@ -44,17 +44,7 @@ export async function PATCH(request: Request) {
 
     const { updated, targetApplicationId } = await updateBpocApplicationStatus(applicantId, jobIndex, dbStatus)
 
-    const notificationPayload = {
-      type: 'bpoc_job_status_update',
-      data: {
-        applicantId,
-        jobIndex,
-        newStatus: dbStatus,
-        applicationId: targetApplicationId,
-        timestamp: new Date().toISOString(),
-      },
-    }
-    await notifyApplicantChange(notificationPayload)
+
 
     console.log('✅ BPOC application status updated successfully:', updated)
     return NextResponse.json({ 

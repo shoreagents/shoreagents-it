@@ -56,10 +56,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   console.log('AppSidebar: Role:', role)
   console.log('AppSidebar: IsAdmin:', isAdmin)
   console.log('AppSidebar: NewTicketsCount:', newTicketsCount)
-  console.log('AppSidebar: TicketsError:', ticketsError)
-  console.log('AppSidebar: WebSocket Connected:', isConnected)
+  console.log('AppSidebar: TicketsError:', ticketsError || 'None')
+  console.log('AppSidebar: TicketsWebSocket Connected:', isConnected)
   console.log('AppSidebar: NewApplicantsCount:', newApplicantsCount)
-  console.log('AppSidebar: ApplicantsError:', applicantsError)
+  console.log('AppSidebar: ApplicantsError:', applicantsError || 'None')
   console.log('AppSidebar: ApplicantsWebSocket Connected:', applicantsIsConnected)
   
 

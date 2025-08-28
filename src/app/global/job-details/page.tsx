@@ -259,20 +259,19 @@ export default function JobDetailsPage({ searchParams }: JobDetailsPageProps) {
       <div className="flex-1 overflow-auto p-6 space-y-6">
         {/* Job Header */}
         <div className="bg-card rounded-lg border p-6">
-          <div className="flex items-start justify-between">
-                               <div className="flex-1">
-                     <h1 className="text-2xl font-bold text-foreground mb-2">
-                       {jobData.job_title || jobData.title || 'Job Title'}
-                     </h1>
-                     {(jobData.company_name || jobData.company) && (
-                       <p className="text-lg text-muted-foreground mb-4">
-                         {jobData.company_name || jobData.company}
-                       </p>
-                     )}
-
-                     <div className="flex flex-wrap gap-3">
-                     </div>
-                   </div>
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-foreground">
+                {jobData.job_title || jobData.title || 'Job Title'}
+              </h1>
+            </div>
+            {(jobData.company_name || jobData.company) && (
+              <div className="flex-shrink-0 text-right">
+                <p className="text-lg text-muted-foreground">
+                  {jobData.company_name || jobData.company}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

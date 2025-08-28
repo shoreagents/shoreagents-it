@@ -1,9 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { IconPhoto, IconDeviceFloppy, IconArrowsMaximize, IconZoomIn, IconZoomOut, IconMaximize } from "@tabler/icons-react"
+import { IconPhoto, IconDeviceFloppy, IconArrowsMaximize, IconZoomIn, IconZoomOut } from "@tabler/icons-react"
 import { X } from "lucide-react"
 
 interface FileViewerPageProps {
@@ -24,6 +24,7 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 })
   const [fileSize, setFileSize] = useState<string>("")
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   useEffect(() => {
     // Get file URL and filename from search params
@@ -82,18 +83,19 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
     }
   }
 
-  const handleMaximizeWindow = () => {
+  const handleFullscreenToggle = useCallback(() => {
     if (typeof window !== 'undefined' && (window as any).electronAPI) {
-      (window as any).electronAPI.maximizeWindow()
+      (window as any).electronAPI.toggleFullscreen()
         .then((result: any) => {
           if (result.success) {
-            console.log('Window maximized successfully')
+            setIsFullscreen(!isFullscreen)
+            console.log('Fullscreen toggled successfully')
           } else {
-            console.error('Failed to maximize window:', result.error)
+            console.error('Failed to toggle fullscreen:', result.error)
           }
         })
         .catch((error: any) => {
-          console.error('Error maximizing window:', error)
+          console.error('Error toggling fullscreen:', error)
         })
     } else {
       // Fallback to browser fullscreen API
@@ -107,7 +109,13 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
         })
       }
     }
-  }
+  }, [isFullscreen])
+
+  const handleHeaderDoubleClick = useCallback(() => {
+    if (isFullscreen) {
+      handleFullscreenToggle()
+    }
+  }, [isFullscreen, handleFullscreenToggle])
 
   const handleSaveFile = () => {
     if (fileUrl) {
@@ -250,6 +258,35 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
     }
   }, [isDragging])
 
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (typeof window !== 'undefined' && (window as any).electronAPI) {
+        // In Electron, we can check if the window is fullscreen
+        // For now, we'll use a simple approach and let the user toggle
+        // The actual state will be managed by the main process
+      }
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F11') {
+        e.preventDefault()
+        handleFullscreenToggle()
+      } else if (e.key === 'Escape' && isFullscreen) {
+        e.preventDefault()
+        handleFullscreenToggle()
+      }
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('keydown', handleKeyDown)
+    
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [handleFullscreenToggle, isFullscreen])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -265,20 +302,49 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
     <div className="flex flex-col h-screen bg-background w-full">
       {/* Draggable Header */}
              <div 
-         className="flex items-center justify-between p-3 border-b border-border bg-sidebar cursor-move"
-         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+         className={`flex items-center justify-between cursor-move transition-all duration-300 ${
+           isFullscreen 
+             ? 'p-2 bg-primary/5 border-b border-primary/10' 
+             : 'p-3 border-b border-border bg-sidebar'
+         }`}
+         style={{ 
+           WebkitAppRegion: 'drag',
+           cursor: 'move'
+         } as React.CSSProperties}
+         onDoubleClick={handleHeaderDoubleClick}
        >
          <div className="flex items-center gap-2 flex-1 min-w-0">
            <div className="min-w-0 flex-1">
-             <h1 className="text-base font-semibold truncate">
+             <h1 className={`font-semibold truncate ${
+               isFullscreen ? 'text-sm' : 'text-base'
+             }`}
+             style={{ cursor: 'default' }}
+             >
                {fileName}
+               {isFullscreen && (
+                 <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                   FS
+                 </span>
+               )}
              </h1>
+             {isFullscreen && (
+               <p className="text-xs text-muted-foreground mt-1"
+                  style={{ cursor: 'default' }}
+               >
+                 Double-click to exit fullscreen
+               </p>
+             )}
            </div>
          </div>
          <button
            onClick={handleCloseWindow}
-           className="h-6 w-6 p-0 rounded-sm opacity-70 hover:opacity-100 transition-opacity flex-shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground"
+           className={`h-6 w-6 p-0 rounded-sm transition-all duration-300 flex-shrink-0 flex items-center justify-center ${
+             isFullscreen 
+               ? 'opacity-100 text-primary hover:text-primary/80 bg-primary/10 hover:bg-primary/20' 
+               : 'opacity-70 hover:opacity-100 text-muted-foreground hover:text-foreground'
+           }`}
            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+           title="Close Window"
          >
            <X className="h-6 w-6" />
          </button>
@@ -398,7 +464,9 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
        </div>
 
        {/* Footer Bar */}
-       <div className="flex items-center justify-between px-6 py-3 bg-sidebar border-t border-border">
+       <div className={`flex items-center justify-between px-6 py-3 bg-sidebar border-t border-border transition-all duration-300 ${
+         isFullscreen ? 'opacity-0 pointer-events-none' : 'opacity-100'
+       }`}>
          {/* Left side - File info and actions */}
          <div className="flex items-center gap-4">
            <IconPhoto className="h-5 w-5 text-muted-foreground" />
@@ -446,8 +514,18 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
            />
            <div className="w-px h-4 bg-border mx-2"></div>
            <IconArrowsMaximize 
-             className="h-5 w-5 text-muted-foreground hover:text-primary cursor-pointer transition-colors" 
-             onClick={handleMaximizeWindow}
+             className={`h-5 w-5 cursor-pointer transition-colors ${
+               isFullscreen 
+                 ? 'text-primary hover:text-primary/80' 
+                 : 'text-muted-foreground hover:text-primary'
+             }`}
+             onClick={handleFullscreenToggle}
+             title={isFullscreen ? "Exit Fullscreen (F11)" : "Enter Fullscreen (F11)"}
+             style={{ 
+               cursor: isFullscreen ? 'pointer' : 'pointer',
+               transform: isFullscreen ? 'rotate(180deg)' : 'rotate(0deg)',
+               transition: 'transform 0.3s ease'
+             }}
            />
          </div>
        </div>

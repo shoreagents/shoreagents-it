@@ -14,8 +14,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useTheme } from "next-themes"
 import { useRealtimeApplicants } from "@/hooks/use-realtime-applicants"
+
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
-import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface ApplicantsDetailModalProps {
   applicant: Applicant | null
@@ -291,7 +292,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     return hasFieldChanges || hasStatusChanges
   }, [inputValues, originalValues, localApplicant, pendingStatusChanges])
   
-  // Real-time updates for applicant data
+  // Real-time updates for applicant data (separate from BPOC job status updates)
   const { isConnected: isRealtimeConnected } = useRealtimeApplicants({
     onApplicantUpdated: (updatedApplicant, oldApplicant) => {
       console.log('🔄 Real-time: Applicant update received in modal:', { 
@@ -349,11 +350,12 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     }
   })
 
-  console.log('🔍 Modal real-time hook initialized:', { 
-    isRealtimeConnected, 
-    applicantId: localApplicant?.id,
-    hasLocalApplicant: !!localApplicant,
-    modalProps: { applicantId: applicant?.id, isOpen }
+
+
+  // Log connection status for debugging
+  console.log('🔍 Modal connection status:', { 
+    isRealtimeConnected,
+    applicantId: localApplicant?.id
   })
 
   // Update local applicant when prop changes
@@ -384,6 +386,8 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
       setHasChanges(false)
     }
   }, [applicant])
+
+
 
 
 
@@ -723,6 +727,34 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
         if (onStatusUpdate) {
           onStatusUpdate(localApplicant.id, 0, pendingStatusChanges.mainStatus)
         }
+        
+        // Refresh applicant data to get updated status
+        try {
+          console.log('🔄 Refreshing applicant data after main status update...')
+          const refreshResponse = await fetch(`/api/bpoc?id=${localApplicant.id}`)
+          if (refreshResponse.ok) {
+            const refreshedData = await refreshResponse.json()
+            if (refreshedData.applicants && refreshedData.applicants.length > 0) {
+              const refreshedApplicant = refreshedData.applicants[0]
+              console.log('✅ Applicant data refreshed:', refreshedApplicant)
+              
+              // Update local applicant with refreshed data
+              setLocalApplicant(prev => prev ? {
+                ...prev,
+                status: refreshedApplicant.status,
+                all_job_statuses: refreshedApplicant.all_job_statuses,
+                all_job_titles: refreshedApplicant.all_job_titles,
+                all_companies: refreshedApplicant.all_companies,
+                all_job_timestamps: refreshedApplicant.all_job_timestamps
+              } : null)
+              
+              // Update current status
+              setCurrentStatus(refreshedApplicant.status)
+            }
+          }
+        } catch (refreshError) {
+          console.warn('⚠️ Failed to refresh applicant data:', refreshError)
+        }
       }
       
       // Handle job status updates
@@ -752,6 +784,30 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
           // Call parent callback if provided
           if (onStatusUpdate) {
             onStatusUpdate(localApplicant.id, parseInt(jobIndex), newStatus)
+          }
+          
+          // Refresh applicant data to get updated job statuses
+          try {
+            console.log('🔄 Refreshing applicant data after job status update...')
+            const refreshResponse = await fetch(`/api/bpoc?id=${localApplicant.id}`)
+            if (refreshResponse.ok) {
+              const refreshedData = await refreshResponse.json()
+              if (refreshedData.applicants && refreshedData.applicants.length > 0) {
+                const refreshedApplicant = refreshedData.applicants[0]
+                console.log('✅ Applicant data refreshed:', refreshedApplicant)
+                
+                // Update local applicant with refreshed data
+                setLocalApplicant(prev => prev ? {
+                  ...prev,
+                  all_job_statuses: refreshedApplicant.all_job_statuses,
+                  all_job_titles: refreshedApplicant.all_job_titles,
+                  all_companies: refreshedApplicant.all_companies,
+                  all_job_timestamps: refreshedApplicant.all_job_timestamps
+                } : null)
+              }
+            }
+          } catch (refreshError) {
+            console.warn('⚠️ Failed to refresh applicant data:', refreshError)
           }
         }
       }
@@ -1032,48 +1088,66 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                   )}
                                 </div>
                                 
-                                {/* Company Name and Status Badge Container */}
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    {localApplicant.all_companies && localApplicant.all_companies[index] ? (
-                                      <p className="text-sm text-muted-foreground">{localApplicant.all_companies[index]}</p>
-                                    ) : (
-                                      <div className="h-5"></div>
-                                    )}
-                                  </div>
+                                {/* Company Name and Status Badge Container - Only show when there's company data or in talent pool */}
+                                {(() => {
+                                  const hasCompany = localApplicant?.all_companies && localApplicant.all_companies[index];
+                                  const isTalentPool = pageContext === 'talent-pool';
                                   
-                                  {/* Status Badge - Right side of company container */}
-                                  {(() => {
-                                    const status = localApplicant.all_job_statuses?.[index] || localApplicant.status;
-                                    const showStatus = pageContext === 'talent-pool' || ['withdrawn', 'not qualified', 'failed', 'qualified', 'final interview', 'hired'].includes(status.toLowerCase());
-                                    
-                                    // Debug: Log status for each job
-                                    console.log(`🔍 Job ${index} Status Debug:`, {
-                                      jobIndex: index,
-                                      jobTitle: localApplicant.all_job_titles?.[index],
-                                      company: localApplicant.all_companies?.[index],
-                                      jobStatus: localApplicant.all_job_statuses?.[index],
-                                      fallbackStatus: localApplicant.status,
-                                      finalStatus: status,
-                                      showStatus
-                                    })
-                                    
-                                    if (showStatus) {
-                                      return (
-                                        <div className="flex-shrink-0">
-                                          <Popover>
-                                            <PopoverTrigger asChild>
-                                              <Badge 
-                                                variant="outline" 
-                                                className={`${getStatusColor(status, true)} px-2 py-0.5 text-xs font-medium rounded-md cursor-pointer hover:opacity-80 transition-opacity`}
-                                                onClick={(e) => {
-                                                  e.stopPropagation()
-                                                }}
-                                              >
-                                                {getStatusLabel(status, true)}
-                                              </Badge>
-                                            </PopoverTrigger>
-                                                                                          <PopoverContent className="w-48 p-2" align="end" side="top" sideOffset={4}>
+                                  // Only show container if there's company data OR we're in talent pool (for status editing)
+                                  if (!hasCompany && !isTalentPool) {
+                                    return null;
+                                  }
+                                  
+                                  return (
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex-1">
+                                        {hasCompany ? (
+                                          <p className="text-sm text-muted-foreground">{localApplicant?.all_companies?.[index]}</p>
+                                        ) : (
+                                          // Only show placeholder in talent pool when we might add company data
+                                          isTalentPool ? <div className="h-5"></div> : null
+                                        )}
+                                      </div>
+                                      
+                                      {/* Status Badge - Right side of company container */}
+                                      {(() => {
+                                        // Only show job statuses when in talent pool page
+                                        if (!isTalentPool) {
+                                          return null;
+                                        }
+                                        
+                                        const status = localApplicant.all_job_statuses?.[index] || localApplicant.status;
+                                        // Only show statuses that can be edited in the popover
+                                        const showStatus = ['not qualified', 'qualified', 'final interview'].includes(status.toLowerCase());
+                                        
+                                        // Debug: Log status for each job
+                                        console.log(`🔍 Job ${index} Status Debug:`, {
+                                          jobIndex: index,
+                                          jobTitle: localApplicant.all_job_titles?.[index],
+                                          company: localApplicant.all_companies?.[index],
+                                          jobStatus: localApplicant.all_job_statuses?.[index],
+                                          fallbackStatus: localApplicant.status,
+                                          finalStatus: status,
+                                          showStatus,
+                                          pageContext
+                                        })
+                                        
+                                        if (showStatus) {
+                                          return (
+                                            <div className="flex-shrink-0">
+                                              <Popover>
+                                                <PopoverTrigger asChild>
+                                                  <Badge 
+                                                    variant="outline" 
+                                                    className={`${getStatusColor(status, true)} px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center mt-1`}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                    }}
+                                                  >
+                                                    {getStatusLabel(status, true)}
+                                                  </Badge>
+                                                </PopoverTrigger>
+                                                                                              <PopoverContent className="w-48 p-2" align="end" side="top" sideOffset={4}>
                                                 <div className="space-y-1">
                                                   {['not qualified', 'qualified', 'final interview'].map((statusOption) => (
                                                   <div 
@@ -1122,11 +1196,74 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                           </Popover>
                                         </div>
                                       );
-                                    }
+                                    } else {
+                                      // Show "Set Status" button when no status is set
+                                      return (
+                                        <div className="flex-shrink-0">
+                                          <Popover>
+                                            <PopoverTrigger asChild>
+                                              <Badge 
+                                                variant="outline" 
+                                                className={`text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20 px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center border-dashed mt-1`}
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                }}
+                                              >
+                                                Set Status
+                                              </Badge>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-48 p-2" align="end" side="top" sideOffset={4}>
+                                              <div className="space-y-1">
+                                                {['not qualified', 'qualified', 'final interview'].map((statusOption) => (
+                                                <div 
+                                                  key={statusOption}
+                                                  className="flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    console.log(`🔄 Setting initial job ${index} status:`, statusOption);
+                                                    
+                                                    // Store the pending job status change
+                                                    setPendingStatusChanges(prev => ({
+                                                      ...prev,
+                                                      jobStatuses: {
+                                                        ...prev.jobStatuses,
+                                                        [index]: statusOption
+                                                      }
+                                                    }))
+                                                    
+                                                    // Update local applicant state for immediate feedback
+                                                    if (localApplicant) {
+                                                      const updatedJobStatuses = [...(localApplicant.all_job_statuses || [])]
+                                                      updatedJobStatuses[index] = statusOption
+                                                      setLocalApplicant(prev => prev ? {
+                                                        ...prev,
+                                                        all_job_statuses: updatedJobStatuses
+                                                      } : null)
+                                                    }
+                                                  }}
+                                                >
+                                                  {/* Colored status indicator */}
+                                                  <div className={`w-3 h-3 rounded-full ${
+                                                    statusOption === 'qualified' ? 'bg-green-500' :
+                                                    statusOption === 'final interview' ? 'bg-blue-500' :
+                                                    statusOption === 'not qualified' ? 'bg-red-500' :
+                                                    'bg-gray-500'
+                                                  }`}></div>
+                                                  <span className="text-sm font-medium">{getStatusLabel(statusOption)}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </PopoverContent>
+                                        </Popover>
+                                      </div>
+                                    );
+                                  }
                                     
-                                    return null;
+                                  return null;
                                   })()}
-                                </div>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             ))}
                           </>

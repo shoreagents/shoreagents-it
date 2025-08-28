@@ -23,8 +23,12 @@ export async function GET(
     }
 
     // Fetch job details from processed_job_requests table in BPOC database
+    // JOIN with members table to get company name
     const { rows: jobData } = await bpocPool.query(
-      'SELECT * FROM public.processed_job_requests WHERE id = $1',
+      `SELECT pjr.*, m.company as company_name 
+       FROM public.processed_job_requests pjr
+       LEFT JOIN public.members m ON pjr.company_id = m.company_id
+       WHERE pjr.id = $1`,
       [jobId]
     )
 
@@ -38,7 +42,8 @@ export async function GET(
     // Transform the data to include company name if available
     const transformedJobData = {
       ...jobData[0],
-      company_name: jobData[0].company_name || jobData[0].company || null
+      company_name: jobData[0].company_name || null,
+      company: jobData[0].company_name || null  // Also set company field for compatibility
     }
 
     return NextResponse.json(transformedJobData)

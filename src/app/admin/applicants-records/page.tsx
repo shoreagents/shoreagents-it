@@ -22,7 +22,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { ApplicantsDetailModal } from "@/components/modals/applicants-detail-modal"
 import { useRealtimeApplicants } from "@/hooks/use-realtime-applicants"
 
-type ApplicantStatus = 'submitted' | 'qualified' | 'for verification' | 'verified' | 'initial interview' | 'final interview' | 'not qualified' | 'not qualifies' | 'passed' | 'rejected' | 'withdrawn' | 'hired' | 'closed' | 'failed'
+type ApplicantStatus = 'submitted' | 'qualified' | 'for verification' | 'verified' | 'initial interview' | 'final interview' | 'not qualified' | 'passed' | 'rejected' | 'withdrawn' | 'hired' | 'closed' | 'failed'
 
 // Only show these specific statuses - defined outside component to prevent recreation
 const ALLOWED_STATUSES: ApplicantStatus[] = ['failed', 'withdrawn', 'rejected', 'passed', 'hired']

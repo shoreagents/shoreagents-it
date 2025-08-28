@@ -6,7 +6,7 @@ async function testApplicantRealtime() {
 
   // Step 1: Connect to WebSocket
   console.log('📡 Step 1: Connecting to WebSocket...');
-  const ws = new WebSocket('ws://localhost:3002/ws');
+  const ws = new WebSocket('ws://localhost:3001/ws');
   
   let wsConnected = false;
   let messagesReceived = [];
@@ -46,7 +46,7 @@ async function testApplicantRealtime() {
   // Test 1: Create a new applicant
   console.log('\n🆕 Test 1: Creating new applicant...');
   try {
-    const createResponse = await fetch('http://localhost:3002/api/bpoc/auto-save', {
+            const createResponse = await fetch('http://localhost:3001/api/bpoc/auto-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     });
@@ -69,14 +69,14 @@ async function testApplicantRealtime() {
   console.log('\n🔄 Test 2: Updating applicant status...');
   try {
     // First get existing applicants
-    const getResponse = await fetch('http://localhost:3002/api/bpoc');
+    const getResponse = await fetch('http://localhost:3001/api/bpoc');
     if (getResponse.ok) {
       const applicants = await getResponse.json();
       if (applicants.length > 0) {
         const firstApplicant = applicants[0];
         console.log('📝 Updating applicant:', firstApplicant.id);
         
-        const updateResponse = await fetch(`http://localhost:3002/api/bpoc`, {
+        const updateResponse = await fetch(`http://localhost:3001/api/bpoc`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -108,14 +108,14 @@ async function testApplicantRealtime() {
   // Step 4: Test position update
   console.log('\n📍 Test 3: Updating applicant position...');
   try {
-    const getResponse = await fetch('http://localhost:3002/api/bpoc');
+    const getResponse = await fetch('http://localhost:3001/api/bpoc');
     if (getResponse.ok) {
       const applicants = await getResponse.json();
       if (applicants.length > 0) {
         const firstApplicant = applicants[0];
         console.log('📝 Updating position for applicant:', firstApplicant.id);
         
-        const positionResponse = await fetch('http://localhost:3002/api/bpoc/positions', {
+        const positionResponse = await fetch('http://localhost:3001/api/bpoc/positions', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
