@@ -20,16 +20,24 @@ export const EditableField = ({
   onBlur,
   onKeyDown,
   className = "h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none"
-}: EditableFieldProps) => (
-  <Input
-    value={value}
-    onChange={(e) => onSave(fieldName, e.target.value)}
-    onBlur={onBlur}
-    onKeyDown={onKeyDown}
-    className={className}
-    placeholder={placeholder}
-  />
-)
+}: EditableFieldProps) => {
+  const [isFocused, setIsFocused] = React.useState(false);
+  
+  return (
+    <Input
+      value={value}
+      onChange={(e) => onSave(fieldName, e.target.value)}
+      onBlur={(e) => {
+        setIsFocused(false);
+        onBlur?.();
+      }}
+      onFocus={() => setIsFocused(true)}
+      onKeyDown={onKeyDown}
+      className={className}
+      placeholder={!isFocused && !value ? placeholder : ""}
+    />
+  );
+}
 
 interface DataFieldRowProps {
   icon: React.ReactNode

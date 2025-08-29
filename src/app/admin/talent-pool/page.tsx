@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ApplicantsDetailModal } from "@/components/modals/applicants-detail-modal"
+import { useRealtimeApplicants } from "@/hooks/use-realtime-applicants"
 
 import { 
   Search, 
@@ -176,11 +177,115 @@ export default function TalentPoolPage() {
 
 
 
-  // Real-time updates for BPOC applications (separate from job status updates)
-  // Removed useRealtimeApplicants hook
+  // Function to refresh the entire applicants list with enriched data
+  const refreshApplicantsList = useCallback(async () => {
+    try {
+      console.log('🔄 Refreshing applicants list with enriched data...')
+      const res = await fetch('/api/bpoc?status=passed')
+      if (res.ok) {
+        const data = await res.json()
+        const mapped: Applicant[] = data.map((a: any) => mapApplicantData(a))
+        setApplicants(mapped)
+        console.log('✅ Applicants list refreshed with enriched data')
+      }
+    } catch (error) {
+      console.error('Error refreshing applicants list:', error)
+    }
+  }, [mapApplicantData])
 
-
-  // Removed realtime functionality
+  // Real-time updates for applicants (bpoc_recruits table)
+  const { isConnected: isApplicantsConnected } = useRealtimeApplicants({
+    onApplicantCreated: async (newApplicant) => {
+      console.log('🆕 Real-time: New applicant created:', newApplicant)
+      console.log('🔍 New applicant status:', newApplicant.status)
+      // Only update if the new applicant has 'passed' status
+      if (newApplicant.status === 'passed') {
+        console.log('✅ Applicant has "passed" status, refreshing applicants list...')
+        // Refresh the entire list to get the new applicant with enriched data
+        await refreshApplicantsList()
+      } else {
+        console.log('❌ Applicant status is not "passed":', newApplicant.status)
+      }
+    },
+    onApplicantUpdated: async (updatedApplicant, oldApplicant) => {
+      console.log('📝 Real-time: Applicant updated:', updatedApplicant, 'Old:', oldApplicant)
+      console.log('🔍 Update details:', {
+        newStatus: updatedApplicant.status,
+        oldStatus: oldApplicant?.status,
+        applicantId: updatedApplicant.applicant_id || updatedApplicant.id
+      })
+      
+      // Update the applicant in the existing list without showing loading
+      setApplicants(prev => {
+        const existingIndex = prev.findIndex(app => 
+          String(app.applicant_id) === String(updatedApplicant.applicant_id) ||
+          String(app.id) === String(updatedApplicant.id)
+        )
+        
+        if (existingIndex !== -1) {
+          const newList = [...prev]
+          
+          // If status changed from 'passed' to something else, remove from list
+          if (oldApplicant?.status === 'passed' && updatedApplicant.status !== 'passed') {
+            newList.splice(existingIndex, 1)
+            return newList
+          }
+          
+          // If status is 'passed', refresh the entire list to get updated enriched data
+          if (updatedApplicant.status === 'passed') {
+            // Refresh the entire list to get updated data with all enriched fields
+            refreshApplicantsList()
+            return newList
+          }
+          
+          return newList
+        } else {
+          // If not found in list and new status is 'passed', refresh the entire list
+          if (updatedApplicant.status === 'passed') {
+            refreshApplicantsList()
+            return prev
+          }
+          return prev
+        }
+      })
+    },
+    onApplicantDeleted: (deletedApplicant) => {
+      console.log('🗑️ Real-time: Applicant deleted:', deletedApplicant)
+      // Remove from the existing list without showing loading
+      setApplicants(prev => prev.filter(app => 
+        String(app.applicant_id) !== String(deletedApplicant.applicant_id) &&
+        String(app.id) !== String(deletedApplicant.id)
+      ))
+      
+      // Close modal if the deleted applicant was selected
+      if (selectedTalent && (
+        String(selectedTalent.applicant_id) === String(deletedApplicant.applicant_id) ||
+        String(selectedTalent.id) === String(deletedApplicant.id)
+      )) {
+        setIsModalOpen(false)
+        setSelectedTalent(null)
+      }
+    }
+  })
+  
+  // Log connection status for debugging
+  console.log('🔍 Talent Pool connection status:', { 
+    isApplicantsConnected,
+    applicantsCount: applicants.length
+  })
+  
+  // Debug: Log when applicants state changes
+  useEffect(() => {
+    console.log('🔄 Applicants state changed:', {
+      count: applicants.length,
+      firstApplicant: applicants[0] ? {
+        id: applicants[0].id,
+        status: applicants[0].status,
+        full_name: applicants[0].full_name,
+        skills: applicants[0].skills?.length || 0
+      } : null
+    })
+  }, [applicants])
   
   // Update selectedTalent when applicants state changes
   useEffect(() => {

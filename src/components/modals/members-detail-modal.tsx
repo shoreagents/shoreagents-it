@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck } from "@tabler/icons-react"
+import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconWorld, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck } from "@tabler/icons-react"
 import { useRealtimeMembers } from '@/hooks/use-realtime-members'
 import { SendHorizontal } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -2336,7 +2336,34 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
               )}
               
               {/* Company Metadata Grid */}
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                {/* Badge Color */}
+                <div className="flex items-center gap-2">
+                  <IconTag className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Badge Color:</span>
+                  <div className="flex items-center gap-2">
+                    <ColorPicker
+                      color={formData.badge_color}
+                      onChange={(color) => handleInputChange('badge_color', color)}
+                      open={isColorPickerOpen}
+                      onOpenChange={setIsColorPickerOpen}
+                    >
+                      <Badge 
+                        variant="outline" 
+                        className="px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center"
+                        style={{ 
+                          color: '#ffffff',
+                          borderColor: `${formData.badge_color || '#0EA5E9'}20`,
+                          backgroundColor: `${formData.badge_color || '#0EA5E9'}20`
+                        }}
+                        title="Click to open color picker"
+                      >
+                        {formData.badge_color || '#0EA5E9'}
+                      </Badge>
+                    </ColorPicker>
+                  </div>
+                </div>
+
                 {/* Service */}
                 <div className="flex items-center gap-2">
                   <IconBriefcase className="h-4 w-4 text-muted-foreground" />
@@ -2436,29 +2463,6 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       </div>
                     </PopoverContent>
                   </Popover>
-                </div>
-
-                {/* Badge Color */}
-                <div className="flex items-center gap-2">
-                  <IconTag className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Badge Color:</span>
-                  <div className="flex items-center gap-2">
-                    <ColorPicker
-                      color={formData.badge_color}
-                      onChange={(color) => handleInputChange('badge_color', color)}
-                      open={isColorPickerOpen}
-                      onOpenChange={setIsColorPickerOpen}
-                    >
-                      <div 
-                        className="w-5 h-5 rounded-full border border-border cursor-pointer shadow-sm flex-shrink-0" 
-                        style={{ backgroundColor: formData.badge_color || '#0EA5E9' }}
-                        title="Click to open color picker"
-                      />
-                    </ColorPicker>
-                    <span className="text-xs text-muted-foreground leading-none">
-                      {formData.badge_color || '#0EA5E9'}
-                    </span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -2586,7 +2590,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
 
                     {/* Country */}
                     <DataFieldRow
-                      icon={<IconGlobe className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                      icon={<IconWorld className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
                       label="Country"
                       fieldName="country"
                       value={formData.country || ''}

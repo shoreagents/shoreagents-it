@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 
 // Check if we're in development mode
@@ -35,8 +35,8 @@ function createWindow() {
     // In development, load from the custom server
     console.log('Loading from development server: http://localhost:3001');
             mainWindow.loadURL('http://localhost:3001');
-    // Open DevTools in development
-    mainWindow.webContents.openDevTools();
+    // Open DevTools in development (commented out to prevent auto-opening)
+    // mainWindow.webContents.openDevTools();
     
     // Handle load errors
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
@@ -89,7 +89,7 @@ function createChatWindow(ticketId, ticketData) {
   // Load chat page
   if (isDev) {
           chatWindow.loadURL(`http://localhost:3001/global/chat/${ticketId}`);
-    chatWindow.webContents.openDevTools();
+    // chatWindow.webContents.openDevTools();
   } else {
     chatWindow.loadFile(path.join(__dirname, `../out/global/chat/${ticketId}/index.html`));
   }
@@ -136,7 +136,7 @@ function createTicketDetailWindow(ticketId, ticketData) {
   // Load ticket detail page
   if (isDev) {
           ticketDetailWindow.loadURL(`http://localhost:3001/ticket-detail/${ticketId}`);
-    ticketDetailWindow.webContents.openDevTools();
+    // ticketDetailWindow.webContents.openDevTools();
   } else {
     ticketDetailWindow.loadFile(path.join(__dirname, `../out/ticket-detail/${ticketId}/index.html`));
   }
@@ -189,7 +189,7 @@ function createFileWindow(fileUrl, fileName) {
   
   if (isDev) {
           fileWindow.loadURL(`http://localhost:3001/global/file-viewer?url=${encodedUrl}&filename=${encodedFileName}`);
-    fileWindow.webContents.openDevTools();
+    // fileWindow.webContents.openDevTools();
   } else {
     fileWindow.loadFile(path.join(__dirname, `../out/global/file-viewer/index.html?url=${encodedUrl}&filename=${encodedFileName}`));
   }
@@ -237,7 +237,7 @@ function createJobDetailWindow(jobId, jobData) {
   if (isDev) {
     const encodedJobData = encodeURIComponent(JSON.stringify(jobData))
     jobDetailWindow.loadURL(`http://localhost:3001/global/job-details?jobId=${jobId}&jobData=${encodedJobData}`)
-    jobDetailWindow.webContents.openDevTools()
+    // jobDetailWindow.webContents.openDevTools()
   } else {
     // For production, we'll need to build and serve the static files
     jobDetailWindow.loadFile(path.join(__dirname, `../out/global/job-details/index.html?jobId=${jobId}&jobData=${encodeURIComponent(JSON.stringify(jobData))}`))
@@ -352,6 +352,243 @@ ipcMain.handle('toggle-fullscreen', async (event) => {
     return { success: true };
   } catch (error) {
     console.error('Error toggling fullscreen:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('toggle-dual-monitor-fullscreen', async (event) => {
+  try {
+    // Verify screen module is available
+    if (!screen || typeof screen.getAllDisplays !== 'function') {
+      console.error('Screen module not available');
+      return { success: false, error: 'Screen module not available' };
+    }
+    
+    const currentWindow = BrowserWindow.fromWebContents(event.sender);
+    if (currentWindow && !currentWindow.isDestroyed()) {
+      const displays = screen.getAllDisplays();
+      console.log('Available displays:', displays.map(d => ({ id: d.id, bounds: d.bounds, size: d.size })));
+      
+      if (displays.length > 1) {
+        // Get the primary display using the proper API
+        const primaryDisplay = screen.getPrimaryDisplay();
+        console.log('Primary display:', { id: primaryDisplay.id, bounds: primaryDisplay.bounds, size: primaryDisplay.size });
+        
+        const secondaryDisplay = displays.find(display => display.id !== primaryDisplay.id);
+        console.log('Secondary display:', secondaryDisplay ? { id: secondaryDisplay.id, bounds: secondaryDisplay.bounds, size: secondaryDisplay.size } : 'Not found');
+        
+        if (primaryDisplay && secondaryDisplay) {
+          // Additional validation to ensure displays are valid
+          if (!primaryDisplay.bounds || !secondaryDisplay.bounds || 
+              !primaryDisplay.size || !secondaryDisplay.size) {
+            console.error('Display bounds or size are invalid:', { 
+              primary: { bounds: primaryDisplay.bounds, size: primaryDisplay.size },
+              secondary: { bounds: secondaryDisplay.bounds, size: secondaryDisplay.size }
+            });
+            return { success: false, error: 'Display configuration is invalid' };
+          }
+          // Create a black window on secondary monitor
+          const blackWindow = new BrowserWindow({
+            width: secondaryDisplay.size.width,
+            height: secondaryDisplay.size.height,
+            x: secondaryDisplay.bounds.x,
+            y: secondaryDisplay.bounds.y,
+            frame: false,
+            fullscreen: true,
+            alwaysOnTop: true,
+            skipTaskbar: true,
+            webPreferences: {
+              nodeIntegration: false,
+              contextIsolation: true,
+              enableRemoteModule: false,
+            }
+          });
+          
+          // Load a simple black HTML page
+          blackWindow.loadURL('data:text/html,<html><body style="background-color: black; margin: 0; padding: 0; width: 100vw; height: 100vh;"></body></html>');
+          
+          // Store reference to black window
+          if (!currentWindow.blackWindow) {
+            currentWindow.blackWindow = blackWindow;
+          }
+          
+          // Set current window to fullscreen on primary monitor
+          currentWindow.setFullScreen(true);
+          
+          // Handle black window close
+          blackWindow.on('closed', () => {
+            if (currentWindow.blackWindow === blackWindow) {
+              currentWindow.blackWindow = null;
+            }
+          });
+          
+          console.log('Dual monitor fullscreen activated successfully');
+          return { success: true, message: 'Dual monitor fullscreen activated' };
+        } else {
+          console.error('Failed to identify displays using primary method, trying fallback...');
+          
+          // Fallback: try using first two displays
+          if (displays.length >= 2) {
+            const fallbackPrimary = displays[0];
+            const fallbackSecondary = displays[1];
+            
+            console.log('Fallback - Display 1:', { id: fallbackPrimary.id, bounds: fallbackPrimary.bounds, size: fallbackPrimary.size });
+            console.log('Fallback - Display 2:', { id: fallbackSecondary.id, bounds: fallbackSecondary.bounds, size: fallbackSecondary.size });
+            
+            if (fallbackPrimary.bounds && fallbackSecondary.bounds && 
+                fallbackPrimary.size && fallbackSecondary.size) {
+              
+              // Create a black window on second display
+              const blackWindow = new BrowserWindow({
+                width: fallbackSecondary.size.width,
+                height: fallbackSecondary.size.height,
+                x: fallbackSecondary.bounds.x,
+                y: fallbackSecondary.bounds.y,
+                frame: false,
+                fullscreen: true,
+                alwaysOnTop: true,
+                skipTaskbar: true,
+                webPreferences: {
+                  nodeIntegration: false,
+                  contextIsolation: true,
+                  enableRemoteModule: false,
+                }
+              });
+              
+              // Load a simple black HTML page
+              blackWindow.loadURL('data:text/html,<html><body style="background-color: black; margin: 0; padding: 0; width: 100vw; height: 100vh;"></body></html>');
+              
+              // Store reference to black window
+              if (!currentWindow.blackWindow) {
+                currentWindow.blackWindow = blackWindow;
+              }
+              
+              // Set current window to fullscreen on first display
+              currentWindow.setFullScreen(true);
+              
+              // Handle black window close
+              blackWindow.on('closed', () => {
+                if (currentWindow.blackWindow === blackWindow) {
+                  currentWindow.blackWindow = null;
+                }
+              });
+              
+              console.log('Dual monitor fullscreen activated using fallback method');
+              return { success: true, message: 'Dual monitor fullscreen activated (fallback method)' };
+            }
+          }
+          
+          console.error('All methods failed to identify displays');
+          return { success: false, error: 'Could not identify primary and secondary displays' };
+        }
+      } else {
+        console.log('Only one monitor detected:', displays.length);
+        return { success: false, error: 'Only one monitor detected' };
+      }
+    }
+    return { success: false, error: 'Window not found' };
+  } catch (error) {
+    console.error('Error toggling dual monitor fullscreen:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('exit-dual-monitor-fullscreen', async (event) => {
+  try {
+    const currentWindow = BrowserWindow.fromWebContents(event.sender);
+    if (currentWindow && !currentWindow.isDestroyed()) {
+      // Close black window if it exists
+      if (currentWindow.blackWindow && !currentWindow.blackWindow.isDestroyed()) {
+        currentWindow.blackWindow.close();
+        currentWindow.blackWindow = null;
+      }
+      
+      // Exit fullscreen on current window
+      currentWindow.setFullScreen(false);
+      
+      return { success: true, message: 'Dual monitor fullscreen deactivated' };
+    }
+    return { success: false, error: 'Window not found' };
+  } catch (error) {
+    console.error('Error exiting dual monitor fullscreen:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('check-multiple-monitors', async (event) => {
+  try {
+    // Verify screen module is available
+    if (!screen || typeof screen.getAllDisplays !== 'function') {
+      console.error('Screen module not available');
+      return { success: false, error: 'Screen module not available' };
+    }
+    
+    const displays = screen.getAllDisplays();
+    console.log('Monitor check - Available displays:', displays.length);
+    
+    return { 
+      success: true, 
+      hasMultipleMonitors: displays.length > 1,
+      monitorCount: displays.length
+    };
+  } catch (error) {
+    console.error('Error checking monitors:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('toggle-multi-monitor-fullscreen', async (event) => {
+  try {
+    const currentWindow = BrowserWindow.fromWebContents(event.sender);
+    if (currentWindow && !currentWindow.isDestroyed()) {
+      if (currentWindow.isFullScreen()) {
+        // Exit multi-monitor fullscreen
+        currentWindow.setFullScreen(false);
+        currentWindow.setResizable(true);
+        currentWindow.setMovable(true);
+        currentWindow.setAlwaysOnTop(false);
+        currentWindow.setVisibleOnAllWorkspaces(false);
+        currentWindow.setBounds({ x: 0, y: 0, width: 800, height: 600 });
+      } else {
+        // Enter multi-monitor fullscreen - create a truly borderless window covering all displays
+        const { screen } = require('electron');
+        const displays = screen.getAllDisplays();
+        
+        // Calculate bounds to cover all displays
+        let minX = 0, minY = 0, maxX = 0, maxY = 0;
+        displays.forEach(display => {
+          minX = Math.min(minX, display.bounds.x);
+          minY = Math.min(minY, display.bounds.y);
+          maxX = Math.max(maxX, display.bounds.x + display.bounds.width);
+          maxY = Math.max(maxY, display.bounds.y + display.bounds.height);
+        });
+        
+        // Set window to cover all displays with no borders
+        currentWindow.setBounds({
+          x: minX,
+          y: minY,
+          width: maxX - minX,
+          height: maxY - minY
+        });
+        
+        // Make it truly fullscreen across all monitors
+        currentWindow.setFullScreen(true);
+        
+        // Force the window to be on top and cover everything
+        currentWindow.setAlwaysOnTop(true, 'screen-saver');
+        currentWindow.setVisibleOnAllWorkspaces(true);
+        
+        // Ensure it covers the entire screen area
+        currentWindow.setResizable(false);
+        currentWindow.setMovable(false);
+        
+        // Set the window to be borderless and truly fullscreen
+        currentWindow.setMenuBarVisibility(false);
+      }
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error toggling multi-monitor fullscreen:', error);
     return { success: false, error: error.message };
   }
 });

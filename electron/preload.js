@@ -11,5 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   closeCurrentWindow: () => ipcRenderer.invoke('close-current-window'),
   maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
   toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
+  toggleDualMonitorFullscreen: () => ipcRenderer.invoke('toggle-dual-monitor-fullscreen'),
+  exitDualMonitorFullscreen: () => ipcRenderer.invoke('exit-dual-monitor-fullscreen'),
+  checkMultipleMonitors: () => ipcRenderer.invoke('check-multiple-monitors'),
   isElectron: true,
 }); 

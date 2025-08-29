@@ -94,7 +94,7 @@ export async function PUT(request: Request) {
     
     return NextResponse.json({ 
       success: true, 
-      applicant: updated,
+      applicant: updated, // This now contains the complete enriched data
       updatedFields: updateFields
     })
 

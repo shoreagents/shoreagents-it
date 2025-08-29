@@ -25,6 +25,8 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 })
   const [fileSize, setFileSize] = useState<string>("")
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isDualMonitorFullscreen, setIsDualMonitorFullscreen] = useState(false)
+  const [hasMultipleMonitors, setHasMultipleMonitors] = useState(false)
 
   useEffect(() => {
     // Get file URL and filename from search params
@@ -52,6 +54,21 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
         })
         .catch(() => {
           setFileSize("Unknown")
+        })
+    }
+
+    // Check for multiple monitors
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      (window as any).electronAPI.checkMultipleMonitors()
+        .then((result: any) => {
+          if (result.success) {
+            setHasMultipleMonitors(result.hasMultipleMonitors)
+            console.log(`Detected ${result.monitorCount} monitor(s)`)
+          }
+        })
+        .catch((error: any) => {
+          console.error('Error checking monitors:', error)
+          setHasMultipleMonitors(false)
         })
     }
   }, [searchParams])
@@ -89,6 +106,7 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
         .then((result: any) => {
           if (result.success) {
             setIsFullscreen(!isFullscreen)
+            setIsDualMonitorFullscreen(false) // Exit dual monitor mode when regular fullscreen is toggled
             console.log('Fullscreen toggled successfully')
           } else {
             console.error('Failed to toggle fullscreen:', result.error)
@@ -111,11 +129,65 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
     }
   }, [isFullscreen])
 
-  const handleHeaderDoubleClick = useCallback(() => {
-    if (isFullscreen) {
+  const handleDualMonitorFullscreenToggle = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      if (isDualMonitorFullscreen) {
+        // Exit dual monitor fullscreen
+        (window as any).electronAPI.exitDualMonitorFullscreen()
+          .then((result: any) => {
+            if (result.success) {
+              setIsDualMonitorFullscreen(false)
+              setIsFullscreen(false)
+              console.log('Dual monitor fullscreen deactivated')
+            } else {
+              console.error('Failed to exit dual monitor fullscreen:', result.error)
+            }
+          })
+          .catch((error: any) => {
+            console.error('Error exiting dual monitor fullscreen:', error)
+          })
+      } else {
+        // Enter dual monitor fullscreen
+        (window as any).electronAPI.toggleDualMonitorFullscreen()
+          .then((result: any) => {
+            if (result.success) {
+              setIsDualMonitorFullscreen(true)
+              setIsFullscreen(false)
+              console.log('Dual monitor fullscreen activated')
+            } else {
+              console.error('Failed to activate dual monitor fullscreen:', result.error)
+              // Show user-friendly error message
+              if (result.error === 'Only one monitor detected') {
+                alert('Dual monitor fullscreen requires at least 2 monitors')
+              } else if (result.error === 'Could not identify primary and secondary displays') {
+                alert('Failed to identify monitor configuration. Please check your display settings.')
+              } else if (result.error === 'Display configuration is invalid') {
+                alert('Monitor configuration appears to be invalid. Please check your display settings.')
+              } else if (result.error === 'Screen module not available') {
+                alert('Screen detection is not available. Please restart the application.')
+              } else {
+                alert(`Failed to activate dual monitor fullscreen: ${result.error}`)
+              }
+            }
+          })
+          .catch((error: any) => {
+            console.error('Error activating dual monitor fullscreen:', error)
+            alert('Error activating dual monitor fullscreen')
+          })
+      }
+    } else {
+      // Fallback to regular fullscreen for browser
       handleFullscreenToggle()
     }
-  }, [isFullscreen, handleFullscreenToggle])
+  }, [isDualMonitorFullscreen, handleFullscreenToggle])
+
+  const handleHeaderDoubleClick = useCallback(() => {
+    if (isDualMonitorFullscreen) {
+      handleDualMonitorFullscreenToggle()
+    } else if (isFullscreen) {
+      handleFullscreenToggle()
+    }
+  }, [isDualMonitorFullscreen, isFullscreen, handleFullscreenToggle, handleDualMonitorFullscreenToggle])
 
   const handleSaveFile = () => {
     if (fileUrl) {
@@ -269,23 +341,70 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Disable all keyboard keys when in fullscreen modes
+      if (isFullscreen || isDualMonitorFullscreen) {
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
+      
+      // Only allow specific keys when not in fullscreen
       if (e.key === 'F11') {
         e.preventDefault()
         handleFullscreenToggle()
-      } else if (e.key === 'Escape' && isFullscreen) {
+      } else if (e.key === 'F10') {
         e.preventDefault()
-        handleFullscreenToggle()
+        handleDualMonitorFullscreenToggle()
+      }
+    }
+
+    // Global keyboard event listener to block all keys in fullscreen
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (isFullscreen || isDualMonitorFullscreen) {
+        // Block ALL keyboard input including browser shortcuts
+        e.preventDefault()
+        e.stopPropagation()
+        e.stopImmediatePropagation()
+        return false
+      }
+    }
+
+    // Global keyboard event listener to block all keys in fullscreen
+    const handleGlobalKeyUp = (e: KeyboardEvent) => {
+      if (isFullscreen || isDualMonitorFullscreen) {
+        e.preventDefault()
+        e.stopPropagation()
+        e.stopImmediatePropagation()
+        return false
+      }
+    }
+
+    // Global keyboard event listener to block all keys in fullscreen
+    const handleGlobalKeyPress = (e: KeyboardEvent) => {
+      if (isFullscreen || isDualMonitorFullscreen) {
+        e.preventDefault()
+        e.stopPropagation()
+        e.stopImmediatePropagation()
+        return false
       }
     }
 
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     document.addEventListener('keydown', handleKeyDown)
     
+    // Add global event listeners with capture phase to intercept all keyboard events
+    document.addEventListener('keydown', handleGlobalKeyDown, true)
+    document.addEventListener('keyup', handleGlobalKeyUp, true)
+    document.addEventListener('keypress', handleGlobalKeyPress, true)
+    
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
       document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keydown', handleGlobalKeyDown, true)
+      document.removeEventListener('keyup', handleGlobalKeyUp, true)
+      document.removeEventListener('keypress', handleGlobalKeyPress, true)
     }
-  }, [handleFullscreenToggle, isFullscreen])
+  }, [handleFullscreenToggle, handleDualMonitorFullscreenToggle, isFullscreen, isDualMonitorFullscreen])
 
   if (loading) {
     return (
@@ -299,50 +418,57 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background w-full">
+    <div className={`flex flex-col h-screen w-full ${
+      isDualMonitorFullscreen 
+        ? 'bg-black' 
+        : 'bg-background'
+    }`}
+    style={{
+      minHeight: '100vh',
+      minWidth: '100vw'
+    } as React.CSSProperties}
+    >
       {/* Draggable Header */}
              <div 
-         className={`flex items-center justify-between cursor-move transition-all duration-300 ${
-           isFullscreen 
-             ? 'p-2 bg-primary/5 border-b border-primary/10' 
-             : 'p-3 border-b border-border bg-sidebar'
+         className={`flex items-center justify-between transition-all duration-300 ${
+           isDualMonitorFullscreen
+             ? 'p-2 bg-black/20 border-b border-white/10 cursor-default' 
+             : isFullscreen 
+               ? 'p-2 bg-primary/5 border-b border-primary/10 cursor-default' 
+               : 'p-3 border-b border-border bg-sidebar cursor-move'
          }`}
          style={{ 
-           WebkitAppRegion: 'drag',
-           cursor: 'move'
+           WebkitAppRegion: (isFullscreen || isDualMonitorFullscreen) ? 'no-drag' : 'drag',
+           cursor: (isFullscreen || isDualMonitorFullscreen) ? 'default' : 'move'
          } as React.CSSProperties}
          onDoubleClick={handleHeaderDoubleClick}
        >
          <div className="flex items-center gap-2 flex-1 min-w-0">
            <div className="min-w-0 flex-1">
              <h1 className={`font-semibold truncate ${
-               isFullscreen ? 'text-sm' : 'text-base'
+               isDualMonitorFullscreen ? 'text-sm text-white' : isFullscreen ? 'text-sm' : 'text-base'
              }`}
              style={{ cursor: 'default' }}
              >
                {fileName}
-               {isFullscreen && (
+               {isDualMonitorFullscreen && (
+                 <span className="ml-2 text-xs bg-white/20 text-white px-2 py-0.5 rounded-full">
+                   ALL MONITORS
+                 </span>
+               )}
+               {isFullscreen && !isDualMonitorFullscreen && (
                  <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
                    FS
                  </span>
                )}
+
              </h1>
-             {isFullscreen && (
-               <p className="text-xs text-muted-foreground mt-1"
-                  style={{ cursor: 'default' }}
-               >
-                 Double-click to exit fullscreen
-               </p>
-             )}
            </div>
          </div>
+         {/* Close Window Button */}
          <button
            onClick={handleCloseWindow}
-           className={`h-6 w-6 p-0 rounded-sm transition-all duration-300 flex-shrink-0 flex items-center justify-center ${
-             isFullscreen 
-               ? 'opacity-100 text-primary hover:text-primary/80 bg-primary/10 hover:bg-primary/20' 
-               : 'opacity-70 hover:opacity-100 text-muted-foreground hover:text-foreground'
-           }`}
+           className="h-6 w-6 p-0 rounded-sm transition-all duration-300 flex-shrink-0 flex items-center justify-center opacity-70 hover:opacity-100 text-muted-foreground hover:text-foreground"
            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
            title="Close Window"
          >
@@ -354,7 +480,9 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
        <div className="flex-1 overflow-hidden">
                   {isImage ? (
                         <div 
-               className="h-full flex items-center justify-center bg-black overflow-hidden cursor-grab active:cursor-grabbing select-none"
+               className={`h-full flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing select-none ${
+                 isDualMonitorFullscreen ? 'bg-black' : 'bg-background'
+               }`}
                onMouseDown={handleMouseDown}
                onMouseMove={handleMouseMove}
                onMouseUp={handleMouseUp}
@@ -400,7 +528,7 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
             />
           </div>
         ) : isVideo ? (
-          <div className="h-full flex items-center justify-center bg-black">
+          <div className="h-full flex items-center justify-center bg-background">
             <video 
               src={fileUrl}
               controls
@@ -465,24 +593,19 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
 
        {/* Footer Bar */}
        <div className={`flex items-center justify-between px-6 py-3 bg-sidebar border-t border-border transition-all duration-300 ${
-         isFullscreen ? 'opacity-0 pointer-events-none' : 'opacity-100'
+         (isFullscreen || isDualMonitorFullscreen) ? 'opacity-0 pointer-events-none' : 'opacity-100'
        }`}>
-         {/* Left side - File info and actions */}
-         <div className="flex items-center gap-4">
-           <IconPhoto className="h-5 w-5 text-muted-foreground" />
-           {isImage && (
-             <>
-               <span className="text-xs text-muted-foreground">
-                 {imageDimensions.width > 0 ? `${imageDimensions.width} x ${imageDimensions.height}` : 'Loading...'}
-               </span>
-               <IconDeviceFloppy 
-                 className="h-5 w-5 text-muted-foreground hover:text-primary cursor-pointer transition-colors" 
-                 onClick={handleSaveFile}
-               />
-               <span className="text-xs text-muted-foreground">{fileSize || 'Loading...'}</span>
-             </>
-           )}
-         </div>
+                    {/* Left side - File info and actions */}
+           <div className="flex items-center gap-4">
+            <IconPhoto className="h-5 w-5 text-muted-foreground" />
+            {isImage && (
+              <>
+                <span className="text-xs text-muted-foreground">
+                  {imageDimensions.width > 0 ? `${imageDimensions.width} x ${imageDimensions.height}` : ''}
+                </span>
+              </>
+            )}
+          </div>
 
          {/* Right side - Zoom controls */}
          <div className="flex items-center gap-3">
@@ -514,6 +637,30 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
            />
            <div className="w-px h-4 bg-border mx-2"></div>
            <IconArrowsMaximize 
+             className={`h-5 w-5 transition-colors ${
+               !hasMultipleMonitors 
+                 ? 'text-muted-foreground/50 cursor-not-allowed' 
+                 : isDualMonitorFullscreen
+                   ? 'text-white hover:text-white/80 cursor-pointer' 
+                   : isFullscreen 
+                     ? 'text-primary hover:text-primary/80 cursor-pointer' 
+                     : 'text-muted-foreground hover:text-primary cursor-pointer'
+             }`}
+             onClick={hasMultipleMonitors ? handleDualMonitorFullscreenToggle : undefined}
+             title={!hasMultipleMonitors 
+               ? "Dual monitor fullscreen requires multiple monitors" 
+               : isDualMonitorFullscreen 
+                 ? "Exit Dual Monitor Fullscreen (F10)" 
+                 : "Enter Dual Monitor Fullscreen (F10)"
+             }
+             style={{ 
+               cursor: hasMultipleMonitors ? 'pointer' : 'not-allowed',
+               transform: (isFullscreen || isDualMonitorFullscreen) ? 'rotate(180deg)' : 'rotate(0deg)',
+               transition: 'transform 0.3s ease'
+             }}
+           />
+           <div className="w-px h-4 bg-border mx-2"></div>
+           <IconArrowsMaximize 
              className={`h-5 w-5 cursor-pointer transition-colors ${
                isFullscreen 
                  ? 'text-primary hover:text-primary/80' 
@@ -522,7 +669,7 @@ export default function FileViewerPage({ searchParams }: FileViewerPageProps) {
              onClick={handleFullscreenToggle}
              title={isFullscreen ? "Exit Fullscreen (F11)" : "Enter Fullscreen (F11)"}
              style={{ 
-               cursor: isFullscreen ? 'pointer' : 'pointer',
+               cursor: 'pointer',
                transform: isFullscreen ? 'rotate(180deg)' : 'rotate(0deg)',
                transition: 'transform 0.3s ease'
              }}

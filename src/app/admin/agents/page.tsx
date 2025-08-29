@@ -10,6 +10,7 @@ import { AppHeader } from "@/components/app-header"
 import { SidebarInset } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { IconSearch, IconMail, IconPhone, IconArrowUp, IconArrowDown } from "@tabler/icons-react"
+import { AgentsDetailModal } from "@/components/modals/agents-detail-modal"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator, SelectGroup, SelectLabel } from "@/components/ui/select"
 import {
@@ -68,6 +69,18 @@ export default function AgentsPage() {
   const [memberOptions, setMemberOptions] = useState<{ id: number; company: string }[]>([])
   const [sortField, setSortField] = useState<string>('first_name')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [selectedAgent, setSelectedAgent] = useState<AgentRecord | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  const handleRowClick = (agent: AgentRecord) => {
+    setSelectedAgent(agent)
+    setIsModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedAgent(null)
+  }
 
   const fetchAgents = async () => {
     try {
@@ -235,8 +248,12 @@ export default function AgentsPage() {
                         </TableHeader>
                       <TableBody>
                         {agents.map((a) => (
-                          <TableRow key={a.user_id}>
-                            <TableCell className="whitespace-nowrap">
+                          <TableRow 
+                            key={a.user_id} 
+                            className="cursor-pointer hover:bg-muted/50 hover:shadow-sm transition-all duration-200 group"
+                            onClick={() => handleRowClick(a)}
+                          >
+                            <TableCell className="whitespace-nowrap group-hover:bg-muted/30 transition-colors">
                               <div className="flex items-center gap-2 min-w-0">
                                 <Avatar className="h-7 w-7">
                                   <AvatarImage src={a.profile_picture ?? undefined} alt={(a.first_name || "") + (a.last_name ? ` ${a.last_name}` : "")} />
@@ -268,8 +285,8 @@ export default function AgentsPage() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell className="whitespace-nowrap"><span className="truncate block max-w-[18rem]">{a.job_title || "-"}</span></TableCell>
-                            <TableCell className="whitespace-nowrap">
+                            <TableCell className="whitespace-nowrap group-hover:bg-muted/30 transition-colors"><span className="truncate block max-w-[18rem]">{a.job_title || "-"}</span></TableCell>
+                            <TableCell className="whitespace-nowrap group-hover:bg-muted/30 transition-colors">
                               {a.member_company ? (
                                 <Badge
                                   variant="outline"
@@ -285,7 +302,7 @@ export default function AgentsPage() {
                                 "-"
                               )}
                             </TableCell>
-                            <TableCell className="whitespace-nowrap">
+                            <TableCell className="whitespace-nowrap group-hover:bg-muted/30 transition-colors">
                               <div className="flex flex-col gap-0.5 leading-tight">
                                 <div className="flex items-center gap-1.5">
                                   <IconMail className="h-3.5 w-3.5 text-muted-foreground" />
@@ -361,6 +378,14 @@ export default function AgentsPage() {
           </div>
         </div>
       </SidebarInset>
+
+      {/* Agents Detail Modal */}
+      <AgentsDetailModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        agentId={selectedAgent?.user_id?.toString()}
+        agentData={selectedAgent || undefined}
+      />
     </>
   )
 }

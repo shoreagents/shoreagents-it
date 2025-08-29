@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useTheme } from "next-themes"
 import { useRealtimeApplicants } from "@/hooks/use-realtime-applicants"
+import { useRealtimeBpocJobStatus } from "@/hooks/use-realtime-bpoc-job-status"
 
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -350,11 +351,55 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     }
   })
 
-
+  // Real-time updates for BPOC job status changes
+  const { isConnected: isBpocJobStatusConnected } = useRealtimeBpocJobStatus({
+    onJobStatusUpdate: (jobStatusUpdate) => {
+      console.log('🔄 Real-time: BPOC job status update received in modal:', { 
+        jobStatusUpdate, 
+        currentApplicantId: localApplicant?.id,
+        modalIsOpen: isOpen,
+        hasLocalApplicant: !!localApplicant
+      })
+      
+      // Only process updates if modal is open and we have a local applicant
+      if (isOpen && localApplicant) {
+        // Check if this job status update affects the current applicant
+        // We need to check if the job_id is in the applicant's job_ids array
+        if (localApplicant.job_ids && localApplicant.job_ids.includes(jobStatusUpdate.job_id)) {
+          console.log('🔄 Real-time: Job status update affects current applicant, updating local state...')
+          
+          // Update the local applicant's job statuses array
+          setLocalApplicant(prevApplicant => {
+            if (!prevApplicant) return prevApplicant
+            
+            // Find the index of the updated job status
+            const jobIndex = prevApplicant.all_job_statuses?.findIndex((_, index) => 
+              prevApplicant.job_ids?.[index] === jobStatusUpdate.job_id
+            )
+            
+            if (jobIndex !== undefined && jobIndex !== -1 && prevApplicant.all_job_statuses) {
+              const updatedJobStatuses = [...prevApplicant.all_job_statuses]
+              updatedJobStatuses[jobIndex] = jobStatusUpdate.new_status
+              
+              return {
+                ...prevApplicant,
+                all_job_statuses: updatedJobStatuses
+              }
+            }
+            
+            return prevApplicant
+          })
+        } else {
+          console.log('🔄 Real-time: Job status update does not affect current applicant, skipping')
+        }
+      }
+    }
+  })
 
   // Log connection status for debugging
   console.log('🔍 Modal connection status:', { 
     isRealtimeConnected,
+    isBpocJobStatusConnected,
     applicantId: localApplicant?.id
   })
 
@@ -731,11 +776,11 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
         // Refresh applicant data to get updated status
         try {
           console.log('🔄 Refreshing applicant data after main status update...')
-          const refreshResponse = await fetch(`/api/bpoc?id=${localApplicant.id}`)
+          const refreshResponse = await fetch(`/api/bpoc/${localApplicant.id}`)
           if (refreshResponse.ok) {
             const refreshedData = await refreshResponse.json()
-            if (refreshedData.applicants && refreshedData.applicants.length > 0) {
-              const refreshedApplicant = refreshedData.applicants[0]
+            if (refreshedData.applicant) {
+              const refreshedApplicant = refreshedData.applicant
               console.log('✅ Applicant data refreshed:', refreshedApplicant)
               
               // Update local applicant with refreshed data
@@ -789,11 +834,11 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
           // Refresh applicant data to get updated job statuses
           try {
             console.log('🔄 Refreshing applicant data after job status update...')
-            const refreshResponse = await fetch(`/api/bpoc?id=${localApplicant.id}`)
+            const refreshResponse = await fetch(`/api/bpoc/${localApplicant.id}`)
             if (refreshResponse.ok) {
               const refreshedData = await refreshResponse.json()
-              if (refreshedData.applicants && refreshedData.applicants.length > 0) {
-                const refreshedApplicant = refreshedData.applicants[0]
+              if (refreshedData.applicant) {
+                const refreshedApplicant = refreshedData.applicant
                 console.log('✅ Applicant data refreshed:', refreshedApplicant)
                 
                 // Update local applicant with refreshed data
@@ -832,11 +877,26 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
         const result = await response.json()
         console.log(`✅ Field updates completed successfully:`, result)
         
-        // Update original values after successful save
-        setOriginalValues(prev => ({
-          ...prev,
-          ...changedFields
-        }))
+        // Update local applicant with the complete data returned from the API
+        if (result.applicant) {
+          console.log('🔄 Updating local applicant with refreshed data from API')
+          setLocalApplicant(prev => prev ? {
+            ...prev,
+            ...result.applicant
+          } : null)
+          
+          // Update original values after successful save
+          setOriginalValues(prev => ({
+            ...prev,
+            ...changedFields
+          }))
+        } else {
+          // Fallback: just update original values
+          setOriginalValues(prev => ({
+            ...prev,
+            ...changedFields
+          }))
+        }
       }
       
       // Clear pending status changes after successful save
@@ -917,31 +977,59 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
 
               {/* Applicant Header */}
               <div className="px-6 py-5">
-                
-                {/* Metadata Grid */}
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  {/* Name */}
-                  <div className="flex items-center gap-2">
-                    <IconUser className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Name:</span>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={localApplicant.profile_picture || ''} alt="Applicant" />
-                        <AvatarFallback className="text-xs">
-                          {localApplicant.first_name && localApplicant.last_name 
-                            ? `${localApplicant.first_name[0]}${localApplicant.last_name[0]}`
-                            : String(localApplicant.user_id).split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium">
-                        {localApplicant.full_name || (localApplicant.first_name && localApplicant.last_name 
-                          ? `${localApplicant.first_name} ${localApplicant.last_name}`
-                          : `User ${localApplicant.user_id}`)}
-                      </span>
+                {/* Avatar and Applicant Name */}
+                <div className="flex items-center gap-4 mb-6">
+                  <Avatar className="h-16 w-16">
+                    <AvatarImage src={localApplicant.profile_picture || "/avatars/shadcn.svg"} alt="Applicant Avatar" />
+                    <AvatarFallback className="text-2xl">
+                      {localApplicant.first_name && localApplicant.last_name 
+                        ? `${localApplicant.first_name[0]}${localApplicant.last_name[0]}`
+                        : String(localApplicant.user_id).slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="text-2xl font-semibold">
+                      {localApplicant.full_name || (localApplicant.first_name && localApplicant.last_name 
+                        ? `${localApplicant.first_name} ${localApplicant.last_name}`
+                        : `User ${localApplicant.user_id}`)}
                     </div>
+                    <p className="text-base text-muted-foreground">
+                      {localApplicant.job_title || 'No Job Title'}
+                      {localApplicant.company_name && ` • ${localApplicant.company_name}`}
+                    </p>
                   </div>
+                </div>
+                
+                {/* Applicant Metadata Grid */}
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {/* Email */}
+                  {localApplicant.email && (
+                    <div className="flex items-center gap-2">
+                      <IconMail className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Email:</span>
+                      <span className="font-medium">{localApplicant.email}</span>
+                    </div>
+                  )}
                   
-                  {/* Status */}
+                  {/* Phone */}
+                  {localApplicant.phone && (
+                    <div className="flex items-center gap-2">
+                      <IconPhone className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Phone:</span>
+                      <span className="font-medium">{localApplicant.phone}</span>
+                    </div>
+                  )}
+                  
+                  {/* Address */}
+                  {localApplicant.address && (
+                    <div className="flex items-center gap-2">
+                      <IconMapPin className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Address:</span>
+                      <span className="font-medium">{localApplicant.address}</span>
+                    </div>
+                  )}
+                  
+                  {/* Status - Moved to last */}
                   <div className="flex items-center gap-2">
                     {getStatusIcon(currentStatus || localApplicant.status)}
                     <span className="text-muted-foreground">Status:</span>
@@ -997,33 +1085,6 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                       </PopoverContent>
                     </Popover>
                   </div>
-                  
-                  {/* Email */}
-                  {localApplicant.email && (
-                    <div className="flex items-center gap-2">
-                      <IconMail className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Email:</span>
-                      <span className="font-medium">{localApplicant.email}</span>
-                    </div>
-                  )}
-                  
-                  {/* Phone */}
-                  {localApplicant.phone && (
-                    <div className="flex items-center gap-2">
-                      <IconPhone className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Phone:</span>
-                      <span className="font-medium">{localApplicant.phone}</span>
-                    </div>
-                  )}
-                  
-                  {/* Address */}
-                  {localApplicant.address && (
-                    <div className="flex items-center gap-2">
-                      <IconMapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Address:</span>
-                      <span className="font-medium">{localApplicant.address}</span>
-                    </div>
-                  )}
 
                   
 
@@ -1045,7 +1106,9 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                     are mapped 1:1 with the job_ids array from the main database.
                   */}
                   <div className="flex flex-col mb-6">
-                    <h3 className="text-lg font-medium mb-4 text-muted-foreground">Job Application</h3>
+                    <div className="flex items-center justify-between min-h-[40px]">
+                      <h3 className="text-lg font-medium text-muted-foreground">Job Application</h3>
+                    </div>
                     <div className="rounded-lg border p-6 shadow-sm">
                       <div className="space-y-2">
                         {localApplicant.all_job_titles && localApplicant.all_job_titles.length > 0 ? (
@@ -1304,7 +1367,9 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                   <TabsContent value="information" className="space-y-6">
                                           {/* Bio Section */}
                       <div>
-                        <h3 className="text-lg font-medium mb-2 text-muted-foreground">Bio</h3>
+                        <div className="flex items-center justify-between min-h-[40px]">
+                          <h3 className="text-lg font-medium text-muted-foreground">Bio</h3>
+                        </div>
                         <div className="rounded-lg p-6 text-sm leading-relaxed border shadow-sm">
                           {localApplicant.summary || localApplicant.details || "No summary provided."}
                         </div>
@@ -1312,8 +1377,10 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
 
                       {/* Additional Information Section */}
                       <div className="mt-6">
-                        <h3 className="text-lg font-medium mb-4 text-muted-foreground">Additional Information</h3>
-                        <div className="rounded-lg border border-[#cecece99] dark:border-border">
+                        <div className="flex items-center justify-between min-h-[40px]">
+                          <h3 className="text-lg font-medium text-muted-foreground">Additional Information</h3>
+                        </div>
+                        <div className="rounded-lg border border-[#cecece99] dark:border-border overflow-hidden">
                           {/* Shift */}
                           <DataFieldRow
                             icon={<IconClockHour4 className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
@@ -1413,7 +1480,9 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                       <div className="mt-8 grid grid-cols-2 gap-6">
                         {/* Skills Section */}
                         <div className="flex flex-col">
-                          <h3 className="text-lg font-medium mb-4 text-muted-foreground">Skills</h3>
+                          <div className="flex items-center justify-between min-h-[40px]">
+                            <h3 className="text-lg font-medium text-muted-foreground">Skills</h3>
+                          </div>
                           <div className="rounded-lg p-6 border flex-1 shadow-sm">
                             <div className="space-y-4">
                               {/* Dynamic Skills Categories */}
@@ -1532,7 +1601,9 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
 
                                                 {/* Resume Score Container */}
                         <div className="flex flex-col">
-                          <h3 className="text-lg font-medium mb-4 text-muted-foreground">Resume Score</h3>
+                          <div className="flex items-center justify-between min-h-[40px]">
+                            <h3 className="text-lg font-medium text-muted-foreground">Resume Score</h3>
+                          </div>
                           <div className="rounded-lg p-6 border flex-1 shadow-sm">
                             {/* Overall Resume Score with View Resume Button */}
                             {localApplicant.aiAnalysis?.overall_score ? (
@@ -1575,7 +1646,9 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                           if (originalSkillsData?.experience && Array.isArray(originalSkillsData.experience) && originalSkillsData.experience.length > 0) {
                             return (
                               <div>
-                                <h3 className="text-lg font-medium mb-4 text-muted-foreground">Work Experience</h3>
+                                <div className="flex items-center justify-between min-h-[40px]">
+                            <h3 className="text-lg font-medium text-muted-foreground">Work Experience</h3>
+                          </div>
                                 <div className="rounded-lg p-6 border flex-1 shadow-sm">
                                   <div>
                                     {originalSkillsData.experience.map((exp: any, index: number) => (
@@ -1626,7 +1699,9 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                           if (originalSkillsData?.education && Array.isArray(originalSkillsData.education) && originalSkillsData.education.length > 0) {
                             return (
                               <div>
-                                <h3 className="text-lg font-medium mb-4 text-muted-foreground">Education</h3>
+                                <div className="flex items-center justify-between min-h-[40px]">
+                            <h3 className="text-lg font-medium text-muted-foreground">Education</h3>
+                          </div>
                                 <div className="rounded-lg p-6 border flex-1 shadow-sm">
                                   <div>
                                     {originalSkillsData.education.map((edu: any, index: number) => (
@@ -1677,7 +1752,9 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                           if (originalSkillsData?.projects && Array.isArray(originalSkillsData.projects) && originalSkillsData.projects.length > 0) {
                             return (
                               <div>
-                                <h3 className="text-lg font-medium mb-4 text-muted-foreground">Projects</h3>
+                                <div className="flex items-center justify-between min-h-[40px]">
+                            <h3 className="text-lg font-medium text-muted-foreground">Projects</h3>
+                          </div>
                                 <div className="rounded-lg p-6 border flex-1 shadow-sm">
                                   <div>
                                     {originalSkillsData.projects.map((project: any, index: number) => (
@@ -1725,7 +1802,9 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                   {/* Additional Details Section */}
                   {localApplicant.details && (
                     <div>
-                      <h3 className="text-lg font-medium mb-2 text-muted-foreground">Additional Details</h3>
+                                              <div className="flex items-center justify-between min-h-[40px]">
+                          <h3 className="text-lg font-medium text-muted-foreground">Additional Details</h3>
+                        </div>
                       <div className="rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border">
                         <p className="text-foreground leading-relaxed whitespace-pre-wrap break-words">
                           {localApplicant.details}

@@ -54,6 +54,56 @@ async function startListening() {
     await notificationClient.query('LISTEN member_activity_changes')
     await notificationClient.query('LISTEN agent_assignment_changes')
     await notificationClient.query('LISTEN client_assignment_changes')
+    await notificationClient.query('LISTEN talent_pool_changes')
+
+    // Connect to BPOC database for job status notifications
+    if (process.env.BPOC_DATABASE_URL) {
+      try {
+        console.log('🔄 Connecting to BPOC database...')
+        const bpocNotificationClient = new Client({
+          connectionString: process.env.BPOC_DATABASE_URL,
+          ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+        })
+        
+        await bpocNotificationClient.connect()
+        console.log('✅ Connected to BPOC PostgreSQL for notifications')
+        
+        // Listen for BPOC database changes
+        await bpocNotificationClient.query('LISTEN bpoc_job_status_changes')
+        
+        // Handle BPOC database notifications
+        bpocNotificationClient.on('notification', (msg) => {
+          try {
+            const payload = JSON.parse(msg.payload)
+            console.log('Received BPOC database notification:', payload)
+            
+            // Broadcast BPOC job status updates to all WebSocket clients
+            if (wss) {
+              const message = JSON.stringify({
+                type: 'bpoc_job_status_update',
+                data: payload
+              })
+              console.log('Broadcasting BPOC job status message:', message)
+              
+              wss.clients.forEach((client) => {
+                if (client.readyState === 1) { // WebSocket.OPEN
+                  client.send(message)
+                }
+              })
+            }
+          } catch (error) {
+            console.error('Error parsing BPOC database notification:', error)
+          }
+        })
+        
+        console.log('✅ BPOC database notification listener started')
+      } catch (bpocError) {
+        console.warn('⚠️ Failed to connect to BPOC database for notifications:', bpocError)
+        console.log('⚠️ Continuing without BPOC database notifications - job status updates will not be real-time')
+      }
+    } else {
+      console.log('⚠️ BPOC_DATABASE_URL not set - job status updates will not be real-time')
+    }
     
     // Handle main database notifications
     notificationClient.on('notification', (msg) => {
@@ -68,7 +118,7 @@ async function startListening() {
         } else if (msg.channel === 'member_changes') {
           messageType = 'member_update'
         } else if (msg.channel === 'member_detail_changes') {
-          messageType = 'member_update'
+          messageType = 'member_comment_update'
         } else if (msg.channel === 'member_comment_changes') {
           messageType = 'member_comment_update'
         } else if (msg.channel === 'member_activity_changes') {
@@ -77,6 +127,8 @@ async function startListening() {
           messageType = 'agent_update'
         } else if (msg.channel === 'client_assignment_changes') {
           messageType = 'client_update'
+        } else if (msg.channel === 'talent_pool_changes') {
+          messageType = 'talent_pool_update'
         }
         
         // Broadcast to all connected WebSocket clients
@@ -101,7 +153,7 @@ async function startListening() {
     
     
     isListening = true
-    console.log('✅ Started listening for PostgreSQL notifications (main database only)')
+    console.log('✅ Started listening for PostgreSQL notifications (main + BPOC databases)')
   } catch (error) {
     console.error('Error starting notification listener:', error)
     console.log('⚠️ Continuing without database notifications - WebSocket server will still work')
