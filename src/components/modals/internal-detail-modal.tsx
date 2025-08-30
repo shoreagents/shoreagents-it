@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DataFieldRow } from "@/components/ui/fields"
+import { DataFieldRow, EditableField } from "@/components/ui/fields"
 import { Calendar } from "@/components/ui/calendar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
@@ -30,14 +30,14 @@ import { LinkPreview } from "@/components/ui/link-preview"
 import { MembersActivityLog } from "@/components/members-activity-log"
 import { Comment } from "@/components/ui/comment"
 
-interface AgentsDetailModalProps {
+interface InternalDetailModalProps {
   isOpen: boolean
   onClose: () => void
-  agentId?: string
-  agentData?: AgentRecord
+  internalUserId?: string
+  internalUserData?: InternalRecord
 }
 
-interface AgentRecord {
+interface InternalRecord {
   user_id: number
   email: string
   user_type: string
@@ -65,13 +65,13 @@ interface AgentRecord {
   staff_source: string | null
   start_date: string | null
   exit_date: string | null
-  // Agent specific fields
-  member_id: number | null
-  member_company: string | null
-  member_badge_color: string | null
-  department_id: number | null
-  department_name: string | null
+  // Internal specific fields
   station_id: string | null
+  // Additional fields that might be available from API
+  member_id?: number | null
+  member_company?: string | null
+  member_badge_color?: string | null
+  department_name?: string | null
 }
 
 // Helper function to get company badge styling based on badge color
@@ -134,7 +134,7 @@ const staticAgentData = {
   status: "Active"
 }
 
-export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: AgentsDetailModalProps) {
+export function InternalDetailModal({ isOpen, onClose, internalUserId, internalUserData }: InternalDetailModalProps) {
   const { theme } = useTheme()
   const { user } = useAuth()
   
@@ -159,12 +159,10 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     const [localExitDate, setLocalExitDate] = React.useState<Date | undefined>(undefined)
     const [localShiftPeriod, setLocalShiftPeriod] = React.useState<string | null>(null)
     const [localEmploymentStatus, setLocalEmploymentStatus] = React.useState<string | null>(null)
-    const [showCompanySelection, setShowCompanySelection] = React.useState(false)
-    const [companySearch, setCompanySearch] = React.useState("")
-    const [companies, setCompanies] = React.useState<Array<{id: number, company: string, badge_color: string | null}>>([])
-    const [isLoadingCompanies, setIsLoadingCompanies] = React.useState(false)
+    
     const [isHovered, setIsHovered] = React.useState(false)
-    const [localAgentData, setLocalAgentData] = React.useState<AgentRecord | null>(null)
+    const [isWorkEmailHovered, setIsWorkEmailHovered] = React.useState(false)
+    const [localInternalData, setLocalInternalData] = React.useState<InternalRecord | null>(null)
 
     // Add local state for editable text fields
     const [inputValues, setInputValues] = React.useState<Record<string, string>>({
@@ -177,6 +175,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       city: '',
       employee_id: '',
       job_title: '',
+      work_email: '',
       shift_schedule: '',
       shift_time: '',
       work_setup: '',
@@ -195,6 +194,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       city: '',
       employee_id: '',
       job_title: '',
+      work_email: '',
       shift_schedule: '',
       shift_time: '',
       work_setup: '',
@@ -208,116 +208,119 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
 
     // Initialize input values when modal opens
     React.useEffect(() => {
-      if (isOpen && agentData) {
+      if (isOpen && internalUserData) {
         // Reset active tab to Personal Info when modal opens
         setActiveTab("information")
         
-        // Initialize local agent data
-        setLocalAgentData(agentData)
+        // Initialize local internal data
+        setLocalInternalData(internalUserData)
         
-        setLocalGender(agentData.gender)
-        // Initialize birthday date - parse date string directly to avoid timezone issues
-        if (agentData.birthday) {
-          const [year, month, day] = agentData.birthday.split('-').map(Number)
-          setLocalBirthday(new Date(year, month - 1, day))
-        } else {
-          setLocalBirthday(undefined)
-        }
-        // Initialize start date - parse date string directly to avoid timezone issues
-        if (agentData.start_date) {
-          const [year, month, day] = agentData.start_date.split('-').map(Number)
-          setLocalStartDate(new Date(year, month - 1, day))
-        } else {
-          setLocalStartDate(undefined)
-        }
-        // Initialize exit date - parse date string directly to avoid timezone issues
-        if (agentData.exit_date) {
-          const [year, month, day] = agentData.exit_date.split('-').map(Number)
-          setLocalExitDate(new Date(year, month - 1, day))
-        } else {
-          setLocalExitDate(undefined)
-        }
+        setLocalGender(internalUserData.gender)
+                  // Initialize birthday date - parse date string directly to avoid timezone issues
+          if (internalUserData.birthday) {
+            const [year, month, day] = internalUserData.birthday.split('-').map(Number)
+            const date = new Date(year, month - 1, day)
+            setLocalBirthday(!isNaN(date.getTime()) ? date : undefined)
+          } else {
+            setLocalBirthday(undefined)
+          }
+          // Initialize start date - parse date string directly to avoid timezone issues
+          if (internalUserData.start_date) {
+            const [year, month, day] = internalUserData.start_date.split('-').map(Number)
+            const date = new Date(year, month - 1, day)
+            setLocalStartDate(!isNaN(date.getTime()) ? date : undefined)
+          } else {
+            setLocalStartDate(undefined)
+          }
+          // Initialize exit date - parse date string directly to avoid timezone issues
+          if (internalUserData.exit_date) {
+            const [year, month, day] = internalUserData.exit_date.split('-').map(Number)
+            const date = new Date(year, month - 1, day)
+            setLocalExitDate(!isNaN(date.getTime()) ? date : undefined)
+          } else {
+            setLocalExitDate(undefined)
+          }
         // Initialize shift period
-        setLocalShiftPeriod(agentData.shift_period)
+        setLocalShiftPeriod(internalUserData.shift_period)
         // Initialize employment status
-        setLocalEmploymentStatus(agentData.employment_status)
+        setLocalEmploymentStatus(internalUserData.employment_status)
 
         // Initialize input values for editable fields
         const initialValues = {
-          first_name: agentData.first_name || '',
-          middle_name: agentData.middle_name || '',
-          last_name: agentData.last_name || '',
-          nickname: agentData.nickname || '',
-          phone: agentData.phone || '',
-          address: agentData.address || '',
-          city: agentData.city || '',
-          employee_id: agentData.employee_id || '',
-          job_title: agentData.job_title || '',
-          shift_schedule: agentData.shift_schedule || '',
-          shift_time: agentData.shift_time || '',
-          work_setup: agentData.work_setup || '',
-          hire_type: agentData.hire_type || '',
-          staff_source: agentData.staff_source || ''
+          first_name: internalUserData.first_name || '',
+          middle_name: internalUserData.middle_name || '',
+          last_name: internalUserData.last_name || '',
+          nickname: internalUserData.nickname || '',
+          phone: internalUserData.phone || '',
+          address: internalUserData.address || '',
+          city: internalUserData.city || '',
+          employee_id: internalUserData.employee_id || '',
+          job_title: internalUserData.job_title || '',
+          work_email: internalUserData.work_email || '',
+          shift_schedule: internalUserData.shift_schedule || '',
+          shift_time: internalUserData.shift_time || '',
+          work_setup: internalUserData.work_setup || '',
+          hire_type: internalUserData.hire_type || '',
+          staff_source: internalUserData.staff_source || ''
         }
         setInputValues(initialValues)
         setOriginalValues(initialValues)
         setHasChanges(false)
       }
-    }, [isOpen, agentData])
+    }, [isOpen, internalUserData])
 
-  // Fetch companies when company selection is opened
-  React.useEffect(() => {
-    if (showCompanySelection) {
-      fetchCompanies(companySearch)
-    }
-  }, [showCompanySelection, companySearch])
 
-  // Use local agent data if available, otherwise use original agent data, fallback to static data
-  const currentAgentData = localAgentData || agentData
+
+  // Use local internal data if available, otherwise use original internal data, fallback to static data
+  const currentInternalData = localInternalData || internalUserData
   
-  // Debug: Log the current agent data and display data
-  console.log('🔄 Current agent data:', {
-    member_id: currentAgentData?.member_id,
-    member_company: currentAgentData?.member_company,
-    member_badge_color: currentAgentData?.member_badge_color
+  // Debug: Log the current internal data and display data
+  console.log('🔄 Current internal data:', {
+    user_id: currentInternalData?.user_id,
+    station_id: currentInternalData?.station_id,
+    member_company: currentInternalData?.member_company
   })
   
-  const displayData = currentAgentData ? {
-    id: currentAgentData.user_id.toString(),
-    first_name: inputValues.first_name || currentAgentData.first_name || "Unknown",
-    middle_name: inputValues.middle_name || currentAgentData.middle_name || null,
-    last_name: inputValues.last_name || currentAgentData.last_name || "Agent",
-    nickname: inputValues.nickname || currentAgentData.nickname || null,
-    profile_picture: currentAgentData.profile_picture || null,
-    employee_id: inputValues.employee_id || currentAgentData.employee_id || "N/A",
-    member_id: currentAgentData.member_id || null,
-    member_company: currentAgentData.member_company || null,
-    member_badge_color: currentAgentData.member_badge_color || null,
-    member_name: (inputValues.first_name || currentAgentData.first_name) && (inputValues.last_name || currentAgentData.last_name) ? `${inputValues.first_name || currentAgentData.first_name} ${inputValues.last_name || currentAgentData.last_name}` : null,
-    job_title: inputValues.job_title || currentAgentData.job_title || "Not Specified",
-    department: currentAgentData.department_name || "Not Specified",
-    email: currentAgentData.work_email || currentAgentData.email || "No email",
-    phone: inputValues.phone || currentAgentData.phone || "No phone",
-          birthday: localBirthday ? `${localBirthday.getFullYear()}-${String(localBirthday.getMonth() + 1).padStart(2, '0')}-${String(localBirthday.getDate()).padStart(2, '0')}` : (currentAgentData.birthday || null),
-    city: inputValues.city || currentAgentData.city || null,
-    address: inputValues.address || currentAgentData.address || null,
-    gender: localGender !== null ? localGender : (currentAgentData.gender || null),
-    start_date: localStartDate ? `${localStartDate.getFullYear()}-${String(localStartDate.getMonth() + 1).padStart(2, '0')}-${String(localStartDate.getDate()).padStart(2, '0')}` : (currentAgentData.start_date || null),
-    exit_date: localExitDate ? `${localExitDate.getFullYear()}-${String(localExitDate.getMonth() + 1).padStart(2, '0')}-${String(localExitDate.getDate()).padStart(2, '0')}` : (currentAgentData.exit_date || null),
-    work_email: currentAgentData.work_email || null,
-    shift_period: localShiftPeriod !== null ? localShiftPeriod : (currentAgentData.shift_period || null),
-    shift_schedule: inputValues.shift_schedule || currentAgentData.shift_schedule || null,
-    shift_time: inputValues.shift_time || currentAgentData.shift_time || null,
-    work_setup: inputValues.work_setup || currentAgentData.work_setup || null,
-    employment_status: localEmploymentStatus !== null ? localEmploymentStatus : (currentAgentData.employment_status || null),
-    hire_type: inputValues.hire_type || currentAgentData.hire_type || null,
-    staff_source: inputValues.staff_source || currentAgentData.staff_source || null,
-    status: currentAgentData.exit_date ? "Inactive" : "Active"
+  const displayData = currentInternalData ? {
+    id: currentInternalData.user_id.toString(),
+    first_name: inputValues.first_name || currentInternalData.first_name || "Unknown",
+    middle_name: inputValues.middle_name || currentInternalData.middle_name || null,
+    last_name: inputValues.last_name || currentInternalData.last_name || "Agent",
+    nickname: inputValues.nickname || currentInternalData.nickname || null,
+    profile_picture: currentInternalData.profile_picture || null,
+    employee_id: inputValues.employee_id || currentInternalData.employee_id || "N/A",
+    station_id: currentInternalData.station_id || null,
+    member_company: currentInternalData.member_company || null,
+    member_badge_color: currentInternalData.member_badge_color || null,
+    member_name: (inputValues.first_name || currentInternalData.first_name) && (inputValues.last_name || currentInternalData.last_name) ? `${inputValues.first_name || currentInternalData.first_name} ${inputValues.last_name || currentInternalData.last_name}` : null,
+    job_title: inputValues.job_title || currentInternalData.job_title || "Not Specified",
+    department: currentInternalData.department_name || "Not Specified",
+    email: currentInternalData.email || "No email",
+    phone: inputValues.phone || currentInternalData.phone || "No phone",
+          birthday: localBirthday && !isNaN(localBirthday.getTime()) ? `${localBirthday.getFullYear()}-${String(localBirthday.getMonth() + 1).padStart(2, '0')}-${String(localBirthday.getDate()).padStart(2, '0')}` : (currentInternalData.birthday || null),
+    city: inputValues.city || currentInternalData.city || null,
+    address: inputValues.address || currentInternalData.address || null,
+    gender: localGender !== null ? localGender : (currentInternalData.gender || null),
+          start_date: localStartDate && !isNaN(localStartDate.getTime()) ? `${localStartDate.getFullYear()}-${String(localStartDate.getMonth() + 1).padStart(2, '0')}-${String(localStartDate.getDate()).padStart(2, '0')}` : (currentInternalData.start_date || null),
+          exit_date: localExitDate && !isNaN(localExitDate.getTime()) ? `${localExitDate.getFullYear()}-${String(localExitDate.getMonth() + 1).padStart(2, '0')}-${String(localExitDate.getDate()).padStart(2, '0')}` : (currentInternalData.exit_date || null),
+    work_email: inputValues.work_email || currentInternalData.work_email || null,
+    shift_period: localShiftPeriod !== null ? localShiftPeriod : (currentInternalData.shift_period || null),
+    shift_schedule: inputValues.shift_schedule || currentInternalData.shift_schedule || null,
+    shift_time: inputValues.shift_time || currentInternalData.shift_time || null,
+    work_setup: inputValues.work_setup || currentInternalData.work_setup || null,
+    employment_status: localEmploymentStatus !== null ? localEmploymentStatus : (currentInternalData.employment_status || null),
+    hire_type: inputValues.hire_type || currentInternalData.hire_type || null,
+    staff_source: inputValues.staff_source || currentInternalData.staff_source || null,
+    status: currentInternalData.exit_date ? "Inactive" : "Active"
   } : staticAgentData
+  
+  console.log('🔄 Internal user data prop:', internalUserData)
+  console.log('🔄 Local internal data:', localInternalData)
+  console.log('🔄 Display data:', displayData)
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = React.useMemo(() => {
-    if (!localAgentData) return false
+    if (!localInternalData) return false
     
     // Check for input field changes
     const hasFieldChanges = Object.keys(inputValues).some(fieldName => {
@@ -328,12 +331,12 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     
     // Check for other field changes by comparing with original values
     const hasOtherChanges = 
-      localGender !== (agentData?.gender || null) ||
-      (localBirthday?.toISOString().split('T')[0] || null) !== (agentData?.birthday || null) ||
-      (localStartDate?.toISOString().split('T')[0] || null) !== (agentData?.start_date || null) ||
-      (localExitDate?.toISOString().split('T')[0] || null) !== (agentData?.exit_date || null) ||
-      localShiftPeriod !== (agentData?.shift_period || null) ||
-      localEmploymentStatus !== (agentData?.employment_status || null)
+      localGender !== (internalUserData?.gender || null) ||
+      (localBirthday?.toISOString().split('T')[0] || null) !== (internalUserData?.birthday || null) ||
+      (localStartDate?.toISOString().split('T')[0] || null) !== (internalUserData?.start_date || null) ||
+      (localExitDate?.toISOString().split('T')[0] || null) !== (internalUserData?.exit_date || null) ||
+      localShiftPeriod !== (internalUserData?.shift_period || null) ||
+      localEmploymentStatus !== (internalUserData?.employment_status || null)
     
     const hasChanges = hasFieldChanges || hasOtherChanges
     
@@ -348,22 +351,22 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
           return currentValue !== originalValue
         }),
         otherChanges: {
-          gender: { current: localGender, original: agentData?.gender },
-          birthday: { current: localBirthday?.toISOString().split('T')[0], original: agentData?.birthday },
-          startDate: { current: localStartDate?.toISOString().split('T')[0], original: agentData?.start_date },
-          exitDate: { current: localExitDate?.toISOString().split('T')[0], original: agentData?.exit_date },
-          shiftPeriod: { current: localShiftPeriod, original: agentData?.shift_period },
-          employmentStatus: { current: localEmploymentStatus, original: agentData?.employment_status }
+          gender: { current: localGender, original: internalUserData?.gender },
+          birthday: { current: localBirthday && !isNaN(localBirthday.getTime()) ? localBirthday.toISOString().split('T')[0] : null, original: internalUserData?.birthday },
+          startDate: { current: localStartDate && !isNaN(localStartDate.getTime()) ? localStartDate.toISOString().split('T')[0] : null, original: internalUserData?.start_date },
+          exitDate: { current: localExitDate && !isNaN(localExitDate.getTime()) ? localExitDate.toISOString().split('T')[0] : null, original: internalUserData?.exit_date },
+          shiftPeriod: { current: localShiftPeriod, original: internalUserData?.shift_period },
+          employmentStatus: { current: localEmploymentStatus, original: internalUserData?.employment_status }
         }
       })
     }
     
     return hasChanges
-  }, [inputValues, originalValues, localAgentData, agentData, localGender, localBirthday, localStartDate, localExitDate, localShiftPeriod, localEmploymentStatus])
+  }, [inputValues, originalValues, localInternalData, internalUserData, localGender, localBirthday, localStartDate, localExitDate, localShiftPeriod, localEmploymentStatus])
 
   // Auto-save function that can be called before closing
   const autoSaveBeforeClose = async (): Promise<boolean> => {
-    if (!localAgentData || !hasUnsavedChanges) {
+    if (!localInternalData || !hasUnsavedChanges) {
       console.log('🔄 No changes to save, closing directly')
       return true // No need to save, can close
     }
@@ -371,14 +374,14 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     try {
       console.log('🔄 Auto-saving changes before closing...')
       console.log('🔄 Current state:', {
-        localAgentData: localAgentData?.user_id,
+        localInternalData: localInternalData?.user_id,
         hasUnsavedChanges,
         inputValues,
         originalValues,
         localGender,
-        localBirthday: localBirthday?.toISOString().split('T')[0],
-        localStartDate: localStartDate?.toISOString().split('T')[0],
-        localExitDate: localExitDate?.toISOString().split('T')[0],
+        localBirthday: localBirthday && !isNaN(localBirthday.getTime()) ? localBirthday.toISOString().split('T')[0] : null,
+        localStartDate: localStartDate && !isNaN(localStartDate.getTime()) ? localStartDate.toISOString().split('T')[0] : null,
+        localExitDate: localExitDate && !isNaN(localExitDate.getTime()) ? localExitDate.toISOString().split('T')[0] : null,
         localShiftPeriod,
         localEmploymentStatus
       })
@@ -399,47 +402,47 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       })
       
       // Add other field changes
-      if (localGender !== agentData?.gender) {
+      if (localGender !== internalUserData?.gender) {
         allUpdates.gender = localGender
-        console.log(`🔄 Gender change detected:`, { current: localGender, original: agentData?.gender })
+        console.log(`🔄 Gender change detected:`, { current: localGender, original: internalUserData?.gender })
       }
       if (localBirthday) {
         const birthdayStr = `${localBirthday.getFullYear()}-${String(localBirthday.getMonth() + 1).padStart(2, '0')}-${String(localBirthday.getDate()).padStart(2, '0')}`
-        if (birthdayStr !== agentData?.birthday) {
+        if (birthdayStr !== internalUserData?.birthday) {
           allUpdates.birthday = birthdayStr
-          console.log(`🔄 Birthday change detected:`, { current: birthdayStr, original: agentData?.birthday })
+          console.log(`🔄 Birthday change detected:`, { current: birthdayStr, original: internalUserData?.birthday })
         }
       }
       if (localStartDate) {
         const startDateStr = `${localStartDate.getFullYear()}-${String(localStartDate.getMonth() + 1).padStart(2, '0')}-${String(localStartDate.getDate()).padStart(2, '0')}`
-        if (startDateStr !== agentData?.start_date) {
+        if (startDateStr !== internalUserData?.start_date) {
           allUpdates.start_date = startDateStr
-          console.log(`🔄 Start date change detected:`, { current: startDateStr, original: agentData?.start_date })
+          console.log(`🔄 Start date change detected:`, { current: startDateStr, original: internalUserData?.start_date })
         }
       }
       if (localExitDate) {
         const exitDateStr = `${localExitDate.getFullYear()}-${String(localExitDate.getMonth() + 1).padStart(2, '0')}-${String(localExitDate.getDate()).padStart(2, '0')}`
-        if (exitDateStr !== agentData?.exit_date) {
+        if (exitDateStr !== internalUserData?.exit_date) {
           allUpdates.exit_date = exitDateStr
-          console.log(`🔄 Exit date change detected:`, { current: exitDateStr, original: agentData?.exit_date })
+          console.log(`🔄 Exit date change detected:`, { current: exitDateStr, original: internalUserData?.exit_date })
         }
       }
-      if (localShiftPeriod !== agentData?.shift_period) {
+      if (localShiftPeriod !== internalUserData?.shift_period) {
         allUpdates.shift_period = localShiftPeriod
-        console.log(`🔄 Shift period change detected:`, { current: localShiftPeriod, original: agentData?.shift_period })
+        console.log(`🔄 Shift period change detected:`, { current: localShiftPeriod, original: internalUserData?.shift_period })
       }
-      if (localEmploymentStatus !== agentData?.employment_status) {
+      if (localEmploymentStatus !== internalUserData?.employment_status) {
         allUpdates.employment_status = localEmploymentStatus
-        console.log(`🔄 Employment status change detected:`, { current: localEmploymentStatus, original: agentData?.employment_status })
+        console.log(`🔄 Employment status change detected:`, { current: localEmploymentStatus, original: internalUserData?.employment_status })
       }
       
       console.log('🔄 All updates to send:', allUpdates)
       
       // Send all updates to the consolidated endpoint
       if (Object.keys(allUpdates).length > 0) {
-        console.log('🔄 Sending update request to:', `/api/agents/${localAgentData.user_id}/update/`)
+        console.log('🔄 Sending update request to:', `/api/internal/${localInternalData.user_id}/update/`)
         
-        const response = await fetch(`/api/agents/${localAgentData.user_id}/update/`, {
+        const response = await fetch(`/api/internal/${localInternalData.user_id}/update/`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -488,13 +491,13 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
   // Modified close handler with auto-save
   const handleClose = async () => {
     console.log('🔒 handleClose called:', { 
-      agent: localAgentData?.user_id, 
+      internalUser: localInternalData?.user_id, 
       hasUnsavedChanges, 
       isOpen,
-      localAgentData: !!localAgentData
+      localInternalData: !!localInternalData
     })
     
-    if (localAgentData && hasUnsavedChanges) {
+    if (localInternalData && hasUnsavedChanges) {
       // Auto-save changes before closing
       try {
         console.log('🔄 Auto-saving changes before close...')
@@ -519,7 +522,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       // No unsaved changes, just close
       console.log('🔒 Closing without auto-save - no changes detected')
       console.log('🔒 Debug info:', {
-        hasLocalAgent: !!localAgentData,
+        hasLocalInternal: !!localInternalData,
         hasUnsavedChanges,
         inputValues,
         originalValues
@@ -528,198 +531,30 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     }
   }
 
-  // Helper functions to manage company selection panel
-  const openCompanySelection = () => {
-    setShowCompanySelection(true)
-    console.log('🔍 Company selection opened:', true)
-  }
 
-  const closeCompanySelection = () => {
-    setShowCompanySelection(false)
-    console.log('📝 Company selection closed')
-  }
 
-  // Fetch companies from members table
-  const fetchCompanies = async (searchTerm: string = "", page: number = 1) => {
-    try {
-      setIsLoadingCompanies(true)
-      console.log('🔍 Fetching companies with search term:', searchTerm)
-      
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: '1000', // Get all companies for selection
-        search: searchTerm,
-        sortField: 'company',
-        sortDirection: 'asc'
-      })
-      
-      const url = `/api/members?${params.toString()}`
-      console.log('🔍 API URL:', url)
-      
-      const response = await fetch(url)
-      if (!response.ok) {
-        throw new Error('Failed to fetch companies')
-      }
-      
-      const data = await response.json()
-      console.log('🔍 API response:', data)
-      console.log('🔍 Companies found:', data.members?.length || 0)
-      
-      setCompanies(data.members || [])
-    } catch (error) {
-      console.error('Failed to fetch companies:', error)
-    } finally {
-      setIsLoadingCompanies(false)
-    }
-  }
-
-  // Handle company selection
-  const handleCompanySelect = async (companyId: number, companyName: string, badgeColor: string | null) => {
-    try {
-      if (!agentData?.user_id) {
-        console.error('No agent user_id available')
-        return
-      }
-
-      console.log('🔄 Assigning agent to company:', { companyId, companyName, badgeColor })
-      
-      // API call to update agent's member_id in database
-      const response = await fetch(`/api/agents/${agentData.user_id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          member_id: companyId
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to update agent company: ${response.statusText}`)
-      }
-
-      const result = await response.json()
-      console.log('✅ Agent company updated successfully:', result)
-
-      // Update local state to reflect the change
-      if (localAgentData) {
-        // Update the local agent data with new company info
-        const updatedAgentData = {
-          ...localAgentData,
-          member_id: companyId,
-          member_company: companyName,
-          member_badge_color: badgeColor
-        }
-        
-        // Update local state so UI reflects the change immediately
-        setLocalAgentData(updatedAgentData)
-        console.log('🔄 Local agent data updated with new company:', updatedAgentData)
-      }
-
-      // Reset shift period and employment status when company changes
-      setLocalShiftPeriod(null)
-      setLocalEmploymentStatus(null)
-      
-      // Close company selection
-      closeCompanySelection()
-      
-    } catch (error) {
-      console.error('❌ Failed to update agent company:', error)
-      // You could add a toast notification here for user feedback
-    }
-  }
-
-  // Real-time updates for all agent changes
-  console.log('🔄 Initializing real-time hook for agents modal (all changes)')
+  // Real-time updates for all internal user changes
+  console.log('🔄 Initializing real-time hook for internal users modal (all changes)')
   const { isConnected: isRealtimeConnected } = useRealtimeMembers({
-    onAgentMemberChanged: async (updatedAgent, oldAgent, notificationData) => {
-      console.log('🔄 Real-time: Agent member assignment change received in modal:', { 
-        updatedAgent, 
-        oldAgent, 
-        currentAgentId: localAgentData?.user_id,
-        modalIsOpen: isOpen,
-        hasLocalAgent: !!localAgentData
-      })
-      
-      // Only process updates for the current agent
-      if (localAgentData && updatedAgent.user_id === localAgentData.user_id) {
-        console.log('🔄 Real-time: Processing member assignment change for current agent:', updatedAgent)
-        
-        // Update the member_id immediately
-        setLocalAgentData(prevAgent => {
-          if (!prevAgent) return prevAgent
-          
-          return {
-            ...prevAgent,
-            member_id: updatedAgent.member_id
-          }
-        })
-        
-        // If member_id changed, fetch the updated company information
-        if (updatedAgent.member_id !== oldAgent?.member_id) {
-          try {
-            console.log('🔄 Fetching updated company information for member_id:', updatedAgent.member_id)
-            const response = await fetch(`/api/agents/${updatedAgent.user_id}`)
-            if (response.ok) {
-              const responseData = await response.json()
-              const freshAgentData = responseData.agent // Extract agent from response
-              console.log('🔄 Fetched fresh agent data with company info:', freshAgentData)
-              console.log('🔄 Company info from API:', {
-                member_id: freshAgentData.member_id,
-                member_company: freshAgentData.member_company,
-                member_badge_color: freshAgentData.member_badge_color
-              })
-              
-              // Update local agent data with fresh company information
-              setLocalAgentData(prevAgent => {
-                if (!prevAgent) return prevAgent
-                
-                const updatedAgent = {
-                  ...prevAgent,
-                  member_id: freshAgentData.member_id,
-                  member_company: freshAgentData.member_company,
-                  member_badge_color: freshAgentData.member_badge_color
-                }
-                
-                console.log('🔄 Updated localAgentData with company info:', {
-                  member_id: updatedAgent.member_id,
-                  member_company: updatedAgent.member_company,
-                  member_badge_color: updatedAgent.member_badge_color
-                })
-                
-                return updatedAgent
-              })
-            }
-          } catch (error) {
-            console.error('❌ Failed to fetch updated agent data:', error)
-          }
-        }
-        
-        console.log('🔄 Updated agent member assignment in real-time')
-
-      } else {
-        console.log('🔄 Real-time: Update not for current agent, skipping')
-      }
-    },
     onPersonalInfoChanged: async (personalInfo, oldPersonalInfo, notificationData) => {
       console.log('🔄 Real-time: Personal info change received in modal:', { 
         personalInfo, 
         oldPersonalInfo, 
-        currentAgentId: localAgentData?.user_id,
+        currentInternalUserId: localInternalData?.user_id,
         modalIsOpen: isOpen,
-        hasLocalAgent: !!localAgentData
+        hasLocalInternal: !!localInternalData
       })
       
-      // Only process updates for the current agent
-      if (localAgentData && personalInfo.user_id === localAgentData.user_id) {
-        console.log('🔄 Real-time: Processing personal info change for current agent:', personalInfo)
+      // Only process updates for the current internal user
+      if (localInternalData && personalInfo.user_id === localInternalData.user_id) {
+        console.log('🔄 Real-time: Processing personal info change for current internal user:', personalInfo)
         
-        // Update local agent data with new personal info
-        setLocalAgentData(prevAgent => {
-          if (!prevAgent) return prevAgent
+        // Update local internal data with new personal info
+        setLocalInternalData(prevInternal => {
+          if (!prevInternal) return prevInternal
           
           return {
-            ...prevAgent,
+            ...prevInternal,
             first_name: personalInfo.first_name,
             middle_name: personalInfo.middle_name,
             last_name: personalInfo.last_name,
@@ -757,30 +592,30 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
           }
         }
         
-        console.log('🔄 Updated agent personal info in real-time')
+        console.log('🔄 Updated internal user personal info in real-time')
       } else {
-        console.log('🔄 Real-time: Personal info update not for current agent, skipping')
+        console.log('🔄 Real-time: Personal info update not for current internal user, skipping')
       }
     },
     onJobInfoChanged: async (jobInfo, oldJobInfo, notificationData) => {
       console.log('🔄 Real-time: Job info change received in modal:', { 
         jobInfo, 
         oldJobInfo, 
-        currentAgentId: localAgentData?.user_id,
+        currentInternalUserId: localInternalData?.user_id,
         modalIsOpen: isOpen,
-        hasLocalAgent: !!localAgentData
+        hasLocalInternal: !!localInternalData
       })
       
-      // Only process updates for the current agent
-      if (localAgentData && jobInfo.user_id === localAgentData.user_id) {
-        console.log('🔄 Real-time: Processing job info change for current agent:', jobInfo)
+      // Only process updates for the current internal user
+      if (localInternalData && jobInfo.user_id === localInternalData.user_id) {
+        console.log('🔄 Real-time: Processing job info change for current internal user:', jobInfo)
         
-        // Update local agent data with new job info
-        setLocalAgentData(prevAgent => {
-          if (!prevAgent) return prevAgent
+        // Update local internal data with new job info
+        setLocalInternalData(prevInternal => {
+          if (!prevInternal) return prevInternal
           
           return {
-            ...prevAgent,
+            ...prevInternal,
             employee_id: jobInfo.employee_id,
             job_title: jobInfo.job_title,
             shift_period: jobInfo.shift_period,
@@ -832,9 +667,9 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
           }
         }
         
-        console.log('🔄 Updated agent job info in real-time')
+        console.log('🔄 Updated internal user job info in real-time')
       } else {
-        console.log('🔄 Real-time: Job info update not for current agent, skipping')
+        console.log('🔄 Real-time: Job info update not for current internal user, skipping')
       }
     }
   })
@@ -856,7 +691,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
 
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!comment.trim() || !agentData?.user_id || isSubmittingComment) return
+    if (!comment.trim() || !internalUserData?.user_id || isSubmittingComment) return
 
     setIsSubmittingComment(true)
 
@@ -874,7 +709,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
 
     // Save comment to database (you'll need to implement this API endpoint)
     try {
-      const response = await fetch(`/api/agents/${agentData.user_id}/comments`, {
+      const response = await fetch(`/api/agents/${internalUserData.user_id}/comments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -904,7 +739,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
           className="max-w-7xl max-h-[95vh] overflow-hidden p-0 rounded-xl"
           style={{ backgroundColor: theme === 'dark' ? '#111111' : '#f8f9fa' }}
         >
-        <DialogTitle className="sr-only">Agent Details</DialogTitle>
+        <DialogTitle className="sr-only">Internal Details</DialogTitle>
         <div className="flex h-[95vh]">
           {/* Left Panel - Form */}
           <div className="flex-1 flex flex-col">
@@ -912,64 +747,32 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
             <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border">
               <div className="flex items-center gap-3">
                 <Badge className="text-xs h-6 flex items-center rounded-[6px]">
-                  Agent
+                  Internal
                 </Badge>
+
               </div>
             </div>
 
-            {/* Agent Header */}
+            {/* Internal User Header */}
             <div className="px-6 py-5">
-              {/* Avatar and Agent Name */}
+              {/* Avatar and Internal User Name */}
               <div className="flex items-center gap-4 mb-6">
                 <Avatar className="h-16 w-16">
-                  <AvatarImage src={agentData?.profile_picture || "/avatars/shadcn.svg"} alt="Agent Avatar" />
+                  <AvatarImage src={internalUserData?.profile_picture || "/avatars/shadcn.svg"} alt="Internal Avatar" />
                   <AvatarFallback className="text-2xl">
-                    {displayData.first_name[0]}{displayData.last_name[0]}
+                    {(displayData.first_name?.[0] || '?')}{(displayData.last_name?.[0] || '?')}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <div className="text-2xl font-semibold mb-2">
-                    {displayData.first_name} {displayData.last_name}
+                    {displayData.first_name || 'Unknown'} {displayData.last_name || 'User'}
                   </div>
                 </div>
               </div>
               
-              {/* Agent Metadata Grid */}
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                {/* Member */}
-                <div className="flex items-center gap-2">
-                  <IconBuilding className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Member:</span>
-                  {displayData.member_company ? (
-                    <Badge
-                      variant="outline"
-                      className="border cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={openCompanySelection}
-                      style={{
-                        backgroundColor: withAlpha(displayData.member_badge_color || '#999999', 0.2),
-                        borderColor: withAlpha(displayData.member_badge_color || '#999999', 0.4),
-                        color: theme === 'dark' ? '#ffffff' : (displayData.member_badge_color || '#6B7280'),
-                      }}
-                    >
-                      <span className="truncate inline-block max-w-[16rem] align-bottom">{displayData.member_company}</span>
-                    </Badge>
-                  ) : (
-                    <Badge
-                      variant="outline"
-                      className="text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20 px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center border-dashed"
-                      onClick={openCompanySelection}
-                    >
-                      Select Company
-                    </Badge>
-                  )}
-                </div>
+              {/* Internal User Metadata Grid */}
+              <div className="grid grid-cols-1 gap-4 text-sm">
 
-                {/* Department */}
-                <div className="flex items-center gap-2">
-                  <IconBriefcase className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Department:</span>
-                  <span className="font-medium">{displayData.department}</span>
-                </div>
 
                 {/* Status */}
                 <div className="flex items-center gap-2">
@@ -987,7 +790,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                         : 'text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20'
                     }`}
                   >
-                    {displayData.status}
+                    {displayData.status || 'Unknown'}
                   </Badge>
                 </div>
               </div>
@@ -1062,10 +865,10 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                          placeholder="-"
                        />
 
-                       {/* Contact Information */}
+                       {/* Personal Email */}
                        <DataFieldRow
                          icon={<IconMail className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                         label="Email"
+                         label="Personal Email"
                          fieldName="email"
                          value={displayData.email}
                          onSave={() => {}}
@@ -1272,21 +1075,24 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                          icon={<IconMail className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
                          label="Work Email"
                          fieldName="work_email"
-                         value={displayData.work_email}
-                         onSave={() => {}}
+                         value={inputValues.work_email}
+                         onSave={handleInputChange}
                          placeholder="-"
                          customInput={
                            <div 
-                             className="h-[33px] w-full text-sm flex items-center justify-between"
-                             onMouseEnter={() => setIsHovered(true)}
-                             onMouseLeave={() => setIsHovered(false)}
+                             className="flex items-center gap-2 w-full"
+                             onMouseEnter={() => setIsWorkEmailHovered(true)}
+                             onMouseLeave={() => setIsWorkEmailHovered(false)}
                            >
-                             <span className={displayData.work_email ? 'text-foreground' : 'text-muted-foreground'}>
-                               {displayData.work_email || '-'}
-                             </span>
-                             {displayData.work_email && (
+                             <EditableField 
+                               fieldName="work_email"
+                               value={inputValues.work_email || ''}
+                               placeholder="-"
+                               onSave={handleInputChange}
+                             />
+                             {inputValues.work_email && inputValues.work_email.trim() !== '' && (
                                <div className={`flex items-center gap-2 transition-all duration-200 ease-in-out ${
-                                 isHovered 
+                                 isWorkEmailHovered 
                                    ? 'opacity-100 translate-x-0' 
                                    : 'opacity-0 translate-x-2 pointer-events-none'
                                }`}>
@@ -1294,13 +1100,25 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                                    onClick={(e) => {
                                      e.preventDefault()
                                      e.stopPropagation()
-                                     navigator.clipboard.writeText(displayData.work_email || '')
+                                     navigator.clipboard.writeText(inputValues.work_email)
                                    }}
                                    className="p-0 hover:text-foreground rounded transition-colors text-muted-foreground"
                                    title="Copy work email"
                                    tabIndex={-1}
                                  >
                                    <IconCopy className="h-4 w-4" />
+                                 </button>
+                                 <button
+                                   onClick={(e) => {
+                                     e.preventDefault()
+                                     e.stopPropagation()
+                                     handleInputChange('work_email', '')
+                                   }}
+                                   className="p-0 hover:text-0 hover:text-foreground rounded transition-colors text-muted-foreground"
+                                   title="Clear work email"
+                                   tabIndex={-1}
+                                 >
+                                   <IconX className="h-4 w-4" />
                                  </button>
                                </div>
                              )}
@@ -1583,173 +1401,81 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
           <div className="w-96 flex flex-col border-l border-[#cecece99] dark:border-border h-full bg-[#ebebeb] dark:bg-[#0a0a0a]">
                           <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border flex-shrink-0">
                 <h3 className="font-medium">
-                  {showCompanySelection ? 'Select Companies' : 'Activity'}
+                  Activity
                 </h3>
-              {!showCompanySelection && (
-                <button
-                  type="button"
-                  onClick={openCompanySelection}
-                  className="text-sm text-primary hover:text-primary/80 transition-all duration-300 cursor-pointer flex items-center gap-2 group"
-                >
 
-
-                </button>
-              )}
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-[#ebebeb] dark:bg-[#0a0a0a]">
-              {showCompanySelection ? (
-                /* Company Selection Content */
-                <div className="flex flex-col h-full">
-                  {/* Search Input */}
-                  <div className="space-y-3 flex-shrink-0">
-                    <div className="relative">
-                      <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search companies..."
-                        value={companySearch}
-                        onChange={(e) => {
-                          console.log('🔍 Search input changed:', e.target.value)
-                          setCompanySearch(e.target.value)
-                        }}
-                        className="pl-9"
-                      />
-                      {companySearch && (
-                        <button
-                          onClick={() => setCompanySearch('')}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <IconX className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
+              {/* Activity Content - Shows internal user activity and recent changes */}
+              <div className="space-y-4">
+                {internalUserData?.user_id ? (
+                  <MembersActivityLog 
+                    memberId={internalUserData.user_id} 
+                    companyName={internalUserData.first_name && internalUserData.last_name ? `${internalUserData.first_name} ${internalUserData.last_name}` : 'Unknown Internal'} 
+                    onRefresh={() => {
+                      // Real-time updates handle refresh automatically
+                    }}
+                  />
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p className="text-sm">No Activities Found</p>
                   </div>
-
-                  {/* Companies List */}
-                  <div 
-                    className="space-y-3 flex-1 overflow-y-auto min-h-0 px-2 py-4"
-                  >
-                    {isLoadingCompanies ? (
-                      <div className="space-y-3">
-                        {[...Array(5)].map((_, index) => (
-                          <div key={index} className="flex items-center gap-3 p-4 border bg-muted/20 dark:bg-muted/30 border-border rounded-lg">
-                            <Skeleton className="w-4 h-4 rounded-full flex-shrink-0" />
-                            <div className="flex-1">
-                              <Skeleton className="h-4 w-32" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : companies.length > 0 ? (
-                      (() => {
-                        console.log('🔍 Rendering companies:', companies)
-                        return companies.map((company) => (
-                          <div
-                            key={company.id}
-                            onClick={() => handleCompanySelect(company.id, company.company, company.badge_color)}
-                            className={`flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition-all duration-200 hover:border-primary/50 hover:bg-primary/5 ${
-                              !company.badge_color ? 'bg-gray-50 dark:bg-gray-600/20 border-gray-300 dark:border-gray-600/20 text-gray-700 dark:text-gray-300' : ''
-                            }`}
-                            style={{
-                              backgroundColor: company.badge_color ? `${company.badge_color}20` : undefined,
-                              borderColor: company.badge_color ? `${company.badge_color}40` : undefined,
-                              color: theme === 'dark' ? '#ffffff' : (company.badge_color || undefined)
-                            }}
-                          >
-                            <span className="text-sm font-medium truncate">{company.company}</span>
-                          </div>
-                        ))
-                      })()
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <p className="text-sm">No companies found</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Done Button */}
-                  <div className="flex-shrink-0">
-                    <Button
-                      onClick={closeCompanySelection}
-                      className="w-full"
-                    >
-                      Done
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                /* Activity Content - Shows agent activity and recent changes */
-                <div className="space-y-4">
-                  {agentData?.user_id ? (
-                    <MembersActivityLog 
-                      memberId={agentData.user_id} 
-                      companyName={agentData.first_name && agentData.last_name ? `${agentData.first_name} ${agentData.last_name}` : 'Unknown Agent'} 
-                      onRefresh={() => {
-                        // Real-time updates handle refresh automatically
-                      }}
-                    />
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <p className="text-sm">No Activities Found</p>
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Comment Input Section - Outside main content */}
-            {!showCompanySelection && (
-              <div className="px-3 pb-3 bg-[#ebebeb] dark:bg-[#0a0a0a]">
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <form onSubmit={handleCommentSubmit}>
-                      <div className={`border rounded-lg bg-sidebar overflow-hidden transition-all duration-300 ease-in-out [&>*]:border-none [&>*]:outline-none [&>textarea]:transition-all [&>textarea]:duration-300 [&>textarea]:ease-in-out ${
-                        isCommentFocused || comment.trim() 
-                          ? 'border-muted-foreground' 
-                          : 'border-border'
-                      }`}>
-                        <textarea 
-                          placeholder="Write a comment..." 
-                          value={comment}
-                          onChange={(e) => {
-                            setComment(e.target.value)
-                            // Auto-resize the textarea
-                            e.target.style.height = 'auto'
-                            e.target.style.height = e.target.scrollHeight + 'px'
-                          }}
-                          onFocus={(e) => {
-                            setIsCommentFocused(true)
-                          }}
-                          onBlur={(e) => {
-                            setIsCommentFocused(false)
-                          }}
-                          className="w-full resize-none border-0 bg-transparent text-foreground px-3 py-2 shadow-none text-sm focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:text-foreground placeholder:text-muted-foreground align-middle transition-all duration-300 ease-in-out min-h-[36px] overflow-hidden"
-                          disabled={isSubmittingComment}
-                          rows={1}
-                        />
-                        
-                        {/* Send button - only show when expanded, inside the textarea container */}
-                        {(isCommentFocused || comment.trim()) && (
-                          <div className="p-1 flex justify-end animate-in fade-in duration-300">
-                            <button
-                              type="submit"
-                              onClick={handleCommentSubmit}
-                              disabled={!comment.trim() || isSubmittingComment}
-                              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                            >
-                              {isSubmittingComment ? (
-                                <IconClock className="h-3 w-3 text-muted-foreground animate-spin" />
-                              ) : (
-                                <SendHorizontal className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </form>
-                  </div>
+            <div className="px-3 pb-3 bg-[#ebebeb] dark:bg-[#0a0a0a]">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <form onSubmit={handleCommentSubmit}>
+                    <div className={`border rounded-lg bg-sidebar overflow-hidden transition-all duration-300 ease-in-out [&>*]:border-none [&>*]:outline-none [&>textarea]:transition-all [&>textarea]:duration-300 [&>textarea]:ease-in-out ${
+                      isCommentFocused || comment.trim() 
+                        ? 'border-muted-foreground' 
+                        : 'border-border'
+                    }`}>
+                      <textarea 
+                        placeholder="Write a comment..." 
+                        value={comment}
+                        onChange={(e) => {
+                          setComment(e.target.value)
+                          // Auto-resize the textarea
+                          e.target.style.height = 'auto'
+                          e.target.style.height = e.target.scrollHeight + 'px'
+                        }}
+                        onFocus={(e) => {
+                          setIsCommentFocused(true)
+                        }}
+                        onBlur={(e) => {
+                          setIsCommentFocused(false)
+                        }}
+                        className="w-full resize-none border-0 bg-transparent text-foreground px-3 py-2 shadow-none text-sm focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:text-foreground placeholder:text-muted-foreground align-middle transition-all duration-300 ease-in-out min-h-[36px] overflow-hidden"
+                        disabled={isSubmittingComment}
+                        rows={1}
+                      />
+                      
+                      {/* Send button - only show when expanded, inside the textarea container */}
+                      {(isCommentFocused || comment.trim()) && (
+                        <div className="p-1 flex justify-end animate-in fade-in duration-300">
+                          <button
+                            type="submit"
+                            onClick={handleCommentSubmit}
+                            disabled={!comment.trim() || isSubmittingComment}
+                            className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                          >
+                            {isSubmittingComment ? (
+                              <IconClock className="h-3 w-3 text-muted-foreground animate-spin" />
+                            ) : (
+                              <SendHorizontal className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </form>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
       </DialogContent>

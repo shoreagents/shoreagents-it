@@ -10,11 +10,11 @@ export async function GET(request: NextRequest) {
     const sortField = searchParams.get('sortField') || 'first_name'
     const sortDirection = (searchParams.get('sortDirection') as 'asc' | 'desc') || 'asc'
 
-    const { agents, totalCount } = await getInternalPaginated({ search, page, limit, sortField, sortDirection })
+    const { internal, totalCount } = await getInternalPaginated({ search, page, limit, sortField, sortDirection })
     const totalPages = Math.ceil(totalCount / Math.max(1, limit))
 
     return NextResponse.json({
-      agents,
+      internal,
       pagination: {
         page,
         limit,

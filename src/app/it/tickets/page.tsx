@@ -1030,6 +1030,9 @@ export default function TicketsPage() {
                     <h1 className="text-2xl font-bold">Tickets</h1>
                     <p className="text-sm text-muted-foreground">Drag and drop tickets to manage their status.</p>
                   </div>
+                  <div className="flex gap-2">
+                    <ReloadButton onReload={fetchTickets} loading={loading} className="flex-1" />
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -1080,10 +1083,7 @@ export default function TicketsPage() {
                     </Button>
                   </div>
 
-                  <ReloadButton 
-                    onReload={fetchTickets}
-                    loading={loading}
-                  />
+
                 </div>
               </div>
 

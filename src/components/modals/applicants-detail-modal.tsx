@@ -11,7 +11,7 @@ import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, 
 import { Input } from "@/components/ui/input"
 import { EditableField, DataFieldRow } from "@/components/ui/fields"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger, PopoverItem } from "@/components/ui/popover"
 import { useTheme } from "next-themes"
 import { useRealtimeApplicants } from "@/hooks/use-realtime-applicants"
 import { useRealtimeBpocJobStatus } from "@/hooks/use-realtime-bpoc-job-status"
@@ -553,6 +553,9 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
   // Prevent body scroll when modal is open
   React.useEffect(() => {
     if (isOpen) {
+      // Reset active tab to Personal Info when modal opens
+      setActiveTab("information")
+      
       document.body.style.overflow = 'hidden'
       document.body.style.paddingRight = '0px'
       document.documentElement.style.overflow = 'hidden'
@@ -1043,18 +1046,14 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                         </Badge>
                       </PopoverTrigger>
                       <PopoverContent className="w-56 p-2">
-                        <div className="space-y-1">
-                          {statusOptions.map((option) => {
+                        {statusOptions.map((option) => {
                             const isCurrentStatus = (currentStatus || localApplicant.status) === option.value;
                             return (
-                              <div 
+                              <PopoverItem
                                 key={option.value}
-                                className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                  isCurrentStatus 
-                                    ? 'bg-primary/10 text-primary border border-primary/20 cursor-default' 
-                                    : 'hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground cursor-pointer'
-                                }`}
-                                onClick={isCurrentStatus ? undefined : () => handleStatusUpdate(option.value)}
+                                variant="primary"
+                                isSelected={isCurrentStatus}
+                                onClick={() => handleStatusUpdate(option.value)}
                               >
                                 {option.icon === 'rose' ? (
                                   <div className="w-3 h-3 rounded-full bg-rose-500"></div>
@@ -1078,10 +1077,9 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                   <div className="w-3 h-3 rounded-full bg-gray-500"></div>
                                 )}
                                 <span className="text-sm font-medium">{option.label}</span>
-                              </div>
+                              </PopoverItem>
                             );
                           })}
-                        </div>
                       </PopoverContent>
                     </Popover>
                   </div>
@@ -1210,16 +1208,12 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                                     {getStatusLabel(status, true)}
                                                   </Badge>
                                                 </PopoverTrigger>
-                                                                                              <PopoverContent className="w-48 p-2" align="end" side="top" sideOffset={4}>
-                                                <div className="space-y-1">
-                                                  {['not qualified', 'qualified', 'final interview'].map((statusOption) => (
-                                                  <div 
+                                                                                                                                          <PopoverContent className="w-48 p-2" align="end" side="top" sideOffset={4}>
+                                              {['not qualified', 'qualified', 'final interview'].map((statusOption) => (
+                                                <PopoverItem
                                                     key={statusOption}
-                                                    className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                                      status.toLowerCase() === statusOption 
-                                                        ? 'bg-primary/10 text-primary border border-primary/20 pointer-events-none cursor-default' 
-                                                        : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
-                                                    }`}
+                                                    variant="primary"
+                                                    isSelected={status.toLowerCase() === statusOption}
                                                     onClick={(e) => {
                                                       e.stopPropagation()
                                                       console.log(`🔄 Storing job ${index} status change locally:`, statusOption);
@@ -1252,9 +1246,8 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                                       'bg-gray-500'
                                                     }`}></div>
                                                     <span className="text-sm font-medium">{getStatusLabel(statusOption)}</span>
-                                                  </div>
+                                                  </PopoverItem>
                                                 ))}
-                                              </div>
                                             </PopoverContent>
                                           </Popover>
                                         </div>
@@ -1276,11 +1269,10 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                               </Badge>
                                             </PopoverTrigger>
                                             <PopoverContent className="w-48 p-2" align="end" side="top" sideOffset={4}>
-                                              <div className="space-y-1">
-                                                {['not qualified', 'qualified', 'final interview'].map((statusOption) => (
-                                                <div 
+                                              {['not qualified', 'qualified', 'final interview'].map((statusOption) => (
+                                                <PopoverItem
                                                   key={statusOption}
-                                                  className="flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground"
+                                                  variant="primary"
                                                   onClick={(e) => {
                                                     e.stopPropagation()
                                                     console.log(`🔄 Setting initial job ${index} status:`, statusOption);
@@ -1313,9 +1305,8 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                                     'bg-gray-500'
                                                   }`}></div>
                                                   <span className="text-sm font-medium">{getStatusLabel(statusOption)}</span>
-                                                </div>
+                                                </PopoverItem>
                                               ))}
-                                            </div>
                                           </PopoverContent>
                                         </Popover>
                                       </div>
@@ -1353,11 +1344,6 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                           { title: "AI Analysis", value: "ai-analysis" }
                         ]}
                         containerClassName="grid grid-cols-2 w-fit"
-                        activeTabClassName={`rounded-xl ${
-                          theme === 'dark' 
-                            ? 'bg-zinc-800' 
-                            : 'bg-[#ebebeb]'
-                        }`}
                         onTabChange={(tab) => setActiveTab(tab.value)}
                       />
                     </div>
@@ -1384,7 +1370,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                           {/* Shift */}
                           <DataFieldRow
                             icon={<IconClockHour4 className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                            label="Shift"
+                            label="Shift Period"
                             fieldName="shift"
                             value={inputValues.shift || ''}
                             onSave={() => {}}
@@ -1405,42 +1391,31 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                   </div>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-32 p-1" align="start" side="bottom" sideOffset={4}>
-                                  <div className="space-y-1">
-                                    {[
-                                      { value: 'Day', icon: <IconSun className="h-4 w-4 text-muted-foreground" /> },
-                                      { value: 'Night', icon: <IconMoon className="h-4 w-4 text-muted-foreground" /> }
-                                    ].map((shiftOption) => (
-                                      <div 
+                                  {[
+                                    { value: 'Day', icon: <IconSun className="h-4 w-4 text-muted-foreground" /> },
+                                    { value: 'Night', icon: <IconMoon className="h-4 w-4 text-muted-foreground" /> }
+                                  ].map((shiftOption) => (
+                                      <PopoverItem
                                         key={shiftOption.value}
-                                        className={`flex items-center gap-2 p-2 rounded-md transition-all duration-200 ${
-                                          inputValues.shift === shiftOption.value 
-                                            ? 'bg-primary/10 text-primary border border-primary/20 cursor-default opacity-75' 
-                                            : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
-                                        }`}
+                                        isSelected={inputValues.shift === shiftOption.value}
                                         onClick={() => {
-                                          // Only allow clicking if it's a different value
-                                          if (inputValues.shift !== shiftOption.value) {
-                                            console.log(`🔄 Shift changing from "${inputValues.shift}" to "${shiftOption.value}"`)
-                                            console.log(`🔍 Original value: "${originalValues.shift}"`)
-                                            console.log(`🔍 Current value: "${inputValues.shift}"`)
-                                            console.log(`🔍 New value: "${shiftOption.value}"`)
-                                            
-                                            // Update the input values first
-                                            setInputValues(prev => ({ ...prev, shift: shiftOption.value }))
-                                            
-                                            // Save immediately with the new value
-                                            const newValue = shiftOption.value
-                                            console.log(`💾 Saving shift with new value: "${newValue}"`)
-                                          } else {
-                                            console.log(`⏭️ Shift value unchanged: "${shiftOption.value}"`)
-                                          }
+                                          console.log(`🔄 Shift changing from "${inputValues.shift}" to "${shiftOption.value}"`)
+                                          console.log(`🔍 Original value: "${originalValues.shift}"`)
+                                          console.log(`🔍 Current value: "${inputValues.shift}"`)
+                                          console.log(`🔍 New value: "${shiftOption.value}"`)
+                                          
+                                          // Update the input values first
+                                          setInputValues(prev => ({ ...prev, shift: shiftOption.value }))
+                                          
+                                          // Save immediately with the new value
+                                          const newValue = shiftOption.value
+                                          console.log(`💾 Saving shift with new value: "${newValue}"`)
                                         }}
                                       >
                                         <span className="text-sm">{shiftOption.icon}</span>
                                         <span className="text-sm font-medium">{shiftOption.value}</span>
-                                      </div>
+                                      </PopoverItem>
                                     ))}
-                                  </div>
                                 </PopoverContent>
                               </Popover>
                             }
@@ -1988,14 +1963,14 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
             </div>
 
             {/* Right Panel - Activity Log */}
-            <div className="w-96 flex flex-col border-l border-[#cecece99] dark:border-border h-full bg-[#ebebeb] dark:bg-[#0a0a0a]">
+            <div className="w-96 flex flex-col border-l border-[#cecece99] dark:border-border h-full bg-[#ececec] dark:bg-[#0a0a0a]">
               {/* Activity Header */}
               <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border flex-shrink-0">
                 <h3 className="font-medium">Activity</h3>
               </div>
 
               {/* Activity Content */}
-              <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-[#ebebeb] dark:bg-[#0a0a0a]">
+              <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-[#ececec] dark:bg-[#0a0a0a]">
                 <div className="space-y-4">
                   {isLoadingComments ? (
                     <div className="flex items-center justify-center py-8">
@@ -2033,7 +2008,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
               </div>
 
               {/* Comment Input */}
-              <div className="px-3 pb-3 bg-[#ebebeb] dark:bg-[#0a0a0a]">
+              <div className="px-3 pb-3 bg-[#ececec] dark:bg-[#0a0a0a]">
                 <div className="flex gap-3 bg-sidebar rounded-lg p-4 border border-[#cecece99] dark:border-border">
                   <Avatar className="h-8 w-8 flex-shrink-0">
                     <AvatarImage src="" alt="Current User" />

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getMemberById, updateMember, deleteMember } from '@/lib/db-utils'
-import { createServiceClient } from '@/lib/supabase/server'
+import { getMemberById, updateMember, deleteMember, uploadMemberLogo } from '@/lib/db-utils'
 import { MembersActivityLogger } from '@/lib/logs-utils'
 
 export async function PATCH(
@@ -35,11 +34,17 @@ export async function PATCH(
       address: address ? 'present' : 'missing',
       phone,
       country,
-      service,
+      service: service || 'missing',
       website: website ? 'present' : 'missing',
       logo: logo ? `File: ${logo.name} (${logo.size} bytes)` : 'none',
       badge_color,
       status
+    })
+    console.log('API: Service field details:', {
+      rawService: service,
+      serviceType: typeof service,
+      serviceLength: service ? service.length : 0,
+      serviceTrimmed: service ? service.trim() : null
     })
 
     // Validate required fields
@@ -55,48 +60,22 @@ export async function PATCH(
       }, { status: 400 })
     }
 
+    // Validate service enum values
+    const validServices = ['One Agent', 'Team', 'Workforce']
+    if (service && !validServices.includes(service)) {
+      return NextResponse.json({ 
+        error: 'Invalid service value. Must be one of: ' + validServices.join(', ') 
+      }, { status: 400 })
+    }
+
     // Handle logo upload if provided
     let logoUrl = null
     if (logo && logo.size > 0) {
       try {
-        // Use service role key for storage operations (more permissions)
-        const supabase = createServiceClient()
-        
-        // Create folder structure: CompanyName/Logos (keep original name)
-        const logoExt = logo.name.split('.').pop()
-        const logoFileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${logoExt}`
-        const folderPath = `${company}/Logos`
-        const fullPath = `${folderPath}/${logoFileName}`
-        
-        console.log('Attempting to upload logo for update:', {
-          bucket: 'members',
-          path: fullPath,
-          fileName: logo.name,
-          fileSize: logo.size
-        })
-        
-        // Upload logo to Supabase storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('members')
-          .upload(fullPath, logo, {
-            cacheControl: '3600',
-            upsert: false
-          })
-        
-        if (uploadError) {
-          console.error('Logo upload error for update:', uploadError)
-          logoUrl = null
-        } else {
-          // Get public URL for the uploaded logo
-          const { data: urlData } = supabase.storage
-            .from('members')
-            .getPublicUrl(fullPath)
-          
-          logoUrl = urlData.publicUrl
-          console.log('Logo uploaded successfully for update:', logoUrl)
-        }
+        logoUrl = await uploadMemberLogo(logo, company)
+        console.log('Logo uploaded successfully for update:', logoUrl)
       } catch (uploadError) {
-        console.error('Logo upload exception for update:', uploadError)
+        console.error('Logo upload error for update:', uploadError)
         logoUrl = null
       }
     }
@@ -109,12 +88,14 @@ export async function PATCH(
     console.log('  website type:', typeof website)
     console.log('  websiteArray:', websiteArray)
 
-    // Format service field for consistency
-    const formattedService = service ? service
-      .toLowerCase()
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ') : null
+    // Format service field for consistency - ensure it matches the enum values exactly
+    const formattedService = service ? service.trim() : null
+    
+    console.log('API: Service formatting:', {
+      originalService: service,
+      formattedService: formattedService,
+      isValidService: formattedService ? validServices.includes(formattedService) : 'null'
+    })
 
     // Prepare update data
     const updateData: any = {

@@ -55,6 +55,8 @@ async function startListening() {
     await notificationClient.query('LISTEN agent_assignment_changes')
     await notificationClient.query('LISTEN client_assignment_changes')
     await notificationClient.query('LISTEN talent_pool_changes')
+    await notificationClient.query('LISTEN personal_info_changes')
+    await notificationClient.query('LISTEN job_info_changes')
 
     // Connect to BPOC database for job status notifications
     if (process.env.BPOC_DATABASE_URL) {
@@ -129,6 +131,10 @@ async function startListening() {
           messageType = 'client_update'
         } else if (msg.channel === 'talent_pool_changes') {
           messageType = 'talent_pool_update'
+        } else if (msg.channel === 'personal_info_changes') {
+          messageType = 'personal_info_update'
+        } else if (msg.channel === 'job_info_changes') {
+          messageType = 'job_info_update'
         }
         
         // Broadcast to all connected WebSocket clients

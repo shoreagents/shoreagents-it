@@ -20,19 +20,45 @@ import {
   PaginationNext,
 } from "@/components/ui/pagination"
 import { useTheme } from "next-themes"
+import { ReloadButton } from "@/components/ui/reload-button"
+import { InternalDetailModal } from "@/components/modals/internal-detail-modal"
+import { useRealtimeMembers } from '@/hooks/use-realtime-members'
 
 interface InternalRecord {
   user_id: number
   email: string
   user_type: string
+  // Personal Info fields
   first_name: string | null
+  middle_name: string | null
   last_name: string | null
+  nickname: string | null
   profile_picture: string | null
   phone: string | null
+  birthday: string | null
+  city: string | null
+  address: string | null
+  gender: string | null
+  // Job Info fields
   employee_id: string | null
   job_title: string | null
   work_email: string | null
+  shift_period: string | null
+  shift_schedule: string | null
+  shift_time: string | null
+  work_setup: string | null
+  employment_status: string | null
+  hire_type: string | null
+  staff_source: string | null
+  start_date: string | null
+  exit_date: string | null
+  // Internal specific fields
   station_id: string | null
+  // Additional fields that might be available from API
+  member_id?: number | null
+  member_company?: string | null
+  member_badge_color?: string | null
+  department_name?: string | null
 }
 
 export default function InternalPage() {
@@ -48,6 +74,89 @@ export default function InternalPage() {
   const PAGE_SIZE = 40
   const [sortField, setSortField] = useState<string>('first_name')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [selectedUser, setSelectedUser] = useState<InternalRecord | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // 🔄 Real-time updates for internal users - automatically syncs with database changes
+  const { isConnected: isRealtimeConnected } = useRealtimeMembers({
+    onPersonalInfoChanged: async (personalInfo, oldPersonalInfo, notificationData) => {
+      console.log('🔄 Real-time: Personal info change received in internal page:', { 
+        personalInfo, 
+        oldPersonalInfo, 
+        currentUsersCount: users.length
+      })
+      
+      // Update the users list with new personal info
+      setUsers(prevUsers => {
+        const userIndex = prevUsers.findIndex(user => user.user_id === personalInfo.user_id)
+        
+        if (userIndex !== -1) {
+          console.log('🔄 Updating internal user personal info in list:', personalInfo.user_id)
+          
+          // Create updated user with new personal info
+          const updatedUserInList = {
+            ...prevUsers[userIndex],
+            first_name: personalInfo.first_name,
+            middle_name: personalInfo.middle_name,
+            last_name: personalInfo.last_name,
+            nickname: personalInfo.nickname,
+            phone: personalInfo.phone,
+            address: personalInfo.address,
+            city: personalInfo.city,
+            gender: personalInfo.gender,
+            birthday: personalInfo.birthday
+          }
+          
+          // Create new array with updated user
+          const newUsers = [...prevUsers]
+          newUsers[userIndex] = updatedUserInList
+          return newUsers
+        }
+        
+        return prevUsers
+      })
+    },
+    onJobInfoChanged: async (jobInfo, oldJobInfo, notificationData) => {
+      console.log('🔄 Real-time: Job info change received in internal page:', { 
+        jobInfo, 
+        oldJobInfo, 
+        currentUsersCount: users.length
+      })
+      
+      // Update the users list with new job info
+      setUsers(prevUsers => {
+        const userIndex = prevUsers.findIndex(user => user.user_id === jobInfo.user_id)
+        
+        if (userIndex !== -1) {
+          console.log('🔄 Updating internal user job info in list:', jobInfo.user_id)
+          
+          // Create updated user with new job info
+          const updatedUserInList = {
+            ...prevUsers[userIndex],
+            employee_id: jobInfo.employee_id,
+            job_title: jobInfo.job_title,
+            shift_period: jobInfo.shift_period,
+            shift_schedule: jobInfo.shift_schedule,
+            shift_time: jobInfo.shift_time,
+            work_setup: jobInfo.work_setup,
+            employment_status: jobInfo.employment_status,
+            hire_type: jobInfo.hire_type,
+            staff_source: jobInfo.staff_source,
+            start_date: jobInfo.start_date,
+            exit_date: jobInfo.exit_date,
+            work_email: jobInfo.work_email
+          }
+          
+          // Create new array with updated user
+          const newUsers = [...prevUsers]
+          newUsers[userIndex] = updatedUserInList
+          return newUsers
+        }
+        
+        return prevUsers
+      })
+    }
+  })
 
   const fetchUsers = async () => {
     try {
@@ -66,7 +175,7 @@ export default function InternalPage() {
         throw new Error(err.error || "Failed to fetch internal users")
       }
       const data = await res.json()
-      setUsers(data.agents || [])
+      setUsers(data.internal || [])
       setTotalCount(data.pagination?.totalCount || 0)
       setTotalPages(data.pagination?.totalPages || 1)
     } catch (e: any) {
@@ -93,6 +202,16 @@ export default function InternalPage() {
     setCurrentPage(1)
   }
 
+  const handleRowClick = (user: InternalRecord) => {
+    setSelectedUser(user)
+    setIsModalOpen(true)
+  }
+
+  const handleModalClose = () => {
+    setIsModalOpen(false)
+    setSelectedUser(null)
+  }
+
   return (
     <>
       <AppSidebar variant="inset" />
@@ -105,7 +224,18 @@ export default function InternalPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h1 className="text-2xl font-bold">Internal</h1>
-                    <p className="text-sm text-muted-foreground">Directory of internal employees and contact details</p>
+                    <p className="text-sm text-muted-foreground">
+                      Directory of internal employees and contact details
+                      {isRealtimeConnected && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                          Live
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <ReloadButton onReload={fetchUsers} loading={loading} className="flex-1" />
                   </div>
                 </div>
               </div>
@@ -165,7 +295,7 @@ export default function InternalPage() {
                             </TableHeader>
                             <TableBody>
                               {users.map((u) => (
-                                <TableRow key={u.user_id}>
+                                <TableRow key={u.user_id} onClick={() => handleRowClick(u)} className="cursor-pointer hover:bg-accent/50">
                                   <TableCell className="whitespace-nowrap">
                                     <div className="flex items-center gap-2 min-w-0">
                                       <Avatar className="h-7 w-7">
@@ -254,6 +384,12 @@ export default function InternalPage() {
           </div>
         </div>
       </SidebarInset>
+      <InternalDetailModal
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        internalUserId={selectedUser?.user_id?.toString()}
+        internalUserData={selectedUser || undefined}
+      />
     </>
   )
 }

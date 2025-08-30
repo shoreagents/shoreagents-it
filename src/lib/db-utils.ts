@@ -18,14 +18,27 @@ export interface AgentRecord {
   email: string
   user_type: string
   first_name: string | null
+  middle_name: string | null
   last_name: string | null
+  nickname: string | null
   profile_picture: string | null
   phone: string | null
+  address: string | null
+  city: string | null
+  gender: string | null
+  birthday: string | null
   employee_id: string | null
   job_title: string | null
   work_email: string | null
   start_date: string | null
   exit_date: string | null
+  shift_period: string | null
+  shift_schedule: string | null
+  shift_time: string | null
+  work_setup: string | null
+  employment_status: string | null
+  hire_type: string | null
+  staff_source: string | null
   member_id: number | null
   member_company: string | null
   member_badge_color: string | null
@@ -1022,14 +1035,27 @@ export async function getAgentsPaginated({
         u.email,
         u.user_type,
         pi.first_name,
+        pi.middle_name,
         pi.last_name,
+        pi.nickname,
         pi.profile_picture,
         pi.phone,
+        pi.address,
+        pi.city,
+        pi.gender,
+        to_char(pi.birthday, 'YYYY-MM-DD') AS birthday,
         ji.employee_id,
         ji.job_title,
         ji.work_email,
-        ji.start_date,
-        ji.exit_date,
+        to_char(ji.start_date, 'YYYY-MM-DD') AS start_date,
+        to_char(ji.exit_date, 'YYYY-MM-DD') AS exit_date,
+        ji.shift_period,
+        ji.shift_schedule,
+        ji.shift_time,
+        ji.work_setup,
+        ji.employment_status,
+        ji.hire_type,
+        ji.staff_source,
         m.id AS member_id,
         m.company AS member_company,
         m.badge_color AS member_badge_color,
@@ -1087,6 +1113,166 @@ export async function updateAgentMember(userId: number, memberId: number | null)
   }
 }
 
+// Update agent personal information
+export async function updateAgentPersonalInfo(userId: number, personalInfo: Record<string, any>): Promise<any> {
+  try {
+    const checkQuery = 'SELECT id FROM public.personal_info WHERE user_id = $1'
+    const checkResult = await pool.query(checkQuery, [userId])
+    
+    if (checkResult.rows.length === 0) {
+      // Create new personal_info record
+      const insertQuery = `
+        INSERT INTO public.personal_info (
+          user_id, first_name, middle_name, last_name, nickname, phone, address, city, gender, birthday, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+        RETURNING *
+      `
+      const values = [
+        userId,
+        personalInfo.first_name || null,
+        personalInfo.middle_name || null,
+        personalInfo.last_name || null,
+        personalInfo.nickname || null,
+        personalInfo.phone || null,
+        personalInfo.address || null,
+        personalInfo.city || null,
+        personalInfo.gender || null,
+        personalInfo.birthday || null
+      ]
+      const result = await pool.query(insertQuery, values)
+      return result.rows[0]
+    } else {
+      // Update existing personal_info record
+      const setClause = Object.keys(personalInfo)
+        .map((key, index) => `${key} = $${index + 2}`)
+        .join(', ')
+      
+      const updateQuery = `
+        UPDATE public.personal_info 
+        SET ${setClause}, updated_at = NOW()
+        WHERE user_id = $1
+        RETURNING *
+      `
+      const values = [userId, ...Object.values(personalInfo)]
+      const result = await pool.query(updateQuery, values)
+      return result.rows[0]
+    }
+  } catch (error) {
+    console.error('Error updating agent personal info:', error)
+    throw error
+  }
+}
+
+// Update agent job information
+export async function updateAgentJobInfo(userId: number, jobInfo: Record<string, any>): Promise<any> {
+  try {
+    const checkQuery = 'SELECT id FROM public.job_info WHERE agent_user_id = $1'
+    const checkResult = await pool.query(checkQuery, [userId])
+    
+    if (checkResult.rows.length === 0) {
+      // Create new job_info record
+      const insertQuery = `
+        INSERT INTO public.job_info (
+          agent_user_id, employee_id, job_title, shift_schedule, shift_time, work_setup, hire_type, staff_source, start_date, exit_date, shift_period, employment_status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+        RETURNING *
+      `
+      const values = [
+        userId,
+        jobInfo.employee_id || null,
+        jobInfo.job_title || null,
+        jobInfo.shift_schedule || null,
+        jobInfo.shift_time || null,
+        jobInfo.work_setup || null,
+        jobInfo.hire_type || null,
+        jobInfo.staff_source || null,
+        jobInfo.start_date || null,
+        jobInfo.exit_date || null,
+        jobInfo.shift_period || null,
+        jobInfo.employment_status || null
+      ]
+      const result = await pool.query(insertQuery, values)
+      return result.rows[0]
+    } else {
+      // Update existing job_info record
+      const setClause = Object.keys(jobInfo)
+        .map((key, index) => `${key} = $${index + 2}`)
+        .join(', ')
+      
+      const updateQuery = `
+        UPDATE public.job_info 
+        SET ${setClause}, updated_at = NOW()
+        WHERE agent_user_id = $1
+        RETURNING *
+      `
+      const values = [userId, ...Object.values(jobInfo)]
+      const result = await pool.query(updateQuery, values)
+      return result.rows[0]
+    }
+  } catch (error) {
+    console.error('Error updating agent job info:', error)
+    throw error
+  }
+}
+
+// Update agent data (consolidated function)
+export async function updateAgentData(userId: number, updates: Record<string, any>): Promise<any> {
+  try {
+    // Separate fields by table
+    const personalInfoFields = {
+      first_name: updates.first_name,
+      middle_name: updates.middle_name,
+      last_name: updates.last_name,
+      nickname: updates.nickname,
+      phone: updates.phone,
+      address: updates.address,
+      city: updates.city,
+      gender: updates.gender,
+      birthday: updates.birthday
+    }
+    
+    const jobInfoFields = {
+      employee_id: updates.employee_id,
+      job_title: updates.job_title,
+      shift_schedule: updates.shift_schedule,
+      shift_time: updates.shift_time,
+      work_setup: updates.work_setup,
+      hire_type: updates.hire_type,
+      staff_source: updates.staff_source,
+      start_date: updates.start_date,
+      exit_date: updates.exit_date,
+      shift_period: updates.shift_period,
+      employment_status: updates.employment_status
+    }
+
+    // Remove undefined values
+    const cleanPersonalInfo = Object.fromEntries(
+      Object.entries(personalInfoFields).filter(([_, value]) => value !== undefined)
+    )
+    
+    const cleanJobInfo = Object.fromEntries(
+      Object.entries(jobInfoFields).filter(([_, value]) => value !== undefined)
+    )
+
+    const results: any = {}
+
+    // Update personal_info table if there are personal info changes
+    if (Object.keys(cleanPersonalInfo).length > 0) {
+      results.personalInfo = await updateAgentPersonalInfo(userId, cleanPersonalInfo)
+    }
+
+    // Update job_info table if there are job info changes
+    if (Object.keys(cleanJobInfo).length > 0) {
+      results.jobInfo = await updateAgentJobInfo(userId, cleanJobInfo)
+    }
+
+    return results
+  } catch (error) {
+    console.error('Error updating agent data:', error)
+    throw error
+  }
+}
+
 // Get agent by user_id with full details
 export async function getAgentById(userId: number): Promise<any> {
   try {
@@ -1100,14 +1286,27 @@ export async function getAgentById(userId: number): Promise<any> {
         u.email,
         u.user_type,
         pi.first_name,
+        pi.middle_name,
         pi.last_name,
+        pi.nickname,
         pi.profile_picture,
         pi.phone,
+        pi.address,
+        pi.city,
+        pi.gender,
+        to_char(pi.birthday, 'YYYY-MM-DD') AS birthday,
         ji.employee_id,
         ji.job_title,
         ji.work_email,
-        ji.start_date,
-        ji.exit_date,
+        to_char(ji.start_date, 'YYYY-MM-DD') AS start_date,
+        to_char(ji.exit_date, 'YYYY-MM-DD') AS exit_date,
+        ji.shift_period,
+        ji.shift_schedule,
+        ji.shift_time,
+        ji.work_setup,
+        ji.employment_status,
+        ji.hire_type,
+        ji.staff_source,
         m.company AS member_company,
         m.badge_color AS member_badge_color,
         d.name AS department_name
@@ -1355,12 +1554,7 @@ export async function getMembersPaginated({
     const t = `$${paramIndex++}`
     whereParts.push(
       `(
-        m.company ILIKE ${t} OR
-        COALESCE(m.service,'') ILIKE ${t} OR
-        COALESCE(m.country,'') ILIKE ${t} OR
-        COALESCE(m.phone,'') ILIKE ${t} OR
-        COALESCE(m.address,'') ILIKE ${t} OR
-        COALESCE(m.website::text,'') ILIKE ${t}
+        m.company ILIKE ${t}
       )`
     )
   }
@@ -1423,7 +1617,7 @@ export async function getMembersPaginated({
     ) cl ON cl.member_id = m.id
     ${whereClause}
     ORDER BY ${mapSort(sortField)} ${sortDirection.toUpperCase()}
-    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    LIMIT $${params.length + 1} OFFSET $${params.length + 2}
   `
   const dataParams = [...params, Math.max(1, limit), offset]
   const dataResult = await pool.query(dataQuery, dataParams)
@@ -1443,7 +1637,7 @@ export async function getInternalPaginated({
   limit?: number
   sortField?: string
   sortDirection?: 'asc' | 'desc'
-}): Promise<{ agents: AgentRecord[]; totalCount: number }> {
+}): Promise<{ internal: any[]; totalCount: number }> {
   const offset = (Math.max(1, page) - 1) * Math.max(1, limit)
 
   const params: any[] = []
@@ -1500,17 +1694,27 @@ export async function getInternalPaginated({
         u.email,
         u.user_type,
         pi.first_name,
+        pi.middle_name,
         pi.last_name,
+        pi.nickname,
         pi.profile_picture,
         pi.phone,
+        to_char(pi.birthday, 'YYYY-MM-DD') AS birthday,
+        pi.city,
+        pi.address,
+        pi.gender,
         ji.employee_id,
         ji.job_title,
         ji.work_email,
-        ji.start_date,
-        ji.exit_date,
-        NULL::int AS member_id,
-        NULL::text AS member_company,
-        NULL::text AS member_badge_color,
+        ji.shift_period,
+        ji.shift_schedule,
+        ji.shift_time,
+        ji.work_setup,
+        ji.employment_status,
+        ji.hire_type,
+        ji.staff_source,
+        to_char(ji.start_date, 'YYYY-MM-DD') AS start_date,
+        to_char(ji.exit_date, 'YYYY-MM-DD') AS exit_date,
         s.station_id
      FROM public.users u
      INNER JOIN public.internal i ON u.id = i.user_id
@@ -1524,7 +1728,7 @@ export async function getInternalPaginated({
   const dataParams = [...params, Math.max(1, limit), offset]
   const dataResult = await pool.query(dataQuery, dataParams)
 
-  return { agents: dataResult.rows, totalCount }
+  return { internal: dataResult.rows, totalCount }
 }
 
 // Fetch agents assigned to a specific member (for avatar popovers)
@@ -3364,6 +3568,528 @@ export async function getClientsForMember(memberId: number): Promise<any[]> {
     return agents
   } catch (error) {
     console.error('Error fetching clients for member:', error)
+    throw error
+  }
+}
+
+// Member Comments Functions
+export async function getMemberCommentsPaginated(memberId: number, page: number = 1, limit: number = 20) {
+  try {
+    const offset = (page - 1) * limit
+
+    // Get total count first
+    const countResult = await pool.query(`
+      SELECT COUNT(*) as total_count
+      FROM public.member_comments mc
+      WHERE mc.member_id = $1
+    `, [memberId])
+    
+    const totalCount = parseInt(countResult.rows[0]?.total_count || '0', 10)
+    const totalPages = Math.ceil(totalCount / limit)
+
+    // Get comments for the member with user names and pagination
+    const result = await pool.query(`
+      SELECT 
+        mc.id,
+        mc.comment,
+        mc.created_at,
+        mc.updated_at,
+        mc.user_id,
+        pi.first_name,
+        pi.last_name
+      FROM public.member_comments mc
+      LEFT JOIN public.personal_info pi ON mc.user_id = pi.user_id
+      WHERE mc.member_id = $1
+      ORDER BY mc.created_at DESC
+      LIMIT $2 OFFSET $3
+    `, [memberId, limit, offset])
+
+    // Transform the data to match the expected format
+    const transformedComments = result.rows.map(comment => ({
+      id: comment.id,
+      comment: comment.comment,
+      user_name: comment.first_name && comment.last_name 
+        ? `${comment.first_name} ${comment.last_name}`.trim() 
+        : comment.first_name || comment.last_name || 'Unknown User',
+      user_id: comment.user_id,
+      created_at: comment.created_at
+    }))
+
+    return {
+      comments: transformedComments,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching member comments:', error)
+    throw error
+  }
+}
+
+export async function createMemberComment(memberId: number, userId: number, comment: string) {
+  try {
+    const result = await pool.query(`
+      INSERT INTO public.member_comments (member_id, user_id, comment)
+      VALUES ($1, $2, $3)
+      RETURNING id, member_id, user_id, comment, created_at, updated_at
+    `, [memberId, userId, comment.trim()])
+
+    if (result.rows.length === 0) {
+      throw new Error('Failed to insert comment')
+    }
+
+    return result.rows[0]
+  } catch (error) {
+    console.error('Error creating member comment:', error)
+    throw error
+  }
+}
+
+// Member Activity Functions
+export async function getMemberActivityPaginated(
+  memberId: number, 
+  page: number = 1, 
+  limit: number = 20, 
+  action: string | null = null
+) {
+  try {
+    const offset = (page - 1) * limit
+
+    // Fetch activity logs
+    let activityQuery = `
+      SELECT 
+        mal.id,
+        mal.member_id,
+        mal.field_name,
+        mal.old_value,
+        mal.new_value,
+        mal.action,
+        mal.created_at,
+        mal.user_id,
+        COALESCE(pi.first_name || ' ' || pi.last_name, u.email) as user_name
+      FROM public.members_activity_log mal
+      LEFT JOIN public.users u ON mal.user_id = u.id
+      LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+      WHERE mal.member_id = $1
+    `
+
+    if (action) {
+      activityQuery += ` AND mal.action = $2`
+    }
+
+    // Fetch comments
+    const commentsQuery = `
+      SELECT 
+        mc.id,
+        mc.comment,
+        mc.created_at,
+        mc.user_id,
+        COALESCE(pi.first_name || ' ' || pi.last_name, u.email) as user_name,
+        pi.profile_picture
+      FROM public.member_comments mc
+      LEFT JOIN public.users u ON mc.user_id = u.id
+      LEFT JOIN public.personal_info pi ON u.id = pi.user_id
+      WHERE mc.member_id = $1
+    `
+
+    // Get total count for both activities and comments
+    const countQuery = `
+      SELECT 
+        (SELECT COUNT(*) FROM public.members_activity_log WHERE member_id = $1 ${action ? 'AND action = $2' : ''}) as activity_count,
+        (SELECT COUNT(*) FROM public.member_comments WHERE member_id = $1) as comment_count
+    `
+    
+    const countResult = await pool.query(countQuery, action ? [memberId, action] : [memberId])
+    const totalActivityCount = parseInt(countResult.rows[0]?.activity_count || '0', 10)
+    const totalCommentCount = parseInt(countResult.rows[0]?.comment_count || '0', 10)
+    const totalCount = totalActivityCount + totalCommentCount
+
+    // Get ALL activities and comments for this member (we'll paginate after combining)
+    const activityResult = await pool.query(activityQuery, action ? [memberId, action] : [memberId])
+    const commentsResult = await pool.query(commentsQuery, [memberId])
+    
+    // Format activities
+    const activities = activityResult.rows.map(row => ({
+      id: `activity_${row.id}`,
+      type: 'activity' as const,
+      action: row.action,
+      fieldName: row.field_name,
+      oldValue: row.old_value,
+      newValue: row.new_value,
+      createdAt: row.created_at,
+      userName: row.user_name,
+      userId: row.user_id
+    }))
+    
+    // Format comments
+    const comments = commentsResult.rows.map(row => ({
+      id: `comment_${row.id}`,
+      type: 'comment' as const,
+      comment: row.comment,
+      createdAt: row.created_at,
+      userName: row.user_name,
+      userId: row.user_id,
+      profilePicture: row.profile_picture
+    }))
+    
+    // Combine and sort by timestamp (oldest first - chronological order)
+    const allEntries = [...activities, ...comments].sort((a, b) => 
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    )
+    
+    // Apply pagination to combined results
+    const paginatedEntries = allEntries.slice(offset, offset + limit)
+    
+    const totalPages = Math.ceil(totalCount / limit)
+
+    return {
+      entries: paginatedEntries,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        activityCount: totalActivityCount,
+        commentCount: totalCommentCount
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching member activity:', error)
+    throw error
+  }
+}
+
+export async function createMemberActivityLog(
+  memberId: number, 
+  fieldName: string, 
+  action: string, 
+  oldValue: string | null, 
+  newValue: string | null, 
+  userId: number | null
+) {
+  try {
+    const result = await pool.query(`
+      INSERT INTO public.members_activity_log (
+        member_id, field_name, action, old_value, new_value, user_id
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id
+    `, [memberId, fieldName || '', action, oldValue || null, newValue || null, userId || null])
+
+    return result.rows[0].id
+  } catch (error) {
+    console.error('Error creating member activity log:', error)
+    throw error
+  }
+}
+
+// Member Logo Upload Functions
+export async function uploadMemberLogo(logo: File, companyName: string) {
+  try {
+    const { createServiceClient } = await import('@/lib/supabase/server')
+    const supabase = createServiceClient()
+    
+    // Create folder structure: CompanyName/Logos (keep original name)
+    const logoExt = logo.name.split('.').pop()
+    const logoFileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${logoExt}`
+    const folderPath = `${companyName}/Logos`
+    const fullPath = `${folderPath}/${logoFileName}`
+    
+    // Upload logo to Supabase storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('members')
+      .upload(fullPath, logo, {
+        cacheControl: '3600',
+        upsert: false
+      })
+    
+    if (uploadError) {
+      throw new Error(`Logo upload failed: ${uploadError.message}`)
+    }
+    
+    // Get public URL for the uploaded logo
+    const { data: urlData } = supabase.storage
+      .from('members')
+      .getPublicUrl(fullPath)
+    
+    return urlData.publicUrl
+  } catch (error) {
+    console.error('Error uploading member logo:', error)
+    throw error
+  }
+}
+
+export async function removeMemberLogo(logoUrl: string) {
+  try {
+    const { createServiceClient } = await import('@/lib/supabase/server')
+    const supabase = createServiceClient()
+    
+    // Extract the path from the public URL
+    const urlParts = logoUrl.split('/')
+    const bucketIndex = urlParts.findIndex(part => part === 'members')
+    if (bucketIndex === -1) {
+      throw new Error('Invalid logo URL format')
+    }
+    
+    const path = urlParts.slice(bucketIndex + 1).join('/')
+    
+    // Remove the file from storage
+    const { error: deleteError } = await supabase.storage
+      .from('members')
+      .remove([path])
+    
+    if (deleteError) {
+      console.warn('Failed to remove logo file from storage:', deleteError)
+      // Don't throw error as this is not critical
+    }
+    
+    return true
+  } catch (error) {
+    console.error('Error removing member logo:', error)
+    // Don't throw error as this is not critical
+    return false
+  }
+}
+
+// Update internal user data (consolidated function)
+// SECURITY: Email field is protected and cannot be updated through this function
+export async function updateInternalData(userId: number, updates: Record<string, any>): Promise<any> {
+  try {
+    // Remove email from updates to prevent any email changes
+    const { email, ...safeUpdates } = updates
+    
+    // Log if email update was attempted (for security monitoring)
+    if (email !== undefined) {
+      console.log(`🛡️ Email update blocked for user ${userId}: Email field is protected from changes`)
+    }
+    
+    // Separate fields by table
+    const personalInfoFields = {
+      first_name: safeUpdates.first_name,
+      middle_name: safeUpdates.middle_name,
+      last_name: safeUpdates.last_name,
+      nickname: safeUpdates.nickname,
+      phone: safeUpdates.phone,
+      address: safeUpdates.address,
+      city: safeUpdates.city,
+      gender: safeUpdates.gender,
+      birthday: safeUpdates.birthday
+    }
+    
+    const jobInfoFields = {
+      employee_id: safeUpdates.employee_id,
+      job_title: safeUpdates.job_title,
+      work_email: safeUpdates.work_email,
+      shift_schedule: safeUpdates.shift_schedule,
+      shift_time: safeUpdates.shift_time,
+      work_setup: safeUpdates.work_setup,
+      hire_type: safeUpdates.hire_type,
+      staff_source: safeUpdates.staff_source,
+      start_date: safeUpdates.start_date,
+      exit_date: safeUpdates.exit_date,
+      shift_period: safeUpdates.shift_period,
+      employment_status: safeUpdates.employment_status
+    }
+    
+    // Email field is protected and cannot be updated
+    // const userFields = {
+    //   email: updates.email
+    // }
+
+    // Remove undefined values
+    const cleanPersonalInfo = Object.fromEntries(
+      Object.entries(personalInfoFields).filter(([_, value]) => value !== undefined)
+    )
+    
+    const cleanJobInfo = Object.fromEntries(
+      Object.entries(jobInfoFields).filter(([_, value]) => value !== undefined)
+    )
+    
+    // No user fields to clean since email is protected
+    // const cleanUserFields = Object.fromEntries(
+    //   Object.entries(userFields).filter(([_, value]) => value !== undefined)
+    // )
+
+    const results: any = {}
+
+    // Email field is protected - no user table updates allowed
+    // if (Object.keys(cleanUserFields).length > 0) {
+    //   results.user = await updateInternalUserFields(userId, cleanUserFields)
+    // }
+
+    // Update personal_info table if there are personal info changes
+    if (Object.keys(cleanPersonalInfo).length > 0) {
+      results.personalInfo = await updateInternalPersonalInfo(userId, cleanPersonalInfo)
+    }
+
+    // Update job_info table if there are job info changes
+    if (Object.keys(cleanJobInfo).length > 0) {
+      results.jobInfo = await updateInternalJobInfo(userId, cleanJobInfo)
+    }
+
+    return results
+  } catch (error) {
+    console.error('Error updating internal user data:', error)
+    throw error
+  }
+}
+
+// Update internal user user fields (email, etc.)
+async function updateInternalUserFields(userId: number, updates: Record<string, any>): Promise<any> {
+  try {
+    const fields = Object.keys(updates)
+    const values = Object.values(updates)
+    const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ')
+    
+    const updateQuery = `
+      UPDATE public.users 
+      SET ${setClause}, updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `
+    const result = await pool.query(updateQuery, [userId, ...values])
+    return result.rows[0]
+  } catch (error) {
+    console.error('Error updating internal user fields:', error)
+    throw error
+  }
+}
+
+// Update internal user personal info
+async function updateInternalPersonalInfo(userId: number, updates: Record<string, any>): Promise<any> {
+  try {
+    // Check if personal_info record exists
+    const checkQuery = 'SELECT id FROM public.personal_info WHERE user_id = $1'
+    const checkResult = await pool.query(checkQuery, [userId])
+    
+    if (checkResult.rows.length === 0) {
+      // Create new personal_info record
+      const fields = Object.keys(updates)
+      const values = Object.values(updates)
+      const placeholders = fields.map((_, index) => `$${index + 2}`).join(', ')
+      
+      const insertQuery = `
+        INSERT INTO public.personal_info (user_id, ${fields.join(', ')})
+        VALUES ($1, ${placeholders})
+        RETURNING *
+      `
+      const result = await pool.query(insertQuery, [userId, ...values])
+      return result.rows[0]
+    } else {
+      // Update existing personal_info record
+      const fields = Object.keys(updates)
+      const values = Object.values(updates)
+      const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ')
+      
+      const updateQuery = `
+        UPDATE public.personal_info 
+        SET ${setClause}, updated_at = NOW()
+        WHERE user_id = $1
+        RETURNING *
+      `
+      const result = await pool.query(updateQuery, [userId, ...values])
+      return result.rows[0]
+    }
+  } catch (error) {
+    console.error('Error updating internal user personal info:', error)
+    throw error
+  }
+}
+
+// Update internal user job info
+async function updateInternalJobInfo(userId: number, updates: Record<string, any>): Promise<any> {
+  try {
+    // Check if job_info record exists for this internal user
+    const checkQuery = 'SELECT id FROM public.job_info WHERE internal_user_id = $1'
+    const checkResult = await pool.query(checkQuery, [userId])
+    
+    if (checkResult.rows.length === 0) {
+      // Create new job_info record
+      const fields = Object.keys(updates)
+      const values = Object.values(updates)
+      const placeholders = fields.map((_, index) => `$${index + 2}`).join(', ')
+      
+      const insertQuery = `
+        INSERT INTO public.job_info (internal_user_id, ${fields.join(', ')})
+        VALUES ($1, ${placeholders})
+        RETURNING *
+      `
+      const result = await pool.query(insertQuery, [userId, ...values])
+      return result.rows[0]
+    } else {
+      // Update existing job_info record
+      const fields = Object.keys(updates)
+      const values = Object.values(updates)
+      const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ')
+      
+      const updateQuery = `
+        UPDATE public.job_info 
+        SET ${setClause}, updated_at = NOW()
+        WHERE internal_user_id = $1
+        RETURNING *
+      `
+      const result = await pool.query(updateQuery, [userId, ...values])
+      return result.rows[0]
+    }
+  } catch (error) {
+    console.error('Error updating internal user job info:', error)
+    throw error
+  }
+}
+
+// Get internal user by user_id with full details
+export async function getInternalById(userId: number): Promise<any> {
+  try {
+    const query = `
+      SELECT 
+        i.user_id,
+        i.created_at,
+        i.updated_at,
+        u.email,
+        u.user_type,
+        pi.first_name,
+        pi.middle_name,
+        pi.last_name,
+        pi.nickname,
+        pi.profile_picture,
+        pi.phone,
+        pi.address,
+        pi.city,
+        pi.gender,
+        to_char(pi.birthday, 'YYYY-MM-DD') AS birthday,
+        ji.employee_id,
+        ji.job_title,
+        ji.work_email,
+        to_char(ji.start_date, 'YYYY-MM-DD') AS start_date,
+        to_char(ji.exit_date, 'YYYY-MM-DD') AS exit_date,
+        ji.shift_period,
+        ji.shift_schedule,
+        ji.shift_time,
+        ji.work_setup,
+        ji.employment_status,
+        ji.hire_type,
+        ji.staff_source,
+        s.station_id
+      FROM public.internal i
+      INNER JOIN public.users u ON i.user_id = u.id
+      LEFT JOIN public.personal_info pi ON i.user_id = pi.user_id
+      LEFT JOIN public.job_info ji ON i.user_id = ji.internal_user_id
+      LEFT JOIN public.stations s ON i.user_id = s.assigned_user_id
+      WHERE i.user_id = $1
+    `
+    
+    const result = await pool.query(query, [userId])
+    
+    if (result.rows.length === 0) {
+      return null
+    }
+    
+    return result.rows[0]
+  } catch (error) {
+    console.error('Error fetching internal user by ID:', error)
     throw error
   }
 }

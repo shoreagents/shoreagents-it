@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getMembersPaginated, getAgentsByMember, getClientsByMember, createMemberCompany } from '@/lib/db-utils'
-import { createServiceClient } from '@/lib/supabase/server'
+import { getMembersPaginated, getAgentsByMember, getClientsByMember, createMemberCompany, uploadMemberLogo } from '@/lib/db-utils'
 import { MembersActivityLogger } from '@/lib/logs-utils'
 
 export async function GET(request: NextRequest) {
@@ -135,66 +134,15 @@ export async function POST(request: NextRequest) {
     
     if (logo && logo.size > 0) {
       try {
-        // Use service role key for storage operations (more permissions)
-        const supabase = createServiceClient()
-        
-        // Create folder structure: CompanyName/Logos (keep original name)
-        const logoExt = logo.name.split('.').pop()
-        const logoFileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${logoExt}`
-        const folderPath = `${company}/Logos`
-        const fullPath = `${folderPath}/${logoFileName}`
-        
-        console.log('Attempting to upload logo to Supabase storage:', {
-          bucket: 'members',
-          path: fullPath,
-          fileName: logo.name,
-          fileSize: logo.size,
-          fileType: logo.type
-        })
-        
-        // Upload logo to Supabase storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('members')
-          .upload(fullPath, logo, {
-            cacheControl: '3600',
-            upsert: false
-          })
-        
-        if (uploadError) {
-          console.error('Logo upload error details:', {
-            error: uploadError,
-            message: uploadError.message
-          })
-          // Don't fail the entire request, just skip logo upload
-          console.log('Logo upload failed, continuing without logo')
-          logoUrl = null
-        } else {
-          console.log('Upload successful, data:', uploadData)
-          
-          // Get public URL for the uploaded logo
-          const { data: urlData } = supabase.storage
-            .from('members')
-            .getPublicUrl(fullPath)
-          
-          logoUrl = urlData.publicUrl
-          console.log('Logo uploaded successfully to:', fullPath)
-          console.log('Public URL:', logoUrl)
-          console.log('🔍 Logo URL details:')
-          console.log('  - URL length:', logoUrl?.length)
-          console.log('  - URL starts with http:', logoUrl?.startsWith('http'))
-          console.log('  - URL includes supabase:', logoUrl?.includes('supabase'))
-          
-          // Verify the URL was generated
-          if (!logoUrl) {
-            console.error('Failed to generate public URL for uploaded logo')
-            logoUrl = null
-          }
-        }
-        
+        logoUrl = await uploadMemberLogo(logo, company)
+        console.log('Logo uploaded successfully for creation:', logoUrl)
       } catch (uploadError) {
-        console.error('Logo upload exception:', uploadError)
+        console.error('Logo upload error details:', {
+          error: uploadError,
+          message: uploadError instanceof Error ? uploadError.message : 'Unknown error'
+        })
         // Don't fail the entire request, just skip logo upload
-        console.log('Logo upload failed due to exception, continuing without logo')
+        console.log('Logo upload failed, continuing without logo')
         logoUrl = null
       }
     }

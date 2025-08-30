@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
+import { ReloadButton } from "@/components/ui/reload-button"
 import { AppSidebar } from "@/components/app-sidebar"
 import { AppHeader } from "@/components/app-header"
 import { SidebarInset } from "@/components/ui/sidebar"
@@ -349,13 +350,9 @@ export default function CompaniesPage() {
                     <h1 className="text-2xl font-bold">Companies</h1>
                     <p className="text-sm text-muted-foreground">Directory of member companies</p>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsAddCompanyModalOpen(true)} 
-                  >
-                    <IconPlus className="h-4 w-4" />
-                    Add Company
-                  </Button>
+                  <div className="flex gap-2">
+                    <ReloadButton onReload={fetchMembers} loading={loading} className="flex-1" />
+                  </div>
                 </div>
               </div>
 
@@ -370,6 +367,13 @@ export default function CompaniesPage() {
                       onChange={(e) => setSearch(e.target.value)}
                     />
                   </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsAddCompanyModalOpen(true)} 
+                  >
+                    <IconPlus className="h-4 w-4" />
+                    Add Company
+                  </Button>
                 </div>
               </div>
 

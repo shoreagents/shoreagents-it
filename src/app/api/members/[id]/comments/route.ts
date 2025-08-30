@@ -1,39 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pool from '@/lib/database'
+import { getMemberCommentsPaginated, createMemberComment } from '@/lib/db-utils'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Get comments for the member with user names
-    const result = await pool.query(`
-      SELECT 
-        mc.id,
-        mc.comment,
-        mc.created_at,
-        mc.updated_at,
-        mc.user_id,
-        pi.first_name,
-        pi.last_name
-      FROM public.member_comments mc
-      LEFT JOIN public.personal_info pi ON mc.user_id = pi.user_id
-      WHERE mc.member_id = $1
-      ORDER BY mc.created_at DESC
-    `, [params.id])
+    const { searchParams } = request.nextUrl
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const limit = parseInt(searchParams.get('limit') || '20', 10)
+    const memberId = parseInt(params.id, 10)
 
-    // Transform the data to match the expected format
-    const transformedComments = result.rows.map(comment => ({
-      id: comment.id,
-      comment: comment.comment,
-      user_name: comment.first_name && comment.last_name 
-        ? `${comment.first_name} ${comment.last_name}`.trim() 
-        : comment.first_name || comment.last_name || 'Unknown User',
-      user_id: comment.user_id, // Add missing user_id field
-      created_at: comment.created_at
-    }))
+    if (isNaN(memberId)) {
+      return NextResponse.json({ error: 'Invalid member ID' }, { status: 400 })
+    }
 
-    return NextResponse.json({ comments: transformedComments })
+    const result = await getMemberCommentsPaginated(memberId, page, limit)
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Error in comments GET:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -46,23 +30,19 @@ export async function POST(
 ) {
   try {
     const { comment, user_id } = await request.json()
+    const memberId = parseInt(params.id, 10)
+
+    if (isNaN(memberId)) {
+      return NextResponse.json({ error: 'Invalid member ID' }, { status: 400 })
+    }
 
     if (!comment?.trim() || !user_id) {
       return NextResponse.json({ error: 'Comment and user_id are required' }, { status: 400 })
     }
 
-    // Insert the comment
-    const result = await pool.query(`
-      INSERT INTO public.member_comments (member_id, user_id, comment)
-      VALUES ($1, $2, $3)
-      RETURNING id, member_id, user_id, comment, created_at, updated_at
-    `, [params.id, user_id, comment.trim()])
+    const newComment = await createMemberComment(memberId, user_id, comment)
 
-    if (result.rows.length === 0) {
-      throw new Error('Failed to insert comment')
-    }
-
-    return NextResponse.json({ success: true, comment: result.rows[0] })
+    return NextResponse.json({ success: true, comment: newComment })
   } catch (error) {
     console.error('Error in comments POST:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

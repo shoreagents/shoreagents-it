@@ -20,7 +20,7 @@ export async function GET(
     
     // For now, return the basic data from getRecruitById
     // In the future, this could be enhanced to include enriched BPOC data
-    return NextResponse.json({ applicant })
+    return NextResponse.json(applicant)
   } catch (error) {
     console.error('❌ Error fetching applicant:', error)
     return NextResponse.json({ 

@@ -250,7 +250,7 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                   <span className="text-xs font-medium text-muted-foreground/70">Applied for:</span>
                   <div className="flex flex-col gap-2">
                     {applicant.all_job_titles.map((jobTitle, index) => (
-                      <div key={index} className="rounded-lg p-3 bg-gray-100 dark:bg-[#1a1a1a] hover:shadow-sm transition-all duration-200">
+                      <div key={index} className="rounded-lg p-3 bg-[#ededed] dark:bg-[#1a1a1a] transition-all duration-200">
                         <div className="flex items-center gap-2 mb-1">
                           <h4 className="font-semibold text-sm text-primary leading-tight break-words flex-1">
                         {jobTitle}
@@ -272,7 +272,7 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
               ) : (
                 <>
                   <span className="text-xs font-medium text-muted-foreground/70">Applied for:</span>
-                  <div className="rounded-lg p-3 bg-gray-100 dark:bg-[#1a1a1a] hover:shadow-sm transition-all duration-200">
+                  <div className="rounded-lg p-3 bg-[#ededed] dark:bg-[#1a1a1a] transition-all duration-200">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="font-semibold text-sm text-primary leading-tight break-words flex-1">
                         {applicant.job_title || applicant.concern}
@@ -314,15 +314,6 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
               <div className="flex items-center gap-2">
                 <Button 
                   size="sm" 
-                  variant="outline" 
-                  className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99]"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onViewAll(applicant) }}
-                >
-                  <IconEye className="h-4 w-4 mr-px" />
-                  <span>View All</span>
-                </Button>
-                <Button 
-                  size="sm" 
                   variant="outline"
                   className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99]"
                   asChild
@@ -336,6 +327,15 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                     <IconFileText className="h-4 w-4 mr-px" />
                     <span>View Resume</span>
                   </a>
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99]"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onViewAll(applicant) }}
+                >
+                  <IconEye className="h-4 w-4 mr-px" />
+                  <span>View All</span>
                 </Button>
               </div>
             </div>
@@ -467,7 +467,7 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                   <span className="text-xs font-medium text-muted-foreground/70">Applied for:</span>
                   <div className="flex flex-col gap-2">
                     {applicant.all_job_titles.map((jobTitle, index) => (
-                      <div key={index} className="rounded-lg p-3 bg-gray-100 dark:bg-[#1a1a1a] hover:shadow-sm transition-all duration-200">
+                      <div key={index} className="rounded-lg p-3 bg-gray-100 dark:bg-[#1a1a1a] transition-all duration-200">
                         <div className="flex items-center gap-2 mb-1">
                           <h4 className="font-semibold text-sm text-primary leading-tight break-words flex-1">
                         {jobTitle}
@@ -491,7 +491,7 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
               ) : (
                 <>
                   <span className="text-xs font-medium text-muted-foreground/70">Applied for:</span>
-                  <div className="rounded-lg p-3 bg-gray-100 dark:bg-[#1a1a1a] hover:shadow-sm transition-all duration-200">
+                  <div className="rounded-lg p-3 bg-[#ededed] dark:bg-[#1a1a1a] transition-all duration-200">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="font-semibold text-sm text-primary leading-tight break-words flex-1">
                         {applicant.job_title || applicant.concern}
@@ -526,14 +526,6 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
             <div className="flex items-center gap-2">
               <Button 
                 size="sm" 
-                variant="outline" 
-                className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99]"
-              >
-                <IconEye className="h-4 w-4 mr-px" />
-                <span>View All</span>
-              </Button>
-              <Button 
-                size="sm" 
                 variant="outline"
                 className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99]"
                 asChild
@@ -547,6 +539,14 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                   <IconFileText className="h-4 w-4 mr-px" />
                   <span>View Resume</span>
                 </a>
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99]"
+              >
+                <IconEye className="h-4 w-4 mr-px" />
+                <span>View All</span>
               </Button>
             </div>
           </div>
@@ -1150,6 +1150,9 @@ export default function BPOCApplicantsPage() {
                             <h1 className="text-2xl font-bold">BPOC Applicants</h1>
         <p className="text-sm text-muted-foreground">Manage and track applicant applications through the recruitment pipeline.</p>
                   </div>
+                  <div className="flex gap-2">
+                    <ReloadButton onReload={fetchApplicants} loading={loading} className="flex-1" />
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -1202,10 +1205,6 @@ export default function BPOCApplicantsPage() {
 
 
 
-                  <ReloadButton 
-                    onReload={fetchApplicants}
-                    loading={loading}
-                  />
                   
                   {/* Real-time connection indicator removed */}
                 </div>

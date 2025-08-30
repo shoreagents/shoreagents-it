@@ -47,7 +47,7 @@ export function Comment({ comment, onDelete, showDeleteButton = false, className
 
   return (
     <motion.div 
-      className={`rounded-lg p-2 bg-sidebar border shadow-sm hover:shadow-md transition-all duration-200 ${className}`}
+      className={`rounded-lg p-2 bg-sidebar border transition-all duration-200 ${className}`}
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
     >

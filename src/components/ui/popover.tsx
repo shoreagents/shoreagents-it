@@ -25,9 +25,44 @@ const PopoverContent = React.forwardRef<
         className
       )}
       {...props}
-    />
+    >
+      <div className="space-y-1">
+        {props.children}
+      </div>
+    </PopoverPrimitive.Content>
   </PopoverPrimitive.Portal>
 ))
+
+// Updated component with variants for different color schemes
+interface PopoverItemProps extends React.HTMLAttributes<HTMLDivElement> {
+  isSelected?: boolean
+  variant?: 'default' | 'primary'
+  children: React.ReactNode
+}
+
+const PopoverItem = React.forwardRef<HTMLDivElement, PopoverItemProps>(
+  ({ className, isSelected = false, variant = 'default', children, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        "relative flex w-full cursor-pointer select-none items-center gap-2 rounded-lg py-1.5 pl-2 pr-8 text-sm outline-none transition-colors",
+        variant === 'default' && isSelected
+          ? "bg-teal-600/50 text-foreground dark:bg-teal-600/30 dark:text-white"
+          : variant === 'primary' && isSelected
+          ? "bg-[hsl(0deg_0%_56.25%_/_20%)] text-primary dark:bg-[hsl(0deg_0%_38.16%_/_30%)] dark:text-primary"
+          : variant === 'default'
+          ? "text-sidebar-foreground hover:!bg-primary/5 focus:bg-sidebar-accent focus:text-sidebar-accent-foreground active:bg-primary/10 dark:hover:bg-sidebar-accent dark:hover:text-sidebar-accent-foreground dark:active:bg-primary/20"
+          : "text-sidebar-foreground hover:!bg-primary/5 focus:bg-sidebar-accent focus:text-sidebar-accent-foreground active:bg-primary/10 dark:hover:bg-sidebar-accent dark:hover:text-sidebar-accent-foreground dark:active:bg-primary/20",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+)
+PopoverItem.displayName = "PopoverItem"
+
 PopoverContent.displayName = PopoverPrimitive.Content.displayName
 
-export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor }
+export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor, PopoverItem }

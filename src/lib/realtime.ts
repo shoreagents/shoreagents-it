@@ -53,6 +53,9 @@ export async function startListening() {
     // Listen for member comment changes
     await notificationClient.query('LISTEN member_comment_changes')
     
+    // Listen for agent assignment changes
+    await notificationClient.query('LISTEN agent_assignment_changes')
+    
     notificationClient.on('notification', (msg: any) => {
       try {
         const payload = JSON.parse(msg.payload)
@@ -66,6 +69,8 @@ export async function startListening() {
           messageType = 'member_update'
         } else if (msg.channel === 'member_comment_changes') {
           messageType = 'member_comment_update'
+        } else if (msg.channel === 'agent_assignment_changes') {
+          messageType = 'agent_update'
         }
         
         // Broadcast to all connected WebSocket clients
@@ -98,6 +103,7 @@ export async function stopListening() {
     await notificationClient.query('UNLISTEN applicant_changes')
     await notificationClient.query('UNLISTEN member_changes')
     await notificationClient.query('UNLISTEN member_comment_changes')
+    await notificationClient.query('UNLISTEN agent_assignment_changes')
     await notificationClient.end()
     isListening = false
     console.log('Stopped listening for PostgreSQL notifications (tickets, applicants, members & comments)')

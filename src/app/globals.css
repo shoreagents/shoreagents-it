@@ -199,6 +199,10 @@ body[data-scroll-locked] {
   color: hsl(var(--sidebar-accent-foreground));
 }
 
+
+
+
+
 /* Override for Clear All button to maintain red text color */
 .popover-surface .clear-all-button {
   color: rgb(239 68 68) !important; /* red-500 - default */

@@ -21,6 +21,7 @@ import {
   PaginationNext,
 } from "@/components/ui/pagination"
 import { useTheme } from "next-themes"
+import { ReloadButton } from "@/components/ui/reload-button"
 
 interface ClientRecord {
   user_id: number
@@ -133,6 +134,9 @@ export default function ClientsPage() {
                   <div>
                     <h1 className="text-2xl font-bold">Clients</h1>
                     <p className="text-sm text-muted-foreground">Directory of client users with member assignments and contact details</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <ReloadButton onReload={fetchClients} loading={loading} className="flex-1" />
                   </div>
                 </div>
               </div>

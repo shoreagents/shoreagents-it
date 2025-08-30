@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataFieldRow } from "@/components/ui/fields"
 
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger, PopoverItem } from "@/components/ui/popover"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/auth-context"
@@ -59,21 +59,21 @@ interface CompanyData {
 }
 
 const serviceOptions = [
-  { value: 'one agent', label: 'One Agent' },
-  { value: 'team', label: 'Team' },
-  { value: 'workforce', label: 'Workforce' }
+  { value: 'One Agent', label: 'One Agent' },
+  { value: 'Team', label: 'Team' },
+  { value: 'Workforce', label: 'Workforce' }
 ]
 
 // Badge helper functions (matching the ticket modal color scheme)
 const getServiceBadgeClass = (service: string | null): string => {
-  const s = (service || '').toLowerCase()
-  if (s === 'workforce') {
+  const s = service || ''
+  if (s === 'Workforce') {
     return 'text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20'
   }
-  if (s === 'one agent') {
+  if (s === 'One Agent') {
     return 'text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20'
   }
-  if (s === 'team') {
+  if (s === 'Team') {
     return 'text-yellow-700 dark:text-white border-yellow-600/20 bg-yellow-50 dark:bg-yellow-600/20'
   }
   return 'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20'
@@ -109,17 +109,29 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         
         // Update the company data with real-time changes
         // Handle null values properly by checking if the field exists in the update
-        setFormData(prev => ({
-          ...prev,
-          company: updatedMember.hasOwnProperty('company') ? updatedMember.company : prev.company,
-          address: updatedMember.hasOwnProperty('address') ? updatedMember.address : prev.address,
-          phone: updatedMember.hasOwnProperty('phone') ? updatedMember.phone : prev.phone,
-          country: updatedMember.hasOwnProperty('country') ? updatedMember.country : prev.country,
-          service: updatedMember.hasOwnProperty('service') ? updatedMember.service : prev.service,
-          website: updatedMember.hasOwnProperty('website') ? updatedMember.website : prev.website,
-          badge_color: updatedMember.hasOwnProperty('badge_color') ? updatedMember.badge_color : prev.badge_color,
-          status: updatedMember.hasOwnProperty('status') ? updatedMember.status : prev.status
-        }))
+        console.log('🔄 Updating form data with real-time changes:')
+        console.log('  Service field in update:', updatedMember.service)
+        console.log('  Service field type:', typeof updatedMember.service)
+        console.log('  Service field exists:', updatedMember.hasOwnProperty('service'))
+        
+        setFormData(prev => {
+          console.log('  Current form data service:', prev.service)
+          
+          const newData = {
+            ...prev,
+            company: updatedMember.hasOwnProperty('company') ? updatedMember.company : prev.company,
+            address: updatedMember.hasOwnProperty('address') ? updatedMember.address : prev.address,
+            phone: updatedMember.hasOwnProperty('phone') ? updatedMember.phone : prev.phone,
+            country: updatedMember.hasOwnProperty('country') ? updatedMember.country : prev.country,
+            service: updatedMember.hasOwnProperty('service') ? updatedMember.service : prev.service,
+            website: updatedMember.hasOwnProperty('website') ? updatedMember.website : prev.website,
+            badge_color: updatedMember.hasOwnProperty('badge_color') ? updatedMember.badge_color : prev.badge_color,
+            status: updatedMember.hasOwnProperty('status') ? updatedMember.status : prev.status
+          }
+          
+          console.log('🔄 New form data after real-time update:', newData)
+          return newData
+        })
       }
     },
     onAgentMemberChanged: (agent, oldAgent) => {
@@ -574,7 +586,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     address: '',
     phone: '',
     country: '',
-    service: '',
+    service: 'One Agent',
     website: '',
     logo: null,
     badge_color: '#0EA5E9',
@@ -1917,7 +1929,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           address: companyToEdit.address || '',
           phone: companyToEdit.phone || '',
           country: companyToEdit.country || '',
-          service: companyToEdit.service || '',
+          service: companyToEdit.service || 'One Agent',
           website: Array.isArray(companyToEdit.website) && companyToEdit.website.length > 0 ? companyToEdit.website[0] : (companyToEdit.website as string) || '',
             logo: null,
           logoUrl: typeof companyToEdit.logo === 'string' ? companyToEdit.logo : companyToEdit.logoUrl,
@@ -2009,7 +2021,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           address: '',
           phone: '',
           country: '',
-          service: '',
+          service: 'One Agent',
           website: '',
           logo: null,
           logoUrl: null,
@@ -2055,9 +2067,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     console.log('🔍 isLoadingCompany changed:', isLoadingCompany)
   }, [isLoadingCompany])
 
-  // Prevent body scroll when either modal or sheet is open
+  // Prevent body scroll when modal is open (but allow main content scrolling when selection panels are open)
   React.useEffect(() => {
-    if (isOpen || isAddAgentDrawerOpen || showAgentSelection || showClientSelection) {
+    if (isOpen || isAddAgentDrawerOpen) {
       document.body.style.overflow = 'hidden'
       document.body.style.paddingRight = '0px'
       // Also try to prevent scroll on html element
@@ -2078,7 +2090,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       // Remove the important overflow style
       document.body.style.cssText = document.body.style.cssText.replace(/overflow:\s*hidden\s*!important;?\s*/g, '')
     }
-  }, [isOpen, isAddAgentDrawerOpen, showAgentSelection, showClientSelection])
+  }, [isOpen, isAddAgentDrawerOpen])
 
   React.useEffect(() => {
     if (isAddAgentDrawerOpen || showAgentSelection) {
@@ -2352,7 +2364,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                         variant="outline" 
                         className="px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center"
                         style={{ 
-                          color: '#ffffff',
+                          color: theme === 'dark' ? '#ffffff' : (formData.badge_color || '#0EA5E9'),
                           borderColor: `${formData.badge_color || '#0EA5E9'}20`,
                           backgroundColor: `${formData.badge_color || '#0EA5E9'}20`
                         }}
@@ -2380,33 +2392,28 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       </Badge>
                     </PopoverTrigger>
                     <PopoverContent className="w-56 p-2">
-                      <div className="space-y-1">
-                        {serviceOptions.map((option) => {
-                          const isCurrentService = formData.service === option.value;
-                          return (
-                            <div 
-                              key={option.value}
-                              className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                isCurrentService 
-                                  ? 'bg-primary/10 text-primary border border-primary/20 cursor-default' 
-                                  : 'hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground cursor-pointer'
-                              }`}
-                              onClick={isCurrentService ? undefined : () => handleInputChange('service', option.value)}
-                            >
-                              {option.value === 'workforce' ? (
-                                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                              ) : option.value === 'one agent' ? (
-                                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                              ) : option.value === 'team' ? (
-                                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                              ) : (
-                                <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-                              )}
-                              <span className="text-sm font-medium">{option.label}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      {serviceOptions.map((option) => {
+                        const isCurrentService = formData.service === option.value;
+                        return (
+                          <PopoverItem
+                            key={option.value}
+                            variant="primary"
+                            isSelected={isCurrentService}
+                            onClick={() => handleInputChange('service', option.value)}
+                          >
+                            {option.value === 'Workforce' ? (
+                              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                            ) : option.value === 'One Agent' ? (
+                              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                            ) : option.value === 'Team' ? (
+                              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            ) : (
+                              <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                            )}
+                            <span className="text-sm font-medium">{option.label}</span>
+                          </PopoverItem>
+                        );
+                      })}
                     </PopoverContent>
                   </Popover>
                 </div>
@@ -2433,43 +2440,36 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       </Badge>
                     </PopoverTrigger>
                     <PopoverContent className="w-56 p-2">
-                      <div className="space-y-1">
-                        {[
-                          { value: 'Current Client' },
-                          { value: 'Lost Client' }
-                        ].map((statusOption) => {
-                          const isCurrentStatus = formData.status === statusOption.value;
-                          return (
-                            <div 
-                              key={statusOption.value}
-                              className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                isCurrentStatus 
-                                  ? 'bg-primary/10 text-primary border border-primary/20 cursor-default' 
-                                  : 'hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground cursor-pointer'
-                              }`}
-                              onClick={isCurrentStatus ? undefined : () => handleInputChange('status', statusOption.value)}
-                            >
-                              {statusOption.value === 'Current Client' ? (
-                                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                              ) : statusOption.value === 'Lost Client' ? (
-                                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                              ) : (
-                                <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-                              )}
-                              <span className="text-sm font-medium">{statusOption.value}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      {[
+                        { value: 'Current Client' },
+                        { value: 'Lost Client' }
+                      ].map((statusOption) => {
+                        const isCurrentStatus = formData.status === statusOption.value;
+                        return (
+                          <PopoverItem
+                            key={statusOption.value}
+                            variant="primary"
+                            isSelected={isCurrentStatus}
+                            onClick={() => handleInputChange('status', statusOption.value)}
+                          >
+                            {statusOption.value === 'Current Client' ? (
+                              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                            ) : statusOption.value === 'Lost Client' ? (
+                              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                            ) : (
+                              <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                            )}
+                            <span className="text-sm font-medium">{statusOption.value}</span>
+                          </PopoverItem>
+                        );
+                      })}
                     </PopoverContent>
                   </Popover>
                 </div>
               </div>
             </div>
             
-            <div className="px-6">
-              <Separator />
-            </div>
+
 
             {/* Scrollable Form Content */}
             <div className="flex-1 px-6 py-5 overflow-y-auto min-h-0">
@@ -2614,7 +2614,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                               {formData.country || '-'}
                             </div>
                           </PopoverTrigger>
-                          <PopoverContent className="w-64 p-2" align="start" side="bottom" sideOffset={4}>
+                          <PopoverContent className="w-64 px-2 pb-2 pt-0" align="start" side="bottom" sideOffset={4}>
                             <div className="space-y-1">
                               <div className="sticky top-0 z-10 border-b px-0 py-0">
                                 <div className="relative">
@@ -2623,7 +2623,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                     placeholder="Search countries..."
                                     value={countrySearch}
                                     onChange={(e) => setCountrySearch(e.target.value)}
-                                    className="bg-white/0 dark:bg-white/0 pl-8 pt-0 border-0 focus:ring-0 shadow-none"
+                                    className="bg-white/0 dark:bg-white/0 pl-8 py-0 border-0 focus:ring-0 shadow-none"
                                     onKeyDown={(e) => e.stopPropagation()}
                                     onClick={(e) => e.stopPropagation()}
                                   />
@@ -2637,17 +2637,13 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                 }}
                               >
                                 {filteredCountries.map((country) => (
-                                  <div 
+                                  <PopoverItem
                                     key={country}
-                                    className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                      formData.country === country 
-                                        ? 'bg-primary/10 text-primary border border-primary/20 pointer-events-none cursor-default' 
-                                        : 'cursor-pointer hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground'
-                                    }`}
+                                    isSelected={formData.country === country}
                                     onClick={() => handleInputChange('country', country)}
                                   >
                                     <span className="text-sm font-medium">{country}</span>
-                                  </div>
+                                  </PopoverItem>
                                 ))}
                               </div>
                             </div>
@@ -2818,7 +2814,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                     
                     <div className="rounded-lg border border-[#cecece99] dark:border-border">
                       {/* Agent Fields */}
-                      <div className="p-4 space-y-4">
+                      <div className="p-4">
                         {isLoadingCompany ? (
                           <div className="space-y-2">
                             {[...Array(2)].map((_, index) => (
@@ -2876,7 +2872,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                         }
                                       }
                                     }}
-                                    className="absolute -top-2 -right-2 w-5 h-5 text-white rounded-full flex items-center justify-center transition-colors duration-200 flex-shrink-0 shadow-sm hover:shadow-md"
+                                    className="absolute -top-2 -right-2 w-5 h-5 text-white rounded-full flex items-center justify-center transition-colors duration-200 flex-shrink-0 shadow-sm border-0"
                                     style={{ backgroundColor: theme === 'dark' ? '#626262' : '#888787' }}
                                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#7a7a7a' : '#9a9a9a'}
                                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#626262' : '#888787'}
@@ -2950,7 +2946,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                   
                   <div className="rounded-lg border border-[#cecece99] dark:border-border">
                     {/* Client Fields */}
-                    <div className="p-4 space-y-4">
+                    <div className="p-4">
                       {isLoadingCompany ? (
                         <div className="space-y-2">
                           {[...Array(2)].map((_, index) => (
@@ -3005,7 +3001,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                         }
                                       }
                                     }}
-                                    className="absolute -top-2 -right-2 w-5 h-5 text-white rounded-full flex items-center justify-center transition-colors duration-200 flex-shrink-0 shadow-sm hover:shadow-md"
+                                    className="absolute -top-2 -right-2 w-5 h-5 text-white rounded-full flex items-center justify-center transition-colors duration-200 flex-shrink-0 shadow-sm"
                                     style={{ backgroundColor: theme === 'dark' ? '#626262' : '#888787' }}
                                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#7a7a7a' : '#888787'}
                                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#626262' : '#888787'}
@@ -3055,25 +3051,25 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           </div>
 
           {/* Right Panel - Preview */}
-          <div className="w-96 flex flex-col border-l border-[#cecece99] dark:border-border h-full bg-[#ebebeb] dark:bg-[#0a0a0a]">
+          <div className="w-96 flex flex-col border-l border-[#cecece99] dark:border-border h-full bg-[#ececec] dark:bg-[#0a0a0a]">
             <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border flex-shrink-0">
               <h3 className="font-medium">
                 {showClientSelection ? 'Select Clients' : showAgentSelection ? 'Select Agents' : 'Activity'}
               </h3>
             </div>
-            <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-[#ebebeb] dark:bg-[#0a0a0a]">
+            <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-[#ececec] dark:bg-[#0a0a0a]">
               {showAgentSelection ? (
                 // Agent Selection Content
-                <div className="flex flex-col h-full space-y-4">
+                <div className="flex flex-col h-full">
                   {/* Search and Filter */}
                   <div className="space-y-3 flex-shrink-0">
                     <div className="relative">
                       <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                          placeholder="Search by name or employee ID..."
+                        placeholder="Search by name or employee ID..."
                         value={agentSearch}
                         onChange={(e) => setAgentSearch(e.target.value)}
-                        className="pl-9"
+                        className="pl-8"
                       />
                       {agentSearch && (
                         <button
@@ -3089,7 +3085,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                   {/* Agents List */}
                   <div 
                     data-agent-list
-                    className="space-y-4 flex-1 overflow-y-auto min-h-0 px-2 py-2"
+                    className="space-y-4 flex-1 overflow-y-auto min-h-0 px-2 py-4"
                     onScroll={(e) => {
                       const target = e.target as HTMLDivElement
                       const { scrollTop, scrollHeight, clientHeight } = target
@@ -3135,7 +3131,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                           {displayAgents.map((agent) => (
                             <div 
                               key={agent.user_id}
-                              className={`p-4 border rounded-lg transition-all duration-200 ${
+                              className={`p-4 border border-gray-300 dark:border-border rounded-lg transition-all duration-200 ${
                                 agent.member_company && agent.member_company !== companyToEdit?.company
                                   ? 'opacity-50 cursor-not-allowed bg-muted/30' 
                                   : `cursor-pointer ${
@@ -3255,54 +3251,29 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                     )}
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="space-y-2 pt-4 border-t flex-shrink-0">
-                    {selectedAgents.size > 0 ? (
-                      <Button 
-                        className="w-full"
-                        onClick={() => {
-                          // TODO: Handle adding selected agents to company
-                          const selectedAgentIds = Array.from(selectedAgents)
-                          const selectedAgentDetails = agents.filter(agent => 
-                            selectedAgentIds.includes(agent.user_id)
-                          )
-                          console.log('Adding agents to company:', selectedAgentDetails)
-                          
-                          // Here you would typically:
-                          // 1. Call an API to add agents to the company
-                          // 2. Update the company's agent list
-                          // 3. Close the agent selection
-                          // 4. Show success message
-                          
-                          closeSelectionContainers()
-                        }}
-                      >
-                        Done
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="outline"
-                        className="w-full"
-                        onClick={closeSelectionContainers}
-                      >
-                        Done
-                      </Button>
-                    )}
+                  {/* Done Button */}
+                  <div className="flex-shrink-0">
+                    <Button
+                      onClick={closeSelectionContainers}
+                      className="w-full"
+                    >
+                      Done
+                    </Button>
                   </div>
                 </div>
               ) : showClientSelection ? (
                 // Client Selection Content
-                <div className="flex flex-col h-full space-y-4">
+                <div className="flex flex-col h-full">
                   {/* Search and Filter */}
                   <div className="space-y-3 flex-shrink-0">
                     <div className="relative">
                       <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                               <Input
-                          placeholder="Search by name..."
-                          value={clientSearch}
-                          onChange={(e) => handleClientSearch(e.target.value)}
-                          className="pl-9"
-                        />
+                        placeholder="Search by name..."
+                        value={clientSearch}
+                        onChange={(e) => handleClientSearch(e.target.value)}
+                        className="pl-8"
+                      />
                       {clientSearch && (
                         <button
                           onClick={() => handleClientSearch('')}
@@ -3317,7 +3288,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                   {/* Clients List */}
                   <div 
                     data-client-list
-                    className="space-y-4 flex-1 overflow-y-auto min-h-0 px-2 py-2"
+                    className="space-y-4 flex-1 overflow-y-auto min-h-0 px-2 py-4"
                     onScroll={(e) => {
                       const target = e.target as HTMLDivElement
                       const { scrollTop, scrollHeight, clientHeight } = target
@@ -3363,7 +3334,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                           {displayClients.map((client) => (
                             <div 
                               key={client.user_id}
-                              className={`p-4 border rounded-lg transition-all duration-200 ${
+                              className={`p-4 border border-gray-300 dark:border-border rounded-lg transition-all duration-200 ${
                                 client.member_company && client.member_company !== companyToEdit?.company
                                   ? 'opacity-50 cursor-not-allowed bg-muted/30' 
                                   : `cursor-pointer ${
@@ -3469,44 +3440,19 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                     )}
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex-shrink-0 space-y-2">
-                    {selectedClients.size > 0 ? (
-                      <Button 
-                        className="w-full"
-                        onClick={() => {
-                          // TODO: Handle adding selected clients to company
-                          const selectedClientIds = Array.from(selectedClients)
-                          const selectedClientDetails = clients.filter(client => 
-                            selectedClientIds.includes(client.user_id)
-                          )
-                          console.log('Adding clients to company:', selectedClientDetails)
-                          
-                          // Here you would typically:
-                          // 1. Call an API to add clients to the company
-                          // 2. Update the company's client list
-                          // 3. Close the client selection
-                          // 4. Show success message
-                          
-                          closeSelectionContainers()
-                        }}
-                      >
-                        Done
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="outline"
-                        className="w-full"
-                        onClick={closeSelectionContainers}
-                      >
-                        Done
-                      </Button>
-                    )}
+                  {/* Done Button */}
+                  <div className="flex-shrink-0">
+                    <Button
+                      onClick={closeSelectionContainers}
+                      className="w-full"
+                    >
+                      Done
+                    </Button>
                   </div>
                 </div>
               ) : (
                 // Activity Content - Shows company activity and recent changes
-                <div className="space-y-4">
+                <div>
                   {companyToEdit?.id ? (
                     <MembersActivityLog 
                       memberId={companyToEdit.id} 
@@ -3530,7 +3476,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
 
             {/* Comment Input Section - Outside main content */}
             {!showAgentSelection && !showClientSelection && (
-              <div className="px-3 pb-3 bg-[#ebebeb] dark:bg-[#0a0a0a]">
+              <div className="px-3 pb-3 bg-[#ececec] dark:bg-[#0a0a0a]">
                 <div className="flex gap-2">
                                       <div className="flex-1">
                       <form onSubmit={handleCommentSubmit}>

@@ -53,12 +53,12 @@ function Calendar({
         ),
         button_previous: cn(
           buttonVariants({ variant: buttonVariant }),
-          "!bg-transparent hover:!bg-red-500 active:!bg-red-600 h-[--cell-size] w-[--cell-size] select-none p-0 aria-disabled:opacity-50",
+          "!bg-transparent hover:!bg-primary/10 h-[--cell-size] w-[--cell-size] select-none p-0 aria-disabled:opacity-50",
           defaultClassNames.button_previous
         ),
         button_next: cn(
           buttonVariants({ variant: buttonVariant }),
-          "!bg-transparent hover:!bg-red-500 active:!bg-red-600 h-[--cell-size] w-[--cell-size] select-none p-0 aria-disabled:opacity-50",
+          "!bg-transparent hover:!bg-primary/10 h-[--cell-size] w-[--cell-size] select-none p-0 aria-disabled:opacity-50",
           defaultClassNames.button_next
         ),
         month_caption: cn(
@@ -70,18 +70,18 @@ function Calendar({
           defaultClassNames.dropdowns
         ),
         dropdown_root: cn(
-          "has-focus:border-ring border-input shadow-xs has-focus:ring-ring/50 has-focus:ring-[3px] relative rounded-md border hover:!bg-red-500",
+          "relative rounded-md hover:!bg-primary/10",
           defaultClassNames.dropdown_root
         ),
         dropdown: cn(
-          "bg-popover absolute inset-0 opacity-0 hover:!bg-red-500",
+          "bg-popover absolute inset-0 opacity-0 hover:!bg-primary/10",
           defaultClassNames.dropdown
         ),
         caption_label: cn(
-          "select-none font-medium hover:!bg-red-500",
+          "select-none font-medium hover:!bg-primary/10",
           captionLayout === "label"
             ? "text-sm"
-            : "[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md pl-2 pr-1 text-sm [&>svg]:size-3.5 hover:!bg-red-500",
+            : "[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md pl-2 pr-1 text-sm [&>svg]:size-3.5 hover:!bg-primary/10",
           defaultClassNames.caption_label
         ),
         table: "w-full border-collapse",
@@ -200,8 +200,8 @@ function CalendarDayButton({
       data-range-start={modifiers.range_start}
       data-range-end={modifiers.range_end}
               data-range-middle={modifiers.range_middle}
-        className={cn(
-          "!bg-transparent hover:!bg-red-500 active:!bg-red-600 data-[selected-single=true]:!bg-red-600 data-[selected-single=true]:text-white data-[range-middle=true]:!bg-red-500 data-[range-middle=true]:text-white data-[range-start=true]:!bg-red-600 data-[range-start=true]:text-white data-[range-end=true]:!bg-red-600 data-[range-end=true]:text-white group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-ring/50 flex aspect-square h-auto w-full min-w-[--cell-size] flex-col gap-1 font-normal leading-none data-[range-end=true]:rounded-md data-[range-middle=true]:rounded-none data-[range-start=true]:rounded-md group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:ring-[3px] [&>span]:text-xs [&>span]:opacity-70",
+                  className={cn(
+            "!bg-transparent hover:!bg-primary/10 data-[selected-single=true]:!bg-teal-600/50 data-[selected-single=true]:text-foreground data-[range-middle=true]:!bg-teal-600/50 data-[range-middle=true]:text-foreground data-[range-start=true]:!bg-teal-600/50 data-[range-start=true]:text-foreground data-[range-end=true]:!bg-teal-600/50 data-[range-end=true]:text-foreground flex aspect-square h-auto w-full min-w-[--cell-size] flex-col gap-1 font-normal leading-none data-[range-end=true]:rounded-md data-[range-middle=true]:rounded-none data-[range-start=true]:rounded-md [&>span]:text-xs [&>span]:opacity-70",
           defaultClassNames.day,
           className
         )}

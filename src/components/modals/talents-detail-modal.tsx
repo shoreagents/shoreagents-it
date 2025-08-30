@@ -470,11 +470,6 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
                              { title: "AI Analysis", value: "ai-analysis" }
                            ]}
                            containerClassName="grid grid-cols-2 w-fit"
-                           activeTabClassName={`rounded-xl ${
-                             theme === 'dark' 
-                               ? 'bg-zinc-800' 
-                               : 'bg-[#ebebeb]'
-                           }`}
                            onTabChange={(tab) => setActiveTab(tab.value)}
                          />
                       </div>
@@ -824,7 +819,7 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
               </div>
 
                             {/* Activity Content */}
-              <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-[#ebebeb] dark:bg-[#0a0a0a]">
+              <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-[#ececec] dark:bg-[#0a0a0a]">
                 
                 {/* Comments Tab */}
                 {activityTab === 'comments' && (
@@ -964,7 +959,7 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
               </div>
 
               {/* Input Section */}
-              <div className="px-3 pb-3 bg-[#ebebeb] dark:bg-[#0a0a0a]">
+              <div className="px-3 pb-3 bg-[#ececec] dark:bg-[#0a0a0a]">
                 <div className="flex gap-3 bg-sidebar rounded-lg p-4 border">
                   <Avatar className="h-8 w-8 flex-shrink-0">
                     <AvatarImage src="" alt="Current User" />

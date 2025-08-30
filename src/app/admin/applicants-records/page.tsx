@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ReloadButton } from "@/components/ui/reload-button"
+
 import { IconSearch, IconArrowUp, IconArrowDown, IconCalendar, IconClock } from "@tabler/icons-react"
 import { Plus } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useAuth } from "@/contexts/auth-context"
 import { ApplicantsDetailModal } from "@/components/modals/applicants-detail-modal"
 import { useRealtimeApplicants } from "@/hooks/use-realtime-applicants"
+import { ReloadButton } from "@/components/ui/reload-button"
 
 type ApplicantStatus = 'submitted' | 'qualified' | 'for verification' | 'verified' | 'initial interview' | 'final interview' | 'not qualified' | 'passed' | 'rejected' | 'withdrawn' | 'hired' | 'closed' | 'failed'
 
@@ -353,31 +354,105 @@ export default function ApplicantsRecordsPage() {
   }), [])
 
   // Real-time updates for BPOC applications
-  const { isConnected: isRealtimeConnected } = useRealtimeApplicants({
+  const { } = useRealtimeApplicants({
     onApplicantCreated: async (newApplicant) => {
       console.log('🆕 Real-time: New applicant created:', newApplicant)
+      console.log('🔍 New applicant data structure:', {
+        id: newApplicant.id,
+        applicant_id: newApplicant.applicant_id,
+        resume_slug: newApplicant.resume_slug,
+        status: newApplicant.status,
+        type: typeof newApplicant.id
+      })
+      
       // Only add if status is in allowed statuses
       if (ALLOWED_STATUSES.includes(newApplicant.status?.toLowerCase() as ApplicantStatus)) {
-        const mappedApplicant = mapApplicantData(newApplicant)
-        setApplicants(prev => [...prev, mappedApplicant])
+        try {
+          // Use the numeric ID from bpoc_recruits table, not the UUID applicant_id
+          const recordId = newApplicant.id
+          console.log('🔍 Fetching enriched data for new applicant with ID:', recordId)
+          const res = await fetch(`/api/bpoc/${recordId}`)
+          if (res.ok) {
+            const enrichedData = await res.json()
+            console.log('✅ Enriched data received:', enrichedData)
+            const mappedApplicant = mapApplicantData(enrichedData)
+            console.log('📋 Mapped applicant:', mappedApplicant)
+            setApplicants(prev => [...prev, mappedApplicant])
+          } else {
+            // Fallback to basic data if enrichment fails
+            console.warn('⚠️ Failed to fetch enriched data, using basic data')
+            const mappedApplicant = mapApplicantData(newApplicant)
+            setApplicants(prev => [...prev, mappedApplicant])
+          }
+        } catch (error) {
+          console.warn('Failed to fetch enriched data for new applicant, using basic data:', error)
+          const mappedApplicant = mapApplicantData(newApplicant)
+          setApplicants(prev => [...prev, mappedApplicant])
+        }
       }
     },
     onApplicantUpdated: async (updatedApplicant) => {
       console.log('📝 Real-time: Applicant updated:', updatedApplicant)
-      const mappedApplicant = mapApplicantData(updatedApplicant)
+      console.log('🔍 Updated applicant data structure:', {
+        id: updatedApplicant.id,
+        applicant_id: updatedApplicant.applicant_id,
+        resume_slug: updatedApplicant.resume_slug,
+        status: updatedApplicant.status,
+        type: typeof updatedApplicant.id
+      })
       
-              // If status changed to allowed status, add to list
-        if (ALLOWED_STATUSES.includes(updatedApplicant.status?.toLowerCase() as ApplicantStatus)) {
-        setApplicants(prev => {
-          const existing = prev.find(applicant => applicant.id === updatedApplicant.id)
-          if (existing) {
-            return prev.map(applicant => 
-              applicant.id === updatedApplicant.id ? mappedApplicant : applicant
-            )
+      // If status changed to allowed status, add to list
+      if (ALLOWED_STATUSES.includes(updatedApplicant.status?.toLowerCase() as ApplicantStatus)) {
+        try {
+          // Use the numeric ID from bpoc_recruits table, not the UUID applicant_id
+          const recordId = updatedApplicant.id
+          console.log('🔍 Fetching enriched data for updated applicant with ID:', recordId)
+          const res = await fetch(`/api/bpoc/${recordId}`)
+          if (res.ok) {
+            const enrichedData = await res.json()
+            console.log('✅ Enriched data received for update:', enrichedData)
+            const mappedApplicant = mapApplicantData(enrichedData)
+            console.log('📋 Mapped applicant for update:', mappedApplicant)
+            
+            setApplicants(prev => {
+              const existing = prev.find(applicant => applicant.id === updatedApplicant.id)
+              if (existing) {
+                return prev.map(applicant => 
+                  applicant.id === updatedApplicant.id ? mappedApplicant : applicant
+                )
+              } else {
+                return [...prev, mappedApplicant]
+              }
+            })
           } else {
-            return [...prev, mappedApplicant]
+            // Fallback to basic data if enrichment fails
+            console.warn('⚠️ Failed to fetch enriched data for update, using basic data')
+            const mappedApplicant = mapApplicantData(updatedApplicant)
+            setApplicants(prev => {
+              const existing = prev.find(applicant => applicant.id === updatedApplicant.id)
+              if (existing) {
+                return prev.map(applicant => 
+                  applicant.id === updatedApplicant.id ? mappedApplicant : applicant
+                )
+              } else {
+                return [...prev, mappedApplicant]
+              }
+            })
           }
-        })
+        } catch (error) {
+          console.warn('Failed to fetch enriched data for updated applicant, using basic data:', error)
+          const mappedApplicant = mapApplicantData(updatedApplicant)
+          setApplicants(prev => {
+            const existing = prev.find(applicant => applicant.id === updatedApplicant.id)
+            if (existing) {
+              return prev.map(applicant => 
+                applicant.id === updatedApplicant.id ? mappedApplicant : applicant
+              )
+            } else {
+              return [...prev, mappedApplicant]
+            }
+          })
+        }
       } else {
         // If status changed to not allowed, remove from list
         setApplicants(prev => prev.filter(applicant => applicant.id !== updatedApplicant.id))

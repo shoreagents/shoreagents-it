@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle } from "@tabler/icons-react"
 import { Input } from "@/components/ui/input"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger, PopoverItem } from "@/components/ui/popover"
 import { getStorageUrl } from "@/lib/supabase"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/auth-context"
@@ -494,18 +494,14 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                             </Badge>
                           </PopoverTrigger>
                           <PopoverContent className="w-56 p-2">
-                            <div className="space-y-1">
-                              {statusOptions.map((option) => {
+                            {statusOptions.map((option) => {
                                 const isCurrentStatus = getDisplayStatus(currentStatus || ticket.status, isAdmin) === option.label;
                                 return (
-                                  <div 
+                                  <PopoverItem
                                     key={option.value}
-                                    className={`flex items-center gap-3 p-1.5 rounded-md transition-all duration-200 ${
-                                      isCurrentStatus 
-                                        ? 'bg-primary/10 text-primary border border-primary/20 cursor-default' 
-                                        : 'hover:bg-muted/50 active:bg-muted/70 text-muted-foreground hover:text-foreground cursor-pointer'
-                                    }`}
-                                    onClick={isCurrentStatus ? undefined : () => handleStatusChange(option.value)}
+                                    variant="primary"
+                                    isSelected={isCurrentStatus}
+                                    onClick={() => handleStatusChange(option.value)}
                                   >
                                     {option.icon === 'yellow' ? (
                                       <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
@@ -523,10 +519,9 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                                       <div className="w-3 h-3 rounded-full bg-gray-500"></div>
                                     )}
                                     <span className="text-sm font-medium">{option.label}</span>
-                                  </div>
+                                  </PopoverItem>
                                 );
                               })}
-                            </div>
                           </PopoverContent>
                         </Popover>
                         )}
@@ -727,14 +722,14 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
             </div>
 
             {/* Right Panel - Activity Log */}
-            <div className="w-96 flex flex-col border-l border-[#cecece99] dark:border-border h-full bg-[#ebebeb] dark:bg-[#0a0a0a]">
+            <div className="w-96 flex flex-col border-l border-[#cecece99] dark:border-border h-full bg-[#ececec] dark:bg-[#0a0a0a]">
                              {/* Activity Header */}
                <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border flex-shrink-0">
                  <h3 className="font-medium">Activity</h3>
                </div>
 
               {/* Activity Content */}
-              <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-[#ebebeb] dark:bg-[#0a0a0a]">
+              <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-[#ececec] dark:bg-[#0a0a0a]">
                   <div className="space-y-4">
                     {isLoadingComments ? (
                       <div className="space-y-4">
@@ -806,7 +801,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                 </div>
 
               {/* Comment Input */}
-              <div className="px-3 pb-3 bg-[#ebebeb] dark:bg-[#0a0a0a]">
+              <div className="px-3 pb-3 bg-[#ececec] dark:bg-[#0a0a0a]">
                 <div className="flex gap-2">
                   <div className="flex-1">
                     {isLoading ? (

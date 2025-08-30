@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 
 interface MemberUpdate {
-  type: 'member_update' | 'agent_update' | 'client_update'
+  type: 'member_update' | 'agent_update' | 'client_update' | 'personal_info_update' | 'job_info_update'
   data: {
     table: string
     action: 'INSERT' | 'UPDATE' | 'DELETE'
@@ -17,6 +17,8 @@ interface UseRealtimeMembersOptions {
   onMemberDeleted?: (member: any) => void
   onAgentMemberChanged?: (agent: any, oldAgent?: any, notificationData?: any) => void
   onClientMemberChanged?: (client: any, oldClient?: any, notificationData?: any) => void
+  onPersonalInfoChanged?: (personalInfo: any, oldPersonalInfo?: any, notificationData?: any) => void
+  onJobInfoChanged?: (jobInfo: any, oldJobInfo?: any, notificationData?: any) => void
   autoConnect?: boolean
 }
 
@@ -43,7 +45,8 @@ function getOrCreateWebSocket() {
 
   try {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/ws`
+    // Use port 3001 for WebSocket connection (same as server.js)
+    const wsUrl = `${protocol}//${window.location.hostname}:3001/ws`
     
     console.log('🔄 Creating new WebSocket connection for members to:', wsUrl)
     globalWebSocket = new WebSocket(wsUrl)
@@ -61,7 +64,7 @@ function getOrCreateWebSocket() {
         console.log('📨 Raw WebSocket data:', event.data)
         
         // Only process member-related updates
-        if (message.type === 'member_update' || message.type === 'agent_update' || message.type === 'client_update') {
+        if (message.type === 'member_update' || message.type === 'agent_update' || message.type === 'client_update' || message.type === 'personal_info_update' || message.type === 'job_info_update') {
           console.log('✅ Processing member-related update:', message.type)
           // Notify all registered callbacks
           globalCallbacks.forEach(callback => {
@@ -114,6 +117,8 @@ export function useRealtimeMembers(options: UseRealtimeMembersOptions = {}) {
     onMemberDeleted,
     onAgentMemberChanged,
     onClientMemberChanged,
+    onPersonalInfoChanged,
+    onJobInfoChanged,
     autoConnect = true,
   } = options
 
@@ -147,10 +152,9 @@ export function useRealtimeMembers(options: UseRealtimeMembersOptions = {}) {
       const { action, record, old_record } = message.data
       console.log('🔍 Processing agent update:', { action, record, old_record })
       
-            // Check if this is an assignment change
-      if (action === 'UPDATE' && old_record && 
-          record.member_id !== old_record.member_id) {
-        console.log('🔄 Agent member changed:', record, 'Old member_id:', old_record.member_id, 'New member_id:', record.member_id)
+      // For agent updates, always call the callback regardless of what changed
+      if (action === 'UPDATE') {
+        console.log('🔄 Agent updated:', record, 'Old:', old_record)
         onAgentMemberChanged?.(record, old_record, message.data)
       }
     } else if (message.type === 'client_update') {
@@ -163,8 +167,24 @@ export function useRealtimeMembers(options: UseRealtimeMembersOptions = {}) {
         console.log('🔄 Client member changed:', record, 'Old member_id:', old_record.member_id, 'New member_id:', record.member_id)
         onClientMemberChanged?.(record, old_record, message.data)
       }
+    } else if (message.type === 'personal_info_update') {
+      const { action, record, old_record } = message.data
+      console.log('🔍 Processing personal info update:', { action, record, old_record })
+      
+      if (action === 'UPDATE') {
+        console.log('🔄 Personal info updated:', record, 'Old:', old_record)
+        onPersonalInfoChanged?.(record, old_record, message.data)
+      }
+    } else if (message.type === 'job_info_update') {
+      const { action, record, old_record } = message.data
+      console.log('🔍 Processing job info update:', { action, record, old_record })
+      
+      if (action === 'UPDATE') {
+        console.log('🔄 Job info updated:', record, 'Old:', old_record)
+        onJobInfoChanged?.(record, old_record, message.data)
+      }
     }
-  }, [onMemberCreated, onMemberUpdated, onMemberDeleted, onAgentMemberChanged, onClientMemberChanged])
+      }, [onMemberCreated, onMemberUpdated, onMemberDeleted, onAgentMemberChanged, onClientMemberChanged, onPersonalInfoChanged, onJobInfoChanged])
 
   // Register callback
   useEffect(() => {

@@ -22,21 +22,38 @@ import {
   PaginationNext,
 } from "@/components/ui/pagination"
 import { useTheme } from "next-themes"
+import { useRealtimeMembers } from "@/hooks/use-realtime-members"
+import { ReloadButton } from "@/components/ui/reload-button"
 
 interface AgentRecord {
   user_id: number
   email: string
   user_type: string
+  // Personal Info fields
   first_name: string | null
+  middle_name: string | null
   last_name: string | null
+  nickname: string | null
   profile_picture: string | null
   phone: string | null
+  birthday: string | null
+  city: string | null
+  address: string | null
+  gender: string | null
+  // Job Info fields
   employee_id: string | null
   job_title: string | null
   work_email: string | null
+  shift_period: string | null
+  shift_schedule: string | null
+  shift_time: string | null
+  work_setup: string | null
+  employment_status: string | null
+  hire_type: string | null
+  staff_source: string | null
   start_date: string | null
   exit_date: string | null
-
+  // Agent specific fields
   member_id: number | null
   member_company: string | null
   member_badge_color: string | null
@@ -71,6 +88,157 @@ export default function AgentsPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [selectedAgent, setSelectedAgent] = useState<AgentRecord | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Real-time updates for all agent changes
+  const { isConnected: isRealtimeConnected } = useRealtimeMembers({
+    onAgentMemberChanged: (updatedAgent, oldAgent, notificationData) => {
+      console.log('🔄 Real-time: Agent member update received in agents page:', { 
+        updatedAgent, 
+        oldAgent, 
+        currentAgentsCount: agents.length
+      })
+      
+      // Update the agents list with the new data
+      setAgents(prevAgents => {
+        const agentIndex = prevAgents.findIndex(agent => agent.user_id === updatedAgent.user_id)
+        
+        if (agentIndex !== -1) {
+          console.log('🔄 Updating agent member in list:', updatedAgent.user_id)
+          
+          // Create updated agent with new member information
+          const updatedAgentInList = {
+            ...prevAgents[agentIndex],
+            member_id: updatedAgent.member_id
+          }
+          
+          // If member_id changed, fetch the updated company information
+          if (updatedAgent.member_id !== oldAgent?.member_id) {
+            // Use setTimeout to avoid async issues in the callback
+            setTimeout(async () => {
+              try {
+                console.log('🔄 Fetching updated company information for agent:', updatedAgent.user_id)
+                const response = await fetch(`/api/agents/${updatedAgent.user_id}`)
+                if (response.ok) {
+                  const responseData = await response.json()
+                  const freshAgentData = responseData.agent
+                  
+                  // Update with complete company information
+                  setAgents(prevAgents => {
+                    const agentIndex = prevAgents.findIndex(agent => agent.user_id === updatedAgent.user_id)
+                    if (agentIndex !== -1) {
+                      const newAgents = [...prevAgents]
+                      newAgents[agentIndex] = {
+                        ...newAgents[agentIndex],
+                        member_company: freshAgentData.member_company,
+                        member_badge_color: freshAgentData.member_badge_color
+                      }
+                      return newAgents
+                    }
+                    return prevAgents
+                  })
+                  
+                  console.log('🔄 Updated agent with company info:', {
+                    member_id: updatedAgent.member_id,
+                    member_company: freshAgentData.member_company,
+                    member_badge_color: freshAgentData.member_badge_color
+                  })
+                }
+              } catch (error) {
+                console.error('❌ Failed to fetch updated agent data:', error)
+              }
+            }, 0)
+          }
+          
+          // Create new array with updated agent
+          const newAgents = [...prevAgents]
+          newAgents[agentIndex] = updatedAgentInList
+          return newAgents
+        }
+        
+        return prevAgents
+      })
+      
+    },
+    onPersonalInfoChanged: (personalInfo, oldPersonalInfo, notificationData) => {
+      console.log('🔄 Real-time: Personal info update received in agents page:', { 
+        personalInfo, 
+        oldPersonalInfo, 
+        currentAgentsCount: agents.length
+      })
+      
+      // Update the agents list with new personal info
+      setAgents(prevAgents => {
+        const agentIndex = prevAgents.findIndex(agent => agent.user_id === personalInfo.user_id)
+        
+        if (agentIndex !== -1) {
+          console.log('🔄 Updating agent personal info in list:', personalInfo.user_id)
+          
+          // Create updated agent with new personal info
+          const updatedAgentInList = {
+            ...prevAgents[agentIndex],
+            first_name: personalInfo.first_name,
+            middle_name: personalInfo.middle_name,
+            last_name: personalInfo.last_name,
+            nickname: personalInfo.nickname,
+            phone: personalInfo.phone,
+            address: personalInfo.address,
+            city: personalInfo.city,
+            gender: personalInfo.gender,
+            birthday: personalInfo.birthday
+          }
+          
+          // Create new array with updated agent
+          const newAgents = [...prevAgents]
+          newAgents[agentIndex] = updatedAgentInList
+          return newAgents
+        }
+        
+        return prevAgents
+      })
+      
+    },
+    onJobInfoChanged: (jobInfo, oldJobInfo, notificationData) => {
+      console.log('🔄 Real-time: Job info update received in agents page:', { 
+        jobInfo, 
+        oldJobInfo, 
+        currentAgentsCount: agents.length
+      })
+      
+      // Update the agents list with new job info
+      setAgents(prevAgents => {
+        const agentIndex = prevAgents.findIndex(agent => agent.user_id === jobInfo.user_id)
+        
+        if (agentIndex !== -1) {
+          console.log('🔄 Updating agent job info in list:', jobInfo.user_id)
+          
+          // Create updated agent with new job info
+          const updatedAgentInList = {
+            ...prevAgents[agentIndex],
+            employee_id: jobInfo.employee_id,
+            job_title: jobInfo.job_title,
+            shift_period: jobInfo.shift_period,
+            shift_schedule: jobInfo.shift_schedule,
+            shift_time: jobInfo.shift_time,
+            work_setup: jobInfo.work_setup,
+            employment_status: jobInfo.employment_status,
+            hire_type: jobInfo.hire_type,
+            staff_source: jobInfo.staff_source,
+            start_date: jobInfo.start_date,
+            exit_date: jobInfo.exit_date,
+            work_email: jobInfo.work_email
+          }
+          
+          // Create new array with updated agent
+          const newAgents = [...prevAgents]
+          newAgents[agentIndex] = updatedAgentInList
+          return newAgents
+        }
+        
+        return prevAgents
+      })
+      
+    }
+  })
 
   const handleRowClick = (agent: AgentRecord) => {
     setSelectedAgent(agent)
@@ -166,6 +334,9 @@ export default function AgentsPage() {
                   <div>
                     <h1 className="text-2xl font-bold">Agents</h1>
                     <p className="text-sm text-muted-foreground">Directory of employees with member assignments and contact details</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <ReloadButton onReload={fetchAgents} loading={loading} className="flex-1" />
                   </div>
                 </div>
               </div>
@@ -294,6 +465,7 @@ export default function AgentsPage() {
                                   style={{
                                     backgroundColor: withAlpha(a.member_badge_color || '#999999', 0.2),
                                     borderColor: withAlpha(a.member_badge_color || '#999999', 0.4),
+                                    color: theme === 'dark' ? '#ffffff' : (a.member_badge_color || '#6B7280'),
                                   }}
                                 >
                                   <span className="truncate inline-block max-w-[16rem] align-bottom">{a.member_company}</span>

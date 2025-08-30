@@ -42,7 +42,7 @@ export function NavMain({
                 <SidebarMenuButton 
                   asChild 
                   tooltip={item.title}
-                  className={`${isActive ? "bg-gray-200 dark:bg-teal-600/30 focus:bg-gray-200 dark:focus:bg-teal-600/30 active:bg-gray-200 dark:active:bg-teal-600/30 text-sidebar-accent-foreground dark:text-white hover:!bg-gray-200 dark:hover:!bg-teal-600/30" : "text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"} group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center relative overflow-visible`}
+                  className={`${isActive ? "bg-teal-600/50 dark:bg-teal-600/30 focus:bg-teal-600/50 dark:focus:bg-teal-600/30 active:bg-teal-600/50 dark:active:bg-teal-600/30 text-sidebar-accent-foreground dark:text-sidebar-accent-foreground" : "text-sidebar-accent-foreground hover:bg-primary/5 hover:text-sidebar-accent-foreground"} ${isActive ? "hover:!bg-teal-600/50 dark:hover:!bg-teal-600/30" : ""} group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center relative overflow-visible`}
                   onMouseEnter={() => iconRefs.current[key]?.startAnimation?.()}
                   onMouseLeave={() => iconRefs.current[key]?.stopAnimation?.()}
                 >
