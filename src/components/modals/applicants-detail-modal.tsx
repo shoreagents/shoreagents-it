@@ -64,6 +64,7 @@ interface Applicant {
   member_color?: string | null
   job_title?: string | null
   company_name?: string | null
+  user_position?: string | null
   // Additional fields from recruits table
   bpoc_application_ids?: string[] | null
   applicant_id?: string | null
@@ -453,59 +454,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
 
 
 
-  // Handle job click to show job details
-  const handleJobClick = async (jobIndex: number) => {
-    try {
-      // Get job ID from the applicant's job_ids array
-      const jobId = localApplicant?.job_ids?.[jobIndex]
-      
-      if (!jobId) {
-        console.error('No job ID found for index:', jobIndex)
-        return
-      }
 
-      // Debug: Log the mapping to verify accuracy
-      console.log('🔍 Job Click Debug:', {
-        jobIndex,
-        jobId,
-        jobTitle: localApplicant?.all_job_titles?.[jobIndex],
-        company: localApplicant?.all_companies?.[jobIndex],
-        status: localApplicant?.all_job_statuses?.[jobIndex],
-        timestamp: localApplicant?.all_job_timestamps?.[jobIndex],
-        allJobIds: localApplicant?.job_ids,
-        allJobTitles: localApplicant?.all_job_titles,
-        allCompanies: localApplicant?.all_companies,
-        allJobStatuses: localApplicant?.all_job_statuses
-      })
-
-      // Fetch detailed job data from BPOC database first
-      const response = await fetch(`/api/bpoc/job-details/${jobId}`)
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch job details: ${response.statusText}`)
-      }
-
-      const jobData = await response.json()
-      
-      // Check if we're in Electron environment
-      if (typeof window !== 'undefined' && window.electronAPI) {
-        // Open Electron window with real job data from the API
-        const result = await window.electronAPI.openJobDetailWindow(jobId, jobData)
-        if (result.success) {
-          console.log('✅ Job detail window opened successfully:', result)
-        } else {
-          console.error('❌ Failed to open job detail window:', result.error)
-        }
-      } else {
-        // Not in Electron environment - show error or fallback
-        console.error('❌ Electron environment not available')
-        alert('Job details can only be viewed in the desktop application.')
-      }
-    } catch (error) {
-      console.error('Error handling job click:', error)
-      alert('Failed to load job details. Please try again.')
-    }
-  }
 
   // Define status options for applicants based on page context
   const getStatusOptions = (): StatusOption[] => {
@@ -981,25 +930,35 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
               {/* Applicant Header */}
               <div className="px-6 py-5">
                 {/* Avatar and Applicant Name */}
-                <div className="flex items-center gap-4 mb-6">
-                  <Avatar className="h-16 w-16">
-                    <AvatarImage src={localApplicant.profile_picture || "/avatars/shadcn.svg"} alt="Applicant Avatar" />
-                    <AvatarFallback className="text-2xl">
-                      {localApplicant.first_name && localApplicant.last_name 
-                        ? `${localApplicant.first_name[0]}${localApplicant.last_name[0]}`
-                        : String(localApplicant.user_id).slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="text-2xl font-semibold">
-                      {localApplicant.full_name || (localApplicant.first_name && localApplicant.last_name 
-                        ? `${localApplicant.first_name} ${localApplicant.last_name}`
-                        : `User ${localApplicant.user_id}`)}
+                <div className="grid grid-cols-2 gap-6 mb-6">
+                  {/* Column 1: Avatar and User Info */}
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-16 w-16">
+                      <AvatarImage src={localApplicant.profile_picture || "/avatars/shadcn.svg"} alt="Applicant Avatar" />
+                      <AvatarFallback className="text-2xl">
+                        {localApplicant.first_name && localApplicant.last_name 
+                          ? `${localApplicant.first_name[0]}${localApplicant.last_name[0]}`
+                          : String(localApplicant.user_id).slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="text-2xl font-semibold">
+                        {localApplicant.full_name || (localApplicant.first_name && localApplicant.last_name 
+                          ? `${localApplicant.first_name} ${localApplicant.last_name}`
+                          : `User ${localApplicant.user_id}`)}
+                      </div>
+                      <p className="text-base text-muted-foreground">
+                        {localApplicant.user_position || 'No Position'}
+                      </p>
                     </div>
-                    <p className="text-base text-muted-foreground">
-                      {localApplicant.job_title || 'No Job Title'}
-                      {localApplicant.company_name && ` • ${localApplicant.company_name}`}
-                    </p>
+                  </div>
+                  
+                  {/* Column 2: Interested Clients */}
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-foreground">Interested Clients</span>
+                    <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer">
+                      0
+                    </button>
                   </div>
                 </div>
                 
@@ -1114,8 +1073,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                               {localApplicant.all_job_titles.map((jobTitle, index) => (
                               <div 
                                 key={index} 
-                                className="rounded-lg p-4 border bg-card cursor-pointer hover:bg-accent/50 transition-colors relative"
-                                onClick={() => handleJobClick(index)}
+                                className="rounded-lg p-4 border bg-card relative"
                               >
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2 flex-1">
@@ -1685,10 +1643,18 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                           <div className="flex items-start justify-between">
                                             <div>
                                               <h4 className="font-medium text-foreground">{edu.degree}</h4>
-                                              <p className="text-sm text-muted-foreground">{edu.institution}</p>
+                                              {edu.major && typeof edu.major === 'string' && edu.major.trim() && (
+                                                <p className="text-sm text-muted-foreground font-medium">{edu.major}</p>
+                                              )}
+                                              {edu.institution && typeof edu.institution === 'string' && edu.institution.trim() && (
+                                                <p className="text-sm text-muted-foreground">{edu.institution}</p>
+                                              )}
+                                              {edu.location && typeof edu.location === 'string' && edu.location.trim() && (
+                                                <p className="text-xs text-muted-foreground">{edu.location}</p>
+                                              )}
                                             </div>
                                             <Badge variant="outline" className="text-xs">
-                                              {edu.year}
+                                              {edu.years || edu.year}
                                             </Badge>
                                           </div>
                                           {edu.highlights && Array.isArray(edu.highlights) && edu.highlights.length > 0 && (
@@ -1736,29 +1702,90 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                       <div key={index}>
                                         <div className="space-y-2">
                                           <div className="mb-2">
-                                            <h4 className="font-medium text-foreground">{project.title}</h4>
-                                            {project.description && (
+                                            <div className="flex items-start justify-between">
+                                              <h4 className="font-medium text-foreground">{project.title}</h4>
+                                              {project.duration && typeof project.duration === 'string' && project.duration.trim() && (
+                                                <Badge variant="outline" className="text-xs ml-2">
+                                                  {project.duration}
+                                                </Badge>
+                                              )}
+                                            </div>
+                                            {project.description && typeof project.description === 'string' && project.description.trim() && (
                                               <p className="text-sm text-muted-foreground mt-1">{project.description}</p>
+                                            )}
+                                            {project.url && typeof project.url === 'string' && project.url.trim() && (
+                                              <a 
+                                                href={project.url} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-primary hover:underline mt-1 inline-block"
+                                              >
+                                                View Project →
+                                              </a>
                                             )}
                                           </div>
                                           {project.technologies && Array.isArray(project.technologies) && project.technologies.length > 0 && (
                                             <div className="mt-3">
-                                              <p className="text-sm font-medium text-muted-foreground mb-2">Technologies:</p>
+                                              <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                                                <IconCode className="h-4 w-4" />
+                                                Technologies:
+                                              </p>
                                               <div className="flex flex-wrap gap-2">
                                                 {project.technologies.map((tech: string, techIndex: number) => (
-                                                  <Badge key={techIndex} variant="secondary" className="text-xs">
+                                                  <Badge key={techIndex} className="text-xs bg-gray-200 text-black dark:bg-zinc-800 dark:text-white border-0">
                                                     {tech}
                                                   </Badge>
                                                 ))}
                                               </div>
                                             </div>
                                           )}
-                                          {project.impact && (
-                                            <div className="mt-3">
-                                              <p className="text-sm font-medium text-muted-foreground mb-2">Impact:</p>
-                                              <p className="text-sm text-foreground">{project.impact}</p>
-                                            </div>
-                                          )}
+                                          {(() => {
+                                            console.log('🔍 Impact Debug - project.impact:', project.impact, 'type:', typeof project.impact)
+                                            if (project.impact) {
+                                              let impactPoints: string[] = []
+                                              
+                                              if (typeof project.impact === 'string' && project.impact.trim()) {
+                                                // Split string by common separators and clean up
+                                                impactPoints = project.impact
+                                                  .split(/[•\n\r,;]+/)
+                                                  .map((point: string) => point.trim())
+                                                  .filter((point: string) => point.length > 0)
+                                              } else if (Array.isArray(project.impact)) {
+                                                // Handle array of impact points
+                                                impactPoints = project.impact
+                                                  .map((point: any) => String(point).trim())
+                                                  .filter((point: string) => point.length > 0)
+                                              } else if (typeof project.impact === 'object' && project.impact !== null) {
+                                                // Handle object - convert values to array
+                                                const values = Object.values(project.impact)
+                                                impactPoints = values
+                                                  .map(value => String(value).trim())
+                                                  .filter(value => value.length > 0)
+                                              } else if (typeof project.impact === 'number') {
+                                                impactPoints = [String(project.impact)]
+                                              }
+                                              
+                                              if (impactPoints.length > 0) {
+                                                return (
+                                                  <div className="mt-3">
+                                                    <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                                                      <IconAward className="h-4 w-4" />
+                                                      Impact:
+                                                    </p>
+                                                    <ul className="space-y-1">
+                                                      {impactPoints.map((point: string, pointIndex: number) => (
+                                                        <li key={pointIndex} className="text-sm text-foreground flex items-center gap-2">
+                                                          <span className="text-primary flex-shrink-0">•</span>
+                                                          <span>{point}</span>
+                                                        </li>
+                                                      ))}
+                                                    </ul>
+                                                  </div>
+                                                )
+                                              }
+                                            }
+                                            return null
+                                          })()}
                                         </div>
                                         {index < originalSkillsData.projects.length - 1 && (
                                           <div className="mt-4 pt-4 border-t border-border/50" />

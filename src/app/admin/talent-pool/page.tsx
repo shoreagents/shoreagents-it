@@ -61,6 +61,7 @@ interface Applicant {
   member_color?: string | null
   job_title?: string | null
   company_name?: string | null
+  user_position?: string | null
   // Additional fields from recruits table
   bpoc_application_ids?: string[] | null
   applicant_id?: string | null
@@ -150,6 +151,7 @@ export default function TalentPoolPage() {
       member_color: rawData.member_color || null,
       job_title: rawData.job_title || null,
       company_name: rawData.company_name || null,
+      user_position: rawData.user_position || null,
       bpoc_application_ids: rawData.bpoc_application_ids || null,
       applicant_id: rawData.applicant_id || null,
       job_ids: rawData.job_ids || null,
@@ -336,6 +338,7 @@ export default function TalentPoolPage() {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(applicant => 
         applicant.full_name?.toLowerCase().includes(query) ||
+        applicant.user_position?.toLowerCase().includes(query) ||
         applicant.job_title?.toLowerCase().includes(query) ||
         applicant.company_name?.toLowerCase().includes(query) ||
         applicant.skills?.some(skill => skill.toLowerCase().includes(query)) ||
@@ -552,7 +555,7 @@ export default function TalentPoolPage() {
                                   </Avatar>
                                   <div className="flex-1 min-w-0">
                                     <h3 className="font-semibold text-lg leading-tight">
-                                      {talent.full_name || talent.job_title || "Talent"}
+                                      {talent.full_name || talent.user_position || "Talent"}
                                     </h3>
                                     <div className="flex items-center gap-1 mt-1">
                                       <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />

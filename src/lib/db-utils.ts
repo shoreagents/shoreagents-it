@@ -2925,6 +2925,7 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
         const emailMap = new Map<string, string>()
         const phoneMap = new Map<string, string>()
         const addressMap = new Map<string, string>()
+        const positionMap = new Map<string, string>()
         const aiAnalysisMap = new Map<string, any>() // Added for AI analysis
         
         if (bpocPool) {
@@ -2963,10 +2964,10 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
                 skillsMap.set(row.user_id, allSkills)
               }
               
-              // Fetch email, phone, and location data for all users
+              // Fetch email, phone, location, and position data for all users
               if (userIds.length > 0) {
                 const userResult = await bpocPool.query(
-                  `SELECT u.id, u.email, u.phone, u.location FROM users u WHERE u.id = ANY($1::uuid[])`,
+                  `SELECT u.id, u.email, u.phone, u.location, u.position FROM users u WHERE u.id = ANY($1::uuid[])`,
                   [userIds]
                 )
                 
@@ -2979,6 +2980,9 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
                   }
                   if (row.location) {
                     addressMap.set(row.id, row.location)
+                  }
+                  if (row.position) {
+                    positionMap.set(row.id, row.position)
                   }
                 }
               }
@@ -3109,7 +3113,7 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
         }
       }
       
-      // Get skills data, summary, email, phone, and address for this applicant 
+      // Get skills data, summary, email, phone, address, and position for this applicant 
       const userId = firstApplication?.user_id || applicant.applicant_id
       const skillsData = skillsMap.get(userId) || null
       const originalSkillsData = originalSkillsMap.get(userId) || null
@@ -3117,6 +3121,7 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
       const emailData = emailMap.get(userId) || null
       const phoneData = phoneMap.get(userId) || null
       const addressData = addressMap.get(userId) || null
+      const positionData = positionMap.get(userId) || null
       const aiAnalysisData = aiAnalysisMap.get(userId) || null // Added for AI analysis
       
       console.log('🔍 Applicant enrichment data:', { 
@@ -3176,6 +3181,7 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
           email: emailData,
           job_title: allJobTitles[0] || null,
           company_name: allCompanies[0] || null,
+          user_position: positionData,
           all_job_titles: allJobTitles,
           all_companies: allCompanies,
           all_job_statuses: allJobStatuses,

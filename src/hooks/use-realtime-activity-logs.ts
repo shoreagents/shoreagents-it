@@ -555,17 +555,7 @@ export const createApplicantsConfig = (applicantId: number): RealtimeTableConfig
   }
 })
 
-// Example 4: For Talent Pool Table
-export const createTalentPoolConfig = (talentId: number): RealtimeTableConfig => ({
-  tableName: 'talent_pool',
-  recordId: talentId,
-  recordIdField: 'talent_pool_id',
-  messageType: 'talent_comment_update',
-  apiEndpoints: {
-    comments: '/api/talent-pool/{id}/comments',
-    activityLogs: '/api/talent-pool/{id}/activity'
-  }
-})
+
 
 // ============================================================================
 // USAGE EXAMPLES IN COMPONENTS

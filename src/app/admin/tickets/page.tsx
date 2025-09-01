@@ -674,7 +674,7 @@ export default function TicketsPage() {
   const clearAllClosedTicketsInStatus = async (status: string) => {
     try {
       // Get all closed tickets in this status column
-      const closedTicketsInStatus = tickets.filter(ticket => ticket.status === status && ticket.status === 'Closed')
+      const closedTicketsInStatus = tickets.filter(ticket => ticket.status === 'Closed')
       
       if (closedTicketsInStatus.length === 0) {
         console.log('No closed tickets to clear in status:', status)
@@ -695,7 +695,7 @@ export default function TicketsPage() {
 
       if (allSuccessful) {
         // Remove all cleared tickets from the current view
-        setTickets(prev => prev.filter(ticket => !(ticket.status === status && ticket.status === 'Closed')))
+        setTickets(prev => prev.filter(ticket => ticket.status !== 'Closed'))
         console.log(`Cleared ${closedTicketsInStatus.length} tickets from ${status} column`)
       } else {
         console.error('Failed to clear some tickets')
@@ -707,7 +707,7 @@ export default function TicketsPage() {
 
   // Function to show clear confirmation modal
   const showClearConfirmationModal = (status: string) => {
-    const closedTicketsCount = tickets.filter(t => t.status === status && t.status === 'Closed').length
+    const closedTicketsCount = tickets.filter(t => t.status === 'Closed').length
     setClearStatus(status)
     setClearCount(closedTicketsCount)
     setShowClearConfirmation(true)

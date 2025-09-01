@@ -186,6 +186,8 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
   const [comments, setComments] = React.useState<any[]>([])
   const [isLoadingComments, setIsLoadingComments] = React.useState(false)
   const [isSubmittingComment, setIsSubmittingComment] = React.useState(false)
+  const [detailedTicket, setDetailedTicket] = React.useState<Ticket | null>(null)
+  const [isLoadingDetail, setIsLoadingDetail] = React.useState(false)
   const { user } = useAuth()
   const isAdmin = ((user as any)?.roleName || '').toLowerCase() === 'admin'
   const [isCommentFocused, setIsCommentFocused] = React.useState<boolean>(false)
@@ -208,9 +210,66 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
     return options
   }
 
+  // Fetch detailed ticket information when modal opens
+  const fetchTicketDetail = async (ticketId: number) => {
+    // Check what data is already available vs what's needed
+    const needsDetailedFetch = !ticket?.supporting_files || 
+                               !ticket?.file_count ||
+                               !ticket?.resolver_last_name
+
+    // If we already have all the data we need, don't fetch but still set the data
+    if (!needsDetailedFetch) {
+      console.log('✅ All needed data already available, skipping fetch')
+      setDetailedTicket(ticket)
+      setIsLoadingDetail(false)
+      return
+    }
+
+    console.log('📡 Fetching missing ticket data...')
+    
+    try {
+      const response = await fetch(`/api/tickets/${ticketId}/detail`)
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Merge new data with existing data, preserving what we already have
+        const mergedData = {
+          ...ticket,           // Keep existing data
+          ...data,             // Add new data
+          // Ensure we don't overwrite existing fields with null/undefined
+          supporting_files: data.supporting_files || ticket?.supporting_files,
+          file_count: data.file_count || ticket?.file_count,
+          resolver_last_name: data.resolver_last_name || ticket?.resolver_last_name,
+        }
+        
+        setDetailedTicket(mergedData)
+        console.log('✅ Ticket data merged successfully')
+      } else {
+        console.error('Failed to fetch ticket detail')
+        // Fallback to basic ticket data
+        setDetailedTicket(ticket)
+      }
+    } catch (error) {
+      console.error('Error fetching ticket detail:', error)
+      // Fallback to basic ticket data
+      setDetailedTicket(ticket)
+    } finally {
+      setIsLoadingDetail(false)
+    }
+  }
+
   React.useEffect(() => {
-    if (ticket) {
+    if (ticket && isOpen) {
+      // Reset detailed ticket data when ticket changes to prevent showing old data
+      setDetailedTicket(null)
       setCurrentStatus(ticket.status)
+      
+      // Show loading state when modal opens
+      setIsLoadingDetail(true)
+      
+      // Fetch ticket detail immediately
+      fetchTicketDetail(ticket.id)
+      
       fetchComments()
       // Reset comment state when ticket changes
       setIsCommentFocused(false)
@@ -221,7 +280,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
       }
     }
     setStatusOptions(getStatusOptions())
-  }, [ticket])
+  }, [ticket, isOpen])
 
   // Reset comment focus state when modal opens/closes
   React.useEffect(() => {
@@ -274,11 +333,11 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
   }, [])
 
   const fetchComments = async () => {
-    if (!ticket) return
+    if (!displayTicket?.ticket_id) return
     
     setIsLoadingComments(true)
     try {
-      const response = await fetch(`/api/tickets/${ticket.ticket_id}/comments`)
+      const response = await fetch(`/api/tickets/${displayTicket.ticket_id}/comments`)
       if (response.ok) {
         const data = await response.json()
         setComments(data.comments || [])
@@ -294,16 +353,20 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
 
   if (!ticket && !isLoading) return null
 
-  const categoryBadge = ticket ? getCategoryBadge(ticket) : { name: '', color: '' }
-  const createdDate = ticket ? formatDate(ticket.created_at) : { date: '', time: '', full: '' }
-  const updatedDate = ticket && ticket.updated_at && ticket.updated_at !== ticket.created_at ? formatDate(ticket.updated_at) : null
-  const resolvedDate = ticket && ticket.resolved_at ? formatDate(ticket.resolved_at) : null
+  // Use detailed ticket data if available, fallback to basic ticket data
+  const displayTicket = detailedTicket || ticket
+  const isLoadingDisplay = isLoading || isLoadingDetail
 
-  const hasAttachments = ticket && ticket.supporting_files && Array.isArray(ticket.supporting_files) && ticket.supporting_files.length > 0
+  const categoryBadge = displayTicket ? getCategoryBadge(displayTicket) : { name: '', color: '' }
+  const createdDate = displayTicket ? formatDate(displayTicket.created_at) : { date: '', time: '', full: '' }
+  const updatedDate = displayTicket && displayTicket.updated_at && displayTicket.updated_at !== displayTicket.created_at ? formatDate(displayTicket.updated_at) : null
+  const resolvedDate = displayTicket && displayTicket.resolved_at ? formatDate(displayTicket.resolved_at) : null
+
+  const hasAttachments = displayTicket && displayTicket.supporting_files && Array.isArray(displayTicket.supporting_files) && displayTicket.supporting_files.length > 0
 
   const copyTicketId = () => {
-    if (ticket) {
-      navigator.clipboard.writeText(ticket.ticket_id)
+    if (displayTicket?.ticket_id) {
+      navigator.clipboard.writeText(displayTicket.ticket_id)
     }
   }
 
@@ -400,7 +463,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                      <Skeleton className="h-8 w-3/4 mb-4" />
                    ) : (
                      <h1 className="text-2xl font-semibold mb-4">
-                       {ticket.concern}
+                       {displayTicket?.concern || 'Loading...'}
                      </h1>
                    )}
                    
@@ -410,54 +473,39 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                       <div className="flex items-center gap-2">
                         <IconUser className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Employee:</span>
-                        {isLoading ? (
-                          <div className="flex items-center gap-2">
-                            <Skeleton className="h-6 w-6 rounded-full" />
-                            <Skeleton className="h-4 w-24" />
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-6 w-6">
-                              <AvatarImage src={ticket.profile_picture || ''} alt="User" />
-                              <AvatarFallback className="text-xs">
-                                {ticket.first_name && ticket.last_name 
-                                  ? `${ticket.first_name[0]}${ticket.last_name[0]}`
-                                  : 'U'
-                                }
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium">
-                              {ticket.first_name && ticket.last_name 
-                                ? `${ticket.first_name} ${ticket.last_name}`
-                                : `User ${ticket.user_id}`
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={displayTicket?.profile_picture || ''} alt="User" />
+                            <AvatarFallback className="text-xs">
+                              {displayTicket?.first_name && displayTicket?.last_name 
+                                ? `${displayTicket.first_name[0]}${displayTicket.last_name[0]}`
+                                : 'U'
                               }
-                            </span>
-                          </div>
-                        )}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">
+                            {displayTicket?.first_name && displayTicket?.last_name 
+                              ? `${displayTicket.first_name} ${displayTicket.last_name}`
+                              : `User ${displayTicket?.user_id}`
+                            }
+                          </span>
+                        </div>
                       </div>
                       
                       {/* 2. Ticket ID */}
                       <div className="flex items-center gap-2">
                         <IconId className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Ticket ID:</span>
-                        {isLoading ? (
-                          <Skeleton className="h-4 w-20" />
-                        ) : (
-                          <span className="font-medium text-primary">
-                            {ticket.ticket_id}
+                                                  <span className="font-medium text-primary">
+                            {displayTicket?.ticket_id}
                           </span>
-                        )}
                       </div>
                       
                       {/* 3. Filed at */}
                       <div className="flex items-center gap-2">
                         <IconCalendar className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Filed at:</span>
-                        {isLoading ? (
-                          <Skeleton className="h-4 w-32" />
-                        ) : (
-                          <span className="font-medium">{createdDate.date} • {createdDate.time}</span>
-                        )}
+                        <span className="font-medium">{createdDate.date} • {createdDate.time}</span>
                       </div>
                       
                       {/* 4. Category */}
@@ -478,7 +526,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                         {isLoading ? (
                           <Skeleton className="h-4 w-4 rounded-full" />
                         ) : (
-                          getStatusIcon(currentStatus || ticket.status)
+                          getStatusIcon(currentStatus || ticket?.status || 'New')
                         )}
                         <span className="text-muted-foreground">Status:</span>
                         {isLoading ? (
@@ -488,14 +536,14 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                           <PopoverTrigger asChild>
                             <Badge 
                               variant="outline" 
-                              className={`${getStatusColor(currentStatus || ticket.status)} px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center`}
+                              className={`${getStatusColor(currentStatus || ticket?.status || 'New')} px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center`}
                             >
-                              {getDisplayStatus(currentStatus || ticket.status, isAdmin)}
+                              {getDisplayStatus(currentStatus || ticket?.status || 'New', isAdmin)}
                             </Badge>
                           </PopoverTrigger>
                           <PopoverContent className="w-56 p-2">
                             {statusOptions.map((option) => {
-                                const isCurrentStatus = getDisplayStatus(currentStatus || ticket.status, isAdmin) === option.label;
+                                const isCurrentStatus = getDisplayStatus(currentStatus || ticket?.status || 'New', isAdmin) === option.label;
                                 return (
                                   <PopoverItem
                                     key={option.value}
@@ -583,7 +631,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                           <Skeleton className="h-4 w-1/2" />
                         </div>
                       ) : (
-                        ticket.details || "No additional details provided."
+                        ticket?.details || "No additional details provided."
                       )}
                     </div>
                   </div>
@@ -592,12 +640,16 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
 
                   {/* Attachments Section */}
                   <div className="flex-1 flex flex-col min-h-0">
-                    <h3 className="text-lg font-medium mb-2 text-muted-foreground">Attachments</h3>
-                    <div className={`rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border flex-1 min-h-0 ${!hasAttachments ? 'flex items-center justify-center' : ''}`}> 
-                      {isLoading ? (
-                        <div className="grid grid-cols-4 gap-3">
+                    <h3 className="text-lg font-medium mb-2 text-muted-foreground">
+                      Attachments {isLoadingDetail ? (
+                        <Skeleton className="inline-block h-5 w-8 ml-2" />
+                      ) : displayTicket?.file_count ? `(${displayTicket.file_count})` : ''}
+                    </h3>
+                    <div className={`rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border flex-1 min-h-0 ${!hasAttachments && !isLoadingDetail ? 'flex items-center justify-center' : ''}`}> 
+                      {isLoadingDetail ? (
+                        <div className="grid grid-cols-4 gap-3 w-full">
                           {[...Array(4)].map((_, index) => (
-                            <div key={index} className="rounded-lg overflow-hidden">
+                            <div key={index} className="rounded-lg overflow-hidden w-full">
                               <Skeleton className="w-full h-20" />
                               <div className="p-2">
                                 <Skeleton className="h-3 w-20 mb-1" />
@@ -608,7 +660,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                         </div>
                       ) : hasAttachments ? (
                         <div className="grid grid-cols-4 gap-3">
-                          {(ticket.supporting_files || []).map((file, index) => {
+                          {(displayTicket.supporting_files || []).map((file, index) => {
                             // Get proper Supabase Storage URL for full quality
                             const fileUrl = getStorageUrl(file);
                             // Get optimized URL for preview
@@ -702,7 +754,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                                 <div className="p-2">
                                   <div className="text-xs font-medium truncate">{fileName}</div>
                                   <div className="text-xs text-muted-foreground">
-                                    {ticket.created_at ? formatDate(ticket.created_at).full : 'Unknown date'}
+                                    {displayTicket.created_at ? formatDate(displayTicket.created_at).full : 'Unknown date'}
                                   </div>
                                 </div>
                               </div>

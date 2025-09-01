@@ -16,10 +16,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ReloadButton } from "@/components/ui/reload-button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
 
-import { IconSearch, IconFilter, IconGripVertical, IconCalendar, IconClock, IconEye, IconMessage, IconDots, IconTrash } from "@tabler/icons-react"
+
+import { IconSearch, IconFilter, IconGripVertical, IconCalendar, IconClock, IconEye, IconMessage } from "@tabler/icons-react"
 import { useRealtimeTickets } from "@/hooks/use-realtime-tickets"
 import {
   DndContext,
@@ -609,63 +608,12 @@ export default function TicketsPage() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(1)
-  const [showClearConfirmation, setShowClearConfirmation] = useState(false)
-  const [clearStatus, setClearStatus] = useState<string>('')
-  const [clearCount, setClearCount] = useState(0)
+
   const { user } = useAuth()
   
 
 
-  // Function to clear all closed tickets in a status column
-  const clearAllClosedTicketsInStatus = async (status: string) => {
-    try {
-      // Get all closed tickets in this status column
-      const closedTicketsInStatus = tickets.filter(ticket => ticket.status === status && ticket.status === 'Closed')
-      
-      if (closedTicketsInStatus.length === 0) {
-        console.log('No closed tickets to clear in status:', status)
-        return
-      }
 
-      // Clear all closed tickets in this status
-      const clearPromises = closedTicketsInStatus.map(ticket => 
-        fetch('/api/tickets/clear', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ticketId: ticket.id, action: 'clear' })
-        })
-      )
-
-      const responses = await Promise.all(clearPromises)
-      const allSuccessful = responses.every(response => response.ok)
-
-      if (allSuccessful) {
-        // Remove all cleared tickets from the current view
-        setTickets(prev => prev.filter(ticket => !(ticket.status === status && ticket.status === 'Closed')))
-        console.log(`Cleared ${closedTicketsInStatus.length} tickets from ${status} column`)
-      } else {
-        console.error('Failed to clear some tickets')
-      }
-    } catch (error) {
-      console.error('Error clearing tickets:', error)
-    }
-  }
-
-  // Function to show clear confirmation modal
-  const showClearConfirmationModal = (status: string) => {
-    const closedTicketsCount = tickets.filter(t => t.status === status && t.status === 'Closed').length
-    setClearStatus(status)
-    setClearCount(closedTicketsCount)
-    setShowClearConfirmation(true)
-  }
-
-  // Function to handle clear confirmation
-  const handleClearConfirm = async () => {
-    setShowClearConfirmation(false)
-    if (clearStatus) {
-      await clearAllClosedTicketsInStatus(clearStatus)
-    }
-  }
 
   // Compute fractional insert position within a target list
   const calculateInsertPosition = (targetTickets: any[], dropIndex: number) => {
@@ -1154,32 +1102,7 @@ export default function TicketsPage() {
                                     }`}>{getTicketsByStatus(status as TicketStatus).length}</span>
                                   </Badge>
                                 </div>
-                                {status === 'Closed' && (
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <button 
-                                        className="text-xs h-7 w-7 p-0 text-muted-foreground border-0 bg-transparent hover:bg-sidebar-accent focus:outline-none focus:ring-0 rounded-md transition-colors flex items-center justify-center group"
-                                      >
-                                        <IconDots className="h-5 w-5 text-muted-foreground group-hover:text-sidebar-accent-foreground transition-colors" />
-                                      </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent align="end" className="w-32 p-1" onOpenAutoFocus={(e) => e.preventDefault()}>
-                                      <div>
-                                        <button
-                                          className="clear-all-button relative w-full text-left text-sm py-1.5 pl-2 pr-8 rounded-lg transition-colors flex items-center hover:bg-sidebar-accent active:bg-sidebar-accent/90"
-                                          onClick={(e) => { 
-                                            e.preventDefault(); 
-                                            e.stopPropagation(); 
-                                            showClearConfirmationModal(status);
-                                          }}
-                                        >
-                                          <IconTrash className="h-4 w-4 mr-2" />
-                                          Clear All
-                                        </button>
-                                      </div>
-                                    </PopoverContent>
-                                  </Popover>
-                                )}
+
                               </div>
                             </div>
                             <DroppableContainer status={status}>
@@ -1257,31 +1180,7 @@ export default function TicketsPage() {
         isLoading={loading}
       />
 
-      {/* Clear All Confirmation Dialog */}
-      <Dialog open={showClearConfirmation} onOpenChange={setShowClearConfirmation}>
-        <DialogContent className="sm:max-w-[380px] w-[90vw] rounded-xl [&>button]:hidden">
-          <div className="flex flex-col space-y-1.5 text-center sm:text-center">
-            <h2 className="text-lg font-semibold leading-none tracking-tight">Clear All</h2>
-          </div>
-          <div className="text-sm space-y-2">
-            <p className="text-muted-foreground">Clear all {clearCount} closed tickets? You can still view them in the records page.</p>
-          </div>
-          <div className="flex justify-center gap-2 pt-2">
-            <Button 
-              variant="ghost" 
-              onClick={() => setShowClearConfirmation(false)}
-            >
-              No
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleClearConfirm}
-            >
-              Yes
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+
     </>
   )
 } 
