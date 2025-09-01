@@ -404,6 +404,55 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
     applicantId: localApplicant?.id
   })
 
+  // Function to handle opening job detail window
+  const handleOpenJobDetails = async (jobIndex: number) => {
+    if (!localApplicant || !localApplicant.job_ids || !localApplicant.job_ids[jobIndex]) {
+      console.error('No job ID found for index:', jobIndex)
+      return
+    }
+
+    const jobId = localApplicant.job_ids[jobIndex]
+    const jobTitle = localApplicant.all_job_titles?.[jobIndex] || 'Unknown Job'
+    const companyName = localApplicant.all_companies?.[jobIndex] || 'Unknown Company'
+
+    try {
+      // Fetch detailed job data from the API
+      const response = await fetch(`/api/bpoc/job-details/${jobId}`)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch job details: ${response.statusText}`)
+      }
+
+      const jobData = await response.json()
+      
+      // Prepare job data for the window
+      const jobDataForWindow = {
+        id: jobId,
+        job_title: jobTitle,
+        company_name: companyName,
+        ...jobData
+      }
+
+      // Open job detail window using Electron API
+      if (typeof window !== 'undefined' && (window as any).electronAPI) {
+        await (window as any).electronAPI.openJobDetailWindow(jobId, jobDataForWindow)
+        console.log('✅ Job detail window opened successfully')
+      } else {
+        console.error('Electron API not available')
+      }
+    } catch (error) {
+      console.error('Error opening job details:', error)
+      // Fallback: try to open with basic data
+      if (typeof window !== 'undefined' && (window as any).electronAPI) {
+        const basicJobData = {
+          id: jobId,
+          job_title: jobTitle,
+          company_name: companyName
+        }
+        await (window as any).electronAPI.openJobDetailWindow(jobId, basicJobData)
+      }
+    }
+  }
+
   // Update local applicant when prop changes
   useEffect(() => {
     if (applicant) {
@@ -1073,13 +1122,16 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                               {localApplicant.all_job_titles.map((jobTitle, index) => (
                               <div 
                                 key={index} 
-                                className="rounded-lg p-4 border bg-card relative"
+                                className="rounded-lg p-4 border bg-card relative cursor-pointer hover:bg-accent/50 transition-colors group"
+                                onClick={() => handleOpenJobDetails(index)}
+                                title="Click to view job details"
                               >
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2 flex-1">
-                                    <h4 className="font-medium text-foreground">
+                                    <h4 className="font-medium text-foreground group-hover:text-primary transition-colors">
                                       {jobTitle}
                                     </h4>
+                                    <IconExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors opacity-0 group-hover:opacity-100" />
                                   </div>
                                   
                                   {/* Applied Date and Time - Top Right */}
