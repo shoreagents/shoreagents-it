@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconVideo, IconCash, IconClockHour4, IconExternalLink, IconSun, IconMoon, IconAward, IconCode, IconSparkles } from "@tabler/icons-react"
+import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconVideo, IconCash, IconClockHour4, IconArrowRight, IconSun, IconMoon, IconAward, IconCode, IconSparkles } from "@tabler/icons-react"
 import { Input } from "@/components/ui/input"
 import { EditableField, DataFieldRow } from "@/components/ui/fields"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -1131,7 +1131,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                     <h4 className="font-medium text-foreground group-hover:text-primary transition-colors">
                                       {jobTitle}
                                     </h4>
-                                    <IconExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors opacity-0 group-hover:opacity-100" />
+                                    <IconArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-all duration-300 opacity-0 group-hover:opacity-100 transform translate-x-0 group-hover:translate-x-1" />
                                   </div>
                                   
                                   {/* Applied Date and Time - Top Right */}
