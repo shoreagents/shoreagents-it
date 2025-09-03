@@ -1601,7 +1601,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                       })()
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
-                        <p className="text-sm">No companies found</p>
+                        <p className="text-sm">No Companies Found</p>
                       </div>
                     )}
                   </div>

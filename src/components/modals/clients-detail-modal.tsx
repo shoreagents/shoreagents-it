@@ -895,7 +895,7 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
                       ))
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
-                        <p className="text-sm">No companies found</p>
+                        <p className="text-sm">No Companies Found</p>
                       </div>
                     )}
                   </div>
