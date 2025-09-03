@@ -22,26 +22,45 @@ import {
 } from "@/components/ui/pagination"
 import { useTheme } from "next-themes"
 import { ReloadButton } from "@/components/ui/reload-button"
+import { ClientsDetailModal } from "@/components/modals/clients-detail-modal"
 
 interface ClientRecord {
   user_id: number
   email: string
   user_type: string
+  // Personal Info fields
   first_name: string | null
+  middle_name: string | null
   last_name: string | null
+  nickname: string | null
   profile_picture: string | null
   phone: string | null
-  employee_id: string | null
-  job_title: string | null
-  work_email: string | null
+  birthday: string | null
+  city: string | null
+  address: string | null
+  gender: string | null
+  // Client specific fields
   member_id: number | null
   member_company: string | null
   member_badge_color: string | null
   station_id: string | null
+  department_id: number | null
+  department_name: string | null
 }
 
 export default function ClientsPage() {
   const { theme } = useTheme()
+  
+  // Helper function to create colors with alpha transparency
+  function withAlpha(hex: string, alpha: number): string {
+    const clean = hex?.trim() || ''
+    const match = /^#([A-Fa-f0-9]{6})$/.exec(clean)
+    if (!match) return hex || 'transparent'
+    const r = parseInt(clean.slice(1, 3), 16)
+    const g = parseInt(clean.slice(3, 5), 16)
+    const b = parseInt(clean.slice(5, 7), 16)
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  }
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -55,6 +74,10 @@ export default function ClientsPage() {
   const [memberOptions, setMemberOptions] = useState<{ id: number; company: string }[]>([])
   const [sortField, setSortField] = useState<string>('first_name')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedClient, setSelectedClient] = useState<ClientRecord | null>(null)
 
   const fetchClients = async () => {
     try {
@@ -119,6 +142,29 @@ export default function ClientsPage() {
       setSortDirection('asc')
     }
     setCurrentPage(1)
+  }
+
+  const handleClientClick = async (client: ClientRecord) => {
+    try {
+      // Fetch detailed client data
+      const response = await fetch(`/api/clients/${client.user_id}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch client details')
+      }
+      const data = await response.json()
+      setSelectedClient(data.client || client)
+      setIsModalOpen(true)
+    } catch (error) {
+      console.error('Error fetching client details:', error)
+      // Fallback to basic client data
+      setSelectedClient(client)
+      setIsModalOpen(true)
+    }
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedClient(null)
   }
 
   return (
@@ -190,7 +236,6 @@ export default function ClientsPage() {
                           <Table className="table-fixed w-full">
                             <colgroup>
                               <col className="w-[16rem]" />
-                              <col className="w-80" />
                               <col className="w-72" />
                               <col className="w-[22rem]" />
                             </colgroup>
@@ -201,11 +246,7 @@ export default function ClientsPage() {
                                     Client <span className="w-4 h-4">{sortField === 'first_name' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
                                   </div>
                                 </TableHead>
-                                <TableHead onClick={() => handleSort('job_title')} className={`cursor-pointer ${sortField === 'job_title' ? 'text-primary font-medium bg-accent/50' : ''}`}>
-                                  <div className="flex items-center gap-1">
-                                    Job Title <span className="w-4 h-4">{sortField === 'job_title' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
-                                  </div>
-                                </TableHead>
+
                                 <TableHead onClick={() => handleSort('member_company')} className={`cursor-pointer ${sortField === 'member_company' ? 'text-primary font-medium bg-accent/50' : ''}`}>
                                   <div className="flex items-center gap-1">
                                     Member <span className="w-4 h-4">{sortField === 'member_company' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
@@ -220,7 +261,11 @@ export default function ClientsPage() {
                             </TableHeader>
                             <TableBody>
                               {clients.map((c) => (
-                                <TableRow key={c.user_id}>
+                                <TableRow 
+                                  key={c.user_id} 
+                                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                                  onClick={() => handleClientClick(c)}
+                                >
                                   <TableCell className="whitespace-nowrap">
                                     <div className="flex items-center gap-2 min-w-0">
                                       <Avatar className="h-7 w-7">
@@ -232,15 +277,16 @@ export default function ClientsPage() {
                                       <span className="truncate block max-w-[9rem]">{(c.first_name || "") + (c.last_name ? ` ${c.last_name}` : "")}</span>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="whitespace-nowrap"><span className="truncate block max-w-[18rem]">{c.job_title || "-"}</span></TableCell>
+
                                   <TableCell className="whitespace-nowrap">
                                     {c.member_company ? (
                                       <Badge
                                         variant="outline"
                                         className="border"
                                         style={{
-                                          backgroundColor: `rgba(153,153,153,0.2)`,
-                                          borderColor: `rgba(153,153,153,0.4)`,
+                                          backgroundColor: withAlpha(c.member_badge_color || '#999999', 0.2),
+                                          borderColor: withAlpha(c.member_badge_color || '#999999', 0.4),
+                                          color: theme === 'dark' ? '#ffffff' : (c.member_badge_color || '#6B7280'),
                                         }}
                                       >
                                         <span className="truncate inline-block max-w-[16rem] align-bottom">{c.member_company}</span>
@@ -253,7 +299,7 @@ export default function ClientsPage() {
                                     <div className="flex flex-col gap-0.5 leading-tight">
                                       <div className="flex items-center gap-1.5">
                                         <IconMail className="h-3.5 w-3.5 text-muted-foreground" />
-                                        <span className="truncate block max-w-[18rem]">{c.work_email || c.email}</span>
+                                        <span className="truncate block max-w-[18rem]">{c.email}</span>
                                       </div>
                                       {c.phone && (
                                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -325,6 +371,14 @@ export default function ClientsPage() {
           </div>
         </div>
       </SidebarInset>
+      
+      {/* Client Detail Modal */}
+      <ClientsDetailModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        clientId={selectedClient?.user_id?.toString()}
+        clientData={selectedClient || undefined}
+      />
     </>
   )
 }

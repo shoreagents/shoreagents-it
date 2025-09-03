@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
+import { AppHeader } from "@/components/app-header"
+import { SidebarInset } from "@/components/ui/sidebar"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -158,71 +160,81 @@ export default function JobsPage() {
   if (loading) {
     return (
       <>
-        <AppSidebar />
-        <div className="flex-1 flex flex-col">
-          <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="container flex flex-col items-start gap-4 py-4 sm:h-auto sm:flex-row sm:items-center sm:gap-8">
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-6 w-6" />
-                <h1 className="text-lg font-semibold">Jobs</h1>
+        <AppSidebar variant="inset" />
+        <SidebarInset>
+          <AppHeader />
+          <div className="flex flex-1 flex-col">
+            <div className="@container/main flex flex-1 flex-col gap-2">
+              <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+                <div className="px-4 lg:px-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h1 className="text-2xl font-bold">Jobs</h1>
+                      <p className="text-sm text-muted-foreground">Browse and manage job postings</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-4 lg:px-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <Card key={i} className="rounded-xl">
+                        <CardHeader className="pb-4">
+                          <div className="flex items-start gap-3">
+                            <Skeleton className="h-12 w-12 rounded-full" />
+                            <div className="flex-1 space-y-2">
+                              <Skeleton className="h-5 w-3/4" />
+                              <Skeleton className="h-4 w-1/2" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <Skeleton className="h-4 w-16" />
+                            <Skeleton className="h-4 w-20" />
+                          </div>
+                          <Skeleton className="h-16 w-full" />
+                          <div className="flex flex-wrap gap-1">
+                            <Skeleton className="h-6 w-16" />
+                            <Skeleton className="h-6 w-20" />
+                            <Skeleton className="h-6 w-14" />
+                          </div>
+                          <Skeleton className="h-10 w-full" />
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Card key={i} className="rounded-xl">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-start gap-3">
-                      <Skeleton className="h-12 w-12 rounded-full" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-5 w-3/4" />
-                        <Skeleton className="h-4 w-1/2" />
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Skeleton className="h-4 w-16" />
-                      <Skeleton className="h-4 w-20" />
-                    </div>
-                    <Skeleton className="h-16 w-full" />
-                    <div className="flex flex-wrap gap-1">
-                      <Skeleton className="h-6 w-16" />
-                      <Skeleton className="h-6 w-20" />
-                      <Skeleton className="h-6 w-14" />
-                    </div>
-                    <Skeleton className="h-10 w-full" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
+        </SidebarInset>
       </>
     )
   }
 
   return (
     <>
-      <AppSidebar />
-      <div className="flex-1 flex flex-col">
-        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex flex-col items-start gap-4 py-4 sm:h-auto sm:flex-row sm:items-center sm:gap-8">
-            <div className="flex items-center gap-2">
-              <Briefcase className="h-6 w-6" />
-              <h1 className="text-lg font-semibold">Jobs</h1>
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              <Button size="sm" className="gap-2">
-                <Plus className="h-4 w-4" />
-                Post New Job
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <AppSidebar variant="inset" />
+      <SidebarInset>
+        <AppHeader />
+        <div className="flex flex-1 flex-col">
+          <div className="@container/main flex flex-1 flex-col gap-2">
+            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+              <div className="px-4 lg:px-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl font-bold">Jobs</h1>
+                    <p className="text-sm text-muted-foreground">Browse and manage job postings</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Post New Job
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div className="px-4 lg:px-6">
           {/* Search and Filters */}
           <div className="space-y-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -425,8 +437,11 @@ export default function JobsPage() {
               ))}
             </div>
           )}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </SidebarInset>
     </>
   )
 }

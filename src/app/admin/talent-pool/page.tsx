@@ -391,31 +391,39 @@ export default function TalentPoolPage() {
   // Handle status updates
   const handleStatusUpdate = useCallback(async (applicantId: string, jobIndex: number, newStatus: string) => {
     try {
-      const response = await fetch('/api/bpoc', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: applicantId, status: newStatus })
-      })
+      console.log(`🔄 Updating local job status for applicant ${applicantId}, job ${jobIndex} to:`, newStatus);
       
-      if (!response.ok) {
-        throw new Error('Failed to update status')
-      }
-      
-      // Update local state
-      setApplicants(prev => prev.map(applicant => 
-        applicant.id === applicantId 
-          ? { ...applicant, status: newStatus as ApplicantStatus }
-          : applicant
-      ))
-      
+      // Update local state only - the modal already handled the API calls
+      setApplicants(prev => prev.map(app => {
+        if (app.id === applicantId && app.all_job_statuses) {
+          const updatedStatuses = [...app.all_job_statuses];
+          updatedStatuses[jobIndex] = newStatus;
+          return {
+            ...app,
+            all_job_statuses: updatedStatuses
+          };
+        }
+        return app;
+      }));
+
       // Also update selectedTalent if the modal is open for this applicant
       if (selectedTalent && String(selectedTalent.id) === String(applicantId)) {
-        setSelectedTalent(prev => prev ? { ...prev, status: newStatus as ApplicantStatus } : null)
+        setSelectedTalent(prev => {
+          if (prev && prev.all_job_statuses) {
+            const updatedStatuses = [...prev.all_job_statuses];
+            updatedStatuses[jobIndex] = newStatus;
+            return { ...prev, all_job_statuses: updatedStatuses };
+          }
+          return prev;
+        });
       }
+      
+      console.log('✅ Local job status updated successfully');
+      
     } catch (error) {
-      console.error('Failed to update status:', error)
+      console.error('❌ Error updating local job status:', error);
     }
-  }, [])
+  }, [selectedTalent])
 
   return (
     <>

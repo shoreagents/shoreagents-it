@@ -466,6 +466,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
         bpoc_application_ids: applicant.bpoc_application_ids
       })
       
+
       setLocalApplicant(applicant)
       // Reset input values when applicant changes
       const initialValues = {

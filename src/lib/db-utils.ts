@@ -1120,7 +1120,7 @@ export async function updateAgentPersonalInfo(userId: number, personalInfo: Reco
     const checkResult = await pool.query(checkQuery, [userId])
     
     if (checkResult.rows.length === 0) {
-      // Create new personal_info record
+      // Create new personal_info record - ensure required fields are not null
       const insertQuery = `
         INSERT INTO public.personal_info (
           user_id, first_name, middle_name, last_name, nickname, phone, address, city, gender, birthday, created_at, updated_at
@@ -1129,9 +1129,9 @@ export async function updateAgentPersonalInfo(userId: number, personalInfo: Reco
       `
       const values = [
         userId,
-        personalInfo.first_name || null,
+        personalInfo.first_name || 'Unknown',
         personalInfo.middle_name || null,
-        personalInfo.last_name || null,
+        personalInfo.last_name || 'User',
         personalInfo.nickname || null,
         personalInfo.phone || null,
         personalInfo.address || null,
@@ -1142,8 +1142,23 @@ export async function updateAgentPersonalInfo(userId: number, personalInfo: Reco
       const result = await pool.query(insertQuery, values)
       return result.rows[0]
     } else {
-      // Update existing personal_info record
-      const setClause = Object.keys(personalInfo)
+      // Update existing personal_info record - filter out null values for required fields
+      const filteredPersonalInfo = Object.fromEntries(
+        Object.entries(personalInfo).filter(([key, value]) => {
+          // Don't include null values for required fields
+          if ((key === 'first_name' || key === 'last_name') && (value === null || value === '')) {
+            return false
+          }
+          return value !== undefined
+        })
+      )
+
+      // If no valid fields to update, return early
+      if (Object.keys(filteredPersonalInfo).length === 0) {
+        return null
+      }
+
+      const setClause = Object.keys(filteredPersonalInfo)
         .map((key, index) => `${key} = $${index + 2}`)
         .join(', ')
       
@@ -1153,7 +1168,7 @@ export async function updateAgentPersonalInfo(userId: number, personalInfo: Reco
         WHERE user_id = $1
         RETURNING *
       `
-      const values = [userId, ...Object.values(personalInfo)]
+      const values = [userId, ...Object.values(filteredPersonalInfo)]
       const result = await pool.query(updateQuery, values)
       return result.rows[0]
     }
@@ -1498,20 +1513,24 @@ export async function getClientById(userId: number): Promise<any> {
         u.email,
         u.user_type,
         pi.first_name,
+        pi.middle_name,
         pi.last_name,
+        pi.nickname,
         pi.profile_picture,
         pi.phone,
-        ji.employee_id,
-        ji.job_title,
-        ji.work_email,
+        to_char(pi.birthday, 'YYYY-MM-DD') AS birthday,
+        pi.city,
+        pi.address,
+        pi.gender,
         m.company AS member_company,
-        m.badge_color AS member_badge_color
+        m.badge_color AS member_badge_color,
+        d.name AS department_name
       FROM public.clients c
       INNER JOIN public.users u ON c.user_id = u.id
       LEFT JOIN public.personal_info pi ON c.user_id = pi.user_id
-      LEFT JOIN public.job_info ji ON c.user_id = ji.agent_user_id
       LEFT JOIN public.stations s ON u.id = s.assigned_user_id
       LEFT JOIN public.members m ON c.member_id = m.id
+      LEFT JOIN public.departments d ON c.department_id = d.id
       WHERE c.user_id = $1
     `
     
@@ -1524,6 +1543,109 @@ export async function getClientById(userId: number): Promise<any> {
     return result.rows[0]
   } catch (error) {
     console.error('Error fetching client by ID:', error)
+    throw error
+  }
+}
+
+// Update client personal info
+export async function updateClientPersonalInfo(userId: number, personalInfo: Record<string, any>): Promise<any> {
+  try {
+    // Check if record exists first
+    const checkQuery = 'SELECT id FROM public.personal_info WHERE user_id = $1'
+    const checkResult = await pool.query(checkQuery, [userId])
+    
+    if (checkResult.rows.length === 0) {
+      // Create new personal_info record - ensure required fields are not null
+      const insertQuery = `
+        INSERT INTO public.personal_info (
+          user_id, first_name, middle_name, last_name, nickname, phone, address, city, gender, birthday, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+        RETURNING *
+      `
+      const values = [
+        userId,
+        personalInfo.first_name || 'Unknown',
+        personalInfo.middle_name || null,
+        personalInfo.last_name || 'User',
+        personalInfo.nickname || null,
+        personalInfo.phone || null,
+        personalInfo.address || null,
+        personalInfo.city || null,
+        personalInfo.gender || null,
+        personalInfo.birthday || null
+      ]
+      const result = await pool.query(insertQuery, values)
+      return result.rows[0]
+    } else {
+      // Update existing personal_info record - filter out null values for required fields
+      const filteredPersonalInfo = Object.fromEntries(
+        Object.entries(personalInfo).filter(([key, value]) => {
+          // Don't include null values for required fields
+          if ((key === 'first_name' || key === 'last_name') && (value === null || value === '')) {
+            return false
+          }
+          return value !== undefined
+        })
+      )
+
+      // If no valid fields to update, return early
+      if (Object.keys(filteredPersonalInfo).length === 0) {
+        return null
+      }
+
+      const setClause = Object.keys(filteredPersonalInfo)
+        .map((key, index) => `${key} = $${index + 2}`)
+        .join(', ')
+      
+      const updateQuery = `
+        UPDATE public.personal_info 
+        SET ${setClause}, updated_at = NOW()
+        WHERE user_id = $1
+        RETURNING *
+      `
+      const values = [userId, ...Object.values(filteredPersonalInfo)]
+      const result = await pool.query(updateQuery, values)
+      return result.rows[0]
+    }
+  } catch (error) {
+    console.error('Error updating client personal info:', error)
+    throw error
+  }
+}
+
+// Note: Clients don't have job_info records, so this function is not used
+
+// Update client data (consolidated function)
+export async function updateClientData(userId: number, updates: Record<string, any>): Promise<any> {
+  try {
+    // Only personal info fields are available for clients
+    const personalInfoFields = {
+      first_name: updates.first_name,
+      middle_name: updates.middle_name,
+      last_name: updates.last_name,
+      nickname: updates.nickname,
+      phone: updates.phone,
+      address: updates.address,
+      city: updates.city,
+      gender: updates.gender,
+      birthday: updates.birthday
+    }
+
+    // Remove undefined values
+    const cleanPersonalInfo = Object.fromEntries(
+      Object.entries(personalInfoFields).filter(([_, value]) => value !== undefined)
+    )
+
+    const results: any = {}
+
+    // Update personal_info table if there are personal info changes
+    if (Object.keys(cleanPersonalInfo).length > 0) {
+      results.personalInfo = await updateClientPersonalInfo(userId, cleanPersonalInfo)
+    }
+
+    return results
+  } catch (error) {
+    console.error('Error updating client data:', error)
     throw error
   }
 }

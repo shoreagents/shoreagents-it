@@ -695,32 +695,13 @@ export default function BPOCApplicantsPage() {
          aiAnalysis: rawData.aiAnalysis,
   }), [])
 
-  // Helper function to update job status in local state and both databases
+  // Helper function to update job status in local state only
+  // Note: The modal handles the actual API calls, this just updates the local state
   const updateJobStatusInLocalState = useCallback(async (applicantId: string, jobIndex: number, newStatus: string) => {
     try {
-      console.log(`🔄 Updating job status for applicant ${applicantId}, job ${jobIndex} to:`, newStatus);
+      console.log(`🔄 Updating local job status for applicant ${applicantId}, job ${jobIndex} to:`, newStatus);
       
-      // Update main database first
-      const mainResponse = await fetch('/api/bpoc', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: applicantId,
-          status: newStatus
-        })
-      });
-      
-      if (!mainResponse.ok) {
-        const error = await mainResponse.json();
-        console.error('❌ Failed to update main database status:', error);
-        throw new Error('Failed to update main database status');
-      }
-      
-      console.log('✅ Main database status updated successfully');
-      
-      // Update local state
+      // Update local state only - the modal already handled the API calls
       setApplicants(prev => prev.map(app => {
         if (app.id === applicantId && app.all_job_statuses) {
           const updatedStatuses = [...app.all_job_statuses];
@@ -743,10 +724,10 @@ export default function BPOCApplicantsPage() {
         return prev;
       });
       
+      console.log('✅ Local job status updated successfully');
+      
     } catch (error) {
-      console.error('❌ Error updating job status:', error);
-      // Revert local state on error
-      // Note: In a production app, you might want to show a toast notification here
+      console.error('❌ Error updating local job status:', error);
     }
   }, []);
 
@@ -1130,9 +1111,15 @@ export default function BPOCApplicantsPage() {
 
 
   const handleViewAllClick = useCallback((applicant: Applicant) => {
-    setSelectedApplicant(applicant)
+    // Get the latest applicant data from the applicants array to ensure we have the most up-to-date information
+    const latestApplicant = applicants.find(app => String(app.id) === String(applicant.id))
+    if (latestApplicant) {
+      setSelectedApplicant(latestApplicant)
+    } else {
+      setSelectedApplicant(applicant)
+    }
     setIsModalOpen(true)
-  }, [])
+  }, [applicants])
 
   const statuses: ApplicantStatus[] = ["submitted", "for verification", "verified", "initial interview", "passed"]
 
