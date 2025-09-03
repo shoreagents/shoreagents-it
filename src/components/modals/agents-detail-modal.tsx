@@ -1070,37 +1070,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                          value={displayData.email}
                          onSave={() => {}}
                          placeholder="-"
-                         customInput={
-                           <div 
-                             className="h-[33px] w-full text-sm flex items-center justify-between"
-                             onMouseEnter={() => setIsHovered(true)}
-                             onMouseLeave={() => setIsHovered(false)}
-                           >
-                             <span className={displayData.email ? 'text-foreground' : 'text-muted-foreground'}>
-                               {displayData.email || '-'}
-                             </span>
-                             {displayData.email && (
-                               <div className={`flex items-center gap-2 transition-all duration-200 ease-in-out ${
-                                 isHovered 
-                                   ? 'opacity-100 translate-x-0' 
-                                   : 'opacity-0 translate-x-2 pointer-events-none'
-                               }`}>
-                                 <button
-                                   onClick={(e) => {
-                                     e.preventDefault()
-                                     e.stopPropagation()
-                                     navigator.clipboard.writeText(displayData.email)
-                                   }}
-                                   className="p-0 hover:text-foreground rounded transition-colors text-muted-foreground"
-                                   title="Copy email"
-                                   tabIndex={-1}
-                                 >
-                                   <IconCopy className="h-4 w-4" />
-                                 </button>
-                               </div>
-                             )}
-                           </div>
-                         }
+                         readOnly={true}
                        />
 
                        {/* Phone */}
@@ -1275,37 +1245,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                          value={displayData.work_email}
                          onSave={() => {}}
                          placeholder="-"
-                         customInput={
-                           <div 
-                             className="h-[33px] w-full text-sm flex items-center justify-between"
-                             onMouseEnter={() => setIsHovered(true)}
-                             onMouseLeave={() => setIsHovered(false)}
-                           >
-                             <span className={displayData.work_email ? 'text-foreground' : 'text-muted-foreground'}>
-                               {displayData.work_email || '-'}
-                             </span>
-                             {displayData.work_email && (
-                               <div className={`flex items-center gap-2 transition-all duration-200 ease-in-out ${
-                                 isHovered 
-                                   ? 'opacity-100 translate-x-0' 
-                                   : 'opacity-0 translate-x-2 pointer-events-none'
-                               }`}>
-                                 <button
-                                   onClick={(e) => {
-                                     e.preventDefault()
-                                     e.stopPropagation()
-                                     navigator.clipboard.writeText(displayData.work_email || '')
-                                   }}
-                                   className="p-0 hover:text-foreground rounded transition-colors text-muted-foreground"
-                                   title="Copy work email"
-                                   tabIndex={-1}
-                                 >
-                                   <IconCopy className="h-4 w-4" />
-                                 </button>
-                               </div>
-                             )}
-                           </div>
-                         }
+                         readOnly={true}
                        />
 
                        {/* Shift Period */}

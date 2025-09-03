@@ -50,6 +50,7 @@ interface DataFieldRowProps {
   onKeyDown?: (e: React.KeyboardEvent) => void
   isLast?: boolean
   customInput?: React.ReactNode  // New prop for custom input components
+  readOnly?: boolean  // New prop to make field read-only
 }
 
 export const DataFieldRow = ({
@@ -62,7 +63,8 @@ export const DataFieldRow = ({
   onBlur,
   onKeyDown,
   isLast = false,
-  customInput
+  customInput,
+  readOnly = false
 }: DataFieldRowProps) => {
   const [isHovered, setIsHovered] = React.useState(false);
   const [isActive, setIsActive] = React.useState(false);
@@ -77,7 +79,7 @@ export const DataFieldRow = ({
       </div>
       <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
       <div 
-        className={`min-w-0 flex items-center relative transition-colors duration-200 pl-2 pr-2 ${
+        className={`min-w-0 flex items-center relative transition-colors duration-200 pl-2 pr-2 h-full ${
           (isActive || isHovered) 
             ? 'bg-[#ebebeb] dark:bg-[#0a0a0a]' 
             : ''
@@ -89,6 +91,32 @@ export const DataFieldRow = ({
       >
         {customInput ? (
           customInput
+        ) : readOnly ? (
+          <div className="flex items-center justify-between w-full">
+            <span className={`text-sm ${value ? 'text-foreground' : 'text-muted-foreground'}`}>
+              {value || placeholder}
+            </span>
+            {value && typeof value === 'string' && value.trim() !== '' && (
+              <div className={`flex items-center gap-2 transition-all duration-200 ease-in-out ${
+                isHovered 
+                  ? 'opacity-100 translate-x-0' 
+                  : 'opacity-0 translate-x-2 pointer-events-none'
+              }`}>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    navigator.clipboard.writeText(value)
+                  }}
+                  className="p-0 hover:text-foreground rounded transition-colors text-muted-foreground"
+                  title="Copy value"
+                  tabIndex={-1}
+                >
+                  <IconCopy className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="flex items-center gap-2 w-full">
             <EditableField 
