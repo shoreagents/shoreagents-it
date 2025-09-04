@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
     const country = formData.get('country') as string
     const service = formData.get('service') as string
     const website = formData.get('website') as string
+    const shift = formData.get('shift') as string
     const logo = formData.get('logo') as File | null
     const badge_color = formData.get('badge_color') as string
     const status = formData.get('status') as string
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest) {
     console.log('  country:', country)
     console.log('  service:', service)
     console.log('  website:', website)
+    console.log('  shift:', shift)
     console.log('  logo:', logo ? `File: ${logo.name}` : 'none')
     console.log('  badge_color:', badge_color)
     console.log('  status:', status)
@@ -180,6 +182,7 @@ export async function POST(request: NextRequest) {
       country,
       service: formattedService,
       website: websiteArray,
+      shift,
       logo: logoUrl,
       badge_color: finalBadgeColor,
       status: finalStatus,

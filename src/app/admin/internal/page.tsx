@@ -226,12 +226,6 @@ export default function InternalPage() {
                     <h1 className="text-2xl font-bold">Internal</h1>
                     <p className="text-sm text-muted-foreground">
                       Directory of internal employees and contact details
-                      {isRealtimeConnected && (
-                        <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                          Live
-                        </span>
-                      )}
                     </p>
                   </div>
                   <div className="flex gap-2">

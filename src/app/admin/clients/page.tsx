@@ -23,6 +23,7 @@ import {
 import { useTheme } from "next-themes"
 import { ReloadButton } from "@/components/ui/reload-button"
 import { ClientsDetailModal } from "@/components/modals/clients-detail-modal"
+import { useRealtimeClients } from "@/hooks/use-realtime-clients"
 
 interface ClientRecord {
   user_id: number
@@ -78,6 +79,93 @@ export default function ClientsPage() {
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedClient, setSelectedClient] = useState<ClientRecord | null>(null)
+
+  // Realtime functionality
+  const { isConnected: isRealtimeConnected } = useRealtimeClients({
+    onClientCreated: (newClient) => {
+      console.log('🆕 New client created via realtime:', newClient)
+      // Add new client to the list if it matches current filters
+      setClients(prev => {
+        // Check if client already exists (avoid duplicates)
+        const exists = prev.some(client => client.user_id === newClient.user_id)
+        if (exists) return prev
+        
+        // Add new client to the beginning of the list
+        return [newClient, ...prev]
+      })
+      // Update total count
+      setTotalCount(prev => prev + 1)
+    },
+    onClientUpdated: (updatedClient, oldClient) => {
+      console.log('📝 Client updated via realtime:', updatedClient, 'Old:', oldClient)
+      
+      // If this update is missing member company information, we need to refetch the full client data
+      // because some updates don't include complete member information
+      if (updatedClient && (!updatedClient.member_company || !updatedClient.member_badge_color)) {
+        console.log('🔄 Incomplete client data detected, refetching full client data...')
+        
+        // First, update with the partial data to avoid showing empty data
+        setClients(prev => 
+          prev.map(client => 
+            client.user_id === updatedClient.user_id ? { ...client, ...updatedClient } : client
+          )
+        )
+        
+        // Update selected client if it's the one being updated
+        if (selectedClient?.user_id === updatedClient.user_id) {
+          setSelectedClient(prev => prev ? { ...prev, ...updatedClient } : updatedClient)
+        }
+        
+        // Then refetch the complete data in the background
+        fetch(`/api/clients/${updatedClient.user_id}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.client) {
+              console.log('✅ Refetched full client data:', data.client)
+              // Update client in the list with complete data
+              setClients(prev => 
+                prev.map(client => 
+                  client.user_id === data.client.user_id ? data.client : client
+                )
+              )
+              // Update selected client if it's the one being updated
+              if (selectedClient?.user_id === data.client.user_id) {
+                setSelectedClient(data.client)
+              }
+            }
+          })
+          .catch(error => {
+            console.error('❌ Failed to refetch client data:', error)
+            // Keep the partial data that was already set
+          })
+      } else {
+        // For other updates, use the data directly
+        setClients(prev => 
+          prev.map(client => 
+            client.user_id === updatedClient.user_id ? updatedClient : client
+          )
+        )
+        // Update selected client if it's the one being updated
+        if (selectedClient?.user_id === updatedClient.user_id) {
+          setSelectedClient(updatedClient)
+        }
+      }
+    },
+    onClientDeleted: (deletedClient) => {
+      console.log('🗑️ Client deleted via realtime:', deletedClient)
+      // Remove client from the list
+      setClients(prev => 
+        prev.filter(client => client.user_id !== deletedClient.user_id)
+      )
+      // Update total count
+      setTotalCount(prev => Math.max(0, prev - 1))
+      // Close modal if the deleted client was selected
+      if (selectedClient?.user_id === deletedClient.user_id) {
+        setIsModalOpen(false)
+        setSelectedClient(null)
+      }
+    }
+  })
 
   const fetchClients = async () => {
     try {
@@ -178,7 +266,9 @@ export default function ClientsPage() {
               <div className="px-4 lg:px-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h1 className="text-2xl font-bold">Clients</h1>
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-2xl font-bold">Clients</h1>
+                    </div>
                     <p className="text-sm text-muted-foreground">Directory of client users with member assignments and contact details</p>
                   </div>
                   <div className="flex gap-2">

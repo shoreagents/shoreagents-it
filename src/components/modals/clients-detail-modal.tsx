@@ -126,6 +126,139 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
   const [hasChanges, setHasChanges] = React.useState(false)
   const [isSaving, setIsSaving] = React.useState(false)
 
+  // Realtime functionality - using useRealtimeMembers for specific callbacks
+  const { isConnected: isRealtimeConnected } = useRealtimeMembers({
+    onClientMemberChanged: async (updatedClient, oldClient, notificationData) => {
+      console.log('🔄 Real-time: Client member assignment change received in modal:', { 
+        updatedClient, 
+        oldClient, 
+        currentClientId: localClientData?.user_id,
+        modalIsOpen: isOpen,
+        hasLocalClient: !!localClientData
+      })
+      
+      // Only process updates for the current client
+      if (localClientData && updatedClient.user_id === localClientData.user_id) {
+        console.log('🔄 Real-time: Processing member assignment change for current client:', updatedClient)
+        
+        // Update the member_id immediately
+        setLocalClientData(prevClient => {
+          if (!prevClient) return prevClient
+          
+          return {
+            ...prevClient,
+            member_id: updatedClient.member_id
+          }
+        })
+        
+        // If member_id changed, fetch the updated company information
+        if (updatedClient.member_id !== oldClient?.member_id) {
+          try {
+            console.log('🔄 Fetching updated company information for member_id:', updatedClient.member_id)
+            const response = await fetch(`/api/clients/${updatedClient.user_id}`)
+            if (response.ok) {
+              const responseData = await response.json()
+              const freshClientData = responseData.client // Extract client from response
+              console.log('🔄 Fetched fresh client data with company info:', freshClientData)
+              console.log('🔄 Company info from API:', {
+                member_id: freshClientData.member_id,
+                member_company: freshClientData.member_company,
+                member_badge_color: freshClientData.member_badge_color
+              })
+              
+              // Update local client data with fresh company information
+              setLocalClientData(prevClient => {
+                if (!prevClient) return prevClient
+                
+                const updatedClient = {
+                  ...prevClient,
+                  member_id: freshClientData.member_id,
+                  member_company: freshClientData.member_company,
+                  member_badge_color: freshClientData.member_badge_color
+                }
+                
+                console.log('🔄 Updated localClientData with company info:', {
+                  member_id: updatedClient.member_id,
+                  member_company: updatedClient.member_company,
+                  member_badge_color: updatedClient.member_badge_color
+                })
+                
+                return updatedClient
+              })
+            }
+          } catch (error) {
+            console.error('❌ Failed to fetch updated client data:', error)
+          }
+        }
+        
+        console.log('🔄 Updated client member assignment in real-time')
+      } else {
+        console.log('🔄 Real-time: Update not for current client, skipping')
+      }
+    },
+    onPersonalInfoChanged: async (personalInfo, oldPersonalInfo, notificationData) => {
+      console.log('🔄 Real-time: Personal info change received in modal:', { 
+        personalInfo, 
+        oldPersonalInfo, 
+        currentClientId: localClientData?.user_id,
+        modalIsOpen: isOpen,
+        hasLocalClient: !!localClientData
+      })
+      
+      // Only process updates for the current client
+      if (localClientData && personalInfo.user_id === localClientData.user_id) {
+        console.log('🔄 Real-time: Processing personal info change for current client:', personalInfo)
+        
+        // Update local client data with new personal info
+        setLocalClientData(prevClient => {
+          if (!prevClient) return prevClient
+          
+          return {
+            ...prevClient,
+            first_name: personalInfo.first_name,
+            middle_name: personalInfo.middle_name,
+            last_name: personalInfo.last_name,
+            nickname: personalInfo.nickname,
+            phone: personalInfo.phone,
+            address: personalInfo.address,
+            city: personalInfo.city,
+            gender: personalInfo.gender,
+            birthday: personalInfo.birthday
+          }
+        })
+        
+        // Update input values if they haven't been changed locally
+        setInputValues(prev => ({
+          ...prev,
+          first_name: personalInfo.first_name || '',
+          middle_name: personalInfo.middle_name || '',
+          last_name: personalInfo.last_name || '',
+          nickname: personalInfo.nickname || '',
+          phone: personalInfo.phone || '',
+          address: personalInfo.address || '',
+          city: personalInfo.city || ''
+        }))
+        
+        // Update local state for fields that have their own state
+        if (personalInfo.gender !== oldPersonalInfo?.gender) {
+          setLocalGender(personalInfo.gender)
+        }
+        if (personalInfo.birthday !== oldPersonalInfo?.birthday) {
+          if (personalInfo.birthday) {
+            const [year, month, day] = personalInfo.birthday.split('-').map(Number)
+            setLocalBirthday(new Date(year, month - 1, day))
+          } else {
+            setLocalBirthday(undefined)
+          }
+        }
+        
+        console.log('🔄 Updated client personal info in real-time')
+      } else {
+        console.log('🔄 Real-time: Personal info update not for current client, skipping')
+      }
+    }
+  })
+
   // Initialize input values when modal opens
   React.useEffect(() => {
     if (isOpen && clientData) {

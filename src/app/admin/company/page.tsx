@@ -25,7 +25,6 @@ import { AppHeader } from "@/components/app-header"
 import { SidebarInset } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { IconSearch, IconChevronUp, IconChevronDown, IconLink, IconPhone, IconMapPin, IconPlus } from "@tabler/icons-react"
 import { LinkPreview } from "@/components/ui/link-preview"
 import { Card, CardContent } from "@/components/ui/card"
@@ -41,6 +40,7 @@ import {
 import { useTheme } from "next-themes"
 import { AddCompanyModal } from "@/components/modals/members-detail-modal"
 import { useRealtimeMembers } from "@/hooks/use-realtime-members"
+import { UserTooltip } from "@/components/ui/user-tooltip"
 
 interface MemberRecord {
   id: number
@@ -53,6 +53,7 @@ interface MemberRecord {
   badge_color: string | null
   country: string | null
   website: string[] | null
+  shift: string | null
   company_id: string
   created_at: string
   updated_at: string
@@ -257,6 +258,7 @@ export default function CompaniesPage() {
       badge_color: company.badge_color || '#0EA5E9',
       country: company.country,
       website: Array.isArray(company.website) && company.website.length > 0 ? company.website[0] : null,
+      shift: company.shift || null,
       originalAgentIds: [], // Will be populated by the modal
       originalClientIds: [], // Will be populated by the modal
       selectedAgentIds: [],
@@ -448,34 +450,7 @@ export default function CompaniesPage() {
                                           </div>
                                         )}
                                         {(memberUsersCache[`agents:${m.id}`]?.users || []).map(u => (
-                                          <TooltipProvider key={u.user_id}>
-                                            <Tooltip delayDuration={100}>
-                                              <TooltipTrigger asChild>
-                                                <div className="flex items-center justify-center gap-2 cursor-pointer">
-                                                  <Avatar className="h-7 w-7">
-                                                    <AvatarImage src={u.profile_picture ?? undefined} alt={(u.first_name || '') + ' ' + (u.last_name || '')} />
-                                                    <AvatarFallback>{((u.first_name || 'U')[0] + (u.last_name || 'N')[0]).toUpperCase()}</AvatarFallback>
-                                                  </Avatar>
-                                                </div>
-                                              </TooltipTrigger>
-                                              <TooltipContent className="text-sm px-3 py-2">
-                                                <span className="font-medium">{[u.first_name, u.last_name].filter(Boolean).join(' ') || 'Unknown'}</span>
-                                                {u.employee_id ? (
-                                                  <Badge
-                                                    variant="outline"
-                                                    className="border ml-2"
-                                                    style={
-                                                      theme === 'dark'
-                                                        ? { backgroundColor: '#44464880', borderColor: '#444648', color: '#ffffff' }
-                                                        : { backgroundColor: '#44464814', borderColor: '#a5a5a540', color: '#444648' }
-                                                    }
-                                                  >
-                                                    {u.employee_id}
-                                                  </Badge>
-                                                ) : null}
-                                              </TooltipContent>
-                                            </Tooltip>
-                                          </TooltipProvider>
+                                          <UserTooltip key={u.user_id} user={u} showEmployeeId={true} />
                                         ))}
                                         {loadingUsersKey !== `agents:${m.id}` && (!memberUsersCache[`agents:${m.id}`]?.users || memberUsersCache[`agents:${m.id}`]?.users.length === 0) && (
                                           <div className="text-xs text-muted-foreground w-full text-center">No Agents</div>
@@ -502,34 +477,7 @@ export default function CompaniesPage() {
                                           </div>
                                         )}
                                         {(memberUsersCache[`clients:${m.id}`]?.users || []).map(u => (
-                                          <TooltipProvider key={u.user_id}>
-                                            <Tooltip delayDuration={100}>
-                                              <TooltipTrigger asChild>
-                                                <div className="flex items-center justify-center gap-2 cursor-pointer">
-                                                  <Avatar className="h-7 w-7">
-                                                    <AvatarImage src={u.profile_picture ?? undefined} alt={(u.first_name || '') + ' ' + (u.last_name || '')} />
-                                                    <AvatarFallback>{((u.first_name || 'U')[0] + (u.last_name || 'N')[0]).toUpperCase()}</AvatarFallback>
-                                                  </Avatar>
-                                                </div>
-                                              </TooltipTrigger>
-                                              <TooltipContent className="text-sm px-3 py-2">
-                                                <span className="font-medium">{[u.first_name, u.last_name].filter(Boolean).join(' ') || 'Unknown'}</span>
-                                                {u.employee_id ? (
-                                                  <Badge
-                                                    variant="outline"
-                                                    className="border ml-2"
-                                                    style={
-                                                      theme === 'dark'
-                                                        ? { backgroundColor: '#44464880', borderColor: '#444648', color: '#ffffff' }
-                                                        : { backgroundColor: '#44464814', borderColor: '#a5a5a540', color: '#444648' }
-                                                    }
-                                                  >
-                                                    {u.employee_id}
-                                                  </Badge>
-                                                ) : null}
-                                              </TooltipContent>
-                                            </Tooltip>
-                                          </TooltipProvider>
+                                          <UserTooltip key={u.user_id} user={u} showEmployeeId={false} />
                                         ))}
                                         {loadingUsersKey !== `clients:${m.id}` && (!memberUsersCache[`clients:${m.id}`]?.users || memberUsersCache[`clients:${m.id}`]?.users.length === 0) && (
                                           <div className="text-xs text-muted-foreground w-full text-center">No Clients</div>

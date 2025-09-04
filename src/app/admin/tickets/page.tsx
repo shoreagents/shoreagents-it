@@ -694,8 +694,7 @@ export default function TicketsPage() {
       const allSuccessful = responses.every(response => response.ok)
 
       if (allSuccessful) {
-        // Remove all cleared tickets from the current view
-        setTickets(prev => prev.filter(ticket => ticket.status !== 'Closed'))
+        // Realtime system will handle removing cleared tickets from view
         console.log(`Cleared ${closedTicketsInStatus.length} tickets from ${status} column`)
       } else {
         console.error('Failed to clear some tickets')
@@ -732,13 +731,34 @@ export default function TicketsPage() {
         isManuallyUpdating: manuallyUpdatingTickets.has(updatedTicket.id),
         changes: {
           status: oldTicket?.status !== updatedTicket.status ? `${oldTicket?.status} → ${updatedTicket.status}` : 'unchanged',
-          position: oldTicket?.position !== updatedTicket.position ? `${oldTicket?.position} → ${updatedTicket.position}` : 'unchanged'
+          position: oldTicket?.position !== updatedTicket.position ? `${oldTicket?.position} → ${updatedTicket.position}` : 'unchanged',
+          clear: oldTicket?.clear !== updatedTicket.clear ? `${oldTicket?.clear} → ${updatedTicket.clear}` : 'unchanged'
         }
       })
       
       // Skip real-time updates for tickets being manually updated
       if (manuallyUpdatingTickets.has(updatedTicket.id)) {
         console.log('⏭️ Skipping real-time update - ticket is being manually updated')
+        return
+      }
+      
+      // Handle clear status changes - remove cleared tickets from view
+      if (oldTicket?.clear !== updatedTicket.clear && updatedTicket.clear === true) {
+        console.log('🧹 Ticket cleared - removing from view:', updatedTicket.id)
+        setTickets(prev => prev.filter(ticket => ticket.id !== updatedTicket.id))
+        return
+      }
+      
+      // Handle unclear status changes - add uncleared tickets back to view if they should be visible
+      if (oldTicket?.clear !== updatedTicket.clear && updatedTicket.clear === false) {
+        console.log('🔄 Ticket uncleared - adding back to view:', updatedTicket.id)
+        setTickets(prev => {
+          const exists = prev.find(t => t.id === updatedTicket.id)
+          if (!exists) {
+            return [...prev, updatedTicket]
+          }
+          return prev
+        })
         return
       }
       

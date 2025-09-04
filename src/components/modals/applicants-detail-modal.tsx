@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { EditableField, DataFieldRow } from "@/components/ui/fields"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Popover, PopoverContent, PopoverTrigger, PopoverItem } from "@/components/ui/popover"
+import { UserTooltip } from "@/components/ui/user-tooltip"
 import { useTheme } from "next-themes"
 import { useRealtimeApplicants } from "@/hooks/use-realtime-applicants"
 import { useRealtimeBpocJobStatus } from "@/hooks/use-realtime-bpoc-job-status"
@@ -84,6 +85,14 @@ interface Applicant {
   all_job_timestamps?: string[]
   // Skills data from BPOC database
   skills?: string[]
+  // Interested clients data
+  interested_clients?: {
+    user_id: number
+    first_name: string | null
+    last_name: string | null
+    profile_picture: string | null
+    employee_id: string | null
+  }[]
   originalSkillsData?: any
   // Summary from BPOC database
   summary?: string | null
@@ -467,7 +476,35 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
       })
       
 
-      setLocalApplicant(applicant)
+      // Add mock interested clients data for demonstration
+      const applicantWithMockClients = {
+        ...applicant,
+        interested_clients: [
+          {
+            user_id: 1,
+            first_name: "John",
+            last_name: "Doe",
+            profile_picture: null,
+            employee_id: null
+          },
+          {
+            user_id: 2,
+            first_name: "Jane",
+            last_name: "Smith",
+            profile_picture: null,
+            employee_id: null
+          },
+          {
+            user_id: 3,
+            first_name: "Mike",
+            last_name: "Johnson",
+            profile_picture: null,
+            employee_id: null
+          }
+        ]
+      }
+
+      setLocalApplicant(applicantWithMockClients)
       // Reset input values when applicant changes
       const initialValues = {
         shift: String(applicant.shift || ''),
@@ -1006,9 +1043,24 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                   {/* Column 2: Interested Clients */}
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-foreground">Interested Clients</span>
-                    <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer">
-                      0
-                    </button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer">
+                          {localApplicant.interested_clients?.length || 0}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" sideOffset={6} className="w-80 p-2">
+                        <div className="flex flex-wrap gap-2 items-center justify-center min-h-10">
+                          {localApplicant.interested_clients && localApplicant.interested_clients.length > 0 ? (
+                            localApplicant.interested_clients.map(client => (
+                              <UserTooltip key={client.user_id} user={client} showEmployeeId={false} />
+                            ))
+                          ) : (
+                            <div className="text-xs text-muted-foreground w-full text-center">No Interested Clients</div>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
                 

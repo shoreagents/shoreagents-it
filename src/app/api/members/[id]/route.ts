@@ -24,6 +24,7 @@ export async function PATCH(
     const country = formData.get('country') as string
     const service = formData.get('service') as string
     const website = formData.get('website') as string
+    const shift = formData.get('shift') as string
     const logo = formData.get('logo') as File | null
     const remove_logo = formData.get('remove_logo') as string
     const badge_color = formData.get('badge_color') as string
@@ -36,6 +37,7 @@ export async function PATCH(
       country,
       service: service || 'missing',
       website: website ? 'present' : 'missing',
+      shift: shift || 'missing',
       logo: logo ? `File: ${logo.name} (${logo.size} bytes)` : 'none',
       badge_color,
       status
@@ -105,6 +107,7 @@ export async function PATCH(
       country,
       service: formattedService,
       website: websiteArray,
+      shift,
       badge_color,
       status,
     }

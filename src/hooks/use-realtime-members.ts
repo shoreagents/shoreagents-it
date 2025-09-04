@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 
 interface MemberUpdate {
-  type: 'member_update' | 'agent_update' | 'client_update' | 'personal_info_update' | 'job_info_update'
+  type: 'member_update' | 'agent_update' | 'client_update' | 'client_assignment_update' | 'personal_info_update' | 'job_info_update' | 'member_activity_update'
   data: {
     table: string
     action: 'INSERT' | 'UPDATE' | 'DELETE'
@@ -45,8 +45,8 @@ function getOrCreateWebSocket() {
 
   try {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    // Use port 3001 for WebSocket connection (same as server.js)
-    const wsUrl = `${protocol}//${window.location.hostname}:3001/ws`
+    // Use window.location.host which includes port if present
+    const wsUrl = `${protocol}//${window.location.host}/ws`
     
     console.log('🔄 Creating new WebSocket connection for members to:', wsUrl)
     globalWebSocket = new WebSocket(wsUrl)
@@ -64,7 +64,7 @@ function getOrCreateWebSocket() {
         console.log('📨 Raw WebSocket data:', event.data)
         
         // Only process member-related updates
-        if (message.type === 'member_update' || message.type === 'agent_update' || message.type === 'client_update' || message.type === 'personal_info_update' || message.type === 'job_info_update') {
+        if (message.type === 'member_update' || message.type === 'agent_update' || message.type === 'client_update' || message.type === 'client_assignment_update' || message.type === 'personal_info_update' || message.type === 'job_info_update' || message.type === 'member_activity_update') {
           console.log('✅ Processing member-related update:', message.type)
           // Notify all registered callbacks
           globalCallbacks.forEach(callback => {
@@ -157,11 +157,11 @@ export function useRealtimeMembers(options: UseRealtimeMembersOptions = {}) {
         console.log('🔄 Agent updated:', record, 'Old:', old_record)
         onAgentMemberChanged?.(record, old_record, message.data)
       }
-    } else if (message.type === 'client_update') {
+    } else if (message.type === 'client_assignment_update') {
       const { action, record, old_record } = message.data
-      console.log('🔍 Processing client update:', { action, record, old_record })
+      console.log('🔍 Processing client assignment update:', { action, record, old_record })
       
-      // Check if this is an assignment change
+      // This is specifically for client member assignment changes
       if (action === 'UPDATE' && old_record && 
           record.member_id !== old_record.member_id) {
         console.log('🔄 Client member changed:', record, 'Old member_id:', old_record.member_id, 'New member_id:', record.member_id)
@@ -182,6 +182,16 @@ export function useRealtimeMembers(options: UseRealtimeMembersOptions = {}) {
       if (action === 'UPDATE') {
         console.log('🔄 Job info updated:', record, 'Old:', old_record)
         onJobInfoChanged?.(record, old_record, message.data)
+      }
+    } else if (message.type === 'member_activity_update') {
+      const { action, record, old_record } = message.data
+      console.log('🔍 Processing member activity update:', { action, record, old_record })
+      
+      // Activity updates are typically INSERT operations for new activity logs
+      if (action === 'INSERT') {
+        console.log('🔄 New member activity logged:', record)
+        // You can add a callback for activity updates if needed
+        // onMemberActivityChanged?.(record, old_record, message.data)
       }
     }
       }, [onMemberCreated, onMemberUpdated, onMemberDeleted, onAgentMemberChanged, onClientMemberChanged, onPersonalInfoChanged, onJobInfoChanged])

@@ -1719,6 +1719,7 @@ export async function getMembersPaginated({
       m.badge_color,
       m.country,
       m.website,
+      m.shift,
       m.company_id,
       m.created_at,
       m.updated_at,
@@ -2425,6 +2426,7 @@ export interface NewCompanyInput {
   country: string
   service: string | null
   website: string[]
+  shift: string | null
   logo: string | null
   badge_color?: string
   status?: 'Current Client' | 'Lost Client'
@@ -2432,7 +2434,7 @@ export interface NewCompanyInput {
 }
 
 export async function createMemberCompany(input: NewCompanyInput) {
-  const insertColumns = ['company', 'address', 'phone', 'country', 'service', 'website', 'logo', 'company_id', 'badge_color', 'status']
+  const insertColumns = ['company', 'address', 'phone', 'country', 'service', 'website', 'shift', 'logo', 'company_id', 'badge_color', 'status']
   const companyId = (globalThis.crypto?.randomUUID?.() || undefined) as unknown as string || Math.random().toString(36).slice(2)
   const insertValues: any[] = [
     input.company,
@@ -2441,6 +2443,7 @@ export async function createMemberCompany(input: NewCompanyInput) {
     input.country,
     input.service,
     input.website,
+    input.shift,
     input.logo,
     companyId,
     input.badge_color, // Use the form's badge color (including default)
@@ -4218,6 +4221,54 @@ export async function getInternalById(userId: number): Promise<any> {
     return result.rows[0]
   } catch (error) {
     console.error('Error fetching internal user by ID:', error)
+    throw error
+  }
+}
+
+// Mark ticket as cleared
+export async function markTicketAsCleared(ticketId: number): Promise<void> {
+  try {
+    console.log('🗄️ DATABASE - Marking ticket as cleared:', ticketId)
+    
+    const query = `
+      UPDATE public.tickets 
+      SET clear = true, updated_at = NOW()
+      WHERE id = $1
+    `
+    
+    const result = await pool.query(query, [ticketId])
+    
+    if (result.rowCount === 0) {
+      throw new Error(`Ticket with ID ${ticketId} not found`)
+    }
+    
+    console.log('✅ DATABASE - Ticket marked as cleared successfully')
+  } catch (error) {
+    console.error('Database clear ticket failed:', error)
+    throw error
+  }
+}
+
+// Unmark ticket as cleared
+export async function unmarkTicketAsCleared(ticketId: number): Promise<void> {
+  try {
+    console.log('🗄️ DATABASE - Unmarking ticket as cleared:', ticketId)
+    
+    const query = `
+      UPDATE public.tickets 
+      SET clear = false, updated_at = NOW()
+      WHERE id = $1
+    `
+    
+    const result = await pool.query(query, [ticketId])
+    
+    if (result.rowCount === 0) {
+      throw new Error(`Ticket with ID ${ticketId} not found`)
+    }
+    
+    console.log('✅ DATABASE - Ticket unmarked as cleared successfully')
+  } catch (error) {
+    console.error('Database unmark clear ticket failed:', error)
     throw error
   }
 }

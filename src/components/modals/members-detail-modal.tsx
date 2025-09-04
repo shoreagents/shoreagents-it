@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconWorld, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck } from "@tabler/icons-react"
+import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconWorld, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconSun, IconMoon } from "@tabler/icons-react"
 import { useRealtimeMembers } from '@/hooks/use-realtime-members'
 import { SendHorizontal } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -44,6 +44,7 @@ interface CompanyData {
   country: string | null
   service: string | null
   website: string | null
+  shift: string | null
   logo?: File | null
   logoUrl?: string | null
   badge_color?: string
@@ -125,6 +126,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             country: updatedMember.hasOwnProperty('country') ? updatedMember.country : prev.country,
             service: updatedMember.hasOwnProperty('service') ? updatedMember.service : prev.service,
             website: updatedMember.hasOwnProperty('website') ? updatedMember.website : prev.website,
+            shift: updatedMember.hasOwnProperty('shift') ? updatedMember.shift : prev.shift,
             badge_color: updatedMember.hasOwnProperty('badge_color') ? updatedMember.badge_color : prev.badge_color,
             status: updatedMember.hasOwnProperty('status') ? updatedMember.status : prev.status
           }
@@ -132,6 +134,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           console.log('🔄 New form data after real-time update:', newData)
           return newData
         })
+        
+        // Also update localShift state if shift field was updated
+        if (updatedMember.hasOwnProperty('shift')) {
+          console.log('🔄 Updating localShift with real-time shift value:', updatedMember.shift)
+          setLocalShift(updatedMember.shift)
+        }
       }
     },
     onAgentMemberChanged: (agent, oldAgent) => {
@@ -481,8 +489,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       console.log('🔄 Auto-saving changes before closing...')
       setIsSubmitting(true)
       
-      // Update company data
-      await updateDatabase(formData)
+      // Update company data - merge localShift into formData
+      const dataToUpdate = {
+        ...formData,
+        shift: localShift !== null ? localShift : formData.shift
+      }
+      await updateDatabase(dataToUpdate)
       
       // Update assignments
       await updateAssignments()
@@ -516,7 +528,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       // Auto-save company data changes before closing
       try {
         console.log('🔄 Auto-saving changes before close...')
-        await updateDatabase(formData)
+        // Merge localShift into formData
+        const dataToUpdate = {
+          ...formData,
+          shift: localShift !== null ? localShift : formData.shift
+        }
+        await updateDatabase(dataToUpdate)
         console.log('✅ Company data saved successfully')
         
         // Notify parent of changes
@@ -588,11 +605,13 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     country: '',
     service: 'One Agent',
     website: '',
+    shift: '',
     logo: null,
     badge_color: '#0EA5E9',
     status: 'Current Client'
   })
   const [existingLogoUrl, setExistingLogoUrl] = React.useState<string | null>(null)
+  const [localShift, setLocalShift] = React.useState<string | null>(null)
 
   const logoPreviewUrl = React.useMemo(() => {
     if (formData.logo) {
@@ -645,8 +664,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       console.log('🔍 Current selected agents:', Array.from(selectedAgents))
       console.log('🔍 Current selected clients:', Array.from(selectedClients))
       
-      // Update database
-      await updateDatabase(formData)
+      // Update database - merge localShift into formData
+      const dataToUpdate = {
+        ...formData,
+        shift: localShift !== null ? localShift : formData.shift
+      }
+      await updateDatabase(dataToUpdate)
       
       // Update agent and client assignments
       await updateAssignments()
@@ -693,6 +716,10 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       if (data.country) formDataToSend.append('country', data.country)
       if (data.service) formDataToSend.append('service', data.service)
       if (data.website) formDataToSend.append('website', data.website)
+      // Always send shift field (use localShift if available, otherwise data.shift)
+      const shiftValue = localShift !== null ? localShift : data.shift
+      console.log('🔍 Shift value for update submission:', { localShift, dataShift: data.shift, shiftValue })
+      if (shiftValue) formDataToSend.append('shift', shiftValue)
       if (data.badge_color) formDataToSend.append('badge_color', data.badge_color)
       if (data.status) formDataToSend.append('status', data.status)
       
@@ -1414,6 +1441,10 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       if (formData.country) formDataToSend.append('country', formData.country)
       if (formData.service) formDataToSend.append('service', formData.service)
       if (formData.website) formDataToSend.append('website', formData.website)
+      // Always send shift field (use localShift if available, otherwise formData.shift)
+      const shiftValue = localShift !== null ? localShift : formData.shift
+      console.log('🔍 Shift value for submission:', { localShift, formDataShift: formData.shift, shiftValue })
+      if (shiftValue) formDataToSend.append('shift', shiftValue)
       if (formData.logo) {
         formDataToSend.append('logo', formData.logo)
       }
@@ -1628,10 +1659,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         country: '',
         service: '',
         website: '',
+        shift: '',
         logo: null,
         badge_color: '#0EA5E9',
         status: 'Current Client'
       })
+      setLocalShift(null)
       
       // Reset agent selection
       setSelectedAgents(new Set())
@@ -1931,6 +1964,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           country: companyToEdit.country || '',
           service: companyToEdit.service || 'One Agent',
           website: Array.isArray(companyToEdit.website) && companyToEdit.website.length > 0 ? companyToEdit.website[0] : (companyToEdit.website as string) || '',
+          shift: companyToEdit.shift || '',
             logo: null,
           logoUrl: typeof companyToEdit.logo === 'string' ? companyToEdit.logo : companyToEdit.logoUrl,
           badge_color: companyToEdit.badge_color || '#0EA5E9',
@@ -1954,6 +1988,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           
           // Set form data with fresh database data
           setFormData(freshData)
+          setLocalShift(companyToEdit.shift || null)
           setLastDatabaseSync(new Date())
           
           // Fetch current assignments from database and set original IDs
@@ -2023,6 +2058,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           country: '',
           service: 'One Agent',
           website: '',
+          shift: '',
           logo: null,
           logoUrl: null,
           badge_color: '#0EA5E9',
@@ -2031,6 +2067,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           originalAgentIds: [],
           originalClientIds: []
         })
+        setLocalShift(null)
         
         // Reset selections - only when adding a new company, not when editing
         setSelectedAgents(new Set())
@@ -2247,6 +2284,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         formData.country !== companyToEdit.country ||
         formData.service !== companyToEdit.service ||
         formData.website !== (Array.isArray(companyToEdit.website) ? companyToEdit.website[0] : companyToEdit.website) ||
+        (localShift !== null ? localShift : formData.shift) !== companyToEdit.shift ||
         logoChanged ||
         formData.badge_color !== companyToEdit.badge_color ||
         formData.status !== companyToEdit.status ||
@@ -2263,6 +2301,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         country: formData.country !== companyToEdit.country,
         service: formData.service !== companyToEdit.service,
         website: formData.website !== (Array.isArray(companyToEdit.website) ? companyToEdit.website[0] : companyToEdit.website),
+        shift: (localShift !== null ? localShift : formData.shift) !== companyToEdit.shift,
         logo: logoChanged,
         badge_color: formData.badge_color !== companyToEdit.badge_color,
         status: formData.status !== companyToEdit.status,
@@ -2271,7 +2310,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       })
       setHasUnsavedChanges(hasChanges)
     }
-  }, [formData, selectedAgents, selectedClients, companyToEdit, existingLogoUrl])
+  }, [formData, selectedAgents, selectedClients, companyToEdit, existingLogoUrl, localShift])
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -2660,6 +2699,58 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       value={formData.website || ''}
                       onSave={(fieldName, value) => handleInputChange(fieldName as keyof CompanyData, value)}
                       placeholder="-"
+                    />
+
+                    {/* Shift */}
+                    <DataFieldRow
+                      icon={<IconClock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                      label="Shift"
+                      fieldName="shift"
+                      value={localShift !== null ? localShift : (formData.shift || '')}
+                      onSave={() => {}}
+                      placeholder="-"
+                      customInput={
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <div 
+                              className={`h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none justify-start text-left font-normal cursor-pointer select-none flex items-center ${
+                                (localShift !== null ? localShift : formData.shift) ? 'text-foreground' : 'text-muted-foreground'
+                              }`}
+                              style={{ backgroundColor: 'transparent' }}
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                }
+                              }}
+                            >
+                              {(localShift !== null ? localShift : formData.shift) || '-'}
+                            </div>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-32 p-1" align="start" side="bottom" sideOffset={4}>
+                            {[
+                              { value: 'Day', icon: <IconSun className="h-4 w-4 text-muted-foreground" /> },
+                              { value: 'Night', icon: <IconMoon className="h-4 w-4 text-muted-foreground" /> }
+                            ].map((shiftOption) => (
+                                <PopoverItem
+                                  key={shiftOption.value}
+                                  isSelected={(localShift !== null ? localShift : formData.shift) === shiftOption.value}
+                                  onClick={() => {
+                                    // Update the shift value
+                                    if ((localShift !== null ? localShift : formData.shift) !== shiftOption.value) {
+                                      setLocalShift(shiftOption.value)
+                                      handleInputChange('shift', shiftOption.value)
+                                      console.log('Shift changed to:', shiftOption.value)
+                                    }
+                                  }}
+                                >
+                                  <span className="text-sm">{shiftOption.icon}</span>
+                                  <span className="text-sm font-medium">{shiftOption.value}</span>
+                                </PopoverItem>
+                              ))}
+                          </PopoverContent>
+                        </Popover>
+                      }
                     />
 
                     {/* Company Logo */}

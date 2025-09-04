@@ -54,6 +54,7 @@ async function startListening() {
     await notificationClient.query('LISTEN member_activity_changes')
     await notificationClient.query('LISTEN agent_assignment_changes')
     await notificationClient.query('LISTEN client_assignment_changes')
+    await notificationClient.query('LISTEN client_changes')
     await notificationClient.query('LISTEN talent_pool_changes')
     await notificationClient.query('LISTEN personal_info_changes')
     await notificationClient.query('LISTEN job_info_changes')
@@ -128,6 +129,8 @@ async function startListening() {
         } else if (msg.channel === 'agent_assignment_changes') {
           messageType = 'agent_update'
         } else if (msg.channel === 'client_assignment_changes') {
+          messageType = 'client_assignment_update'
+        } else if (msg.channel === 'client_changes') {
           messageType = 'client_update'
         } else if (msg.channel === 'talent_pool_changes') {
           messageType = 'talent_pool_update'

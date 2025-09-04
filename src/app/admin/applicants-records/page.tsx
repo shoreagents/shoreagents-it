@@ -528,7 +528,7 @@ export default function ApplicantsRecordsPage() {
     if (!loading) {
       autoSaveOnLoad()
     }
-  }, [loading, fetchApplicants])
+  }, [loading])
 
   useEffect(() => { setCurrentPage(1) }, [searchTerm, selectedStatus])
 
@@ -730,8 +730,8 @@ export default function ApplicantsRecordsPage() {
         onClose={handleModalClose}
         pageContext="applicants-records"
         onStatusUpdate={() => {
-          // Refresh data after status update
-          fetchApplicants()
+          // Real-time updates will handle status changes automatically
+          // No need to manually refresh
         }}
       />
     </>
