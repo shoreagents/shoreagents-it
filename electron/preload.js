@@ -14,5 +14,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleDualMonitorFullscreen: () => ipcRenderer.invoke('toggle-dual-monitor-fullscreen'),
   exitDualMonitorFullscreen: () => ipcRenderer.invoke('exit-dual-monitor-fullscreen'),
   checkMultipleMonitors: () => ipcRenderer.invoke('check-multiple-monitors'),
+  
+  // Notification API
+  showNotification: (options) => ipcRenderer.invoke('show-notification', options),
+  requestNotificationPermission: () => ipcRenderer.invoke('request-notification-permission'),
+  checkNotificationPermission: () => ipcRenderer.invoke('check-notification-permission'),
+  
+  // Notification event listeners
+  onNotificationClicked: (callback) => ipcRenderer.on('notification-clicked', callback),
+  onNotificationClosed: (callback) => ipcRenderer.on('notification-closed', callback),
+  onNotificationReply: (callback) => ipcRenderer.on('notification-reply', callback),
+  onNotificationAction: (callback) => ipcRenderer.on('notification-action', callback),
+  
+  // Remove notification event listeners
+  removeNotificationListeners: () => {
+    ipcRenderer.removeAllListeners('notification-clicked');
+    ipcRenderer.removeAllListeners('notification-closed');
+    ipcRenderer.removeAllListeners('notification-reply');
+    ipcRenderer.removeAllListeners('notification-action');
+  },
+  
   isElectron: true,
 }); 

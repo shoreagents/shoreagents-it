@@ -1,5 +1,11 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Notification } = require('electron');
 const path = require('path');
+
+// Set the app name for notifications - must be done before app is ready
+app.setName('ShoreAgents AI');
+app.setAppUserModelId('com.shoreagents.ai');
+
+const packageJson = require('../package.json');
 
 // Check if we're in development mode
 const isDev = !app.isPackaged;
@@ -21,6 +27,7 @@ function createWindow() {
     minWidth: 400,  // Minimum window width
     minHeight: 800, // Minimum window height
     resizable: true, // Allow window resizing
+    title: 'ShoreAgents AI', // Set window title
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -593,8 +600,114 @@ ipcMain.handle('toggle-multi-monitor-fullscreen', async (event) => {
   }
 });
 
+// Notification handlers
+ipcMain.handle('show-notification', async (event, options) => {
+  try {
+    // Check if notifications are supported
+    if (!Notification.isSupported()) {
+      return { success: false, error: 'Notifications are not supported on this system' };
+    }
+
+    // In Electron, permission is handled by the system automatically
+    // No need to check or request permission explicitly
+
+    // Create and show notification
+    console.log('🔔 App name:', app.getName());
+    console.log('🔔 Notification title:', options.title);
+    
+    const notification = new Notification({
+      title: options.title || 'ShoreAgents AI',
+      body: options.body || '',
+      icon: options.icon || path.join(__dirname, '../public/icon.png'),
+      silent: options.silent || false,
+      urgency: options.urgency || 'normal', // 'critical', 'normal', 'low'
+      timeoutType: options.timeoutType || 'default', // 'default', 'never'
+      actions: options.actions || [],
+      hasReply: options.hasReply || false,
+      replyPlaceholder: options.replyPlaceholder || 'Type a reply...',
+      sound: options.sound || 'default',
+      ...options
+    });
+
+    // Handle notification events
+    notification.on('click', () => {
+      if (options.onClick) {
+        event.sender.send('notification-clicked', options.id || null);
+      }
+    });
+
+    notification.on('close', () => {
+      if (options.onClose) {
+        event.sender.send('notification-closed', options.id || null);
+      }
+    });
+
+    notification.on('reply', (event, reply) => {
+      if (options.onReply) {
+        event.sender.send('notification-reply', { id: options.id || null, reply });
+      }
+    });
+
+    notification.on('action', (event, index) => {
+      if (options.onAction) {
+        event.sender.send('notification-action', { id: options.id || null, actionIndex: index });
+      }
+    });
+
+    notification.show();
+
+    return { success: true, notificationId: options.id || null };
+  } catch (error) {
+    console.error('Error showing notification:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('request-notification-permission', async (event) => {
+  try {
+    if (!Notification.isSupported()) {
+      return { success: false, error: 'Notifications are not supported on this system' };
+    }
+
+    // In Electron, we don't need to request permission explicitly
+    // The system will handle permission prompts when showing notifications
+    // We can check if notifications are supported and assume permission will be granted
+    return { 
+      success: true, 
+      permission: 'granted', // Electron handles permissions automatically
+      granted: true,
+      supported: true
+    };
+  } catch (error) {
+    console.error('Error requesting notification permission:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('check-notification-permission', async (event) => {
+  try {
+    if (!Notification.isSupported()) {
+      return { success: false, error: 'Notifications are not supported on this system' };
+    }
+
+    // In Electron, notifications are supported and permission is handled by the system
+    return { 
+      success: true, 
+      permission: 'granted', // Electron handles permissions automatically
+      granted: true,
+      supported: true
+    };
+  } catch (error) {
+    console.error('Error checking notification permission:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // This method will be called when Electron has finished initialization
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  console.log('🚀 App ready, name:', app.getName());
+  createWindow();
+});
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {

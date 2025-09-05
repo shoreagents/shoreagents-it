@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useElectronNotifications } from './use-electron-notifications'
 
 interface TicketUpdate {
   type: 'ticket_update'
@@ -19,6 +20,8 @@ interface UseRealtimeTicketsOptions {
   // If set (e.g., 1 for IT board), role transitions will be treated specially (create/delete when entering/leaving scope)
   // If null/undefined, updates won't be converted into create/delete on role changes
   roleFilter?: number | null
+  // Enable notifications for new tickets
+  enableNotifications?: boolean
 }
 
 // Singleton WebSocket connection
@@ -108,7 +111,11 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
     onTicketDeleted,
     autoConnect = true,
     roleFilter = 1,
+    enableNotifications = false,
   } = options
+
+  // Initialize notification system if enabled
+  const { showInfoNotification, isSupported } = useElectronNotifications()
 
   const [isConnected, setIsConnected] = useState(globalConnectionState.isConnected)
   const [error, setError] = useState<string | null>(globalConnectionState.error)
@@ -121,13 +128,115 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
       
       switch (action) {
         case 'INSERT':
-          onTicketCreated?.(record)
+          // Fetch complete ticket data with user information for new tickets
+          fetch(`/api/tickets/${record.id}`)
+            .then(res => {
+              if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`)
+              }
+              return res.json()
+            })
+            .then(completeTicket => {
+              onTicketCreated?.(completeTicket)
+              
+              // Show notification for new tickets if enabled and supported
+              if (enableNotifications && isSupported) {
+                console.log('🔔 Attempting to show notification for new ticket:', completeTicket.id)
+                
+                // Format name from available fields
+                const getName = () => {
+                  if (completeTicket.member_name) {
+                    return completeTicket.member_name
+                  }
+                  if (completeTicket.first_name && completeTicket.last_name) {
+                    return `${completeTicket.first_name} ${completeTicket.last_name}`
+                  }
+                  if (completeTicket.first_name) {
+                    return completeTicket.first_name
+                  }
+                  return 'Unknown User'
+                }
+                
+                const ticketTitle = completeTicket.concern || 'New Ticket'
+                const userName = getName()
+                
+                showInfoNotification(
+                  `TICKETS - ${userName}`,
+                  ticketTitle,
+                  {
+                    id: `ticket-${completeTicket.id}-${Date.now()}`,
+                    urgency: 'normal',
+                    onClick: true
+                  }
+                ).then(result => {
+                  console.log('✅ Notification sent successfully:', result)
+                }).catch(error => {
+                  console.error('❌ Failed to show ticket notification:', error)
+                })
+              } else {
+                console.log('🔕 Notification skipped:', { enableNotifications, isSupported })
+              }
+            })
+            .catch(error => {
+              console.error('Error fetching complete ticket data for new ticket:', error)
+              // Fallback to using the record directly
+              onTicketCreated?.(record)
+              
+              // Show notification with basic record data if fetch failed
+              if (enableNotifications && isSupported) {
+                console.log('🔔 Attempting to show notification with basic record data:', record.id)
+                
+                // Format name from available fields (fallback)
+                const getName = () => {
+                  if (record.member_name) {
+                    return record.member_name
+                  }
+                  if (record.first_name && record.last_name) {
+                    return `${record.first_name} ${record.last_name}`
+                  }
+                  if (record.first_name) {
+                    return record.first_name
+                  }
+                  return 'Unknown User'
+                }
+                
+                const ticketTitle = record.title || record.concern || 'New Ticket'
+                const userName = getName()
+                
+                showInfoNotification(
+                  `TICKETS - ${userName}`,
+                  ticketTitle,
+                  {
+                    id: `ticket-${record.id}-${Date.now()}`,
+                    urgency: 'normal',
+                    onClick: true
+                  }
+                ).then(result => {
+                  console.log('✅ Fallback notification sent successfully:', result)
+                }).catch(error => {
+                  console.error('❌ Failed to show fallback notification:', error)
+                })
+              }
+            })
           break
         case 'UPDATE':
-          // For admin board (no role filter), use the record directly without refetching
-          // This prevents duplicate API calls and blinking when manually updating tickets
+          // For admin board (no role filter), fetch complete data to ensure user names are available
           if (roleFilter == null) {
-            onTicketUpdated?.(record, old_record)
+            fetch(`/api/tickets/${record.id}`)
+              .then(res => {
+                if (!res.ok) {
+                  throw new Error(`HTTP error! status: ${res.status}`)
+                }
+                return res.json()
+              })
+              .then(completeTicket => {
+                onTicketUpdated?.(completeTicket, old_record)
+              })
+              .catch(error => {
+                console.error('Error refetching complete ticket data for admin update:', error)
+                // Fallback to using the record directly
+                onTicketUpdated?.(record, old_record)
+              })
             return
           }
 
@@ -163,12 +272,30 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
                 }
               })
           } else {
-            // No role change, use the record directly to avoid unnecessary API calls
-            if (record.role_id === roleFilter) {
-              onTicketUpdated?.(record, old_record)
-            } else {
-              onTicketDeleted?.(record)
-            }
+            // No role change, but still fetch complete data to ensure user names are available
+            fetch(`/api/tickets/${record.id}`)
+              .then(res => {
+                if (!res.ok) {
+                  throw new Error(`HTTP error! status: ${res.status}`)
+                }
+                return res.json()
+              })
+              .then(completeTicket => {
+                if (completeTicket && completeTicket.role_id === roleFilter) {
+                  onTicketUpdated?.(completeTicket, old_record)
+                } else {
+                  onTicketDeleted?.(record)
+                }
+              })
+              .catch(error => {
+                console.error('Error refetching ticket data for update:', error)
+                // Fallback to using the record directly
+                if (record.role_id === roleFilter) {
+                  onTicketUpdated?.(record, old_record)
+                } else {
+                  onTicketDeleted?.(record)
+                }
+              })
           }
           break
         case 'DELETE':
@@ -176,7 +303,7 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
           break
       }
     }
-  }, [onTicketCreated, onTicketUpdated, onTicketDeleted, roleFilter])
+  }, [onTicketCreated, onTicketUpdated, onTicketDeleted, roleFilter, enableNotifications, isSupported, showInfoNotification])
 
   // Register callback
   useEffect(() => {

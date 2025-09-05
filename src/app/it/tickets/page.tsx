@@ -655,6 +655,7 @@ export default function TicketsPage() {
       setTickets(prev => prev.filter(ticket => ticket.id !== deletedTicket.id))
     },
     roleFilter: 1,
+    enableNotifications: true, // Enable notifications for new tickets
   })
 
   useEffect(() => {
