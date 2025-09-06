@@ -353,8 +353,8 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
                 </Popover>
                 <Button 
                   size="sm" 
-                  variant="outline" 
-                  className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99] inline-flex items-center"
+                  variant="muted" 
+                  className="text-sm h-8 flex-1 rounded-lg inline-flex items-center"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onViewAll(ticket) }}
                 >
                   <IconEye className="h-4 w-4 mr-px" />
@@ -518,16 +518,16 @@ function DraggingTicket({ ticket, isExpanded, roleNameById, user }: { ticket: Ti
             <div className="flex items-center gap-2">
               <Button 
                 size="sm" 
-                variant="outline" 
-                className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] inline-flex items-center"
+                variant="muted" 
+                className="text-sm h-8 flex-1 rounded-lg inline-flex items-center"
               >
                 <IconUserCheck className="h-4 w-4 mr-px" />
                 <span>{roleNameById && ticket.role_id ? (roleNameById[ticket.role_id] || 'Assign Role') : 'Assign Role'}</span>
               </Button>
               <Button 
                 size="sm" 
-                variant="outline" 
-                className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] inline-flex items-center"
+                variant="muted" 
+                className="text-sm h-8 flex-1 rounded-lg inline-flex items-center"
               >
                 <IconEye className="h-4 w-4 mr-px" />
                 <span>View All</span>

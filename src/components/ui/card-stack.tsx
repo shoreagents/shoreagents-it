@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { IconEye } from "@tabler/icons-react";
+import { Button } from "./button";
 
 type Card = {
   id: number;
@@ -93,18 +94,18 @@ export const CardStack = ({
                   </p>
                 </div>
                 {onViewTicket && card.ticket && (
-                  <button
+                  <Button
+                    size="sm"
+                    variant="muted"
                     onClick={(e) => {
                       e.stopPropagation();
                       onViewTicket(card.ticket);
                     }}
-                    className="text-xs h-6 px-2 rounded-md shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] transition-colors"
+                    className="text-xs h-6 px-2 rounded-md"
                   >
-                    <span className="inline-flex items-center">
-                      <IconEye className="h-3.5 w-3.5 mr-1" />
-                      <span>View Info</span>
-                    </span>
-                  </button>
+                    <IconEye className="h-3.5 w-3.5 mr-1" />
+                    <span>View Info</span>
+                  </Button>
                 )}
               </div>
             </div>

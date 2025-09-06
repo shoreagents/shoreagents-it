@@ -330,8 +330,8 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                 </Button>
                 <Button 
                   size="sm" 
-                  variant="outline" 
-                  className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99]"
+                  variant="muted" 
+                  className="text-sm h-8 flex-1 rounded-lg inline-flex items-center"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onViewAll(applicant) }}
                 >
                   <IconEye className="h-4 w-4 mr-px" />
@@ -542,8 +542,8 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
               </Button>
               <Button 
                 size="sm" 
-                variant="outline" 
-                className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99]"
+                variant="muted" 
+                className="text-sm h-8 flex-1 rounded-lg inline-flex items-center"
               >
                 <IconEye className="h-4 w-4 mr-px" />
                 <span>View All</span>

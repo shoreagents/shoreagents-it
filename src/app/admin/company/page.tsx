@@ -370,7 +370,7 @@ export default function CompaniesPage() {
                     />
                   </div>
                   <Button 
-                    variant="outline" 
+                    variant="default" 
                     onClick={() => setIsAddCompanyModalOpen(true)} 
                   >
                     <IconPlus className="h-4 w-4" />
