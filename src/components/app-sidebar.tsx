@@ -22,6 +22,7 @@ import { IdCardIcon } from "@/components/icons/id-card-icon"
 import { FilePenLineIcon } from "@/components/icons/file-pen-line-icon"
 import { SparklesIcon } from "@/components/icons/sparkles-icon"
 import { HomeIcon } from "@/components/icons/home-icon"
+import { ClockIcon, BarChart3Icon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -165,6 +166,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <Skeleton className="h-8 w-3/5 rounded-lg" />
             </div>
           </SidebarGroup>
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel>TRACKING</SidebarGroupLabel>
+            <div className="flex flex-col gap-2 px-2 py-2">
+              <Skeleton className="h-8 w-4/5 rounded-lg" />
+              <Skeleton className="h-8 w-3/5 rounded-lg" />
+            </div>
+          </SidebarGroup>
         </SidebarContent>
       </Sidebar>
     )
@@ -239,6 +247,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 },
                 { title: "Talent Pool", url: "/admin/talent-pool", icon: SparklesIcon },
                 { title: "Jobs", url: "/admin/jobs", icon: FilePenLineIcon }
+              ]}
+            />
+          </SidebarGroup>
+        )}
+        {isAdmin && (
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel>TRACKING</SidebarGroupLabel>
+            <NavMain
+              items={[
+                { title: "Breaks", url: "#", icon: ClockIcon },
+                { title: "Activity Data", url: "#", icon: BarChart3Icon },
               ]}
             />
           </SidebarGroup>

@@ -109,7 +109,6 @@ const getCategoryBadge = (ticket: Ticket) => {
 }
 
 const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = false, isExpanded, onToggleExpanded, onViewAll, user }: SortableTicketProps) {
-  const [isHovered, setIsHovered] = useState(false)
   const {
     attributes,
     listeners,
@@ -161,8 +160,6 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
     onToggleExpanded(ticket.id.toString())
   }, [onToggleExpanded, ticket.id])
 
-  const handleMouseEnter = useCallback(() => setIsHovered(true), [])
-  const handleMouseLeave = useCallback(() => setIsHovered(false), [])
 
   const handleChatClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -201,20 +198,16 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
   const categoryBadge = useMemo(() => getCategoryBadge(ticket), [ticket.category, ticket.category_name])
 
   const cardClassName = useMemo(() => {
-    return `${isLast ? '' : 'mb-3'} p-4 transition-colors duration-150 cursor-pointer overflow-hidden bg-sidebar dark:bg-[#252525] ticket-card w-full ${
+    return `${isLast ? '' : 'mb-3'} p-4 transition-all duration-200 cursor-pointer overflow-hidden bg-sidebar dark:bg-[#252525] ticket-card w-full hover:border-primary/50 hover:text-primary ${
       isDragging ? 'opacity-50' : ''
-    } ${
-      isHovered ? 'border-primary' : 'hover:border-primary/50'
     }`
-  }, [isDragging, isHovered, isLast])
+  }, [isDragging, isLast])
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
       className={cardClassName}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
       onClick={handleCardClick}
     >
       <div className="flex flex-col mb-3">
