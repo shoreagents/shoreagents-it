@@ -19,24 +19,7 @@ import {
   PaginationPrevious,
   PaginationNext,
 } from "@/components/ui/pagination"
-
-interface Event {
-  id: number
-  title: string
-  description: string | null
-  event_date: string
-  start_time: string
-  end_time: string
-  location: string | null
-  status: string
-  event_type: string
-  created_by: number
-  created_at: string
-  updated_at: string
-  first_name: string | null
-  last_name: string | null
-  participants_count: number
-}
+import { Event } from "@/lib/db-utils"
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([])
@@ -59,16 +42,22 @@ export default function EventsPage() {
       })
       if (search.trim()) params.append('search', search.trim())
       
+      console.log('Fetching events with params:', params.toString())
       const res = await fetch(`/api/events?${params.toString()}`)
+      console.log('Events API response status:', res.status)
+      
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
+        console.error('Events API error:', err)
         throw new Error(err.error || "Failed to fetch events")
       }
       const data = await res.json()
+      console.log('Events data received:', data)
       setEvents(data.events || [])
       setTotalCount(data.pagination?.totalCount || 0)
       setTotalPages(data.pagination?.totalPages || 1)
     } catch (e: any) {
+      console.error('Error fetching events:', e)
       setError(e?.message || "Failed to fetch events")
     } finally {
       setLoading(false)
