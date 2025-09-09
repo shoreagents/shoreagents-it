@@ -559,7 +559,8 @@ export default function TalentPoolPage() {
                         {(Array.isArray(filteredApplicants) ? filteredApplicants : []).map((talent: Applicant) => (
                           <Card
                             key={talent.id}
-                            className="rounded-xl flex flex-col"
+                            className="rounded-xl flex flex-col cursor-pointer hover:border-primary/50 hover:text-primary transition-all duration-200"
+                            onClick={() => handleTalentClick(talent)}
                           >
                             <CardHeader className="pb-4">
                               <div className="flex items-start justify-between">
@@ -812,14 +813,6 @@ export default function TalentPoolPage() {
                                 </div>
                               </div>
 
-                              {/* Action Button */}
-                              <Button 
-                                variant="default" 
-                                className="w-full text-sm h-9 rounded-lg shadow-none mt-4"
-                                onClick={() => handleTalentClick(talent)}
-                              >
-                                See Profile
-                              </Button>
                             </CardContent>
                           </Card>
                         ))}

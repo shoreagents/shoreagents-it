@@ -119,33 +119,12 @@ export interface TalentPoolRecord {
 export async function getAllTickets(): Promise<Ticket[]> {
   const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
-           t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
-           ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
-           u.user_type,
-           t.supporting_files, t.file_count,
-           CASE 
-             WHEN u.user_type = 'Internal' THEN 'Internal'
-             WHEN a.member_id IS NOT NULL THEN m.company
-             WHEN c.member_id IS NOT NULL THEN m.company
-             ELSE NULL
-           END as member_name,
-           CASE 
-             WHEN u.user_type = 'Internal' THEN NULL
-             WHEN a.member_id IS NOT NULL THEN m.badge_color
-             WHEN c.member_id IS NOT NULL THEN m.badge_color
-             ELSE NULL
-           END as member_color
+           t.role_id, pi.profile_picture, pi.first_name, pi.last_name, tc.name as category_name,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
-    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
     LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
-    LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
     LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
-    LEFT JOIN public.users u ON t.user_id = u.id
-    LEFT JOIN public.agents a ON t.user_id = a.user_id
-    LEFT JOIN public.clients c ON t.user_id = c.user_id
-    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
     WHERE t.role_id = 1 AND NOT (t.status = 'Closed' AND t.clear = true)
     ORDER BY t.status, t.position ASC, t.created_at DESC
   `)
@@ -156,33 +135,12 @@ export async function getAllTickets(): Promise<Ticket[]> {
 export async function getAllTicketsAdmin(): Promise<Ticket[]> {
   const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
-           t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
-           ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
-           u.user_type,
-           t.supporting_files, t.file_count,
-           CASE 
-             WHEN u.user_type = 'Internal' THEN 'Internal'
-             WHEN a.member_id IS NOT NULL THEN m.company
-             WHEN c.member_id IS NOT NULL THEN m.company
-             ELSE NULL
-           END as member_name,
-           CASE 
-             WHEN u.user_type = 'Internal' THEN NULL
-             WHEN a.member_id IS NOT NULL THEN m.badge_color
-             WHEN c.member_id IS NOT NULL THEN m.badge_color
-             ELSE NULL
-           END as member_color
+           t.role_id, pi.profile_picture, pi.first_name, pi.last_name, tc.name as category_name,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
-    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
     LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
-    LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
     LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
-    LEFT JOIN public.users u ON t.user_id = u.id
-    LEFT JOIN public.agents a ON t.user_id = a.user_id
-    LEFT JOIN public.clients c ON t.user_id = c.user_id
-    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
     WHERE NOT (t.status = 'Closed' AND t.clear = true)
     ORDER BY t.status, t.position ASC, t.created_at DESC
   `)
@@ -4318,3 +4276,451 @@ export async function unmarkTicketAsCleared(ticketId: number): Promise<void> {
     throw error
   }
 }
+
+// ============================================================================
+// JOB REQUEST FUNCTIONS
+// ============================================================================
+
+export interface JobRequest {
+  id: number
+  company_id: string | null
+  company_name: string | null
+  company_badge_color: string | null
+  job_title: string
+  work_arrangement: 'onsite' | 'remote' | 'hybrid' | null
+  salary_min: number | null
+  salary_max: number | null
+  job_description: string
+  requirements: string[]
+  responsibilities: string[]
+  benefits: string[]
+  skills: string[]
+  experience_level: 'entry-level' | 'mid-level' | 'senior-level' | null
+  application_deadline: string | null
+  industry: string | null
+  department: string | null
+  work_type: string
+  currency: string
+  salary_type: string
+  status: 'active' | 'inactive' | 'closed' | 'processed'
+  views: number
+  applicants: number
+  created_at: string
+  updated_at: string
+  priority: 'low' | 'medium' | 'high' | 'urgent'
+  shift: 'day' | 'night'
+}
+
+export interface JobRequestInput {
+  companyId: string
+  jobTitle: string
+  workArrangement?: 'onsite' | 'remote' | 'hybrid' | null
+  salaryMin?: number | null
+  salaryMax?: number | null
+  jobDescription: string
+  requirements?: string[]
+  responsibilities?: string[]
+  benefits?: string[]
+  skills?: string[]
+  experienceLevel?: 'entry-level' | 'mid-level' | 'senior-level' | null
+  applicationDeadline?: string | null
+  industry?: string | null
+  department?: string | null
+}
+
+// Helper function to enrich job requests with company names
+async function enrichJobRequestsWithCompanyNames(jobRequests: JobRequest[]): Promise<JobRequest[]> {
+  if (!jobRequests.length) return jobRequests
+  
+  try {
+    // Get unique company IDs
+    const companyIds = [...new Set(jobRequests.map(jr => jr.company_id).filter(Boolean))]
+    
+    if (companyIds.length === 0) return jobRequests
+    
+    // Fetch company names and badge colors from main database
+    const companyQuery = `
+      SELECT company_id, company, badge_color 
+      FROM public.members 
+      WHERE company_id = ANY($1)
+    `
+    const { rows: companyRows } = await pool.query(companyQuery, [companyIds])
+    
+    // Create maps of company_id to company data
+    const companyMap = new Map(companyRows.map(row => [row.company_id, row.company]))
+    const badgeColorMap = new Map(companyRows.map(row => [row.company_id, row.badge_color]))
+    
+    // Enrich job requests with company names and badge colors
+    return jobRequests.map(jr => ({
+      ...jr,
+      company_name: jr.company_id ? companyMap.get(jr.company_id) || null : null,
+      company_badge_color: jr.company_id ? badgeColorMap.get(jr.company_id) || null : null
+    }))
+  } catch (error) {
+    console.error('Error enriching job requests with company names:', error)
+    return jobRequests
+  }
+}
+
+// Get all job requests for a specific company
+export async function getJobRequestsForCompany(companyId: string | null): Promise<JobRequest[]> {
+  try {
+    if (!companyId || !bpocPool) {
+      return []
+    }
+
+    const query = `
+      SELECT 
+        jr.id,
+        jr.company_id,
+        jr.job_title,
+        jr.work_arrangement,
+        jr.salary_min,
+        jr.salary_max,
+        jr.job_description,
+        jr.requirements,
+        jr.responsibilities,
+        jr.benefits,
+        jr.skills,
+        jr.experience_level,
+        jr.application_deadline,
+        jr.industry,
+        jr.department,
+        jr.work_type,
+        jr.currency,
+        jr.salary_type,
+        jr.status,
+        jr.views,
+        jr.applicants,
+        jr.created_at,
+        jr.updated_at,
+        jr.priority,
+        jr.shift
+      FROM public.job_requests jr
+      WHERE jr.company_id = $1
+      ORDER BY jr.created_at DESC
+    `
+    
+    const { rows } = await bpocPool.query(query, [companyId])
+    return await enrichJobRequestsWithCompanyNames(rows)
+  } catch (error) {
+    console.error('Error fetching job requests for company:', error)
+    throw error
+  }
+}
+
+// Get all job requests (admin function)
+export async function getAllJobRequests(): Promise<JobRequest[]> {
+  try {
+    if (!bpocPool) {
+      throw new Error('BPOC database connection not available')
+    }
+    const query = `
+      SELECT 
+        jr.id,
+        jr.company_id,
+        jr.job_title,
+        jr.work_arrangement,
+        jr.salary_min,
+        jr.salary_max,
+        jr.job_description,
+        jr.requirements,
+        jr.responsibilities,
+        jr.benefits,
+        jr.skills,
+        jr.experience_level,
+        jr.application_deadline,
+        jr.industry,
+        jr.department,
+        jr.work_type,
+        jr.currency,
+        jr.salary_type,
+        jr.status,
+        jr.views,
+        jr.applicants,
+        jr.created_at,
+        jr.updated_at,
+        jr.priority,
+        jr.shift
+      FROM public.job_requests jr
+      ORDER BY jr.created_at DESC
+    `
+    
+    const { rows } = await bpocPool.query(query)
+    return await enrichJobRequestsWithCompanyNames(rows)
+  } catch (error) {
+    console.error('Error fetching all job requests:', error)
+    throw error
+  }
+}
+
+// Create a new job request
+export async function insertJobRequest(input: JobRequestInput): Promise<JobRequest> {
+  try {
+    if (!bpocPool) {
+      throw new Error('BPOC database connection not available')
+    }
+    const query = `
+      INSERT INTO public.job_requests (
+        company_id,
+        job_title,
+        work_arrangement,
+        salary_min,
+        salary_max,
+        job_description,
+        requirements,
+        responsibilities,
+        benefits,
+        skills,
+        experience_level,
+        application_deadline,
+        industry,
+        department
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+      ) RETURNING *
+    `
+    
+    const values = [
+      input.companyId,
+      input.jobTitle,
+      input.workArrangement,
+      input.salaryMin,
+      input.salaryMax,
+      input.jobDescription,
+      input.requirements || [],
+      input.responsibilities || [],
+      input.benefits || [],
+      input.skills || [],
+      input.experienceLevel,
+      input.applicationDeadline,
+      input.industry,
+      input.department
+    ]
+    
+    const { rows } = await bpocPool.query(query, values)
+    return rows[0]
+  } catch (error) {
+    console.error('Error creating job request:', error)
+    throw error
+  }
+}
+
+// Resolve company ID from various input formats
+export async function resolveCompanyId(companyId: string | number | null): Promise<string | null> {
+  try {
+    if (!companyId) return null
+    
+    // If it's already a UUID, return it
+    if (typeof companyId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(companyId)) {
+      return companyId
+    }
+    
+    // If it's a number, look up the company_id from members table
+    if (typeof companyId === 'number' || /^\d+$/.test(companyId.toString())) {
+      const query = 'SELECT company_id FROM public.members WHERE id = $1'
+      const { rows } = await pool.query(query, [companyId])
+      return rows[0]?.company_id || null
+    }
+    
+    // If it's a string but not a UUID, treat it as company name and look up
+    const query = 'SELECT company_id FROM public.members WHERE company = $1'
+    const { rows } = await pool.query(query, [companyId])
+    return rows[0]?.company_id || null
+  } catch (error) {
+    console.error('Error resolving company ID:', error)
+    throw error
+  }
+}
+
+// Get job request by ID
+export async function getJobRequestById(id: number): Promise<JobRequest | null> {
+  try {
+    if (!bpocPool) {
+      throw new Error('BPOC database connection not available')
+    }
+    const query = `
+      SELECT 
+        jr.id,
+        jr.company_id,
+        jr.job_title,
+        jr.work_arrangement,
+        jr.salary_min,
+        jr.salary_max,
+        jr.job_description,
+        jr.requirements,
+        jr.responsibilities,
+        jr.benefits,
+        jr.skills,
+        jr.experience_level,
+        jr.application_deadline,
+        jr.industry,
+        jr.department,
+        jr.work_type,
+        jr.currency,
+        jr.salary_type,
+        jr.status,
+        jr.views,
+        jr.applicants,
+        jr.created_at,
+        jr.updated_at,
+        jr.priority,
+        jr.shift
+      FROM public.job_requests jr
+      WHERE jr.id = $1
+    `
+    
+    const { rows } = await bpocPool.query(query, [id])
+    if (rows.length === 0) return null
+    
+    const enrichedRows = await enrichJobRequestsWithCompanyNames(rows)
+    return enrichedRows[0]
+  } catch (error) {
+    console.error('Error fetching job request by ID:', error)
+    throw error
+  }
+}
+
+// Update job request
+export async function updateJobRequest(id: number, updates: Partial<JobRequestInput>): Promise<JobRequest> {
+  try {
+    if (!bpocPool) {
+      throw new Error('BPOC database connection not available')
+    }
+    const fields = Object.keys(updates).filter(key => 
+      key !== 'companyId' && 
+      updates[key as keyof JobRequestInput] !== undefined
+    )
+    
+    if (fields.length === 0) {
+      throw new Error('No valid fields to update')
+    }
+    
+    const setClause = fields.map((field, index) => {
+      const dbField = field === 'companyId' ? 'company_id' : 
+                     field === 'jobTitle' ? 'job_title' :
+                     field === 'workArrangement' ? 'work_arrangement' :
+                     field === 'salaryMin' ? 'salary_min' :
+                     field === 'salaryMax' ? 'salary_max' :
+                     field === 'jobDescription' ? 'job_description' :
+                     field === 'experienceLevel' ? 'experience_level' :
+                     field === 'applicationDeadline' ? 'application_deadline' :
+                     field
+      return `${dbField} = $${index + 2}`
+    }).join(', ')
+    
+    const query = `
+      UPDATE public.job_requests 
+      SET ${setClause}, updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `
+    
+    const values = [id, ...fields.map(field => updates[field as keyof JobRequestInput])]
+    
+    const { rows } = await bpocPool.query(query, values)
+    
+    if (rows.length === 0) {
+      throw new Error(`Job request with ID ${id} not found`)
+    }
+    
+    return rows[0]
+  } catch (error) {
+    console.error('Error updating job request:', error)
+    throw error
+  }
+}
+
+// Delete job request
+export async function deleteJobRequest(id: number): Promise<void> {
+  try {
+    if (!bpocPool) {
+      throw new Error('BPOC database connection not available')
+    }
+    const query = 'DELETE FROM public.job_requests WHERE id = $1'
+    const result = await bpocPool.query(query, [id])
+    
+    if (result.rowCount === 0) {
+      throw new Error(`Job request with ID ${id} not found`)
+    }
+  } catch (error) {
+    console.error('Error deleting job request:', error)
+    throw error
+  }
+}
+
+// Update job request status
+export async function updateJobRequestStatus(id: number, status: JobRequest['status']): Promise<JobRequest> {
+  try {
+    if (!bpocPool) {
+      throw new Error('BPOC database connection not available')
+    }
+    const query = `
+      UPDATE public.job_requests 
+      SET status = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING *
+    `
+    
+    const { rows } = await bpocPool.query(query, [status, id])
+    
+    if (rows.length === 0) {
+      throw new Error(`Job request with ID ${id} not found`)
+    }
+    
+    return rows[0]
+  } catch (error) {
+    console.error('Error updating job request status:', error)
+    throw error
+  }
+}
+
+// Get job request statistics
+export async function getJobRequestStats(companyId?: string): Promise<{
+  total: number
+  active: number
+  inactive: number
+  closed: number
+  processed: number
+  totalViews: number
+  totalApplicants: number
+}> {
+  try {
+    if (!bpocPool) {
+      throw new Error('BPOC database connection not available')
+    }
+    const whereClause = companyId ? 'WHERE company_id = $1' : ''
+    const params = companyId ? [companyId] : []
+    
+    const query = `
+      SELECT 
+        COUNT(*) as total,
+        COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
+        COUNT(CASE WHEN status = 'inactive' THEN 1 END) as inactive,
+        COUNT(CASE WHEN status = 'closed' THEN 1 END) as closed,
+        COUNT(CASE WHEN status = 'processed' THEN 1 END) as processed,
+        COALESCE(SUM(views), 0) as total_views,
+        COALESCE(SUM(applicants), 0) as total_applicants
+      FROM public.job_requests
+      ${whereClause}
+    `
+    
+    const { rows } = await bpocPool.query(query, params)
+    const stats = rows[0]
+    
+    return {
+      total: parseInt(stats.total),
+      active: parseInt(stats.active),
+      inactive: parseInt(stats.inactive),
+      closed: parseInt(stats.closed),
+      processed: parseInt(stats.processed),
+      totalViews: parseInt(stats.total_views),
+      totalApplicants: parseInt(stats.total_applicants)
+    }
+  } catch (error) {
+    console.error('Error fetching job request stats:', error)
+    throw error
+  }
+}
+
+

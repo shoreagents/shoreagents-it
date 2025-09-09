@@ -738,9 +738,6 @@ export default function Dashboard() {
                                 { title: "This Week", value: "weekly" },
                                 { title: "This Month", value: "monthly" }
                               ]}
-                              containerClassName="bg-sidebar/20 rounded-lg"
-                              activeTabClassName="bg-sidebar-accent"
-                              tabClassName="text-xs text-muted-foreground hover:text-foreground"
                               onTabChange={(tab) => setViewMode(tab.value as 'daily' | 'weekly' | 'monthly')}
                             />
                           </div>

@@ -126,8 +126,6 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
   const [commentToDelete, setCommentToDelete] = React.useState<string | null>(null)
   const [activeTab, setActiveTab] = React.useState("information")
   const [aiAnalysis, setAiAnalysis] = React.useState<any>(null)
-  const [isLoadingAi, setIsLoadingAi] = React.useState(false)
-  const [aiError, setAiError] = React.useState<string | null>(null)
   
   // Chatbot state
   const [activityTab, setActivityTab] = React.useState<'comments' | 'ai-chat'>('comments')
@@ -142,7 +140,6 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
     setCommentsList(talent?.comments || [])
     // Reset AI analysis when talent changes
     setAiAnalysis(null)
-    setAiError(null)
     // Reset active tab to default when talent changes
     setActiveTab("information")
     // Reset activity tab to default when talent changes
@@ -441,37 +438,20 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
 
                    {/* AI Analysis Tab */}
                    <TabsContent value="ai-analysis" className="space-y-6 overflow-y-auto flex-1 min-h-0">
-                     {isLoadingAi ? (
-                       <div className="space-y-4">
-                         <div className="h-8 w-56 bg-muted animate-pulse rounded" />
-                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                           <div className="h-24 bg-muted animate-pulse rounded" />
-                           <div className="h-24 bg-muted animate-pulse rounded" />
-                           <div className="h-24 bg-muted animate-pulse rounded" />
-                         </div>
-                         <div className="h-32 bg-muted animate-pulse rounded" />
+                     <div className="text-center py-12">
+                       <div className="w-16 h-16 rounded-full bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center mx-auto mb-4">
+                         <IconBrain className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                        </div>
-                     ) : aiError ? (
-                       <div className="text-center py-12">
-                         <p className="text-sm text-red-500 mb-3">{aiError}</p>
-                         <Button 
-                           onClick={() => { setAiAnalysis(null); setAiError(null); setActiveTab('ai-analysis') }}
-                           variant="secondary"
-                           size="sm"
-                         >
-                           Retry
-                         </Button>
+                       <h3 className="text-xl font-semibold mb-2">AI-Powered Analysis</h3>
+                       <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                         AI analysis feature coming soon! This will provide intelligent insights about talent profiles.
+                       </p>
+                       <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                         <IconSparkles className="h-4 w-4" />
+                         <span>Powered by AI</span>
                        </div>
-                     ) : !aiAnalysis ? (
-                       <div className="text-center py-12">
-                         <div className="w-16 h-16 rounded-full bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center mx-auto mb-4">
-                           <IconFile className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                         </div>
-                         <h3 className="text-xl font-semibold mb-2">AI-Powered Analysis</h3>
-                         <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                           No AI analysis results were found for this talent.
-                         </p>
-                         {talent.resumeSlug && (
+                       {talent.resumeSlug && (
+                         <div className="mt-6">
                            <Button 
                              onClick={() => window.open(`https://www.bpoc.io/${talent.resumeSlug}`, '_blank')}
                              className="bg-blue-600 hover:bg-blue-700"
@@ -479,100 +459,9 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
                              <IconFile className="h-4 w-4 mr-2" />
                              Open Resume
                            </Button>
-                         )}
-                       </div>
-                     ) : (
-                       <div className="space-y-6">
-                         {/* Key Strengths */}
-                         {Array.isArray(aiAnalysis.keyStrengths) && aiAnalysis.keyStrengths.length > 0 && (
-                           <div>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                               {/* Key Strengths Card */}
-                               {Array.isArray(aiAnalysis.keyStrengths) && aiAnalysis.keyStrengths.length > 0 && (
-                                 <Card className="h-full">
-                                   <CardHeader className="pb-2">
-                                     <CardTitle className="text-base text-muted-foreground flex items-center gap-2">
-                                       <span>🎯</span>
-                                       Key Strengths
-                                     </CardTitle>
-                                   </CardHeader>
-                                   <CardContent className="text-sm text-foreground/90">
-                                     <ol className="list-decimal ml-4 space-y-1">
-                                       {aiAnalysis.keyStrengths.map((strength: any, idx: number) => (
-                                         <li key={idx}>
-                                           {typeof strength === 'string' ? strength : strength?.title || strength?.name || 'Strength'}
-                                         </li>
-                                       ))}
-                                     </ol>
-                                   </CardContent>
-                                 </Card>
-                               )}
-                               
-                               {(() => {
-                                 const strengths = aiAnalysis.strengthsAnalysis
-                                 const categories = [
-                                   { key: 'topStrengths', label: 'Top Strengths', icon: '⭐' },
-                                   { key: 'coreStrengths', label: 'Core Strengths', icon: '💪' },
-                                   { key: 'technicalStrengths', label: 'Technical Strengths', icon: '⚙️' },
-                                   { key: 'achievements', label: 'Notable Achievements', icon: '🏆' },
-                                   { key: 'marketAdvantage', label: 'Market Advantages', icon: '📈' },
-                                   { key: 'uniqueValue', label: 'Unique Value Proposition', icon: '💎' },
-                                   { key: 'areasToHighlight', label: 'Areas to Highlight', icon: '✨' }
-                                 ]
-                                 
-                                 return categories.map(({ key, label, icon }) => {
-                                   const data = strengths[key]
-                                   if (!data) return null
-                                   
-                                   let displayValue = ''
-                                   if (Array.isArray(data)) {
-                                     displayValue = data.map((item: any) => 
-                                       typeof item === 'string' ? item : item?.title || item?.name || item?.description || 'Item'
-                                     ).join(', ')
-                                   } else if (typeof data === 'string') {
-                                     displayValue = data
-                                   } else {
-                                     return null
-                                   }
-                                   
-                                   if (!displayValue.trim()) return null
-                                   
-                                   return (
-                                     <Card key={key} className="h-full">
-                                       <CardHeader className="pb-2">
-                                         <CardTitle className="text-base text-muted-foreground flex items-center gap-2">
-                                           <span>{icon}</span>
-                                           {label}
-                                         </CardTitle>
-                                       </CardHeader>
-                                       <CardContent className="text-sm text-foreground/90">
-                                         {Array.isArray(data) ? (
-                                           <ol className="list-decimal ml-4 space-y-1">
-                                             {data.map((item: any, idx: number) => (
-                                               <li key={idx}>
-                                                 {typeof item === 'string' ? item : item?.title || item?.name || item?.description || 'Item'}
-                                               </li>
-                                             ))}
-                                           </ol>
-                                         ) : typeof data === 'string' ? (
-                                           <ol className="list-decimal ml-4 space-y-1">
-                                             <li>{data}</li>
-                                           </ol>
-                                         ) : (
-                                           <ol className="list-decimal ml-4 space-y-1">
-                                             <li>{JSON.stringify(data)}</li>
-                                           </ol>
-                                         )}
-                                       </CardContent>
-                                     </Card>
-                                   )
-                                 }).filter(Boolean)
-                               })()}
-                             </div>
-                           </div>
-                         )}
-                       </div>
-                     )}
+                         </div>
+                       )}
+                     </div>
                    </TabsContent>
                  </Tabs>
                </div>

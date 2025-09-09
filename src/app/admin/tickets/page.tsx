@@ -113,7 +113,6 @@ const getCategoryBadge = (ticket: Ticket) => {
 }
 
 const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = false, isExpanded, onToggleExpanded, onViewAll, roleNameById, user }: SortableTicketProps) {
-  const [isHovered, setIsHovered] = useState(false)
   const [roles, setRoles] = useState<Array<{ id: number; name: string; description: string | null }>>([])
   const [rolesLoading, setRolesLoading] = useState(false)
   const [isAssignOpen, setIsAssignOpen] = useState(false)
@@ -168,8 +167,6 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
     onToggleExpanded(ticket.id.toString())
   }, [onToggleExpanded, ticket.id])
 
-  const handleMouseEnter = useCallback(() => setIsHovered(true), [])
-  const handleMouseLeave = useCallback(() => setIsHovered(false), [])
 
   const fetchRoles = useCallback(async () => {
     if (roles.length > 0 || rolesLoading) return
@@ -226,20 +223,16 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
   const categoryBadge = useMemo(() => getCategoryBadge(ticket), [ticket.category, ticket.category_name])
 
   const cardClassName = useMemo(() => {
-    return `${isLast ? '' : 'mb-3'} p-4 transition-colors duration-150 cursor-pointer overflow-hidden bg-sidebar dark:bg-[#252525] ticket-card w-full ${
+    return `${isLast ? '' : 'mb-3'} p-4 transition-all duration-200 cursor-pointer overflow-hidden bg-sidebar dark:bg-[#252525] ticket-card w-full hover:border-primary/50 hover:text-primary ${
       isDragging ? 'opacity-50' : ''
-    } ${
-      isHovered ? 'border-primary' : 'hover:border-primary/50'
     }`
-  }, [isDragging, isHovered, isLast])
+  }, [isDragging, isLast])
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
       className={cardClassName}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
       onClick={handleCardClick}
     >
       <div className="flex flex-col mb-3">
@@ -353,8 +346,8 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
                 </Popover>
                 <Button 
                   size="sm" 
-                  variant="outline" 
-                  className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99] inline-flex items-center"
+                  variant="muted" 
+                  className="text-sm h-8 flex-1 rounded-lg inline-flex items-center"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onViewAll(ticket) }}
                 >
                   <IconEye className="h-4 w-4 mr-px" />
@@ -518,16 +511,16 @@ function DraggingTicket({ ticket, isExpanded, roleNameById, user }: { ticket: Ti
             <div className="flex items-center gap-2">
               <Button 
                 size="sm" 
-                variant="outline" 
-                className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] inline-flex items-center"
+                variant="muted" 
+                className="text-sm h-8 flex-1 rounded-lg inline-flex items-center"
               >
                 <IconUserCheck className="h-4 w-4 mr-px" />
                 <span>{roleNameById && ticket.role_id ? (roleNameById[ticket.role_id] || 'Assign Role') : 'Assign Role'}</span>
               </Button>
               <Button 
                 size="sm" 
-                variant="outline" 
-                className="text-sm h-8 flex-1 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] inline-flex items-center"
+                variant="muted" 
+                className="text-sm h-8 flex-1 rounded-lg inline-flex items-center"
               >
                 <IconEye className="h-4 w-4 mr-px" />
                 <span>View All</span>
