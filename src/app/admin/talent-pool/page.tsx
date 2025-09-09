@@ -101,6 +101,14 @@ interface Applicant {
     career_path?: any
     section_analysis?: any
   } | null
+  // Interested clients data
+  interested_clients?: {
+    user_id: number
+    first_name: string | null
+    last_name: string | null
+    profile_picture: string | null
+    employee_id: string | null
+  }[]
 }
 
 const categories = ["All", "Design", "Marketing", "Development", "Science", "Writing"]
@@ -174,6 +182,7 @@ export default function TalentPoolPage() {
       phone: rawData.phone || null,
       address: rawData.address || null,
       aiAnalysis: rawData.aiAnalysis || null,
+      interested_clients: rawData.interested_clients || [],
     }
   }, [])
 

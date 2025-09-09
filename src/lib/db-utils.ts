@@ -2008,6 +2008,26 @@ export async function getClientsByMember(memberId: number): Promise<{ user_id: n
   return result.rows
 }
 
+// Fetch client details by user IDs (for interested clients)
+export async function getClientsByUserIds(userIds: number[]): Promise<{ user_id: number; first_name: string | null; last_name: string | null; profile_picture: string | null; employee_id: string | null }[]> {
+  if (!userIds || userIds.length === 0) return []
+  
+  const query = `
+    SELECT 
+      c.user_id,
+      pi.first_name,
+      pi.last_name,
+      pi.profile_picture,
+      NULL::text AS employee_id
+    FROM public.clients c
+    LEFT JOIN public.personal_info pi ON pi.user_id = c.user_id
+    WHERE c.user_id = ANY($1::integer[])
+    ORDER BY COALESCE(pi.first_name, ''), COALESCE(pi.last_name, '')
+  `
+  const result = await pool.query(query, [userIds])
+  return result.rows
+}
+
 // Get clients for modal with pagination, search, and member filtering
 export async function getClientsForModal(
   page: number = 1,
@@ -2952,7 +2972,8 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
       r.current_salary,
       r.expected_monthly_salary,
       r.shift,
-      COALESCE(r.position, 0) as position
+      COALESCE(r.position, 0) as position,
+      r.interested_clients
     FROM public.bpoc_recruits r
   `
   const params: any[] = []
@@ -3143,6 +3164,22 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
             // Skills fetching failed, continue without skills
           }
         }
+
+    // Fetch all interested clients data in batch
+    const allInterestedClientIds = applicants.flatMap(app => app.interested_clients || []).filter(Boolean)
+    const interestedClientsMap = new Map<number, any>()
+    
+    if (allInterestedClientIds.length > 0) {
+      try {
+        const interestedClientsData = await getClientsByUserIds(allInterestedClientIds)
+        interestedClientsData.forEach(client => {
+          interestedClientsMap.set(client.user_id, client)
+        })
+        console.log(`🔍 Fetched interested clients data for ${interestedClientsData.length} clients`)
+      } catch (error) {
+        console.warn('Failed to fetch interested clients data:', error)
+      }
+    }
     
     enrichedData = applicants.map((applicant: any) => {
       // CRITICAL FIX: Filter applications by job_id, not by application ID
@@ -3249,6 +3286,11 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
       const positionData = positionMap.get(userId) || null
       const aiAnalysisData = aiAnalysisMap.get(userId) || null // Added for AI analysis
       
+      // Get interested clients data from the pre-fetched map
+      const interestedClientsData = applicant.interested_clients?.map((clientId: number) => 
+        interestedClientsMap.get(clientId)
+      ).filter(Boolean) || []
+
       console.log('🔍 Applicant enrichment data:', { 
         applicantId: applicant.id, 
         userId, 
@@ -3271,6 +3313,9 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
         currentJobStatusesSample: currentJobStatuses.slice(0, 2),
         // Debug current statuses for this applicant
         applicantCurrentStatuses: currentJobStatuses.filter(s => s.user_id === applicant.applicant_id),
+        // Debug interested clients
+        interestedClientsIds: applicant.interested_clients,
+        interestedClientsData: interestedClientsData,
         // CRITICAL: Debug array alignment
         arraysAligned: {
           jobIdsLength: applicant.job_ids?.length || 0,
@@ -3317,6 +3362,7 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
           phone: phoneData,
           address: addressData,
           aiAnalysis: aiAnalysisData, // Added AI analysis data
+          interested_clients: interestedClientsData, // Added interested clients data
         }
     })
   } catch (e) {

@@ -8,6 +8,7 @@ import {
   Building2Icon,
   UserPlusIcon,
   StarIcon,
+  CalendarIcon,
 } from "lucide-react"
 import { ScanTextIcon } from "@/components/icons/scan-text-icon"
 import { IconFileText } from "@tabler/icons-react"
@@ -229,6 +230,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarGroupLabel>RECRUITMENT</SidebarGroupLabel>
             <NavMainWithSubgroups
               items={[
+                { title: "Jobs", url: "/admin/jobs", icon: FilePenLineIcon },
                 {
                   title: "Applicants",
                   icon: FileTextIcon,
@@ -237,8 +239,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     { title: "Records", url: "/admin/applicants-records" },
                   ]
                 },
-                { title: "Talent Pool", url: "/admin/talent-pool", icon: SparklesIcon },
-                { title: "Jobs", url: "/admin/jobs", icon: FilePenLineIcon }
+                { title: "Talent Pool", url: "/admin/talent-pool", icon: SparklesIcon }
+              ]}
+            />
+          </SidebarGroup>
+        )}
+        {isAdmin && (
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel>FUN</SidebarGroupLabel>
+            <NavMain
+              items={[
+                { title: "Events", url: "/admin/events", icon: CalendarIcon },
               ]}
             />
           </SidebarGroup>

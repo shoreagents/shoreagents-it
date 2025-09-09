@@ -476,32 +476,10 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
       })
       
 
-      // Add mock interested clients data for demonstration
+      // Use the actual interested clients data from the database
       const applicantWithMockClients = {
         ...applicant,
-        interested_clients: [
-          {
-            user_id: 1,
-            first_name: "John",
-            last_name: "Doe",
-            profile_picture: null,
-            employee_id: null
-          },
-          {
-            user_id: 2,
-            first_name: "Jane",
-            last_name: "Smith",
-            profile_picture: null,
-            employee_id: null
-          },
-          {
-            user_id: 3,
-            first_name: "Mike",
-            last_name: "Johnson",
-            profile_picture: null,
-            employee_id: null
-          }
-        ]
+        interested_clients: applicant.interested_clients || []
       }
 
       setLocalApplicant(applicantWithMockClients)
