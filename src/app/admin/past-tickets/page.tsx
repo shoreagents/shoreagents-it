@@ -18,32 +18,40 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { useAuth } from "@/contexts/auth-context"
 import { TicketDetailModal } from "@/components/modals/ticket-detail-modal"
+import { useRealtimeTickets } from "@/hooks/use-realtime-tickets"
 
 type TicketStatus = 'On Hold' | 'In Progress' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
 interface TicketCategory { id: number; name: string }
 
-interface Ticket {
+// Simplified interface for past tickets table display
+interface PastTicketTable {
   id: number
   ticket_id: string
   user_id: number
   concern: string
   details: string | null
+  status: TicketStatus
+  created_at: string
+  resolved_at: string | null
+  resolved_by: number | null
+  profile_picture: string | null
+  first_name: string | null
+  last_name: string | null
+  category_name: string
+  resolver_first_name: string | null
+  resolver_last_name: string | null
+}
+
+// Full ticket interface for modal (extends table data)
+interface Ticket extends PastTicketTable {
   category: string
   category_id: number | null
-  category_name?: string
   status: TicketStatus
   position: number
-  resolved_by: number | null
-  resolved_at: string | null
   created_at: string
   updated_at: string
   role_id: number | null
   station_id: string | null
-  profile_picture: string | null
-  first_name: string | null
-  last_name: string | null
-  resolver_first_name?: string
-  resolver_last_name?: string
   sector: string
   employee_id: string | null
   supporting_files?: string[]
@@ -56,7 +64,6 @@ interface Ticket {
   member_address?: string
   member_phone?: string
   department_name?: string
-
   job_title?: string
   shift_period?: string
   shift_schedule?: string
@@ -73,12 +80,12 @@ interface Ticket {
 }
 
 function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUser, onRowClick }: { 
-  tickets: Ticket[]
+  tickets: PastTicketTable[]
   onSort: (field: string) => void
   sortField: string
   sortDirection: 'asc' | 'desc'
   currentUser: any
-  onRowClick: (ticket: Ticket) => void
+  onRowClick: (ticket: PastTicketTable) => void
 }) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -151,7 +158,7 @@ function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUs
               onClick={() => onRowClick(ticket)}
             >
               <TableCell className="font-mono text-sm text-muted-foreground">{ticket.ticket_id}</TableCell>
-              <TableCell>{getCategoryBadge(ticket.category_name || ticket.category)}</TableCell>
+              <TableCell>{getCategoryBadge(ticket.category_name)}</TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
                   <Avatar className="h-6 w-6">
@@ -259,7 +266,7 @@ function PastTicketsSkeleton() {
 export default function PastTicketsPage() {
   const { user } = useAuth()
 
-  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [tickets, setTickets] = useState<PastTicketTable[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -272,13 +279,69 @@ export default function PastTicketsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([])
   const [resolvedByUserCount, setResolvedByUserCount] = useState<number>(0)
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
+  const [selectedTicket, setSelectedTicket] = useState<PastTicketTable | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     fetchTickets()
     fetchCategories()
   }, [])
+
+  // Real-time updates for past tickets
+  const { isConnected: isRealtimeConnected } = useRealtimeTickets({
+    onTicketUpdated: (updatedTicket, oldTicket) => {
+      // Add ticket if it just became closed (regardless of resolved_at initially)
+      if (updatedTicket.status === 'Closed' && oldTicket?.status !== 'Closed') {
+        // Check if ticket is already in our list
+        setTickets(prev => {
+          const exists = prev.some(ticket => ticket.id === updatedTicket.id)
+          if (!exists) {
+            // Add new closed ticket to the list
+            return [updatedTicket, ...prev]
+          }
+          return prev
+        })
+        setTotalCount(prev => prev + 1)
+      }
+      // Update existing ticket if it's in our list and still closed
+      else if (updatedTicket.status === 'Closed' && updatedTicket.resolved_at) {
+        setTickets(prev => 
+          prev.map(ticket => 
+            ticket.id === updatedTicket.id ? {
+              ...ticket,
+              status: updatedTicket.status,
+              resolved_at: updatedTicket.resolved_at,
+              resolved_by: updatedTicket.resolved_by,
+              resolver_first_name: updatedTicket.resolver_first_name,
+              resolver_last_name: updatedTicket.resolver_last_name,
+              concern: updatedTicket.concern,
+              details: updatedTicket.details,
+              category_name: updatedTicket.category_name
+            } : ticket
+          )
+        )
+      } 
+      // Remove ticket if it's no longer closed
+      else if (oldTicket?.status === 'Closed' && updatedTicket.status !== 'Closed') {
+        setTickets(prev => prev.filter(ticket => ticket.id !== updatedTicket.id))
+        setTotalCount(prev => Math.max(0, prev - 1))
+      }
+    },
+    onTicketCreated: (newTicket) => {
+      // Add new ticket if it's closed and resolved
+      if (newTicket.status === 'Closed' && newTicket.resolved_at) {
+        setTickets(prev => [newTicket, ...prev])
+        setTotalCount(prev => prev + 1)
+      }
+    },
+    onTicketDeleted: (deletedTicket) => {
+      // Remove deleted ticket
+      setTickets(prev => prev.filter(ticket => ticket.id !== deletedTicket.id))
+      setTotalCount(prev => Math.max(0, prev - 1))
+    },
+    roleFilter: null, // Get all tickets for admin
+    enableNotifications: false // Disable notifications for past tickets
+  })
 
   const fetchCategories = async () => {
     try {
@@ -355,7 +418,7 @@ export default function PastTicketsPage() {
     setCurrentPage(1)
   }
 
-  const handleRowClick = (ticket: Ticket) => {
+  const handleRowClick = (ticket: PastTicketTable) => {
     setSelectedTicket(ticket)
     setIsModalOpen(true)
   }
@@ -467,7 +530,7 @@ export default function PastTicketsPage() {
       </SidebarInset>
       
       <TicketDetailModal 
-        ticket={selectedTicket}
+        ticket={selectedTicket as any}
         isOpen={isModalOpen}
         onClose={handleModalClose}
       />

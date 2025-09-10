@@ -150,6 +150,105 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
     setConversationStarters([])
   }, [talent?.id, isOpen])
 
+  // Handler functions
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!comment.trim() || isSubmittingComment) return
+
+    setIsSubmittingComment(true)
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      const newComment: Comment = {
+        id: Date.now().toString(),
+        comment: comment,
+        created_at: new Date().toISOString(),
+        user_name: "Current User",
+        user_role: "admin",
+        avatar_name: ""
+      }
+      
+      setCommentsList(prev => [...prev, newComment])
+      setComment("")
+    } catch (error) {
+      console.error("Failed to submit comment:", error)
+    } finally {
+      setIsSubmittingComment(false)
+    }
+  }
+
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!chatInput.trim() || isLoadingChat) return
+
+    setIsLoadingChat(true)
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: chatInput,
+      timestamp: new Date()
+    }
+
+    setChatMessages(prev => [...prev, userMessage])
+    setChatInput("")
+
+    try {
+      // Simulate AI response
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      const aiResponse: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `I understand you're asking about ${talent?.name || 'this talent'}'s profile. This is a simulated AI response. In a real implementation, this would analyze the talent's skills, experience, and provide intelligent insights.`,
+        timestamp: new Date()
+      }
+
+      setChatMessages(prev => [...prev, aiResponse])
+    } catch (error) {
+      console.error("Failed to get AI response:", error)
+    } finally {
+      setIsLoadingChat(false)
+    }
+  }
+
+  const handleDeleteComment = async (commentId: string) => {
+    setCommentToDelete(commentId)
+    setShowDeleteModal(true)
+  }
+
+  const confirmDeleteComment = async () => {
+    if (!commentToDelete) return
+
+    setDeletingId(commentToDelete)
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      setCommentsList(prev => prev.filter(comment => comment.id !== commentToDelete))
+      setShowDeleteModal(false)
+      setCommentToDelete(null)
+    } catch (error) {
+      console.error("Failed to delete comment:", error)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const cancelDeleteComment = () => {
+    setShowDeleteModal(false)
+    setCommentToDelete(null)
+  }
+
+  const clearChatHistory = () => {
+    setChatMessages([])
+    setChatInput("")
+  }
+
+  const handleStarterClick = (starter: string) => {
+    setChatInput(starter)
+  }
+
 
 
   if (!talent) return null
@@ -717,7 +816,7 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
 
                {/* Delete Confirmation Modal */}
         <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-          <DialogContent className="max-w-sm" hideClose>
+          <DialogContent className="max-w-sm">
             <DialogHeader>
               <DialogTitle>
                 Delete Comment

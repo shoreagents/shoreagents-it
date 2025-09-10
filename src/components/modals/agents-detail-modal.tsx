@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator"
 
 import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconGenderMale, IconGenderFemale, IconGenderNeutrois, IconHelp, IconSun, IconMoon, IconClockHour4, IconUsers, IconHome, IconDeviceLaptop } from "@tabler/icons-react"
 import { useRealtimeMembers } from '@/hooks/use-realtime-members'
-import { SendHorizontal } from "lucide-react"
+import { SendHorizontal, Target } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -973,11 +973,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
 
                 {/* Status */}
                 <div className="flex items-center gap-2">
-                  {displayData.status === 'Active' ? (
-                    <IconCircle className="h-4 w-4 fill-green-500 stroke-none" />
-                  ) : (
-                    <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
-                  )}
+                  <Target className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Status:</span>
                   <Badge 
                     variant="outline" 

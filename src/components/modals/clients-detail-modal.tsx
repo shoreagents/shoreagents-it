@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { IconCalendar, IconUser, IconBuilding, IconMapPin, IconPhone, IconMail, IconId, IconBriefcase, IconCircle, IconSearch, IconX, IconGenderMale, IconGenderFemale, IconMinus, IconClock } from "@tabler/icons-react"
 import { useRealtimeMembers } from '@/hooks/use-realtime-members'
-import { SendHorizontal } from "lucide-react"
+import { SendHorizontal, Target } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { DataFieldRow } from "@/components/ui/fields"
 import { Calendar } from "@/components/ui/calendar"
@@ -629,7 +629,7 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
 
                 {/* Status */}
                 <div className="flex items-center gap-2">
-                  <IconCircle className="h-4 w-4 fill-green-500 stroke-none" />
+                  <Target className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Status:</span>
                   <Badge 
                     variant="outline" 

@@ -15,11 +15,11 @@ export async function GET(
       )
     }
 
-    // Fetch ONLY the 3 missing fields that aren't already available from ticket cards
+    // Fetch ONLY the missing fields that aren't already available from ticket cards
     const result = await pool.query(`
       SELECT 
         -- ONLY the fields NOT available in ticket cards
-        t.supporting_files, t.file_count,
+        t.supporting_files, t.file_count, t.status,
         resolver_pi.last_name as resolver_last_name
         
       FROM public.tickets t

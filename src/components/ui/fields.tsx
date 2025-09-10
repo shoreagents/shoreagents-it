@@ -35,6 +35,7 @@ export const EditableField = ({
       onKeyDown={onKeyDown}
       className={className}
       placeholder={!isFocused && !value ? placeholder : ""}
+      tabIndex={-1}
     />
   );
 }

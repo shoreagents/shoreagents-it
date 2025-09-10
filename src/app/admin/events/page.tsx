@@ -20,6 +20,7 @@ import {
   PaginationNext,
 } from "@/components/ui/pagination"
 import { Event } from "@/lib/db-utils"
+import { AddEventModal } from "@/components/modals/events-detail-modal"
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([])
@@ -29,6 +30,8 @@ export default function EventsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
 
   const fetchEvents = async () => {
     try {
@@ -116,6 +119,25 @@ export default function EventsPage() {
     return `${formatTime(startTime)} - ${formatTime(endTime)}`
   }
 
+  const handleAddEvent = () => {
+    setSelectedEvent(null)
+    setIsModalOpen(true)
+  }
+
+  const handleEditEvent = (event: Event) => {
+    setSelectedEvent(event)
+    setIsModalOpen(true)
+  }
+
+  const handleModalClose = () => {
+    setIsModalOpen(false)
+    setSelectedEvent(null)
+  }
+
+  const handleEventSaved = () => {
+    fetchEvents() // Refresh the events list
+  }
+
   // Filter events based on search (now handled by API)
   const filteredEvents = events
 
@@ -152,7 +174,7 @@ export default function EventsPage() {
                   </div>
                   <Button 
                     variant="outline" 
-                    onClick={() => {/* Add event functionality */}} 
+                    onClick={handleAddEvent} 
                   >
                     <IconPlus className="h-4 w-4" />
                     Add Event
@@ -173,7 +195,11 @@ export default function EventsPage() {
                   <div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {filteredEvents.map((event) => (
-                        <Card key={event.id} className="h-full cursor-pointer hover:border-primary/50 hover:text-primary transition-all duration-200">
+                        <Card 
+                          key={event.id} 
+                          className="h-full cursor-pointer hover:border-primary/50 hover:text-primary transition-all duration-200"
+                          onClick={() => handleEditEvent(event)}
+                        >
                           <CardContent className="p-4 h-full flex flex-col">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
@@ -288,6 +314,14 @@ export default function EventsPage() {
           </div>
         </div>
       </SidebarInset>
+
+      {/* Event Modal */}
+      <AddEventModal
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        onEventAdded={handleEventSaved}
+        eventToEdit={selectedEvent}
+      />
     </>
   )
 }

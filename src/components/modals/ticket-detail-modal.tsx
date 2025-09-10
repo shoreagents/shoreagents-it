@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger, PopoverItem } from "@/componen
 import { getStorageUrl } from "@/lib/supabase"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/auth-context"
-import { SendHorizontal } from "lucide-react"
+import { SendHorizontal, Target } from "lucide-react"
 
 interface TicketDetailModalProps {
   ticket: Ticket | null
@@ -103,25 +103,7 @@ const getStatusColor = (status: TicketStatus) => {
 }
 
 const getStatusIcon = (status: TicketStatus) => {
-  switch (status) {
-    case "For Approval":
-      return <IconCircle className="h-4 w-4 fill-yellow-500 stroke-none" />
-    case "On Hold":
-      return <IconCircle className="h-4 w-4 fill-gray-500 stroke-none" />
-    case "In Progress":
-      return <IconCircle className="h-4 w-4 fill-orange-500 stroke-none" />
-    case "New":
-    case "Approved":
-      return <IconCircle className="h-4 w-4 fill-blue-500 stroke-none" />
-    case "Stuck":
-      return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
-    case "Actioned":
-      return <IconCircle className="h-4 w-4 fill-purple-500 stroke-none" />
-    case "Closed":
-      return <IconCircle className="h-4 w-4 fill-green-500 stroke-none" />
-    default:
-      return <IconCircle className="h-4 w-4 fill-gray-500 stroke-none" />
-  }
+  return <Target className="h-4 w-4 text-muted-foreground" />
 }
 
 const getCategoryBadge = (ticket: Ticket) => {
@@ -215,7 +197,8 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
     // Check what data is already available vs what's needed
     const needsDetailedFetch = !ticket?.supporting_files || 
                                !ticket?.file_count ||
-                               !ticket?.resolver_last_name
+                               !ticket?.resolver_last_name ||
+                               !ticket?.status
 
     // If we already have all the data we need, don't fetch but still set the data
     if (!needsDetailedFetch) {
@@ -240,6 +223,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
           supporting_files: data.supporting_files || ticket?.supporting_files,
           file_count: data.file_count || ticket?.file_count,
           resolver_last_name: data.resolver_last_name || ticket?.resolver_last_name,
+          status: data.status || ticket?.status,
         }
         
         setDetailedTicket(mergedData)

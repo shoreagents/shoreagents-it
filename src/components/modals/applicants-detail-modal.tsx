@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconVideo, IconCash, IconClockHour4, IconArrowRight, IconSun, IconMoon, IconAward, IconCode, IconSparkles } from "@tabler/icons-react"
+import { SendHorizontal, Target } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { EditableField, DataFieldRow } from "@/components/ui/fields"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -164,28 +165,7 @@ const getStatusColor = (status: string, isJobStatus: boolean = false) => {
 }
 
 const getStatusIcon = (status: string) => {
-  switch (status.toLowerCase()) {
-    case "rejected":
-      return <IconCircle className="h-4 w-4 fill-rose-500 stroke-none" />
-    case "submitted":
-      return <IconCircle className="h-4 w-4 fill-blue-500 stroke-none" />
-    case "for verification":
-      return <IconCircle className="h-4 w-4 fill-teal-500 stroke-none" />
-    case "verified":
-      return <IconCircle className="h-4 w-4 fill-purple-500 stroke-none" />
-    case "initial interview":
-      return <IconCircle className="h-4 w-4 fill-amber-500 stroke-none" />
-    case "passed":
-      return <IconCircle className="h-4 w-4 fill-green-500 stroke-none" />
-    case "hired":
-      return <IconCircle className="h-4 w-4 fill-pink-500 stroke-none" />
-    case "failed":
-      return <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
-    case "withdrawn":
-      return <IconCircle className="h-4 w-4 fill-gray-500 stroke-none" />
-    default:
-      return <IconCircle className="h-4 w-4 fill-gray-500 stroke-none" />
-  }
+  return <Target className="h-4 w-4 text-muted-foreground" />
 }
 
 // Get status display label based on status value
@@ -240,6 +220,7 @@ const formatDate = (dateString: string) => {
 export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpdate, pageContext = 'bpoc-recruits' }: ApplicantsDetailModalProps) {
   const { theme } = useTheme()
   const [comment, setComment] = useState("")
+  const [isCommentFocused, setIsCommentFocused] = useState(false)
   const [currentStatus, setCurrentStatus] = useState<string>('')
   const [statusOptions, setStatusOptions] = useState<StatusOption[]>([])
   const [comments, setComments] = useState<Comment[]>([])
@@ -2109,9 +2090,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                     ))
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
-                      <IconMessage className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No Comments Yet</p>
-                      <p className="text-xs">Be the first to add a comment!</p>
+                      <p className="text-sm">No Activities Found</p>
                     </div>
                   )}
                 </div>
@@ -2119,30 +2098,54 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
 
               {/* Comment Input */}
               <div className="px-3 pb-3 bg-[#ececec] dark:bg-[#0a0a0a]">
-                <div className="flex gap-3 bg-sidebar rounded-lg p-4 border border-[#cecece99] dark:border-border">
-                  <Avatar className="h-8 w-8 flex-shrink-0">
-                    <AvatarImage src="" alt="Current User" />
-                    <AvatarFallback className="text-xs">CU</AvatarFallback>
-                  </Avatar>
+                <div className="flex gap-2">
                   <div className="flex-1">
                     <form onSubmit={handleCommentSubmit}>
-                      <Input 
-                        placeholder="Write a comment..." 
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        className="text-sm"
-                        disabled={isSubmittingComment}
-                      />
+                      <div className={`border rounded-lg bg-sidebar overflow-hidden transition-all duration-300 ease-in-out [&>*]:border-none [&>*]:outline-none [&>textarea]:transition-all [&>textarea]:duration-300 [&>textarea]:ease-in-out ${
+                        isCommentFocused || comment.trim() 
+                          ? 'border-muted-foreground' 
+                          : 'border-border'
+                      }`}>
+                        <textarea 
+                          placeholder="Write a comment..." 
+                          value={comment}
+                          onChange={(e) => {
+                            setComment(e.target.value)
+                            // Auto-resize the textarea
+                            e.target.style.height = 'auto'
+                            e.target.style.height = e.target.scrollHeight + 'px'
+                          }}
+                          onFocus={(e) => {
+                            setIsCommentFocused(true)
+                          }}
+                          onBlur={(e) => {
+                            setIsCommentFocused(false)
+                          }}
+                          className="w-full resize-none border-0 bg-transparent text-foreground px-3 py-2 shadow-none text-sm focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:text-foreground placeholder:text-muted-foreground align-middle transition-all duration-300 ease-in-out min-h-[36px] overflow-hidden"
+                          disabled={isSubmittingComment}
+                          rows={1}
+                        />
+                        
+                        {/* Send button - only show when expanded, inside the textarea container */}
+                        {(isCommentFocused || comment.trim()) && (
+                          <div className="p-1 flex justify-end animate-in fade-in duration-300">
+                            <button
+                              type="submit"
+                              onClick={handleCommentSubmit}
+                              disabled={!comment.trim() || isSubmittingComment}
+                              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                            >
+                              {isSubmittingComment ? (
+                                <IconClock className="h-3 w-3 text-muted-foreground animate-spin" />
+                                ) : (
+                                <SendHorizontal className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </form>
                   </div>
-                  <Button 
-                    size="sm" 
-                    className="rounded-lg" 
-                    onClick={handleCommentSubmit}
-                    disabled={!comment.trim() || isSubmittingComment}
-                  >
-                    {isSubmittingComment ? 'Sending...' : 'Send'}
-                  </Button>
                 </div>
               </div>
             </div>

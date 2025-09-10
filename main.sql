@@ -841,13 +841,22 @@ CREATE INDEX idx_talent_pool_interested_clients ON public.talent_pool USING gin 
 
 CREATE TABLE public.tickets ( id serial4 NOT NULL, ticket_id varchar(50) NOT NULL, user_id int4 NOT NULL, concern text NOT NULL, details text NULL, status public."ticket_status_enum" DEFAULT 'For Approval'::ticket_status_enum NOT NULL, resolved_by int4 NULL, resolved_at timestamptz DEFAULT now() NULL, created_at timestamptz DEFAULT now() NOT NULL, updated_at timestamptz DEFAULT now() NOT NULL, "position" int4 DEFAULT 0 NOT NULL, category_id int4 NULL, supporting_files _text DEFAULT '{}'::text[] NULL, file_count int4 DEFAULT 0 NULL, role_id int4 NULL, clear bool DEFAULT false NOT NULL, CONSTRAINT check_file_count CHECK (((file_count = array_length(supporting_files, 1)) OR ((file_count = 0) AND (supporting_files = '{}'::text[])))), CONSTRAINT tickets_pkey PRIMARY KEY (id), CONSTRAINT tickets_ticket_id_key UNIQUE (ticket_id), CONSTRAINT tickets_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.ticket_categories(id) ON DELETE SET NULL, CONSTRAINT tickets_resolved_by_fkey FOREIGN KEY (resolved_by) REFERENCES public.users(id) ON DELETE SET NULL, CONSTRAINT tickets_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(id) ON DELETE SET NULL, CONSTRAINT tickets_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE);
 CREATE INDEX idx_tickets_active ON public.tickets USING btree (status, "position") WHERE (status <> 'Closed'::ticket_status_enum);
+CREATE INDEX idx_tickets_category_id ON public.tickets USING btree (category_id);
 CREATE INDEX idx_tickets_clear_status ON public.tickets USING btree (clear, status);
 CREATE INDEX idx_tickets_closed_clear ON public.tickets USING btree (resolved_at, clear) WHERE (status = 'Closed'::ticket_status_enum);
 CREATE INDEX idx_tickets_created_at ON public.tickets USING btree (created_at);
+CREATE INDEX idx_tickets_created_at_desc ON public.tickets USING btree (created_at DESC);
+CREATE INDEX idx_tickets_pagination ON public.tickets USING btree (status, role_id, clear, created_at DESC, id);
 CREATE INDEX idx_tickets_resolved_at ON public.tickets USING btree (resolved_at);
+CREATE INDEX idx_tickets_resolved_at_desc ON public.tickets USING btree (resolved_at DESC);
+CREATE INDEX idx_tickets_resolved_by ON public.tickets USING btree (resolved_by);
+CREATE INDEX idx_tickets_role_id ON public.tickets USING btree (role_id);
 CREATE INDEX idx_tickets_status ON public.tickets USING btree (status);
 CREATE INDEX idx_tickets_status_clear ON public.tickets USING btree (status, clear);
 CREATE INDEX idx_tickets_status_role ON public.tickets USING btree (status, role_id);
+CREATE INDEX idx_tickets_status_role_clear_created ON public.tickets USING btree (status, role_id, clear, created_at DESC) WHERE (status <> 'Closed'::ticket_status_enum);
+CREATE INDEX idx_tickets_status_role_clear_resolved ON public.tickets USING btree (status, role_id, clear, resolved_at DESC) WHERE (status = 'Closed'::ticket_status_enum);
+CREATE INDEX idx_tickets_ticket_id ON public.tickets USING btree (ticket_id);
 CREATE INDEX idx_tickets_user_id ON public.tickets USING btree (user_id);
 
 -- Table Triggers

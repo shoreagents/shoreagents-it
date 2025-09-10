@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAllTickets, getAllTicketsAdmin, createTicket, getTicketsByStatus, getTicketsByStatusAdmin, getTicketsByStatusWithPagination, getTicketsResolvedByUserCount, getAllRoles, assignRoleToInternalUser, updateTicket } from '@/lib/db-utils'
+import { getAllTickets, getAllTicketsAdmin, createTicket, getTicketsByStatus, getTicketsByStatusAdmin, getTicketsByStatusWithPagination, getPastTicketsTableData, getTicketsResolvedByUserCount, getAllRoles, assignRoleToInternalUser, updateTicket } from '@/lib/db-utils'
 import { generateTicketId } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
       tickets = result.tickets
       totalCount = result.totalCount
     } else if ((status === 'Completed' || status === 'Closed') && (past === 'true' || page > 1 || search || categoryId)) {
-      // Fetch completed tickets with pagination and sorting (for past dates or when pagination/search is needed)
-      console.log('Calling getTicketsByStatusWithPagination with:', { 
+      // Use optimized query for past tickets table display
+      console.log('Calling getPastTicketsTableData with:', { 
         status, 
         past: past === 'true', 
         page, 
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
         categoryId 
       })
       const isAdminPaginated = ((searchParams.get('admin') ?? '') === 'true')
-      const result = await getTicketsByStatusWithPagination(status as string, past === 'true', page, limit, search, sortField, sortDirection, categoryId, userId, isAdminPaginated)
+      const result = await getPastTicketsTableData(page, limit, search, sortField, sortDirection, categoryId, userId, isAdminPaginated)
       tickets = result.tickets
       totalCount = result.totalCount
       

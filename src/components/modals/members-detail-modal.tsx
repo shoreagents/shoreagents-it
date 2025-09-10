@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator"
 
 import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconWorld, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconSun, IconMoon } from "@tabler/icons-react"
 import { useRealtimeMembers } from '@/hooks/use-realtime-members'
-import { SendHorizontal } from "lucide-react"
+import { SendHorizontal, Target } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -26,6 +26,8 @@ import { ColorPicker } from "@/components/ui/color-picker"
 import { LinkPreview } from "@/components/ui/link-preview"
 import { MembersActivityLog } from "@/components/members-activity-log"
 import { Comment } from "@/components/ui/comment"
+import { AgentSelection, type Agent } from "@/components/agent-selection"
+import { ClientSelection, type Client } from "@/components/client-selection"
 
 
 
@@ -2459,13 +2461,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                 
                 {/* Status */}
                 <div className="flex items-center gap-2">
-                  {formData.status === 'Current Client' ? (
-                    <IconCircle className="h-4 w-4 fill-green-500 stroke-none" />
-                  ) : formData.status === 'Lost Client' ? (
-                    <IconCircle className="h-4 w-4 fill-red-500 stroke-none" />
-                  ) : (
-                    <IconCircle className="h-4 w-4 text-muted-foreground" />
-                  )}
+                  <Target className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Status:</span>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -3150,397 +3146,133 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0 bg-[#ececec] dark:bg-[#0a0a0a]">
               {showAgentSelection ? (
-                // Agent Selection Content
-                <div className="flex flex-col h-full">
-                  {/* Search and Filter */}
-                  <div className="space-y-3 flex-shrink-0">
-                    <div className="relative">
-                      <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search by name or employee ID..."
-                        value={agentSearch}
-                        onChange={(e) => setAgentSearch(e.target.value)}
-                        className="pl-8"
-                      />
-                      {agentSearch && (
-                        <button
-                          onClick={() => setAgentSearch('')}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <IconX className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                <AgentSelection
+                  agents={displayAgents}
+                  selectedAgentIds={selectedAgents}
+                  onSelectionChange={async (agentId, isSelected) => {
+                    const agent = displayAgents.find(a => a.user_id === agentId)
+                    if (!agent) return
 
-                  {/* Agents List */}
-                  <div 
-                    data-agent-list
-                    className="space-y-4 flex-1 overflow-y-auto min-h-0 px-2 py-4"
-                    onScroll={(e) => {
-                      const target = e.target as HTMLDivElement
-                      const { scrollTop, scrollHeight, clientHeight } = target
-                      
-                      // Debug scroll values
-                      console.log('🔍 Agents Scroll Debug:', {
-                        scrollTop,
-                        scrollHeight,
-                        clientHeight,
-                        threshold: scrollHeight * 0.8,
-                        shouldLoad: scrollTop + clientHeight >= scrollHeight * 0.8,
-                        hasMore,
-                        isLoadingMore,
-                        agentsLength: displayAgents.length,
-                        totalCount
+                    const newSelected = new Set(selectedAgents)
+                    if (isSelected) {
+                      newSelected.add(agentId)
+                      // Only add if not already in selectedAgentsData
+                      setSelectedAgentsData(prev => {
+                        if (prev.some(a => a.user_id === agentId)) {
+                          return prev
+                        }
+                        return [...prev, agent]
                       })
-                      
-                      // Load more when user scrolls to 80% of the content
-                      if (scrollTop + clientHeight >= scrollHeight * 0.8 && hasMore && !isLoadingMore) {
-                        console.log('🔄 Scroll triggered load more agents')
-                        loadMoreAgents()
+                    } else {
+                      newSelected.delete(agentId)
+                      // Remove from selectedAgentsData when unselecting
+                      setSelectedAgentsData(prev => prev.filter(a => a.user_id !== agentId))
+                    }
+                    
+                    // Update local state immediately for responsive UI
+                    setSelectedAgents(newSelected)
+                    
+                    // Real-time database update
+                    if (companyToEdit?.id) {
+                      try {
+                        await updateAssignmentRealTime(agentId, isSelected, 'agent')
+                        console.log(`✅ Real-time agent assignment updated: ${agentId} ${isSelected ? 'assigned' : 'unassigned'}`)
+                      } catch (error) {
+                        console.error('❌ Real-time agent update failed:', error)
+                        // Error handling is done in updateAssignmentRealTime
                       }
-                    }}
-                  >
-                    {isLoadingAgents ? (
-                      <div className="space-y-3">
-                        {[...Array(6)].map((_, index) => (
-                          <div key={index} className="p-4 border rounded-lg animate-pulse">
-                            <div className="flex items-start gap-3">
-                              <div className="w-8 h-8 bg-muted rounded-full flex-shrink-0"></div>
-                              <div className="flex-1 space-y-2">
-                                <div className="h-4 bg-muted rounded w-3/4"></div>
-                                <div className="h-3 bg-muted rounded w-1/2"></div>
-                              </div>
-                              <div className="w-16 h-6 bg-muted rounded flex-shrink-0"></div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : displayAgents.length > 0 ? (
-                      <>
-                        <div className="space-y-3">
-                          {displayAgents.map((agent) => (
-                            <div 
-                              key={agent.user_id}
-                              className={`p-4 border border-gray-300 dark:border-border rounded-lg transition-all duration-200 ${
-                                agent.member_company && agent.member_company !== companyToEdit?.company
-                                  ? 'opacity-50 cursor-not-allowed bg-muted/30' 
-                                  : `cursor-pointer ${
-                                      selectedAgents.has(agent.user_id)
-                                        ? 'border-primary/50 bg-primary/5'
-                                        : 'hover:border-primary/50 hover:bg-primary/5'
-                                    }`
-                              }`}
-                                                                onClick={async () => {
-                                // Disable selection for agents assigned to other companies
-                                if (agent.member_company && agent.member_company !== companyToEdit?.company) return
-                                
-                                const newSelected = new Set(selectedAgents)
-                                    const wasSelected = newSelected.has(agent.user_id)
-                                    
-                                    if (wasSelected) {
-                                  newSelected.delete(agent.user_id)
-                                  // Remove from selectedAgentsData when unselecting
-                                  setSelectedAgentsData(prev => prev.filter(a => a.user_id !== agent.user_id))
-                                } else {
-                                  newSelected.add(agent.user_id)
-                                  // Only add if not already in selectedAgentsData
-                                  setSelectedAgentsData(prev => {
-                                    if (prev.some(a => a.user_id === agent.user_id)) {
-                                      return prev
-                                    }
-                                    return [...prev, agent]
-                                  })
-                                }
-                                    
-                                    // Update local state immediately for responsive UI
-                                setSelectedAgents(newSelected)
-                                    
-                                    // Real-time database update
-                                    if (companyToEdit?.id) {
-                                      try {
-                                        await updateAssignmentRealTime(agent.user_id, !wasSelected, 'agent')
-                                        console.log(`✅ Real-time agent assignment updated: ${agent.user_id} ${!wasSelected ? 'assigned' : 'unassigned'}`)
-                                      } catch (error) {
-                                        console.error('❌ Real-time agent update failed:', error)
-                                        // Error handling is done in updateAssignmentRealTime
-                                      }
-                                    }
-                              }}
-                            >
-                              <div className="grid grid-cols-[auto_1fr_auto] items-start gap-3">
-                                <div className="relative">
-                                  <Avatar className="w-8 h-8">
-                                    <AvatarImage src={agent.profile_picture || undefined} alt={agent.first_name || 'Agent'} />
-                                    <AvatarFallback>
-                                      {agent.first_name && agent.last_name 
-                                        ? `${agent.first_name.charAt(0)}${agent.last_name.charAt(0)}`
-                                        : agent.first_name?.charAt(0) || agent.last_name?.charAt(0) || 'A'
-                                      }
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  {selectedAgents.has(agent.user_id) && (!agent.member_company || agent.member_company === companyToEdit?.company) && (
-                                    <div className="absolute inset-0 rounded-full" style={{ backgroundColor: '#73a2bb80' }}></div>
-                                  )}
-                                </div>
-                                <div className="min-w-0">
-                                  <h4 className="font-medium text-sm truncate">
-                                    {agent.first_name && agent.last_name 
-                                      ? `${agent.first_name} ${agent.last_name}` 
-                                      : agent.first_name || agent.last_name || 'Unknown Name'
-                                    }
-                                  </h4>
-                                  <span 
-                                    className="text-xs font-medium truncate block"
-                                    style={{ 
-                                      color: agent.member_company 
-                                        ? (agent.member_company === companyToEdit?.company ? '#6B7280' : agent.member_badge_color || '#6B7280')
-                                        : '#6B7280'
-                                    }}
-                                    title={agent.member_company === companyToEdit?.company ? 'Currently Assigned' : (agent.member_company || 'No Member')}
-                                  >
-                                    {agent.member_company === companyToEdit?.company ? 'Currently Assigned' : (agent.member_company || 'No Member')}
-                                  </span>
-                                </div>
-                                {agent.employee_id && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="text-xs px-2 py-0.5 border flex-shrink-0"
-                                    style={
-                                      theme === 'dark'
-                                        ? { backgroundColor: '#44464880', borderColor: '#444648', color: '#ffffff' }
-                                        : { backgroundColor: '#44464814', borderColor: '#a5a5a540', color: '#444648' }
-                                    }
-                                  >
-                                    {agent.employee_id}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        
-                                          {/* Load More Indicator */}
-                  {isLoadingMore && (
-                    <div className="text-center py-4">
-                      <div className="flex items-center justify-center space-x-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0s' }} />
-                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.2s' }} />
-                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.4s' }} />
-                      </div>
-                    </div>
-                  )}
-                  
-
-
-
-                      </>
-                    ) : (
-                                              <div className="text-center py-8 text-muted-foreground">
-                        <p className="text-sm font-medium">No Agents Found</p>
-                        </div>
-                    )}
-                  </div>
-
-                  {/* Done Button */}
-                  <div className="flex-shrink-0">
-                    <Button
-                      onClick={closeSelectionContainers}
-                      className="w-full"
-                    >
-                      Done
-                    </Button>
-                  </div>
-                </div>
+                    }
+                  }}
+                  onSearchChange={setAgentSearch}
+                  searchValue={agentSearch}
+                  isLoading={isLoadingAgents}
+                  isLoadingMore={isLoadingMore}
+                  hasMore={hasMore}
+                  onLoadMore={loadMoreAgents}
+                  onDone={closeSelectionContainers}
+                  currentCompany={companyToEdit?.company}
+                  onScroll={(e) => {
+                    const target = e.target as HTMLDivElement
+                    const { scrollTop, scrollHeight, clientHeight } = target
+                    
+                    // Debug scroll values
+                    console.log('🔍 Agents Scroll Debug:', {
+                      scrollTop,
+                      scrollHeight,
+                      clientHeight,
+                      threshold: scrollHeight * 0.8,
+                      shouldLoad: scrollTop + clientHeight >= scrollHeight * 0.8,
+                      hasMore,
+                      isLoadingMore,
+                      agentsLength: displayAgents.length,
+                      totalCount
+                    })
+                  }}
+                />
               ) : showClientSelection ? (
-                // Client Selection Content
-                <div className="flex flex-col h-full">
-                  {/* Search and Filter */}
-                  <div className="space-y-3 flex-shrink-0">
-                    <div className="relative">
-                      <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                              <Input
-                        placeholder="Search by name..."
-                        value={clientSearch}
-                        onChange={(e) => handleClientSearch(e.target.value)}
-                        className="pl-8"
-                      />
-                      {clientSearch && (
-                        <button
-                          onClick={() => handleClientSearch('')}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <IconX className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                <ClientSelection
+                  clients={displayClients}
+                  selectedClientIds={selectedClients}
+                  onSelectionChange={async (clientId, isSelected) => {
+                    const client = displayClients.find(c => c.user_id === clientId)
+                    if (!client) return
 
-                  {/* Clients List */}
-                  <div 
-                    data-client-list
-                    className="space-y-4 flex-1 overflow-y-auto min-h-0 px-2 py-4"
-                    onScroll={(e) => {
-                      const target = e.target as HTMLDivElement
-                      const { scrollTop, scrollHeight, clientHeight } = target
-                      
-                      // Debug scroll values
-                      console.log('🔍 Clients Scroll Debug:', {
-                        scrollTop,
-                        scrollHeight,
-                        clientHeight,
-                        threshold: scrollHeight * 0.8,
-                        shouldLoad: scrollTop + clientHeight >= scrollHeight * 0.8,
-                        hasMoreClients,
-                        isLoadingMoreClients,
-                        clientsLength: displayClients.length,
-                        totalClientCount
+                    const newSelected = new Set(selectedClients)
+                    if (isSelected) {
+                      newSelected.add(clientId)
+                      // Only add if not already in selectedClientsData
+                      setSelectedClientsData(prev => {
+                        if (prev.some(c => c.user_id === clientId)) {
+                          return prev
+                        }
+                        return [...prev, client]
                       })
-                      
-                      // Load more when user scrolls to 80% of the content
-                      if (scrollTop + clientHeight >= scrollHeight * 0.8 && hasMoreClients && !isLoadingMoreClients) {
-                        console.log('🔄 Scroll triggered load more clients')
-                        loadMoreClients()
+                    } else {
+                      newSelected.delete(clientId)
+                      // Remove from selectedClientsData when unselecting
+                      setSelectedClientsData(prev => prev.filter(c => c.user_id !== clientId))
+                    }
+                    
+                    // Update local state immediately for responsive UI
+                    setSelectedClients(newSelected)
+                    
+                    // Real-time database update
+                    if (companyToEdit?.id) {
+                      try {
+                        await updateAssignmentRealTime(clientId, isSelected, 'client')
+                        console.log(`✅ Real-time client assignment updated: ${clientId} ${isSelected ? 'assigned' : 'unassigned'}`)
+                      } catch (error) {
+                        console.error('❌ Real-time client update failed:', error)
+                        // Error handling is done in updateAssignmentRealTime
                       }
-                    }}
-                  >
-                    {isLoadingClients ? (
-                      <div className="space-y-3">
-                        {[...Array(6)].map((_, index) => (
-                          <div key={index} className="p-4 border rounded-lg animate-pulse">
-                            <div className="flex items-start gap-3">
-                              <div className="w-8 h-8 bg-muted rounded-full flex-shrink-0"></div>
-                              <div className="flex-1 space-y-2">
-                                <div className="h-4 bg-muted rounded w-3/4"></div>
-                                <div className="h-3 bg-muted rounded w-1/2"></div>
-                              </div>
-                              <div className="w-16 h-6 bg-muted rounded flex-shrink-0"></div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : displayClients.length > 0 ? (
-                      <>
-                        <div className="space-y-3">
-                          {displayClients.map((client) => (
-                            <div 
-                              key={client.user_id}
-                              className={`p-4 border border-gray-300 dark:border-border rounded-lg transition-all duration-200 ${
-                                client.member_company && client.member_company !== companyToEdit?.company
-                                  ? 'opacity-50 cursor-not-allowed bg-muted/30' 
-                                  : `cursor-pointer ${
-                                      selectedClients.has(client.user_id)
-                                        ? 'border-primary/50 bg-primary/5'
-                                        : 'hover:border-primary/50 hover:bg-primary/5'
-                                    }`
-                              }`}
-                              onClick={async () => {
-                                // Disable selection for clients assigned to other companies
-                                if (client.member_company && client.member_company !== companyToEdit?.company) return
-                                
-                                const newSelected = new Set(selectedClients)
-                                const wasSelected = newSelected.has(client.user_id)
-                                
-                                if (wasSelected) {
-                                  newSelected.delete(client.user_id)
-                                  // Remove from selectedClientsData when unselecting
-                                  setSelectedClientsData(prev => prev.filter(c => c.user_id !== client.user_id))
-                                } else {
-                                  newSelected.add(client.user_id)
-                                  // Only add if not already in selectedClientsData
-                                  setSelectedClientsData(prev => {
-                                    if (prev.some(c => c.user_id === client.user_id)) {
-                                      return prev
-                                    }
-                                    return [...prev, client]
-                                  })
-                                }
-                                
-                                // Update local state immediately for responsive UI
-                                setSelectedClients(newSelected)
-                                
-                                // Real-time database update
-                                if (companyToEdit?.id) {
-                                  try {
-                                    await updateAssignmentRealTime(client.user_id, !wasSelected, 'client')
-                                    console.log(`✅ Real-time client assignment updated: ${client.user_id} ${!wasSelected ? 'assigned' : 'unassigned'}`)
-                                  } catch (error) {
-                                    console.error('❌ Real-time client update failed:', error)
-                                    // Error handling is done in updateAssignmentRealTime
-                                  }
-                                }
-                              }}
-                            >
-                              <div className="grid grid-cols-[auto_1fr_auto] items-start gap-3">
-                                <div className="relative">
-                                  <Avatar className="w-8 h-8">
-                                    <AvatarImage src={client.profile_picture || undefined} alt={client.first_name || 'Client'} />
-                                    <AvatarFallback>
-                                      {client.first_name && client.last_name 
-                                        ? `${client.first_name.charAt(0)}${client.last_name.charAt(0)}`
-                                        : client.first_name?.charAt(0) || client.last_name?.charAt(0) || 'C'
-                                      }
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  {selectedClients.has(client.user_id) && (!client.member_company || client.member_company === companyToEdit?.company) && (
-                                    <div className="absolute inset-0 rounded-full" style={{ backgroundColor: '#73a2bb80' }}></div>
-                                  )}
-                                </div>
-                                <div className="min-w-0">
-                                  <h4 className="font-medium text-sm truncate">
-                                    {client.first_name && client.last_name 
-                                      ? `${client.first_name} ${client.last_name}` 
-                                      : client.first_name || client.last_name || 'Unknown Name'
-                                    }
-                                  </h4>
-                                  <span 
-                                    className="text-xs font-medium truncate block"
-                                    style={{ 
-                                      color: client.member_company 
-                                        ? (client.member_company === companyToEdit?.company ? '#6B7280' : client.member_badge_color || '#6B7280')
-                                        : '#6B7280'
-                                    }}
-                                    title={client.member_company === companyToEdit?.company ? 'Currently Assigned' : (client.member_company || 'No Member')}
-                                  >
-                                    {client.member_company === companyToEdit?.company ? 'Currently Assigned' : (client.member_company || 'No Member')}
-                                  </span>
-                                </div>
-
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        
-                        {/* Load More Indicator */}
-                        {isLoadingMoreClients && (
-                          <div className="text-center py-4">
-                            <div className="flex items-center justify-center space-x-1">
-                              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0s' }} />
-                              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.2s' }} />
-                              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.4s' }} />
-                            </div>
-                          </div>
-                        )}
-                        
-
-                      </>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <p className="text-sm font-medium">No Clients Found</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Done Button */}
-                  <div className="flex-shrink-0">
-                    <Button
-                      onClick={closeSelectionContainers}
-                      className="w-full"
-                    >
-                      Done
-                    </Button>
-                  </div>
-                </div>
+                    }
+                  }}
+                  onSearchChange={handleClientSearch}
+                  searchValue={clientSearch}
+                  isLoading={isLoadingClients}
+                  isLoadingMore={isLoadingMoreClients}
+                  hasMore={hasMoreClients}
+                  onLoadMore={loadMoreClients}
+                  onDone={closeSelectionContainers}
+                  currentCompany={companyToEdit?.company}
+                  onScroll={(e) => {
+                    const target = e.target as HTMLDivElement
+                    const { scrollTop, scrollHeight, clientHeight } = target
+                    
+                    // Debug scroll values
+                    console.log('🔍 Clients Scroll Debug:', {
+                      scrollTop,
+                      scrollHeight,
+                      clientHeight,
+                      threshold: scrollHeight * 0.8,
+                      shouldLoad: scrollTop + clientHeight >= scrollHeight * 0.8,
+                      hasMoreClients,
+                      isLoadingMoreClients,
+                      clientsLength: displayClients.length,
+                      totalClientCount
+                    })
+                  }}
+                />
               ) : (
                 // Activity Content - Shows company activity and recent changes
                 <div>

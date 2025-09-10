@@ -864,6 +864,106 @@ export async function getTicketsByStatusWithPagination(
   }
 }
 
+// Optimized query for past tickets table display (minimal data only)
+export async function getPastTicketsTableData(
+  page: number = 1, 
+  limit: number = 20, 
+  search: string = '', 
+  sortField: string = 'resolved_at', 
+  sortDirection: string = 'desc', 
+  categoryId: string = '',
+  userId: string = '',
+  isAdmin: boolean = false
+): Promise<{ tickets: any[], totalCount: number }> {
+  const offset = (page - 1) * limit
+  
+  let whereConditions: string[] = ['t.status = $1', 't.resolved_at IS NOT NULL']
+  let queryParams: any[] = ['Closed']
+  let paramIndex = 2
+  
+  if (!isAdmin) {
+    whereConditions.push('t.role_id = 1')
+  }
+  
+  if (search) {
+    // Handle special "you" search for current user's resolved tickets
+    if (search.toLowerCase() === 'you' && userId) {
+      whereConditions.push(`t.resolved_by = $${paramIndex}`)
+      queryParams.push(parseInt(userId))
+      paramIndex++
+    } else {
+      whereConditions.push(`(
+        t.concern ILIKE $${paramIndex} OR 
+        t.details ILIKE $${paramIndex} OR 
+        t.ticket_id ILIKE $${paramIndex} OR
+        pi.first_name ILIKE $${paramIndex} OR
+        pi.last_name ILIKE $${paramIndex} OR
+        resolver_pi.first_name ILIKE $${paramIndex} OR
+        resolver_pi.last_name ILIKE $${paramIndex} OR
+        tc.name ILIKE $${paramIndex}
+      )`)
+      queryParams.push(`%${search}%`)
+      paramIndex++
+    }
+  }
+  
+  if (categoryId) {
+    whereConditions.push(`t.category_id = $${paramIndex}`)
+    queryParams.push(parseInt(categoryId))
+    paramIndex++
+  }
+  
+  const whereClause = whereConditions.join(' AND ')
+  
+  // Count total records
+  const countQuery = `
+    SELECT COUNT(*) as total
+    FROM public.tickets t
+    LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+    LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
+    LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
+    WHERE ${whereClause}
+  `
+  
+  const countResult = await pool.query(countQuery, queryParams)
+  const totalCount = parseInt(countResult.rows[0]?.total || '0')
+  
+  // Get paginated results - ONLY essential data for table display
+  const dataQuery = `
+    SELECT 
+      t.id, 
+      t.ticket_id, 
+      t.user_id, 
+      t.concern, 
+      t.details, 
+      t.status,
+      t.created_at,
+      t.resolved_at, 
+      t.resolved_by,
+      pi.profile_picture, 
+      pi.first_name, 
+      pi.last_name,
+      tc.name as category_name,
+      resolver_pi.first_name as resolver_first_name, 
+      resolver_pi.last_name as resolver_last_name
+    FROM public.tickets t
+    LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+    LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
+    LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
+    WHERE ${whereClause}
+    ORDER BY ${getSortField(sortField)} ${sortDirection.toUpperCase()}
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `
+  
+  const dataParams = [...queryParams, limit, offset]
+  const dataResult = await pool.query(dataQuery, dataParams)
+  
+  return {
+    tickets: dataResult.rows,
+    totalCount
+  }
+}
+
 // Get all agents with joined profile/job/member/department/station info
 export async function getAllAgents(): Promise<AgentRecord[]> {
   const result = await pool.query(
@@ -1839,7 +1939,7 @@ export async function getAgentsForModal(
   memberId: string = '',
   sortField: string = 'first_name',
   sortDirection: 'asc' | 'desc' = 'asc'
-): Promise<{ agents: any[]; totalCount: number }> {
+): Promise<{ agents: any[]; totalCount: number; hasMore: boolean }> {
   try {
     const offset = (Math.max(1, page) - 1) * Math.max(1, limit)
     const params: any[] = []
@@ -1941,7 +2041,9 @@ export async function getAgentsForModal(
     const dataParams = [...params, Math.max(1, limit), offset]
     const dataResult = await pool.query(dataQuery, dataParams)
 
-    return { agents: dataResult.rows, totalCount }
+    const hasMore = (offset + dataResult.rows.length) < totalCount
+    
+    return { agents: dataResult.rows, totalCount, hasMore }
   } catch (error) {
     console.error('Error in getAgentsForModal:', error)
     throw error
