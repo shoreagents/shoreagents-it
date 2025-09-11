@@ -639,7 +639,36 @@ export default function TicketsPage() {
       setTickets(prev => [...prev, newTicket])
     },
     onTicketUpdated: (updatedTicket, oldTicket) => {
-      // Merge to preserve joined fields like member_name and user_type
+      console.log('🔄 Real-time update received:', {
+        ticketId: updatedTicket.id,
+        changes: {
+          status: oldTicket?.status !== updatedTicket.status ? `${oldTicket?.status} → ${updatedTicket.status}` : 'unchanged',
+          position: oldTicket?.position !== updatedTicket.position ? `${oldTicket?.position} → ${updatedTicket.position}` : 'unchanged',
+          clear: oldTicket?.clear !== updatedTicket.clear ? `${oldTicket?.clear} → ${updatedTicket.clear}` : 'unchanged'
+        }
+      })
+      
+      // Handle clear status changes - remove cleared tickets from view
+      if (oldTicket?.clear !== updatedTicket.clear && updatedTicket.clear === true) {
+        console.log('🧹 Ticket cleared - removing from view:', updatedTicket.id)
+        setTickets(prev => prev.filter(ticket => ticket.id !== updatedTicket.id))
+        return
+      }
+      
+      // Handle unclear status changes - add uncleared tickets back to view if they should be visible
+      if (oldTicket?.clear !== updatedTicket.clear && updatedTicket.clear === false) {
+        console.log('🔄 Ticket uncleared - adding back to view:', updatedTicket.id)
+        setTickets(prev => {
+          const exists = prev.find(t => t.id === updatedTicket.id)
+          if (!exists) {
+            return [...prev, updatedTicket]
+          }
+          return prev
+        })
+        return
+      }
+      
+      // For other updates, merge to preserve joined fields like member_name and user_type
       setTickets(prev => prev.map(ticket => 
         ticket.id === updatedTicket.id ? { ...ticket, ...updatedTicket } : ticket
       ))

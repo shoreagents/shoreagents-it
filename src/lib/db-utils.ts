@@ -119,7 +119,7 @@ export interface TalentPoolRecord {
 export async function getAllTickets(): Promise<Ticket[]> {
   const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
-           t.role_id, pi.profile_picture, pi.first_name, pi.last_name, tc.name as category_name,
+           t.role_id, t.clear, pi.profile_picture, pi.first_name, pi.last_name, tc.name as category_name,
            resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
@@ -135,7 +135,7 @@ export async function getAllTickets(): Promise<Ticket[]> {
 export async function getAllTicketsAdmin(): Promise<Ticket[]> {
   const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
-           t.role_id, pi.profile_picture, pi.first_name, pi.last_name, tc.name as category_name,
+           t.role_id, t.clear, pi.profile_picture, pi.first_name, pi.last_name, tc.name as category_name,
            resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
@@ -292,8 +292,8 @@ export async function createTicket(ticket: Omit<Ticket, 'id' | 'created_at' | 'u
 export async function updateTicketStatus(id: number, status: string, resolvedBy?: number): Promise<Ticket> {
   try {
     // First perform the update
-    if (status === 'Completed' || status === 'Closed') {
-      // When marking as completed or closed, set resolved_at timestamp and resolved_by
+    if (status === 'Closed') {
+      // When marking as closed, set resolved_at timestamp and resolved_by
       if (resolvedBy) {
         await pool.query(
           'UPDATE public.tickets SET status = $1, resolved_at = NOW(), resolved_by = $3 WHERE id = $2',
@@ -306,9 +306,9 @@ export async function updateTicketStatus(id: number, status: string, resolvedBy?
         )
       }
     } else {
-      // For other status changes, clear resolved_at and resolved_by fields
+      // For other status changes, clear resolved_at, resolved_by, and clear fields
       await pool.query(
-        'UPDATE public.tickets SET status = $1, resolved_at = NULL, resolved_by = NULL WHERE id = $2',
+        'UPDATE public.tickets SET status = $1, resolved_at = NULL, resolved_by = NULL, clear = false WHERE id = $2',
         [status, id]
       )
     }
@@ -376,10 +376,21 @@ export async function updateTicket(id: number, updates: Partial<Ticket>): Promis
   const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ')
   
   // First perform the update
-  await pool.query(
-    `UPDATE public.tickets SET ${setClause} WHERE id = $1`,
-    [id, ...values]
-  )
+  let query = `UPDATE public.tickets SET ${setClause}`
+  let queryParams = [id, ...values]
+  
+  // If status is being changed from Closed to something else, also reset clear field
+  if (updates.status && updates.status !== 'Closed') {
+    // Check if the current status is Closed
+    const currentTicket = await getTicketById(id)
+    if (currentTicket && currentTicket.status === 'Closed') {
+      query += ', clear = false'
+    }
+  }
+  
+  query += ' WHERE id = $1'
+  
+  await pool.query(query, queryParams)
   
   // Then fetch the complete ticket data with all JOINs
   const result = await pool.query(`
@@ -423,11 +434,11 @@ export async function deleteTicket(id: number): Promise<void> {
 }
 
 
-// Get ticket by ID
+// Get ticket by ID (IT role only)
 export async function getTicketById(id: number): Promise<Ticket | null> {
   const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
-           t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
+           t.role_id, t.clear, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
            resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
            t.supporting_files, t.file_count,
@@ -455,6 +466,42 @@ export async function getTicketById(id: number): Promise<Ticket | null> {
     LEFT JOIN public.clients c ON t.user_id = c.user_id
     LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
     WHERE t.id = $1 AND t.role_id = 1
+  `, [id])
+  return result.rows[0] || null
+}
+
+// Get ticket by ID (Admin - all roles)
+export async function getTicketByIdAdmin(id: number): Promise<Ticket | null> {
+  const result = await pool.query(`
+    SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
+           t.role_id, t.clear, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
+           ji.employee_id,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           t.supporting_files, t.file_count,
+           u.user_type,
+           CASE 
+             WHEN u.user_type = 'Internal' THEN 'Internal'
+             WHEN a.member_id IS NOT NULL THEN m.company
+             WHEN c.member_id IS NOT NULL THEN m.company
+             ELSE NULL
+           END as member_name,
+           CASE 
+             WHEN u.user_type = 'Internal' THEN NULL
+             WHEN a.member_id IS NOT NULL THEN m.badge_color
+             WHEN c.member_id IS NOT NULL THEN m.badge_color
+             ELSE NULL
+           END as member_color
+    FROM public.tickets t
+    LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
+    LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
+    LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
+    LEFT JOIN public.job_info ji ON t.user_id = ji.agent_user_id OR t.user_id = ji.internal_user_id
+    LEFT JOIN public.personal_info resolver_pi ON t.resolved_by = resolver_pi.user_id
+    LEFT JOIN public.users u ON t.user_id = u.id
+    LEFT JOIN public.agents a ON t.user_id = a.user_id
+    LEFT JOIN public.clients c ON t.user_id = c.user_id
+    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+    WHERE t.id = $1
   `, [id])
   return result.rows[0] || null
 }
@@ -501,7 +548,7 @@ export async function searchTickets(searchTerm: string): Promise<Ticket[]> {
 export async function resolveTicket(id: number, resolvedBy: number): Promise<Ticket> {
   const result = await pool.query(
     'UPDATE public.tickets SET status = $1, resolved_by = $2, resolved_at = (NOW() AT TIME ZONE \'Asia/Manila\') WHERE id = $3 RETURNING *',
-    ['Completed', resolvedBy, id]
+    ['Closed', resolvedBy, id]
   )
   return result.rows[0]
 }
@@ -1928,6 +1975,38 @@ export async function getAgentsByMember(memberId: number): Promise<{ user_id: nu
     ORDER BY COALESCE(pi.first_name, ''), COALESCE(pi.last_name, '')
   `
   const result = await pool.query(query, [memberId])
+  return result.rows
+}
+
+// Fetch agents by their user IDs (for event assignments)
+export async function getAgentsByIds(userIds: number[]): Promise<{ user_id: number; first_name: string | null; last_name: string | null; employee_id: string | null; job_title: string | null; profile_picture: string | null; member_company: string | null; member_badge_color: string | null }[]> {
+  console.log('🔄 getAgentsByIds called with:', userIds)
+  if (userIds.length === 0) {
+    console.log('🔄 No user IDs provided, returning empty array')
+    return []
+  }
+  
+  const query = `
+    SELECT 
+      u.id as user_id,
+      pi.first_name,
+      pi.last_name,
+      ji.employee_id,
+      ji.job_title,
+      pi.profile_picture,
+      m.company as member_company,
+      m.badge_color as member_badge_color
+    FROM users u
+    LEFT JOIN personal_info pi ON u.id = pi.user_id
+    LEFT JOIN agents a ON u.id = a.user_id
+    LEFT JOIN job_info ji ON a.user_id = ji.agent_user_id
+    LEFT JOIN members m ON a.member_id = m.id
+    WHERE u.id = ANY($1)
+    ORDER BY pi.first_name, pi.last_name
+  `
+  console.log('🔄 Executing query with user IDs:', userIds)
+  const result = await pool.query(query, [userIds])
+  console.log('🔄 Query result:', result.rows.length, 'agents found')
   return result.rows
 }
 
@@ -4836,6 +4915,7 @@ export interface Event {
   location: string | null
   status: string
   event_type: string
+  assigned_user_ids: number[] | null
   created_by: number
   created_at: string
   updated_at: string
@@ -4873,6 +4953,7 @@ export async function getEventsPaginated({
         e.location,
         e.status,
         e.event_type,
+        e.assigned_user_ids,
         e.created_by,
         e.created_at,
         e.updated_at,
@@ -4959,12 +5040,13 @@ export async function createEvent(event: {
   location?: string | null
   event_type?: string
   status?: string
+  assigned_user_ids?: number[] | null
   created_by: number
 }): Promise<Event> {
   try {
     const query = `
-      INSERT INTO events (title, description, event_date, start_time, end_time, location, event_type, status, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO events (title, description, event_date, start_time, end_time, location, event_type, status, assigned_user_ids, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `
 
@@ -4977,12 +5059,75 @@ export async function createEvent(event: {
       event.location || null,
       event.event_type || 'event',
       event.status || 'upcoming',
+      event.assigned_user_ids || null,
       event.created_by
     ])
 
     return result.rows[0]
   } catch (error) {
     console.error('Error creating event:', error)
+    throw error
+  }
+}
+
+export async function updateEvent(eventId: number, event: {
+  title: string
+  description?: string | null
+  event_date: string
+  start_time: string
+  end_time: string
+  location?: string | null
+  event_type?: string
+  status?: string
+  assigned_user_ids?: number[] | null
+}): Promise<Event> {
+  try {
+    const query = `
+      UPDATE events 
+      SET title = $1, 
+          description = $2, 
+          event_date = $3, 
+          start_time = $4, 
+          end_time = $5, 
+          location = $6, 
+          event_type = $7, 
+          status = $8, 
+          assigned_user_ids = $9,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $10
+      RETURNING *
+    `
+
+    const result = await pool.query(query, [
+      event.title,
+      event.description || null,
+      event.event_date,
+      event.start_time,
+      event.end_time,
+      event.location || null,
+      event.event_type || 'event',
+      event.status || 'upcoming',
+      event.assigned_user_ids || null,
+      eventId
+    ])
+
+    if (result.rows.length === 0) {
+      throw new Error('Event not found')
+    }
+
+    return result.rows[0]
+  } catch (error) {
+    console.error('Error updating event:', error)
+    throw error
+  }
+}
+
+export async function deleteEvent(eventId: number): Promise<void> {
+  try {
+    const query = `DELETE FROM events WHERE id = $1`
+    await pool.query(query, [eventId])
+  } catch (error) {
+    console.error('Error deleting event:', error)
     throw error
   }
 }

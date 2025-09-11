@@ -384,45 +384,67 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
     }
   }
 
-  const handleStatusChange = async (newStatus: string) => {
+  const handleStatusChange = (newStatus: string) => {
+    // Update local state immediately for instant UI feedback
     setCurrentStatus(newStatus as TicketStatus)
-    if (!ticket) return
+  }
+
+  // Auto-save function that saves status changes when modal closes
+  const autoSaveStatusChange = async (): Promise<boolean> => {
+    if (!ticket || !currentStatus || currentStatus === ticket.status) {
+      return true // No changes to save
+    }
+
     try {
       // Map display status to database status
-      let dbStatus = newStatus === 'New' ? 'Approved' : newStatus
+      let dbStatus = currentStatus === 'New' ? 'Approved' : currentStatus
       // Admin can set For Approval explicitly
-      if (isAdmin && newStatus === 'For Approval') {
+      if (isAdmin && currentStatus === 'For Approval') {
         dbStatus = 'For Approval'
       }
       const requestBody: any = { status: dbStatus }
-      if (newStatus === 'Closed' && user?.id) {
+      if (currentStatus === 'Closed' && user?.id) {
         requestBody.resolvedBy = parseInt(user.id)
       }
+      
       const response = await fetch(`/api/tickets/${ticket.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
       })
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error('Failed to update ticket status from modal:', errorData)
-        // Revert local status on failure
-        if (ticket) {
-          setCurrentStatus(ticket.status)
-        }
+        console.error('Failed to update ticket status:', errorData)
+        return false
       }
+      
+      console.log('✅ Ticket status updated successfully')
+      return true
     } catch (error) {
-      console.error('Error updating ticket status from modal:', error)
-      // Revert local status on error
-      if (ticket) {
-        setCurrentStatus(ticket.status)
+      console.error('Error updating ticket status:', error)
+      return false
+    }
+  }
+
+  // Handle modal close with auto-save
+  const handleClose = async () => {
+    // Auto-save status changes before closing
+    const saveSuccess = await autoSaveStatusChange()
+    if (saveSuccess) {
+      onClose()
+    } else {
+      // If save failed, ask user if they want to close anyway
+      const shouldClose = confirm('Failed to save status changes. Do you want to close anyway?')
+      if (shouldClose) {
+        onClose()
       }
     }
   }
 
   return (
     <TooltipProvider>
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden p-0 rounded-xl" style={{ 
           backgroundColor: theme === 'dark' ? '#111111' : '#f8f9fa' 
         }}>
@@ -606,7 +628,9 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                   <div className="space-y-6 flex flex-col min-h-full">
                   {/* Additional Details Section */}
                   <div className="flex-1 flex flex-col min-h-0">
-                    <h3 className="text-lg font-medium mb-2 text-muted-foreground">Additional Details</h3>
+                    <div className="flex items-center justify-between min-h-[40px]">
+                      <h3 className="text-lg font-medium text-muted-foreground">Additional Details</h3>
+                    </div>
                     <div className="rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border flex-1 min-h-0">
                       {isLoading ? (
                         <div className="space-y-3">
@@ -624,11 +648,13 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
 
                   {/* Attachments Section */}
                   <div className="flex-1 flex flex-col min-h-0">
-                    <h3 className="text-lg font-medium mb-2 text-muted-foreground">
-                      Attachments {isLoadingDetail ? (
-                        <Skeleton className="inline-block h-5 w-8 ml-2" />
-                      ) : displayTicket?.file_count ? `(${displayTicket.file_count})` : ''}
-                    </h3>
+                    <div className="flex items-center justify-between min-h-[40px]">
+                      <h3 className="text-lg font-medium text-muted-foreground">
+                        Attachments {isLoadingDetail ? (
+                          <Skeleton className="inline-block h-5 w-8 ml-2" />
+                        ) : displayTicket?.file_count ? `(${displayTicket.file_count})` : ''}
+                      </h3>
+                    </div>
                     <div className={`rounded-lg p-6 text-sm leading-relaxed border border-[#cecece99] dark:border-border flex-1 min-h-0 ${!hasAttachments && !isLoadingDetail ? 'flex items-center justify-center' : ''}`}> 
                       {isLoadingDetail ? (
                         <div className="grid grid-cols-4 gap-3 w-full">

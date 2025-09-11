@@ -222,7 +222,7 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
         case 'UPDATE':
           // For admin board (no role filter), fetch complete data to ensure user names are available
           if (roleFilter == null) {
-            fetch(`/api/tickets/${record.id}`)
+            fetch(`/api/tickets/${record.id}?admin=true`)
               .then(res => {
                 if (!res.ok) {
                   throw new Error(`HTTP error! status: ${res.status}`)

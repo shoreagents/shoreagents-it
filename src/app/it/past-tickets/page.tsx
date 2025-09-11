@@ -448,7 +448,7 @@ export default function PastTicketsPage() {
       }
       
       console.log('Fetching tickets with params:', params.toString())
-      const response = await fetch(`/api/tickets?${params.toString()}`)
+      const response = await fetch(`/api/tickets?admin=false&${params.toString()}`)
       console.log('Response status:', response.status)
       
       if (response.ok) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getTicketById, updateTicketStatus, updateTicket, deleteTicket } from '@/lib/db-utils'
+import { getTicketById, getTicketByIdAdmin, updateTicketStatus, updateTicket, deleteTicket } from '@/lib/db-utils'
 
 export async function GET(
   request: NextRequest,
@@ -7,7 +7,12 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const ticket = await getTicketById(parseInt(id))
+    const { searchParams } = new URL(request.url)
+    const isAdmin = searchParams.get('admin') === 'true'
+    
+    const ticket = isAdmin 
+      ? await getTicketByIdAdmin(parseInt(id))
+      : await getTicketById(parseInt(id))
     
     if (!ticket) {
       return NextResponse.json(

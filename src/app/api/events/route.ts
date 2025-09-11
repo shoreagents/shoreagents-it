@@ -35,7 +35,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { title, description, event_date, start_time, end_time, location, event_type, created_by } = body
+    const { 
+      title, 
+      description, 
+      event_date, 
+      start_time, 
+      end_time, 
+      location, 
+      event_type, 
+      status,
+      assigned_user_ids,
+      created_by 
+    } = body
 
     const event = await createEvent({
       title,
@@ -45,6 +56,8 @@ export async function POST(request: NextRequest) {
       end_time,
       location,
       event_type,
+      status,
+      assigned_user_ids,
       created_by
     })
 

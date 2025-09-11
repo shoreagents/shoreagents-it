@@ -21,8 +21,14 @@ import {
 } from "@/components/ui/pagination"
 import { Event } from "@/lib/db-utils"
 import { AddEventModal } from "@/components/modals/events-detail-modal"
+import { AnimatedTabs } from "@/components/ui/animated-tabs"
+import { useTheme } from "next-themes"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { UserTooltip } from "@/components/ui/user-tooltip"
 
 export default function EventsPage() {
+  const { theme, resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -32,6 +38,10 @@ export default function EventsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
+  const [selectedStatus, setSelectedStatus] = useState<string>('upcoming')
+  const [loadingParticipantsKey, setLoadingParticipantsKey] = useState<string | null>(null)
+  const [eventParticipantsCache, setEventParticipantsCache] = useState<Record<string, { users: { user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, employee_id: string | null }[] }>>({})
+
 
   const fetchEvents = async () => {
     try {
@@ -41,7 +51,8 @@ export default function EventsPage() {
         page: String(currentPage),
         limit: '20',
         sortField: 'event_date',
-        sortDirection: 'asc'
+        sortDirection: 'asc',
+        status: selectedStatus
       })
       if (search.trim()) params.append('search', search.trim())
       
@@ -69,35 +80,14 @@ export default function EventsPage() {
 
   useEffect(() => {
     fetchEvents()
-  }, [currentPage, search])
+  }, [currentPage, search, selectedStatus])
 
-  const getTypeBadgeClass = (type: string): string => {
-    const t = type.toLowerCase()
-    if (t === 'event') {
-      return 'text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20'
-    }
-    if (t === 'activity') {
-      return 'text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20'
-    }
-    return 'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20'
-  }
+  // Handle theme hydration
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
-  const getStatusBadgeClass = (status: string): string => {
-    const s = status.toLowerCase()
-    if (s === 'upcoming') {
-      return 'text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20'
-    }
-    if (s === 'today') {
-      return 'text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20'
-    }
-    if (s === 'ended') {
-      return 'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20'
-    }
-    if (s === 'cancelled') {
-      return 'text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20'
-    }
-    return 'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20'
-  }
+
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -138,8 +128,62 @@ export default function EventsPage() {
     fetchEvents() // Refresh the events list
   }
 
+  const fetchParticipantsForEvent = async (eventId: number) => {
+    const key = `event:${eventId}`
+    if (eventParticipantsCache[key]) return eventParticipantsCache[key].users
+    
+    try {
+      setLoadingParticipantsKey(key)
+      const response = await fetch(`/api/events/${eventId}/participants`)
+      if (response.ok) {
+        const data = await response.json()
+        const participants = data.participants || []
+        setEventParticipantsCache(prev => ({
+          ...prev,
+          [key]: { users: participants }
+        }))
+        return participants
+      }
+    } catch (error) {
+      console.error('Error fetching participants:', error)
+    } finally {
+      setLoadingParticipantsKey(null)
+    }
+    return []
+  }
+
+
   // Filter events based on search (now handled by API)
   const filteredEvents = events
+
+  // Create tabs configuration
+  const tabs = [
+    {
+      title: 'Upcoming',
+      value: 'upcoming',
+      content: null
+    },
+    {
+      title: 'Today',
+      value: 'today',
+      content: null
+    },
+    {
+      title: 'Ended',
+      value: 'ended',
+      content: null
+    },
+    {
+      title: 'Cancelled',
+      value: 'cancelled',
+      content: null
+    }
+  ]
+
+  const handleTabChange = (tab: any) => {
+    setSelectedStatus(tab.value)
+    setCurrentPage(1) // Reset to first page when changing tabs
+  }
 
   return (
     <>
@@ -182,6 +226,23 @@ export default function EventsPage() {
                 </div>
               </div>
 
+              {/* Animated Tabs */}
+              <div className="px-4 lg:px-6">
+                {mounted && (
+                  <div className={`rounded-xl p-1 w-fit ${
+                    resolvedTheme === 'dark' 
+                      ? 'bg-white/5 border border-white/10' 
+                      : 'bg-gray-100/80 border border-gray-200'
+                  }`}>
+                    <AnimatedTabs
+                      tabs={tabs}
+                      onTabChange={handleTabChange}
+                      containerClassName="grid grid-cols-4 w-fit"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 gap-4 px-4 lg:px-6">
                 {loading ? (
                   <div className="space-y-2">
@@ -208,59 +269,78 @@ export default function EventsPage() {
                                   {event.description || 'No description available'}
                                 </div>
                               </div>
-                              {event.status === 'today' && (
+                              <div className="flex flex-col gap-1 items-end">
                                 <Badge 
                                   variant="outline" 
-                                  className="px-2 py-1 text-xs bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800"
+                                  className={`px-3 py-1 font-medium ${
+                                    event.event_type === 'event' 
+                                      ? 'text-purple-700 dark:text-white border-purple-600/20 bg-purple-50 dark:bg-purple-600/20'
+                                      : 'text-yellow-700 dark:text-white border-yellow-600/20 bg-yellow-50 dark:bg-yellow-600/20'
+                                  }`}
                                 >
-                                  Today
+                                  {event.event_type === 'event' ? 'Event' : 'Activity'}
                                 </Badge>
-                              )}
+                                {event.status === 'today' && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="px-2 py-1 text-xs bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800"
+                                  >
+                                    Today
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                             
                             <div className="mt-3 space-y-2 text-sm">
                               <div className="flex items-center gap-2 text-muted-foreground truncate">
                                 <IconCalendar className="h-4 w-4" />
-                                <span className="truncate">{formatDate(event.event_date)} at {formatTimeRange(event.start_time, event.end_time)}</span>
+                                <span className="truncate">{formatDate(event.event_date)}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-muted-foreground truncate">
+                                <IconClock className="h-4 w-4" />
+                                <span className="truncate">{formatTimeRange(event.start_time, event.end_time)}</span>
                               </div>
                               {event.location && (
                                 <div className="flex items-center gap-2 text-muted-foreground truncate">
-                                  <IconMapPin className="h-4 w-4 shrink-0" />
+                                  <IconMapPin className="h-4 w-4" />
                                   <span className="truncate">{event.location}</span>
-                                </div>
-                              )}
-                              <div className="flex items-center gap-2 text-muted-foreground truncate">
-                                <IconUsers className="h-4 w-4" />
-                                <span className="truncate">{event.participants_count} participants</span>
-                              </div>
-                              {(event.first_name || event.last_name) && (
-                                <div className="flex items-center gap-2 text-muted-foreground truncate">
-                                  <span className="text-xs">Created by: {event.first_name} {event.last_name}</span>
                                 </div>
                               )}
                             </div>
                             
                             <div className="mt-auto pt-4">
                               <div className="h-px bg-border mb-3" />
-                              <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <div className="flex items-center gap-2">
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`px-2 py-1 font-medium ${getTypeBadgeClass(event.event_type)}`}
-                                  >
-                                    {event.event_type}
-                                  </Badge>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`px-2 py-1 font-medium ${getStatusBadgeClass(event.status)}`}
-                                  >
-                                    {event.status}
-                                  </Badge>
+                                  <span className="font-medium text-foreground">Participants</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer" onClick={async (e) => { e.stopPropagation(); await fetchParticipantsForEvent(event.id) }}>
+                                        {event.assigned_user_ids ? event.assigned_user_ids.length : 0}
+                                      </button>
+                                    </PopoverTrigger>
+                                  <PopoverContent align="end" sideOffset={6} className="w-80 p-2">
+                                    <div className="flex flex-wrap gap-2 items-center justify-center min-h-10">
+                                      {loadingParticipantsKey === `event:${event.id}` && !eventParticipantsCache[`event:${event.id}`] && (
+                                        <div className="w-full flex items-center justify-center py-2 gap-1">
+                                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0s' }} />
+                                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.2s' }} />
+                                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.4s' }} />
+                                        </div>
+                                      )}
+                                      {(eventParticipantsCache[`event:${event.id}`]?.users || []).map(u => (
+                                        <UserTooltip key={u.user_id} user={u} showEmployeeId={true} />
+                                      ))}
+                                      {loadingParticipantsKey !== `event:${event.id}` && (!eventParticipantsCache[`event:${event.id}`]?.users || eventParticipantsCache[`event:${event.id}`]?.users.length === 0) && (
+                                        <div className="text-xs text-muted-foreground w-full text-center">No Participants</div>
+                                      )}
+                                    </div>
+                                  </PopoverContent>
+                                  </Popover>
                                 </div>
                               </div>
                             </div>
+                            
                           </CardContent>
                         </Card>
                       ))}
@@ -301,10 +381,12 @@ export default function EventsPage() {
                       </div>
                     )}
                     {filteredEvents.length === 0 && !loading && (
-                      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                        <IconCalendar className="h-12 w-12 mb-4" />
-                        <h3 className="text-lg font-medium mb-2">No events found</h3>
-                        <p className="text-sm">Try adjusting your search or add a new event</p>
+                      <div className="flex flex-col h-[75vh]">
+                        <div className="text-center py-16 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-lg bg-muted/20 flex-1 flex items-center justify-center">
+                          <div>
+                            <p className="text-sm font-medium">No Events Found</p>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>

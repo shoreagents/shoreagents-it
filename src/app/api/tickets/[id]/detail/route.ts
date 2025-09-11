@@ -19,7 +19,7 @@ export async function GET(
     const result = await pool.query(`
       SELECT 
         -- ONLY the fields NOT available in ticket cards
-        t.supporting_files, t.file_count, t.status,
+        t.supporting_files, t.file_count, t.status, t.clear,
         resolver_pi.last_name as resolver_last_name
         
       FROM public.tickets t
