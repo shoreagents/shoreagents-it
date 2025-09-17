@@ -58,6 +58,7 @@ interface Applicant {
   member_color?: string | null
   job_title?: string | null
   company_name?: string | null
+  user_position?: string | null
   // Additional fields from recruits table
   bpoc_application_ids?: string[] | null
   applicant_id?: string | null
@@ -326,6 +327,7 @@ export default function ApplicantsRecordsPage() {
     member_color: null,
     job_title: rawData.job_title || null,
     company_name: rawData.company_name || null,
+    user_position: rawData.user_position || null,
     // Add recruits data fields
     bpoc_application_ids: rawData.bpoc_application_ids,
     applicant_id: rawData.applicant_id,

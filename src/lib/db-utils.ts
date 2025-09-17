@@ -3515,10 +3515,43 @@ export async function updateRecruitStatusAndSyncBpoc(id: number, status: string)
   const validStatuses = ['submitted', 'for verification', 'verified', 'initial interview', 'passed', 'hired', 'rejected', 'failed', 'withdrawn']
   if (!validStatuses.includes(status)) throw new Error('Invalid status value')
   const { rows } = await pool.query(`
-    UPDATE public.bpoc_recruits SET status = $1, updated_at = now() WHERE id = $2 RETURNING id, status, updated_at, bpoc_application_ids
+    UPDATE public.bpoc_recruits SET status = $1, updated_at = now() WHERE id = $2 RETURNING id, status, updated_at, bpoc_application_ids, applicant_id
   `, [status, id])
   if (rows.length === 0) throw new Error('Failed to update applicant')
   const recruitRecord = rows[0]
+  
+  // If status changed to 'passed', index to Qdrant
+  if (status === 'passed') {
+    try {
+      // Import the RAG function dynamically to avoid circular dependencies
+      const { indexBpocTalentProfile } = await import('@/lib/rag')
+      
+      // Get the full applicant data for indexing
+      const applicants = await getApplicants({ status: 'passed' })
+      const applicant = applicants.find(app => app.applicant_id === recruitRecord.applicant_id)
+      
+      if (applicant) {
+        await indexBpocTalentProfile({
+          applicant_id: applicant.applicant_id,
+          first_name: applicant.first_name,
+          last_name: applicant.last_name,
+          summary: applicant.summary,
+          skills: applicant.skills,
+          current_salary: applicant.current_salary,
+          expected_monthly_salary: applicant.expected_monthly_salary,
+          all_job_titles: applicant.all_job_titles,
+          all_companies: applicant.all_companies,
+          video_introduction_url: applicant.video_introduction_url,
+          aiAnalysis: applicant.aiAnalysis
+        })
+        console.log(`✅ Indexed talent profile to Qdrant for ${applicant.full_name || applicant.applicant_id}`)
+      }
+    } catch (error) {
+      console.error('Failed to index talent profile to Qdrant:', error)
+      // Don't throw error - this is a non-critical operation
+    }
+  }
+  
   if (bpocPool && recruitRecord.bpoc_application_ids && recruitRecord.bpoc_application_ids.length > 0) {
     try {
       const statusCheck = await bpocPool.query(`
