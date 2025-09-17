@@ -96,6 +96,57 @@ const getCompanyBadgeClass = (badgeColor: string | null): string => {
   return `border-[${borderColor}]`
 }
 
+// Convert 24-hour time to 12-hour format
+const convertTo12Hour = (time24: string): string => {
+  if (!time24) return ''
+  
+  const [hours, minutes] = time24.split(':').map(Number)
+  const period = hours >= 12 ? 'PM' : 'AM'
+  const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
+  
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
+}
+
+// Convert 12-hour time to 24-hour format
+const convertTo24Hour = (time12: string): string => {
+  if (!time12) return ''
+  
+  const [time, period] = time12.split(' ')
+  const [hours, minutes] = time.split(':').map(Number)
+  
+  let hours24 = hours
+  if (period === 'AM' && hours === 12) {
+    hours24 = 0
+  } else if (period === 'PM' && hours !== 12) {
+    hours24 = hours + 12
+  }
+  
+  return `${hours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+}
+
+// Parse shift time string to extract start and end times
+const parseShiftTime = (shiftTime: string | null): { startTime: string; endTime: string } => {
+  if (!shiftTime) return { startTime: '', endTime: '' }
+  
+  const parts = shiftTime.split(' - ')
+  if (parts.length !== 2) return { startTime: '', endTime: '' }
+  
+  return {
+    startTime: convertTo24Hour(parts[0].trim()),
+    endTime: convertTo24Hour(parts[1].trim())
+  }
+}
+
+// Combine start and end times into shift time format
+const combineShiftTime = (startTime: string, endTime: string): string => {
+  if (!startTime || !endTime) return ''
+  
+  const start12 = convertTo12Hour(startTime)
+  const end12 = convertTo12Hour(endTime)
+  
+  return `${start12} - ${end12}`
+}
+
 // Static agent data for fallback
 const staticAgentData = {
   id: "AG001",
@@ -159,6 +210,8 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     const [localExitDate, setLocalExitDate] = React.useState<Date | undefined>(undefined)
     const [localShiftPeriod, setLocalShiftPeriod] = React.useState<string | null>(null)
     const [localEmploymentStatus, setLocalEmploymentStatus] = React.useState<string | null>(null)
+    const [localStartTime, setLocalStartTime] = React.useState<string>('')
+    const [localEndTime, setLocalEndTime] = React.useState<string>('')
     const [showCompanySelection, setShowCompanySelection] = React.useState(false)
     const [companySearch, setCompanySearch] = React.useState("")
     const [companies, setCompanies] = React.useState<Array<{id: number, company: string, badge_color: string | null}>>([])
@@ -178,7 +231,6 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       employee_id: '',
       job_title: '',
       shift_schedule: '',
-      shift_time: '',
       work_setup: '',
       hire_type: '',
       staff_source: ''
@@ -196,7 +248,6 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       employee_id: '',
       job_title: '',
       shift_schedule: '',
-      shift_time: '',
       work_setup: '',
       hire_type: '',
       staff_source: ''
@@ -241,6 +292,11 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
         setLocalShiftPeriod(agentData.shift_period)
         // Initialize employment status
         setLocalEmploymentStatus(agentData.employment_status)
+        
+        // Initialize shift times by parsing the shift_time string
+        const { startTime, endTime } = parseShiftTime(agentData.shift_time)
+        setLocalStartTime(startTime)
+        setLocalEndTime(endTime)
 
         // Initialize input values for editable fields
         const initialValues = {
@@ -254,7 +310,6 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
           employee_id: agentData.employee_id || '',
           job_title: agentData.job_title || '',
           shift_schedule: agentData.shift_schedule || '',
-          shift_time: agentData.shift_time || '',
           work_setup: agentData.work_setup || '',
           hire_type: agentData.hire_type || '',
           staff_source: agentData.staff_source || ''
@@ -307,7 +362,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     work_email: currentAgentData.work_email || null,
     shift_period: localShiftPeriod !== null ? localShiftPeriod : (currentAgentData.shift_period || null),
     shift_schedule: inputValues.shift_schedule || currentAgentData.shift_schedule || null,
-    shift_time: inputValues.shift_time || currentAgentData.shift_time || null,
+    shift_time: (localStartTime && localEndTime) ? combineShiftTime(localStartTime, localEndTime) : (currentAgentData.shift_time || null),
     work_setup: inputValues.work_setup || currentAgentData.work_setup || null,
     employment_status: localEmploymentStatus !== null ? localEmploymentStatus : (currentAgentData.employment_status || null),
     hire_type: inputValues.hire_type || currentAgentData.hire_type || null,
@@ -333,7 +388,9 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       (localStartDate?.toISOString().split('T')[0] || null) !== (agentData?.start_date || null) ||
       (localExitDate?.toISOString().split('T')[0] || null) !== (agentData?.exit_date || null) ||
       localShiftPeriod !== (agentData?.shift_period || null) ||
-      localEmploymentStatus !== (agentData?.employment_status || null)
+      localEmploymentStatus !== (agentData?.employment_status || null) ||
+      localStartTime !== (parseShiftTime(agentData?.shift_time || null).startTime) ||
+      localEndTime !== (parseShiftTime(agentData?.shift_time || null).endTime)
     
     const hasChanges = hasFieldChanges || hasOtherChanges
     
@@ -431,6 +488,16 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       if (localEmploymentStatus !== agentData?.employment_status) {
         allUpdates.employment_status = localEmploymentStatus
         console.log(`🔄 Employment status change detected:`, { current: localEmploymentStatus, original: agentData?.employment_status })
+      }
+      
+      // Check for shift time changes
+      const originalShiftTimes = parseShiftTime(agentData?.shift_time || null)
+      if (localStartTime !== originalShiftTimes.startTime || localEndTime !== originalShiftTimes.endTime) {
+        allUpdates.shift_time = combineShiftTime(localStartTime, localEndTime)
+        console.log(`🔄 Shift time change detected:`, { 
+          current: { startTime: localStartTime, endTime: localEndTime, combined: combineShiftTime(localStartTime, localEndTime) }, 
+          original: { startTime: originalShiftTimes.startTime, endTime: originalShiftTimes.endTime, combined: agentData?.shift_time }
+        })
       }
       
       console.log('🔄 All updates to send:', allUpdates)
@@ -802,11 +869,17 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
           employee_id: jobInfo.employee_id || '',
           job_title: jobInfo.job_title || '',
           shift_schedule: jobInfo.shift_schedule || '',
-          shift_time: jobInfo.shift_time || '',
           work_setup: jobInfo.work_setup || '',
           hire_type: jobInfo.hire_type || '',
           staff_source: jobInfo.staff_source || ''
         }))
+        
+        // Update shift times if they changed
+        if (jobInfo.shift_time !== oldJobInfo?.shift_time) {
+          const { startTime, endTime } = parseShiftTime(jobInfo.shift_time)
+          setLocalStartTime(startTime)
+          setLocalEndTime(endTime)
+        }
         
         // Update local state for fields that have their own state
         if (jobInfo.shift_period !== oldJobInfo?.shift_period) {
@@ -1305,14 +1378,86 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                          placeholder="-"
                        />
 
-                       {/* Shift Time */}
+                       {/* Start Time */}
                        <DataFieldRow
                          icon={<IconClock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                         label="Shift Time"
-                         fieldName="shift_time"
-                         value={inputValues.shift_time}
-                         onSave={handleInputChange}
+                         label="Start Time"
+                         fieldName="start_time"
+                         value={localStartTime ? convertTo12Hour(localStartTime) : ''}
+                         onSave={() => {}}
                          placeholder="-"
+                         customInput={
+                           <Popover>
+                             <PopoverTrigger asChild>
+                               <Button
+                                 variant="outline"
+                                 tabIndex={-1}
+                                 className={`h-[33px] w-full justify-start font-normal border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none hover:bg-muted/50 ${
+                                   localStartTime ? 'text-foreground' : 'text-muted-foreground'
+                                 }`}
+                                 onClick={() => {
+                                   console.log('🔄 Start time popover opened, current value:', localStartTime)
+                                 }}
+                               >
+                                 {localStartTime ? convertTo12Hour(localStartTime) : "-"}
+                               </Button>
+                             </PopoverTrigger>
+                             <PopoverContent className="w-auto p-0" align="start">
+                               <Input
+                                 type="time"
+                                 value={localStartTime || ''}
+                                 onChange={(e) => {
+                                   console.log('🔄 Start time changed:', e.target.value)
+                                   setLocalStartTime(e.target.value)
+                                 }}
+                                 className="w-full"
+                                 autoFocus
+                                 placeholder=""
+                               />
+                             </PopoverContent>
+                           </Popover>
+                         }
+                       />
+
+                       {/* End Time */}
+                       <DataFieldRow
+                         icon={<IconClock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                         label="End Time"
+                         fieldName="end_time"
+                         value={localEndTime ? convertTo12Hour(localEndTime) : ''}
+                         onSave={() => {}}
+                         placeholder="-"
+                         customInput={
+                           <Popover>
+                             <PopoverTrigger asChild>
+                               <Button
+                                 variant="outline"
+                                 tabIndex={-1}
+                                 className={`h-[33px] w-full justify-start font-normal border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none hover:bg-muted/50 ${
+                                   localEndTime ? 'text-foreground' : 'text-muted-foreground'
+                                 }`}
+                                 onClick={() => {
+                                   console.log('🔄 End time popover opened, current value:', localEndTime)
+                                 }}
+                               >
+                                 {localEndTime ? convertTo12Hour(localEndTime) : "-"}
+                               </Button>
+                             </PopoverTrigger>
+                             <PopoverContent className="w-auto p-0" align="start">
+                               <Input
+                                 type="time"
+                                 value={localEndTime || ''}
+                                 onChange={(e) => {
+                                   console.log('🔄 End time changed:', e.target.value)
+                                   setLocalEndTime(e.target.value)
+                                 }}
+                                 className="w-full"
+                                 autoFocus
+                                 placeholder=""
+                               />
+                             </PopoverContent>
+                           </Popover>
+                         }
                        />
 
                        {/* Work Setup */}

@@ -434,20 +434,6 @@ update
     public.break_sessions for each row execute function update_updated_at_column();
 
 
--- public.events definition
-
--- Drop table
-
--- DROP TABLE public.events;
-
-CREATE TABLE public.events ( id serial4 NOT NULL, title varchar(255) NOT NULL, description text NULL, event_date date NOT NULL, start_time time NOT NULL, end_time time NOT NULL, "location" varchar(255) NULL, status varchar(20) DEFAULT 'upcoming'::character varying NULL, created_by int4 NOT NULL, created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL, updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL, event_type varchar(20) DEFAULT 'event'::character varying NOT NULL, CONSTRAINT events_event_type_check CHECK (((event_type)::text = ANY (ARRAY[('event'::character varying)::text, ('activity'::character varying)::text]))), CONSTRAINT events_pkey PRIMARY KEY (id), CONSTRAINT events_status_check CHECK (((status)::text = ANY (ARRAY[('upcoming'::character varying)::text, ('today'::character varying)::text, ('cancelled'::character varying)::text, ('ended'::character varying)::text]))));
-CREATE INDEX idx_events_created_by ON public.events USING btree (created_by);
-CREATE INDEX idx_events_date ON public.events USING btree (event_date);
-CREATE INDEX idx_events_status ON public.events USING btree (status);
-CREATE INDEX idx_events_status_date ON public.events USING btree (status, event_date);
-CREATE INDEX idx_events_type_status ON public.events USING btree (event_type, status);
-
-
 -- public.floor_plans definition
 
 -- Drop table
@@ -494,28 +480,6 @@ create trigger update_inventory_medical_suppliers_updated_at before
 update
     on
     public.inventory_medical_suppliers for each row execute function update_updated_at_column();
-
-
--- public.meetings definition
-
--- Drop table
-
--- DROP TABLE public.meetings;
-
-CREATE TABLE public.meetings ( id serial4 NOT NULL, agent_user_id int4 NOT NULL, title varchar(255) NOT NULL, description text NULL, start_time timestamptz DEFAULT now() NULL, end_time timestamptz DEFAULT now() NULL, duration_minutes int4 NOT NULL, meeting_type varchar(50) NOT NULL, status varchar(50) DEFAULT 'scheduled'::character varying NOT NULL, is_in_meeting bool DEFAULT false NOT NULL, created_at timestamptz DEFAULT now() NULL, updated_at timestamptz DEFAULT now() NULL, started_automatically bool DEFAULT false NULL, CONSTRAINT check_meeting_status_consistency CHECK ((((is_in_meeting = true) AND ((status)::text = 'in-progress'::text)) OR (is_in_meeting = false))), CONSTRAINT meetings_meeting_type_check CHECK (((meeting_type)::text = ANY (ARRAY[('video'::character varying)::text, ('audio'::character varying)::text, ('in-person'::character varying)::text]))), CONSTRAINT meetings_pkey PRIMARY KEY (id), CONSTRAINT meetings_status_check CHECK (((status)::text = ANY (ARRAY[('scheduled'::character varying)::text, ('in-progress'::character varying)::text, ('completed'::character varying)::text, ('cancelled'::character varying)::text]))));
-CREATE INDEX idx_meetings_agent_user_id ON public.meetings USING btree (agent_user_id);
-CREATE INDEX idx_meetings_created_at ON public.meetings USING btree (created_at);
-CREATE INDEX idx_meetings_notification_queries ON public.meetings USING btree (status, start_time, started_automatically) WHERE ((status)::text = ANY (ARRAY[('scheduled'::character varying)::text, ('in-progress'::character varying)::text]));
-CREATE INDEX idx_meetings_start_time ON public.meetings USING btree (start_time);
-CREATE INDEX idx_meetings_started_automatically ON public.meetings USING btree (started_automatically);
-CREATE INDEX idx_meetings_status ON public.meetings USING btree (status);
-
--- Table Triggers
-
-create trigger trigger_update_meetings_updated_at before
-update
-    on
-    public.meetings for each row execute function update_meetings_updated_at();
 
 
 -- public.roles definition
@@ -615,17 +579,19 @@ update
 CREATE TABLE public.clinic_logs ( id serial4 NOT NULL, patient_id int4 NOT NULL, additional_notes text NULL, issued_by varchar(255) NOT NULL, created_at timestamptz DEFAULT CURRENT_TIMESTAMP NULL, updated_at timestamptz DEFAULT CURRENT_TIMESTAMP NULL, patient_diagnose text NOT NULL, CONSTRAINT clinic_logs_pkey PRIMARY KEY (id), CONSTRAINT clinic_logs_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.users(id) ON DELETE CASCADE);
 
 
--- public.event_attendance definition
+-- public.events definition
 
 -- Drop table
 
--- DROP TABLE public.event_attendance;
+-- DROP TABLE public.events;
 
-CREATE TABLE public.event_attendance ( id serial4 NOT NULL, event_id int4 NOT NULL, user_id int4 NOT NULL, is_going bool DEFAULT false NULL, is_back bool DEFAULT false NULL, going_at timestamp NULL, back_at timestamp NULL, created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL, updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL, CONSTRAINT event_attendance_event_id_user_id_key UNIQUE (event_id, user_id), CONSTRAINT event_attendance_pkey PRIMARY KEY (id), CONSTRAINT event_attendance_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id) ON DELETE CASCADE, CONSTRAINT event_attendance_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE);
-CREATE INDEX idx_event_attendance_event_id ON public.event_attendance USING btree (event_id);
-CREATE INDEX idx_event_attendance_going ON public.event_attendance USING btree (is_going, is_back) WHERE (is_going = true);
-CREATE INDEX idx_event_attendance_user_event ON public.event_attendance USING btree (user_id, event_id);
-CREATE INDEX idx_event_attendance_user_id ON public.event_attendance USING btree (user_id);
+CREATE TABLE public.events ( id serial4 NOT NULL, title varchar(255) NOT NULL, description text NULL, event_date date NOT NULL, start_time time NOT NULL, end_time time NOT NULL, "location" varchar(255) NULL, status varchar(20) DEFAULT 'upcoming'::character varying NULL, created_by int4 NOT NULL, created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL, updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL, event_type varchar(20) DEFAULT 'event'::character varying NOT NULL, assigned_user_ids _int4 NULL, CONSTRAINT events_assigned_user_ids_check CHECK (((assigned_user_ids IS NULL) OR (array_length(assigned_user_ids, 1) > 0))), CONSTRAINT events_event_type_check CHECK (((event_type)::text = ANY (ARRAY[('event'::character varying)::text, ('activity'::character varying)::text]))), CONSTRAINT events_pkey PRIMARY KEY (id), CONSTRAINT events_status_check CHECK (((status)::text = ANY (ARRAY[('upcoming'::character varying)::text, ('today'::character varying)::text, ('cancelled'::character varying)::text, ('ended'::character varying)::text]))), CONSTRAINT events_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE CASCADE);
+CREATE INDEX idx_events_assigned_user_ids ON public.events USING gin (assigned_user_ids);
+CREATE INDEX idx_events_created_by ON public.events USING btree (created_by);
+CREATE INDEX idx_events_date ON public.events USING btree (event_date);
+CREATE INDEX idx_events_status ON public.events USING btree (status);
+CREATE INDEX idx_events_status_date ON public.events USING btree (status, event_date);
+CREATE INDEX idx_events_type_status ON public.events USING btree (event_type, status);
 
 
 -- public.internal definition
@@ -674,6 +640,28 @@ create trigger update_inventory_medical_updated_at before
 update
     on
     public.inventory_medical for each row execute function update_updated_at_column();
+
+
+-- public.meetings definition
+
+-- Drop table
+
+-- DROP TABLE public.meetings;
+
+CREATE TABLE public.meetings ( id serial4 NOT NULL, agent_user_id int4 NOT NULL, title varchar(255) NOT NULL, description text NULL, start_time timestamptz DEFAULT now() NULL, end_time timestamptz DEFAULT now() NULL, duration_minutes int4 NOT NULL, meeting_type varchar(50) NOT NULL, status varchar(50) DEFAULT 'scheduled'::character varying NOT NULL, is_in_meeting bool DEFAULT false NOT NULL, created_at timestamptz DEFAULT now() NULL, updated_at timestamptz DEFAULT now() NULL, started_automatically bool DEFAULT false NULL, CONSTRAINT check_meeting_status_consistency CHECK ((((is_in_meeting = true) AND ((status)::text = 'in-progress'::text)) OR (is_in_meeting = false))), CONSTRAINT meetings_meeting_type_check CHECK (((meeting_type)::text = ANY (ARRAY[('video'::character varying)::text, ('audio'::character varying)::text, ('in-person'::character varying)::text]))), CONSTRAINT meetings_pkey PRIMARY KEY (id), CONSTRAINT meetings_status_check CHECK (((status)::text = ANY (ARRAY[('scheduled'::character varying)::text, ('in-progress'::character varying)::text, ('completed'::character varying)::text, ('cancelled'::character varying)::text]))), CONSTRAINT meetings_agent_user_id_fkey FOREIGN KEY (agent_user_id) REFERENCES public.users(id) ON DELETE CASCADE);
+CREATE INDEX idx_meetings_agent_user_id ON public.meetings USING btree (agent_user_id);
+CREATE INDEX idx_meetings_created_at ON public.meetings USING btree (created_at);
+CREATE INDEX idx_meetings_notification_queries ON public.meetings USING btree (status, start_time, started_automatically) WHERE ((status)::text = ANY (ARRAY[('scheduled'::character varying)::text, ('in-progress'::character varying)::text]));
+CREATE INDEX idx_meetings_start_time ON public.meetings USING btree (start_time);
+CREATE INDEX idx_meetings_started_automatically ON public.meetings USING btree (started_automatically);
+CREATE INDEX idx_meetings_status ON public.meetings USING btree (status);
+
+-- Table Triggers
+
+create trigger trigger_update_meetings_updated_at before
+update
+    on
+    public.meetings for each row execute function update_meetings_updated_at();
 
 
 -- public.members definition
@@ -955,6 +943,19 @@ create trigger update_departments_updated_at before
 update
     on
     public.departments for each row execute function update_updated_at_column();
+
+
+-- public.event_attendance definition
+
+-- Drop table
+
+-- DROP TABLE public.event_attendance;
+
+CREATE TABLE public.event_attendance ( id serial4 NOT NULL, event_id int4 NOT NULL, user_id int4 NOT NULL, is_going bool DEFAULT false NULL, is_back bool DEFAULT false NULL, going_at timestamp NULL, back_at timestamp NULL, created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL, updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL, CONSTRAINT event_attendance_event_id_user_id_key UNIQUE (event_id, user_id), CONSTRAINT event_attendance_pkey PRIMARY KEY (id), CONSTRAINT event_attendance_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id) ON DELETE CASCADE, CONSTRAINT event_attendance_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE);
+CREATE INDEX idx_event_attendance_event_id ON public.event_attendance USING btree (event_id);
+CREATE INDEX idx_event_attendance_going ON public.event_attendance USING btree (is_going, is_back) WHERE (is_going = true);
+CREATE INDEX idx_event_attendance_user_event ON public.event_attendance USING btree (user_id, event_id);
+CREATE INDEX idx_event_attendance_user_id ON public.event_attendance USING btree (user_id);
 
 
 -- public.floor_plan_members definition

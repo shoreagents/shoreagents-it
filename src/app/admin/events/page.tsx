@@ -91,7 +91,7 @@ export default function EventsPage() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
+      month: 'long',
       day: 'numeric',
       year: 'numeric'
     })
@@ -312,11 +312,38 @@ export default function EventsPage() {
                               <div className="h-px bg-border mb-3" />
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-medium text-foreground">Participants</span>
+                                  <span className="font-medium text-foreground">Invitees</span>
                                   <Popover>
                                     <PopoverTrigger asChild>
                                       <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer" onClick={async (e) => { e.stopPropagation(); await fetchParticipantsForEvent(event.id) }}>
                                         {event.assigned_user_ids ? event.assigned_user_ids.length : 0}
+                                      </button>
+                                    </PopoverTrigger>
+                                  <PopoverContent align="end" sideOffset={6} className="w-80 p-2">
+                                    <div className="flex flex-wrap gap-2 items-center justify-center min-h-10">
+                                      {loadingParticipantsKey === `event:${event.id}` && !eventParticipantsCache[`event:${event.id}`] && (
+                                        <div className="w-full flex items-center justify-center py-2 gap-1">
+                                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0s' }} />
+                                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.2s' }} />
+                                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.4s' }} />
+                                        </div>
+                                      )}
+                                      {(eventParticipantsCache[`event:${event.id}`]?.users || []).map(u => (
+                                        <UserTooltip key={u.user_id} user={u} showEmployeeId={true} />
+                                      ))}
+                                      {loadingParticipantsKey !== `event:${event.id}` && (!eventParticipantsCache[`event:${event.id}`]?.users || eventParticipantsCache[`event:${event.id}`]?.users.length === 0) && (
+                                        <div className="text-xs text-muted-foreground w-full text-center">No Invitees</div>
+                                      )}
+                                    </div>
+                                  </PopoverContent>
+                                  </Popover>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-foreground">Participants</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer" onClick={async (e) => { e.stopPropagation(); await fetchParticipantsForEvent(event.id) }}>
+                                        {event.participants_count || 0}
                                       </button>
                                     </PopoverTrigger>
                                   <PopoverContent align="end" sideOffset={6} className="w-80 p-2">
@@ -402,7 +429,7 @@ export default function EventsPage() {
         isOpen={isModalOpen}
         onClose={handleModalClose}
         onEventAdded={handleEventSaved}
-        eventToEdit={selectedEvent}
+        eventToEdit={selectedEvent as any}
       />
     </>
   )

@@ -5132,5 +5132,122 @@ export async function deleteEvent(eventId: number): Promise<void> {
   }
 }
 
+// =============================
+// Breaks
+// =============================
+
+export async function getBreakSessions(memberId: string, date: string) {
+  const query = memberId === 'all' ? `
+    SELECT 
+      bs.id,
+      bs.agent_user_id,
+      bs.break_type,
+      bs.start_time,
+      bs.end_time,
+      bs.duration_minutes,
+      bs.created_at,
+      bs.pause_time,
+      bs.resume_time,
+      bs.pause_used,
+      bs.time_remaining_at_pause,
+      bs.break_date,
+      pi.first_name,
+      pi.last_name,
+      pi.profile_picture,
+      u.email,
+      d.name as department_name
+    FROM break_sessions bs
+    LEFT JOIN personal_info pi ON bs.agent_user_id = pi.user_id
+    LEFT JOIN users u ON bs.agent_user_id = u.id
+    LEFT JOIN agents a ON bs.agent_user_id = a.user_id
+    LEFT JOIN departments d ON a.department_id = d.id
+    WHERE bs.break_date = $1
+    ORDER BY bs.created_at DESC
+  ` : `
+    SELECT 
+      bs.id,
+      bs.agent_user_id,
+      bs.break_type,
+      bs.start_time,
+      bs.end_time,
+      bs.duration_minutes,
+      bs.created_at,
+      bs.pause_time,
+      bs.resume_time,
+      bs.pause_used,
+      bs.time_remaining_at_pause,
+      bs.break_date,
+      pi.first_name,
+      pi.last_name,
+      pi.profile_picture,
+      u.email,
+      d.name as department_name
+    FROM break_sessions bs
+    LEFT JOIN personal_info pi ON bs.agent_user_id = pi.user_id
+    LEFT JOIN users u ON bs.agent_user_id = u.id
+    LEFT JOIN agents a ON bs.agent_user_id = a.user_id
+    LEFT JOIN departments d ON a.department_id = d.id
+    WHERE a.member_id = $1 AND bs.break_date = $2
+    ORDER BY bs.created_at DESC
+  `
+  const params = memberId === 'all' ? [date] : [memberId, date]
+  const result = await pool.query(query, params)
+  return result.rows
+}
+
+export async function getBreakStats(memberId: string, date: string) {
+  // Get break session stats
+  const breakQuery = memberId === 'all' ? `
+    SELECT 
+      COUNT(*) as total_sessions,
+      COUNT(CASE WHEN end_time IS NULL THEN 1 END) as active_sessions,
+      COUNT(CASE WHEN break_date = $1 THEN 1 END) as today_sessions,
+      AVG(duration_minutes) as average_duration
+    FROM break_sessions bs
+    LEFT JOIN agents a ON bs.agent_user_id = a.user_id
+    WHERE bs.break_date = $1
+  ` : `
+    SELECT 
+      COUNT(*) as total_sessions,
+      COUNT(CASE WHEN end_time IS NULL THEN 1 END) as active_sessions,
+      COUNT(CASE WHEN break_date = $2 THEN 1 END) as today_sessions,
+      AVG(duration_minutes) as average_duration
+    FROM break_sessions bs
+    LEFT JOIN agents a ON bs.agent_user_id = a.user_id
+    WHERE a.member_id = $1 AND bs.break_date = $2
+  `
+  
+  // Get total agent count for the member
+  const agentQuery = memberId === 'all' ? `
+    SELECT COUNT(*) as total_agents
+    FROM agents a
+    INNER JOIN users u ON a.user_id = u.id
+    WHERE u.user_type = 'Agent'
+  ` : `
+    SELECT COUNT(*) as total_agents
+    FROM agents a
+    INNER JOIN users u ON a.user_id = u.id
+    WHERE a.member_id = $1 AND u.user_type = 'Agent'
+  `
+  
+  const breakParams = memberId === 'all' ? [date] : [memberId, date]
+  const agentParams = memberId === 'all' ? [] : [memberId]
+  
+  const [breakResult, agentResult] = await Promise.all([
+    pool.query(breakQuery, breakParams),
+    pool.query(agentQuery, agentParams)
+  ])
+  
+  const breakStats = breakResult.rows[0] || { total_sessions: 0, active_sessions: 0, today_sessions: 0, average_duration: 0 }
+  const agentStats = agentResult.rows[0] || { total_agents: 0 }
+  
+  return {
+    total: parseInt(breakStats.total_sessions) || 0,
+    active: parseInt(breakStats.active_sessions) || 0,
+    today: parseInt(breakStats.today_sessions) || 0,
+    averageDuration: Math.round(parseFloat(breakStats.average_duration) || 0),
+    totalAgents: parseInt(agentStats.total_agents) || 0
+  }
+}
 
 

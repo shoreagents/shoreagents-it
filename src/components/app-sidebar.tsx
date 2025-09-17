@@ -267,7 +267,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarGroupLabel>TRACKING</SidebarGroupLabel>
             <NavMain
               items={[
-                { title: "Breaks", url: "#", icon: ClockIcon },
+                { title: "Breaks", url: "/admin/breaks", icon: ClockIcon },
                 { title: "Activity Data", url: "#", icon: BarChart3Icon },
               ]}
             />

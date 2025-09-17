@@ -3,10 +3,11 @@ import pool from '@/lib/database'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const eventId = parseInt(params.id)
+    const { id } = await params
+    const eventId = parseInt(id)
     
     if (isNaN(eventId)) {
       return NextResponse.json(
@@ -15,19 +16,19 @@ export async function GET(
       )
     }
 
-    // Get participants for the event based on assigned_user_ids
+    // Get participants for the event based on event_attendance (users who are going)
     const participantsQuery = `
       SELECT 
         u.id as user_id,
         pi.first_name,
         pi.last_name,
         pi.profile_picture,
-        pi.employee_id
-      FROM events e
-      JOIN unnest(e.assigned_user_ids) AS user_id ON true
-      JOIN users u ON u.id = user_id
+        ji.employee_id
+      FROM event_attendance ea
+      JOIN users u ON ea.user_id = u.id
       LEFT JOIN personal_info pi ON u.id = pi.user_id
-      WHERE e.id = $1 AND e.assigned_user_ids IS NOT NULL
+      LEFT JOIN job_info ji ON u.id = ji.agent_user_id OR u.id = ji.internal_user_id
+      WHERE ea.event_id = $1 AND ea.is_going = true
       ORDER BY pi.first_name, pi.last_name
     `
 

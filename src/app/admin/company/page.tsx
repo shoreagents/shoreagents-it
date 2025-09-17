@@ -74,6 +74,7 @@ interface CompanyModalData {
   badge_color?: string
   country: string | null
   website: string | null
+  shift: string | null
   originalAgentIds: number[]
   originalClientIds: number[]
   selectedAgentIds: number[]

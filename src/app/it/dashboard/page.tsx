@@ -18,10 +18,7 @@ import { SidebarInset } from "@/components/ui/sidebar"
 import { useAuth } from "@/contexts/auth-context"
 import { Badge } from "@/components/ui/badge"
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
-import { TicketNotificationTest } from "@/components/ticket-notification-test"
-import { NotificationDebug } from "@/components/notification-debug"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronUp } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -85,7 +82,6 @@ export default function Dashboard() {
   const [prevDirection, setPrevDirection] = useState<'positive' | 'negative' | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [showNotificationTest, setShowNotificationTest] = useState(false)
   const { user } = useAuth()
 
   const handleViewTicket = (ticket: Ticket) => {
@@ -239,23 +235,8 @@ export default function Dashboard() {
                     <h1 className="text-2xl font-bold">Dashboard</h1>
                     <p className="text-sm text-muted-foreground">Overview of your IT support system and metrics.</p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowNotificationTest(!showNotificationTest)}
-                    className="flex items-center gap-2"
-                  >
-                    {showNotificationTest ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    Test Notifications
-                  </Button>
                 </div>
                 
-                {showNotificationTest && (
-                  <div className="mb-6 space-y-4">
-                    <NotificationDebug />
-                    <TicketNotificationTest />
-                  </div>
-                )}
               </div>
               {loading ? (
                 <div className="*:data-[slot=card]:shadow-xs grid grid-cols-1 md:grid-cols-2 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card lg:px-6">

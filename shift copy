@@ -1,0 +1,1339 @@
+{
+"agents": [
+	{
+		"user_id" : 64,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 65,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 66,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 88,
+		"member_id" : 20,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:01:54.898Z",
+		"updated_at" : "2025-08-23T13:58:52.224Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 67,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 68,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 69,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 70,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 71,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 72,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 112,
+		"member_id" : 12,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:36:10.446Z",
+		"updated_at" : "2025-08-23T13:26:29.540Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 73,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 113,
+		"member_id" : 18,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:37:27.767Z",
+		"updated_at" : "2025-08-23T13:26:53.188Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 74,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 75,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 76,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 108,
+		"member_id" : 14,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:15:40.358Z",
+		"updated_at" : "2025-08-23T18:30:58.701Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 109,
+		"member_id" : 14,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:15:40.358Z",
+		"updated_at" : "2025-08-23T18:30:58.865Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 110,
+		"member_id" : 14,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:15:40.358Z",
+		"updated_at" : "2025-08-23T18:30:58.866Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 78,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 79,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 80,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 81,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 143,
+		"member_id" : null,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T19:06:23.361Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 82,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 83,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 84,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 85,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 95,
+		"member_id" : 7,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:04:16.972Z",
+		"updated_at" : "2025-08-23T14:00:29.178Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 86,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 87,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 275,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-08-06T00:07:55.367Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 115,
+		"member_id" : 11,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:38:41.254Z",
+		"updated_at" : "2025-08-23T13:55:11.182Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 116,
+		"member_id" : 11,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:38:41.254Z",
+		"updated_at" : "2025-08-23T13:55:11.189Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 114,
+		"member_id" : 11,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:38:41.254Z",
+		"updated_at" : "2025-08-23T13:55:11.191Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 117,
+		"member_id" : 11,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:38:41.254Z",
+		"updated_at" : "2025-08-23T13:55:11.192Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 118,
+		"member_id" : 11,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:38:41.254Z",
+		"updated_at" : "2025-08-23T13:55:11.192Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 23,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 24,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 25,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 155,
+		"member_id" : null,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T19:07:43.513Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 96,
+		"member_id" : null,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:04:16.972Z",
+		"updated_at" : "2025-08-27T19:07:43.513Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 52,
+		"member_id" : null,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-09-11T01:56:31.201Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 56,
+		"member_id" : null,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-09-11T01:56:31.201Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 102,
+		"member_id" : 5,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:11:10.047Z",
+		"updated_at" : "2025-08-23T14:04:12.110Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 103,
+		"member_id" : 4,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:11:47.453Z",
+		"updated_at" : "2025-08-23T14:04:20.580Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 26,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 27,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 28,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 174,
+		"member_id" : null,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-09-11T01:56:31.201Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 97,
+		"member_id" : 6,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:05:47.733Z",
+		"updated_at" : "2025-08-23T14:01:07.986Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 99,
+		"member_id" : 21,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:06:49.885Z",
+		"updated_at" : "2025-08-23T14:03:20.733Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 98,
+		"member_id" : 21,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:06:49.885Z",
+		"updated_at" : "2025-08-23T14:03:20.735Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 100,
+		"member_id" : 22,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:07:56.107Z",
+		"updated_at" : "2025-08-23T14:03:49.244Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 101,
+		"member_id" : 22,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:07:56.107Z",
+		"updated_at" : "2025-08-23T14:03:49.244Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 104,
+		"member_id" : 3,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:12:54.534Z",
+		"updated_at" : "2025-08-23T14:04:29.580Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 105,
+		"member_id" : 23,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:13:42.223Z",
+		"updated_at" : "2025-08-23T14:04:48.888Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 106,
+		"member_id" : 2,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:14:29.031Z",
+		"updated_at" : "2025-08-23T14:05:07.651Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 29,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 30,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 31,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 39,
+		"member_id" : null,
+		"department_id" : null,
+		"created_at" : "2025-08-22T01:06:51.214Z",
+		"updated_at" : "2025-09-11T01:56:31.201Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 32,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 33,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 34,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 35,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 36,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 37,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 38,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 40,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 179,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-09-02T02:30:48.017Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 129,
+		"member_id" : null,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-30T13:41:15.885Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 119,
+		"member_id" : 19,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:39:48.546Z",
+		"updated_at" : "2025-08-23T13:55:39.633Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 41,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 111,
+		"member_id" : 13,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:31:25.367Z",
+		"updated_at" : "2025-08-23T13:25:59.930Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 42,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 59,
+		"member_id" : 10,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:32:43.260Z",
+		"updated_at" : "2025-08-23T13:56:42.648Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 60,
+		"member_id" : 10,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:32:43.260Z",
+		"updated_at" : "2025-08-23T13:56:42.655Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 61,
+		"member_id" : 10,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:32:43.260Z",
+		"updated_at" : "2025-08-23T13:56:42.656Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 58,
+		"member_id" : 10,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:32:43.260Z",
+		"updated_at" : "2025-08-23T13:56:42.659Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 62,
+		"member_id" : 10,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:32:43.260Z",
+		"updated_at" : "2025-08-23T13:56:42.659Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 63,
+		"member_id" : 24,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:34:52.011Z",
+		"updated_at" : "2025-08-23T13:57:04.591Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 43,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 44,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 45,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 46,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 47,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 48,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 49,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 50,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-08-22T01:06:51.214Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 51,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 54,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 55,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 57,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 120,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:40:36.112Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 121,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:40:36.112Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 122,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:40:36.112Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 124,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:40:36.112Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 125,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:40:36.112Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 126,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:40:36.112Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 127,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:40:36.112Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 280,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-08-06T00:07:55.367Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 279,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-08-06T00:07:55.367Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 107,
+		"member_id" : 15,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:15:05.071Z",
+		"updated_at" : "2025-08-27T18:22:09.818Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 94,
+		"member_id" : 10,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:03:07.110Z",
+		"updated_at" : "2025-08-27T05:09:26.231Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 89,
+		"member_id" : 8,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:03:07.110Z",
+		"updated_at" : "2025-08-27T05:10:45.889Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 90,
+		"member_id" : 8,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:03:07.110Z",
+		"updated_at" : "2025-08-27T05:10:47.674Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 91,
+		"member_id" : 8,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:03:07.110Z",
+		"updated_at" : "2025-08-27T05:10:50.605Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 92,
+		"member_id" : 8,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:03:07.110Z",
+		"updated_at" : "2025-08-27T05:10:53.917Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 93,
+		"member_id" : 8,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:03:07.110Z",
+		"updated_at" : "2025-08-27T05:10:57.065Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 128,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 130,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 77,
+		"member_id" : 9,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:57:53.775Z",
+		"updated_at" : "2025-08-27T05:21:23.604Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 53,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-22T23:16:20.899Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 123,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:40:36.112Z",
+		"updated_at" : "2025-08-27T05:22:51.359Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 157,
+		"member_id" : null,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-09-11T01:56:31.201Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 22,
+		"member_id" : 17,
+		"department_id" : null,
+		"created_at" : "2025-08-22T01:06:51.214Z",
+		"updated_at" : "2025-08-30T15:00:52.070Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 131,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 132,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 133,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 134,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 135,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 136,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 137,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 139,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 140,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 141,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 142,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 144,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 145,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 146,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 147,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 148,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 149,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 150,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 151,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 152,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 153,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 154,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 156,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 158,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 159,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 160,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 161,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 162,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 163,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 164,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 165,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 166,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 167,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 168,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 169,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 170,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 171,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 172,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 173,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 175,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 176,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 177,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 178,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 180,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 181,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 182,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 183,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 184,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 185,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:48:27.527Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	},
+	{
+		"user_id" : 138,
+		"member_id" : 1,
+		"department_id" : null,
+		"created_at" : "2025-07-23T00:43:21.749Z",
+		"updated_at" : "2025-08-27T05:18:34.567Z",
+		"exp_points" : 0
+	}
+]}

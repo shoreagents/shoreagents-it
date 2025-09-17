@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconWorld, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconSun, IconMoon, IconCalendarEvent, IconX as IconCancel, IconCheck as IconDone, IconCalendarPlus, IconX as IconClose } from "@tabler/icons-react"
+import { IconCalendar, IconClock, IconUser, IconUsers, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconWorld, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconSun, IconMoon, IconCalendarEvent, IconX as IconCancel, IconCheck as IconDone, IconCalendarPlus, IconX as IconClose } from "@tabler/icons-react"
 // import { useRealtimeMembers } from '@/hooks/use-realtime-members'
 import { SendHorizontal, Target } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DataFieldRow } from "@/components/ui/fields"
 
 import { Popover, PopoverContent, PopoverTrigger, PopoverItem } from "@/components/ui/popover"
+import { UserTooltip } from "@/components/ui/user-tooltip"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Calendar } from "@/components/ui/calendar"
 import { useTheme } from "next-themes"
@@ -48,6 +49,7 @@ interface EventData {
   updated_at?: string
   event_type: 'event' | 'activity' | string
   assigned_user_ids: number[] | null
+  participants_count?: number
 }
 
 const eventTypeOptions = [
@@ -148,6 +150,10 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
   // Event-specific state
   const [isLoadingEvent, setIsLoadingEvent] = React.useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false)
+  
+  // Participants state
+  const [loadingParticipantsKey, setLoadingParticipantsKey] = React.useState<string | null>(null)
+  const [eventParticipantsCache, setEventParticipantsCache] = React.useState<Record<string, { users: { user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, employee_id: string | null }[] }>>({})
 
   // Agent selection state
   const [showAgentSelection, setShowAgentSelection] = React.useState(false)
@@ -207,7 +213,8 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
           event_type: (eventToEdit.event_type as 'event' | 'activity') || 'event',
           assigned_user_ids: eventToEdit.assigned_user_ids || [],
           created_at: eventToEdit.created_at,
-          updated_at: eventToEdit.updated_at
+          updated_at: eventToEdit.updated_at,
+          participants_count: (eventToEdit as any).participants_count || 0
         })
         // Load comments for existing event
         loadComments(eventToEdit.id)
@@ -603,6 +610,30 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
     setShowCancelConfirmation(false)
   }
 
+  const fetchParticipantsForEvent = async (eventId: number) => {
+    const key = `event:${eventId}`
+    if (eventParticipantsCache[key]) return eventParticipantsCache[key].users
+    
+    try {
+      setLoadingParticipantsKey(key)
+      const response = await fetch(`/api/events/${eventId}/participants`)
+      if (response.ok) {
+        const data = await response.json()
+        const participants = data.participants || []
+        setEventParticipantsCache(prev => ({
+          ...prev,
+          [key]: { users: participants }
+        }))
+        return participants
+      }
+    } catch (error) {
+      console.error('Error fetching participants:', error)
+    } finally {
+      setLoadingParticipantsKey(null)
+    }
+    return []
+  }
+
   // Load existing comments for the event
   const loadComments = async (eventId: number) => {
     try {
@@ -910,6 +941,36 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                     {formData.status ? eventStatusOptions.find(opt => opt.value === formData.status)?.label || formData.status : 'Set Status'}
                   </Badge>
                 </div>
+              </div>
+
+              {/* Participants Row */}
+              <div className="flex items-center gap-2 text-sm mt-4">
+                <IconUsers className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Participants:</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer" onClick={async (e) => { e.stopPropagation(); if (formData.id) await fetchParticipantsForEvent(formData.id) }}>
+                      {formData.participants_count || 0}
+                    </button>
+                  </PopoverTrigger>
+                <PopoverContent align="end" sideOffset={6} className="w-80 p-2">
+                  <div className="flex flex-wrap gap-2 items-center justify-center min-h-10">
+                    {loadingParticipantsKey === `event:${formData.id}` && !eventParticipantsCache[`event:${formData.id}`] && (
+                      <div className="w-full flex items-center justify-center py-2 gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0s' }} />
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.2s' }} />
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.4s' }} />
+                      </div>
+                    )}
+                    {(eventParticipantsCache[`event:${formData.id}`]?.users || []).map(u => (
+                      <UserTooltip key={u.user_id} user={u} showEmployeeId={true} />
+                    ))}
+                    {loadingParticipantsKey !== `event:${formData.id}` && (!eventParticipantsCache[`event:${formData.id}`]?.users || eventParticipantsCache[`event:${formData.id}`]?.users.length === 0) && (
+                      <div className="text-xs text-muted-foreground w-full text-center">No Participants</div>
+                    )}
+                  </div>
+                </PopoverContent>
+                </Popover>
               </div>
             </div>
 
