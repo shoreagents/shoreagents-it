@@ -237,6 +237,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               items={[
                 { title: "Companies", url: "/admin/company", icon: HomeIcon },
                 { title: "Clients", url: "/admin/clients", icon: UserCheckIcon },
+                { title: "Leads", url: "/admin/leads", icon: UserPlusIcon },
               ]}
             />
           </SidebarGroup>

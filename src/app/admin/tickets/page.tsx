@@ -75,6 +75,7 @@ interface Ticket {
   employee_id: string | null
   resolver_first_name?: string | null
   resolver_last_name?: string | null
+  resolver_profile_picture?: string | null
   user_type?: string | null
   member_name?: string | null
   member_color?: string | null
@@ -794,7 +795,7 @@ export default function TicketsPage() {
       setTickets(prev => prev.filter(ticket => ticket.id !== deletedTicket.id))
     },
     roleFilter: null,
-    enableNotifications: true, // Enable notifications for new tickets
+    enableNotifications: false, // Disabled - using global notifications from useRealtimeCount
   })
 
   useEffect(() => {

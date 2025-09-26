@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, screen, Notification } = require('electron');
 const path = require('path');
+const { showProfileNotification } = require('../utils/notifications');
 
 // Set the app name for notifications - must be done before app is ready
 app.setName('ShoreAgents AI');
@@ -745,6 +746,58 @@ ipcMain.handle('check-notification-permission', async (event) => {
     };
   } catch (error) {
     console.error('Error checking notification permission:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Profile notification handler with image caching
+ipcMain.handle('show-profile-notification', async (event, { title, body, imageUrl, userId, options = {} }) => {
+  try {
+    console.log(`🔔 Profile notification requested for user ${userId}`);
+    
+    const result = await showProfileNotification(title, body, imageUrl, userId, options);
+    
+    if (result.success) {
+      console.log(`✅ Profile notification shown successfully`);
+      return {
+        success: true,
+        notificationId: result.notification?.id || 'unknown',
+        iconPath: result.iconPath,
+        fallback: result.fallback || false
+      };
+    } else {
+      console.error(`❌ Profile notification failed: ${result.error}`);
+      return {
+        success: false,
+        error: result.error
+      };
+    }
+  } catch (error) {
+    console.error('Error in profile notification handler:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Clear user cache handler
+ipcMain.handle('clear-user-cache', async (event, userId) => {
+  try {
+    const { clearUserCache } = require('../utils/notifications');
+    const success = await clearUserCache(userId);
+    return { success };
+  } catch (error) {
+    console.error('Error clearing user cache:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Clear all cache handler
+ipcMain.handle('clear-all-cache', async (event) => {
+  try {
+    const { clearAllCache } = require('../utils/notifications');
+    const success = await clearAllCache();
+    return { success };
+  } catch (error) {
+    console.error('Error clearing all cache:', error);
     return { success: false, error: error.message };
   }
 });

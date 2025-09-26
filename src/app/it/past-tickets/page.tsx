@@ -44,6 +44,7 @@ interface PastTicketTable {
   category_name: string
   resolver_first_name: string | null
   resolver_last_name: string | null
+  resolver_profile_picture: string | null
 }
 
 // Full ticket interface for modal (extends table data)
@@ -235,7 +236,7 @@ function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUs
                   ? (
                     <div className="flex items-center gap-2">
                       <Avatar className="h-6 w-6">
-                        <AvatarImage src={ticket.profile_picture || ''} alt={`Resolved by ${ticket.resolver_first_name}`} />
+                        <AvatarImage src={ticket.resolver_profile_picture || ''} alt={`Resolved by ${ticket.resolver_first_name}`} />
                         <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
                           {`${ticket.resolver_first_name[0]}${ticket.resolver_last_name[0]}`}
                         </AvatarFallback>

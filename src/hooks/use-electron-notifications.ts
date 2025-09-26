@@ -131,6 +131,29 @@ export const useElectronNotifications = () => {
     }
   }, []);
 
+  // Show a profile notification with cached image
+  const showProfileNotification = useCallback(async (
+    title: string, 
+    body: string, 
+    imageUrl: string, 
+    userId: string | number, 
+    options: NotificationOptions = {}
+  ): Promise<NotificationResult> => {
+    if (!isElectron) {
+      return { success: false, error: 'Not running in Electron' };
+    }
+
+    try {
+      console.log('🔔 Frontend: Sending profile notification with options:', JSON.stringify({ title, body, imageUrl, userId, options }, null, 2));
+      const result = await window.electronAPI.showProfileNotification({ title, body, imageUrl, userId, options });
+      console.log('🔔 Frontend: Profile notification result:', result);
+      return result;
+    } catch (error) {
+      console.error('🔔 Frontend: Profile notification error:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }, []);
+
   // Set notification event callbacks
   const setCallbacks = useCallback((callbacks: {
     onClick?: (notificationId: string | null) => void;
@@ -183,6 +206,7 @@ export const useElectronNotifications = () => {
     checkPermission,
     requestPermission,
     showNotification,
+    showProfileNotification,
     setCallbacks,
     showSuccessNotification,
     showErrorNotification,

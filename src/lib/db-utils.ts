@@ -69,6 +69,7 @@ export interface Ticket {
   employee_id: string | null
   resolver_first_name?: string | null
   resolver_last_name?: string | null
+  resolver_profile_picture?: string | null
   user_type?: string | null
   member_name?: string | null
   member_color?: string | null
@@ -120,7 +121,7 @@ export async function getAllTickets(): Promise<Ticket[]> {
   const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, t.clear, pi.profile_picture, pi.first_name, pi.last_name, tc.name as category_name,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name, resolver_pi.profile_picture as resolver_profile_picture
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
@@ -136,7 +137,7 @@ export async function getAllTicketsAdmin(): Promise<Ticket[]> {
   const result = await pool.query(`
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, t.clear, pi.profile_picture, pi.first_name, pi.last_name, tc.name as category_name,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name, resolver_pi.profile_picture as resolver_profile_picture
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id
@@ -166,7 +167,7 @@ export async function getTicketsByStatus(status: string, past: boolean = false):
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name, resolver_pi.profile_picture as resolver_profile_picture,
            u.user_type,
            t.supporting_files, t.file_count,
            CASE 
@@ -215,7 +216,7 @@ export async function getTicketsByStatusAdmin(status: string): Promise<Ticket[]>
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name, resolver_pi.profile_picture as resolver_profile_picture,
            u.user_type,
            t.supporting_files, t.file_count,
            CASE 
@@ -318,7 +319,7 @@ export async function updateTicketStatus(id: number, status: string, resolvedBy?
       SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
              t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
              ji.employee_id,
-             resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+             resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name, resolver_pi.profile_picture as resolver_profile_picture,
              u.user_type,
              t.supporting_files, t.file_count,
              CASE 
@@ -397,7 +398,7 @@ export async function updateTicket(id: number, updates: Partial<Ticket>): Promis
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name, resolver_pi.profile_picture as resolver_profile_picture,
            u.user_type,
            t.supporting_files, t.file_count,
            CASE 
@@ -440,7 +441,7 @@ export async function getTicketById(id: number): Promise<Ticket | null> {
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, t.clear, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name, resolver_pi.profile_picture as resolver_profile_picture,
            t.supporting_files, t.file_count,
            u.user_type,
            CASE 
@@ -476,7 +477,7 @@ export async function getTicketByIdAdmin(id: number): Promise<Ticket | null> {
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, t.clear, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name, resolver_pi.profile_picture as resolver_profile_picture,
            t.supporting_files, t.file_count,
            u.user_type,
            CASE 
@@ -512,7 +513,7 @@ export async function getTicketByTicketId(ticketId: string): Promise<Ticket | nu
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name, resolver_pi.profile_picture as resolver_profile_picture,
            t.supporting_files, t.file_count
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
@@ -531,7 +532,7 @@ export async function searchTickets(searchTerm: string): Promise<Ticket[]> {
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name, resolver_pi.profile_picture as resolver_profile_picture
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
@@ -559,7 +560,7 @@ export async function getTicketsByUser(userId: number): Promise<Ticket[]> {
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name, resolver_pi.profile_picture as resolver_profile_picture
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
@@ -593,7 +594,7 @@ export async function updateTicketPosition(id: number, position: number): Promis
       SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
              t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
              ji.employee_id,
-             resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+             resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name, resolver_pi.profile_picture as resolver_profile_picture,
              u.user_type,
              t.supporting_files, t.file_count,
              CASE 
@@ -872,7 +873,7 @@ export async function getTicketsByStatusWithPagination(
     SELECT t.id, t.ticket_id, t.user_id, t.concern, t.details, t.status, t.position, t.created_at, t.resolved_at, t.resolved_by,
            t.role_id, pi.profile_picture, pi.first_name, pi.last_name, s.station_id, tc.name as category_name,
            ji.employee_id,
-           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name,
+           resolver_pi.first_name as resolver_first_name, resolver_pi.last_name as resolver_last_name, resolver_pi.profile_picture as resolver_profile_picture,
            t.supporting_files, t.file_count,
            CASE
              WHEN u.user_type = 'Internal' THEN 'Internal'
@@ -987,12 +988,14 @@ export async function getPastTicketsTableData(
       t.created_at,
       t.resolved_at, 
       t.resolved_by,
+      t.role_id,
       pi.profile_picture, 
       pi.first_name, 
       pi.last_name,
       tc.name as category_name,
       resolver_pi.first_name as resolver_first_name, 
-      resolver_pi.last_name as resolver_last_name
+      resolver_pi.last_name as resolver_last_name,
+      resolver_pi.profile_picture as resolver_profile_picture
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     LEFT JOIN public.ticket_categories tc ON t.category_id = tc.id

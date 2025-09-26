@@ -225,6 +225,7 @@ export function useRealtimeCount(countType: CountType) {
       }
     },
     autoConnect: countType === 'tickets',
+    enableNotifications: true, // Enable global notifications
     roleFilter: null
   })
 

@@ -17,8 +17,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Notification API
   showNotification: (options) => ipcRenderer.invoke('show-notification', options),
+  showProfileNotification: (params) => ipcRenderer.invoke('show-profile-notification', params),
   requestNotificationPermission: () => ipcRenderer.invoke('request-notification-permission'),
   checkNotificationPermission: () => ipcRenderer.invoke('check-notification-permission'),
+  
+  // Cache management
+  clearUserCache: (userId) => ipcRenderer.invoke('clear-user-cache', userId),
+  clearAllCache: () => ipcRenderer.invoke('clear-all-cache'),
   
   // Notification event listeners
   onNotificationClicked: (callback) => ipcRenderer.on('notification-clicked', callback),

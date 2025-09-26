@@ -40,6 +40,8 @@ interface PastTicketTable {
   category_name: string
   resolver_first_name: string | null
   resolver_last_name: string | null
+  resolver_profile_picture: string | null
+  role_id: number | null
 }
 
 // Full ticket interface for modal (extends table data)
@@ -187,10 +189,10 @@ function PastTicketsTable({ tickets, onSort, sortField, sortDirection, currentUs
               <TableCell className="text-sm text-muted-foreground">
                 {ticket.resolver_first_name && ticket.resolver_last_name ? (
                   <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={ticket.profile_picture || ''} alt={`Resolved by ${ticket.resolver_first_name}`} />
-                      <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/10 text-primary">{`${ticket.resolver_first_name[0]}${ticket.resolver_last_name[0]}`}</AvatarFallback>
-                    </Avatar>
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={ticket.resolver_profile_picture || ''} alt={`Resolved by ${ticket.resolver_first_name}`} />
+                        <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/10 text-primary">{`${ticket.resolver_first_name[0]}${ticket.resolver_last_name[0]}`}</AvatarFallback>
+                      </Avatar>
                     <span className="text-sm text-foreground">
                       {currentUser && ticket.resolved_by === parseInt(currentUser.id) ? 'You' : `${ticket.resolver_first_name} ${ticket.resolver_last_name}`}
                     </span>
@@ -281,10 +283,20 @@ export default function PastTicketsPage() {
   const [resolvedByUserCount, setResolvedByUserCount] = useState<number>(0)
   const [selectedTicket, setSelectedTicket] = useState<PastTicketTable | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [roleNameById, setRoleNameById] = useState<Record<number, string>>({})
 
   useEffect(() => {
     fetchTickets()
     fetchCategories()
+    // Preload roles map for label display
+    fetch('/api/tickets?resource=roles', { method: 'PUT' })
+      .then(res => res.ok ? res.json() : [])
+      .then((roles: Array<{ id: number; name: string }>) => {
+        const map: Record<number, string> = {}
+        roles.forEach(r => { map[r.id] = r.name })
+        setRoleNameById(map)
+      })
+      .catch(() => {})
   }, [])
 
   // Real-time updates for past tickets
@@ -533,6 +545,7 @@ export default function PastTicketsPage() {
         ticket={selectedTicket as any}
         isOpen={isModalOpen}
         onClose={handleModalClose}
+        roleNameById={roleNameById}
       />
     </>
   )

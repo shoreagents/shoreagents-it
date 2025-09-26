@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useAuth } from '@/contexts/auth-context'
 import { useElectronNotifications } from './use-electron-notifications'
 
 interface TicketUpdate {
@@ -115,7 +116,8 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
   } = options
 
   // Initialize notification system if enabled
-  const { showInfoNotification, isSupported } = useElectronNotifications()
+  const { showProfileNotification, isSupported } = useElectronNotifications()
+  const { user } = useAuth()
 
   const [isConnected, setIsConnected] = useState(globalConnectionState.isConnected)
   const [error, setError] = useState<string | null>(globalConnectionState.error)
@@ -125,6 +127,10 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
   const createCallback = useCallback((message: TicketUpdate) => {
     if (message.type === 'ticket_update') {
       const { action, record, old_record } = message.data
+      
+      // Get user role for status-based notifications
+      const isAdmin = (user as any)?.roleName?.toLowerCase() === 'admin'
+      const relevantStatus = isAdmin ? 'For Approval' : 'Approved'
       
       switch (action) {
         case 'INSERT':
@@ -138,57 +144,59 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
               }
               return res.json()
             })
-            .then(completeTicket => {
+            .then(async (completeTicket) => {
               onTicketCreated?.(completeTicket)
               
               // Show notification for new tickets if enabled and supported
               if (enableNotifications && isSupported) {
                 console.log('🔔 Attempting to show notification for new ticket:', completeTicket.id)
                 
-                // Format name from available fields - only personal names, no company fallback
-                const getName = () => {
-                  // First priority: Use personal name (first_name + last_name)
-                  if (completeTicket.first_name && completeTicket.last_name) {
-                    return `${completeTicket.first_name} ${completeTicket.last_name}`
-                  }
-                  // Second priority: Use just first name
-                  if (completeTicket.first_name) {
-                    return completeTicket.first_name
-                  }
-                  return 'Unknown User'
-                }
-                
-                const ticketTitle = completeTicket.concern || 'New Ticket'
-                const userName = getName()
-                
-                // Convert icon to local file path for Electron notifications
-                const getIconPath = () => {
-                  if (completeTicket.profile_picture) {
-                    // If it's already a local path, use it
-                    if (completeTicket.profile_picture.startsWith('/')) {
-                      return completeTicket.profile_picture
+                // Only show notifications for admin users (new tickets)
+                if (isAdmin && completeTicket.status === relevantStatus) {
+                  console.log(`🔔 Ticket status "${completeTicket.status}" is relevant for admin user`)
+                  
+                  // Format name from available fields - prioritize personal names over company names
+                  const getName = () => {
+                    // First priority: Use personal name (first_name + last_name)
+                    if (completeTicket.first_name && completeTicket.last_name) {
+                      return `${completeTicket.first_name} ${completeTicket.last_name}`
                     }
-                    // If it's a URL, we can't use it in Electron notifications
-                    // Fall back to default icon
+                    // Second priority: Use just first name
+                    if (completeTicket.first_name) {
+                      return completeTicket.first_name
+                    }
+                    // Last resort: Use member_name (company name) only if no personal name available
+                    if (completeTicket.member_name) {
+                      return completeTicket.member_name
+                    }
+                    return 'Unknown User'
                   }
-                  // Use local file path for default icon
-                  return '/avatars/shadcn.png'
+                  
+                  const ticketTitle = completeTicket.concern || 'New Ticket'
+                  const userName = getName()
+                  
+                  // Use the new profile notification system
+                  console.log('🔔 Debug - Profile picture URL:', completeTicket.profile_picture);
+                  console.log('🔔 Debug - User ID:', completeTicket.user_id);
+                  console.log('🔔 Debug - User name:', userName);
+                  console.log('🔔 Debug - Ticket status:', completeTicket.status);
+                  
+                  const result = await showProfileNotification(
+                    `New Ticket | ${userName}`,
+                    ticketTitle,
+                    completeTicket.profile_picture || '',
+                    completeTicket.user_id,
+                    {
+                      id: `ticket-${completeTicket.id}-${Date.now()}`,
+                      urgency: 'normal',
+                      onClick: true
+                    }
+                  );
+                  
+                  console.log('🔔 Debug - Notification result:', result);
+                } else {
+                  console.log(`🔔 New ticket notification skipped for ${isAdmin ? 'admin' : 'IT'} user`)
                 }
-                
-                showInfoNotification(
-                  `New Ticket - ${userName}`,
-                  ticketTitle,
-                  {
-                    id: `ticket-${completeTicket.id}-${Date.now()}`,
-                    urgency: 'normal',
-                    onClick: true,
-                    icon: getIconPath()
-                  }
-                ).then(result => {
-                  console.log('✅ Notification sent successfully:', result)
-                }).catch(error => {
-                  console.error('❌ Failed to show ticket notification:', error)
-                })
               } else {
                 console.log('🔕 Notification skipped:', { enableNotifications, isSupported })
               }
@@ -198,55 +206,9 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
               // Fallback to using the record directly
               onTicketCreated?.(record)
               
-              // Show notification with basic record data if fetch failed
-              if (enableNotifications && isSupported) {
-                console.log('🔔 Attempting to show notification with basic record data:', record.id)
-                
-                // Format name from available fields (fallback) - only personal names, no company fallback
-                const getName = () => {
-                  // First priority: Use personal name (first_name + last_name)
-                  if (record.first_name && record.last_name) {
-                    return `${record.first_name} ${record.last_name}`
-                  }
-                  // Second priority: Use just first name
-                  if (record.first_name) {
-                    return record.first_name
-                  }
-                  return 'Unknown User'
-                }
-                
-                const ticketTitle = record.title || record.concern || 'New Ticket'
-                const userName = getName()
-                
-                // Convert icon to local file path for Electron notifications (fallback)
-                const getIconPath = () => {
-                  if (record.profile_picture) {
-                    // If it's already a local path, use it
-                    if (record.profile_picture.startsWith('/')) {
-                      return record.profile_picture
-                    }
-                    // If it's a URL, we can't use it in Electron notifications
-                    // Fall back to default icon
-                  }
-                  // Use local file path for default icon
-                  return '/avatars/shadcn.png'
-                }
-                
-                showInfoNotification(
-                  `New Ticket - ${userName}`,
-                  ticketTitle,
-                  {
-                    id: `ticket-${record.id}-${Date.now()}`,
-                    urgency: 'normal',
-                    onClick: true,
-                    icon: getIconPath()
-                  }
-                ).then(result => {
-                  console.log('✅ Fallback notification sent successfully:', result)
-                }).catch(error => {
-                  console.error('❌ Failed to show fallback notification:', error)
-                })
-              }
+              // Only show fallback notification if the main notification wasn't shown
+              // This prevents duplicate notifications
+              console.log('🔔 API call failed, but main notification may have already been shown')
             })
           break
         case 'UPDATE':
@@ -259,8 +221,65 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
                 }
                 return res.json()
               })
-              .then(completeTicket => {
+              .then(async (completeTicket) => {
                 onTicketUpdated?.(completeTicket, old_record)
+                
+                // Show notification for status changes if enabled and supported
+                if (enableNotifications && isSupported) {
+                  console.log('🔔 Checking for status change notification:', completeTicket.id)
+                  
+                  const oldStatus = old_record?.status
+                  const newStatus = completeTicket.status
+                  
+                  console.log(`🔔 Status change: "${oldStatus}" → "${newStatus}"`)
+                  
+                  // Only show status change notifications for IT users
+                  if (!isAdmin && newStatus === relevantStatus && oldStatus !== relevantStatus) {
+                    console.log(`🔔 Status changed to "${newStatus}" - showing notification for IT user`)
+                    
+                    // Format name from available fields - prioritize personal names over company names
+                    const getName = () => {
+                      // First priority: Use personal name (first_name + last_name)
+                      if (completeTicket.first_name && completeTicket.last_name) {
+                        return `${completeTicket.first_name} ${completeTicket.last_name}`
+                      }
+                      // Second priority: Use just first name
+                      if (completeTicket.first_name) {
+                        return completeTicket.first_name
+                      }
+                      // Last resort: Use member_name (company name) only if no personal name available
+                      if (completeTicket.member_name) {
+                        return completeTicket.member_name
+                      }
+                      return 'Unknown User'
+                    }
+                    
+                    const ticketTitle = completeTicket.concern || 'Ticket Approved'
+                    const userName = getName()
+                    
+                    // Use the new profile notification system
+                    console.log('🔔 Debug (Status Change) - Profile picture URL:', completeTicket.profile_picture);
+                    console.log('🔔 Debug (Status Change) - User ID:', completeTicket.user_id);
+                    console.log('🔔 Debug (Status Change) - User name:', userName);
+                    console.log('🔔 Debug (Status Change) - Ticket status:', completeTicket.status);
+                    
+                    const result = await showProfileNotification(
+                      `Ticket Approved | ${userName}`,
+                      ticketTitle,
+                      completeTicket.profile_picture || '',
+                      completeTicket.user_id,
+                      {
+                        id: `ticket-update-${completeTicket.id}-${Date.now()}`,
+                        urgency: 'normal',
+                        onClick: true
+                      }
+                    );
+                    
+                    console.log('🔔 Debug (Status Change) - Notification result:', result);
+                  } else {
+                    console.log(`🔔 Status change notification skipped for ${isAdmin ? 'admin' : 'IT'} user`)
+                  }
+                }
               })
               .catch(error => {
                 console.error('Error refetching complete ticket data for admin update:', error)
@@ -333,7 +352,7 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
           break
       }
     }
-  }, [onTicketCreated, onTicketUpdated, onTicketDeleted, roleFilter, enableNotifications, isSupported, showInfoNotification])
+  }, [onTicketCreated, onTicketUpdated, onTicketDeleted, roleFilter, enableNotifications, isSupported, showProfileNotification])
 
   // Register callback
   useEffect(() => {
