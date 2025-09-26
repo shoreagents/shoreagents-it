@@ -27,7 +27,8 @@
     "test-member-realtime": "node scripts/test-member-realtime.js",
     "apply-members-activity-log": "psql $DATABASE_URL -f scripts/apply-members-activity-log.sql",
     "apply-members-activity-log-simple": "psql $DATABASE_URL -f scripts/apply-members-activity-log-simple.sql",
-    "apply-members-activity-log-fields": "psql $DATABASE_URL -f scripts/apply-members-activity-log-fields.sql"
+    "apply-members-activity-log-fields": "psql $DATABASE_URL -f scripts/apply-members-activity-log-fields.sql",
+    "setup-ai-chat": "node scripts/setup-ai-chat.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

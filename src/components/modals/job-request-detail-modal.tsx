@@ -648,6 +648,14 @@ export function JobRequestDetailModal({ jobRequest, isOpen, onClose, pageContext
                         placeholder="Write a comment..." 
                         value={comment}
                         onChange={(e) => setComment(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            if (comment.trim() && !isSubmittingComment) {
+                              handleCommentSubmit(e)
+                            }
+                          }
+                        }}
                         className="text-sm"
                         disabled={isSubmittingComment}
                       />

@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle } from "@tabler/icons-react"
+import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconUserCheck, IconCheck } from "@tabler/icons-react"
 import { Input } from "@/components/ui/input"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Popover, PopoverContent, PopoverTrigger, PopoverItem } from "@/components/ui/popover"
@@ -22,6 +22,7 @@ interface TicketDetailModalProps {
   isOpen: boolean
   onClose: () => void
   isLoading?: boolean
+  roleNameById?: Record<number, string>
 }
 
 interface StatusOption {
@@ -54,6 +55,7 @@ interface Ticket {
   employee_id: string | null
   supporting_files?: string[]
   file_count?: number
+  role_id?: number | null
   // Additional fields from joins
   user_email?: string
   user_type?: string
@@ -160,7 +162,10 @@ const getDisplayStatus = (status: string, isAdmin?: boolean) => {
   return status
 }
 
-export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: TicketDetailModalProps) {
+export function TicketDetailModal({ ticket, isOpen, onClose, isLoading, roleNameById: passedRoleNameById }: TicketDetailModalProps) {
+  // Early return before any hooks to avoid Rules of Hooks violation
+  if (!ticket && !isLoading) return null
+
   const { theme } = useTheme()
   const [comment, setComment] = React.useState("")
   const [currentStatus, setCurrentStatus] = React.useState<TicketStatus | null>(null)
@@ -174,6 +179,12 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
   const isAdmin = ((user as any)?.roleName || '').toLowerCase() === 'admin'
   const [isCommentFocused, setIsCommentFocused] = React.useState<boolean>(false)
   const commentTextareaRef = React.useRef<HTMLTextAreaElement>(null)
+  
+  // Role assignment state
+  const [roles, setRoles] = React.useState<any[]>([])
+  const [rolesLoading, setRolesLoading] = React.useState(false)
+  const [isAssignOpen, setIsAssignOpen] = React.useState(false)
+  const [roleNameById, setRoleNameById] = React.useState<Record<number, string>>(passedRoleNameById || {})
 
   // Define status options based on application usage
   const getStatusOptions = (): StatusOption[] => {
@@ -335,11 +346,31 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
     }
   }
 
-  if (!ticket && !isLoading) return null
-
   // Use detailed ticket data if available, fallback to basic ticket data
   const displayTicket = detailedTicket || ticket
   const isLoadingDisplay = isLoading || isLoadingDetail
+
+  // Debug logging to see what data we have
+  React.useEffect(() => {
+    if (ticket) {
+      console.log('🔍 Modal received ticket data:', {
+        id: ticket.id,
+        ticket_id: ticket.ticket_id,
+        role_id: ticket.role_id,
+        user_id: ticket.user_id,
+        status: ticket.status
+      })
+    }
+    if (displayTicket) {
+      console.log('🔍 Modal displayTicket data:', {
+        id: displayTicket.id,
+        ticket_id: displayTicket.ticket_id,
+        role_id: displayTicket.role_id,
+        user_id: displayTicket.user_id,
+        status: displayTicket.status
+      })
+    }
+  }, [ticket, displayTicket])
 
   const categoryBadge = displayTicket ? getCategoryBadge(displayTicket) : { name: '', color: '' }
   const createdDate = displayTicket ? formatDate(displayTicket.created_at) : { date: '', time: '', full: '' }
@@ -441,6 +472,67 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
       }
     }
   }
+
+  // Role assignment functions
+  const fetchRoles = React.useCallback(async () => {
+    if (roles.length > 0 || rolesLoading) return
+    setRolesLoading(true)
+    try {
+      const res = await fetch('/api/tickets?resource=roles', { method: 'PUT' })
+      if (res.ok) {
+        const data = await res.json()
+        setRoles(data)
+        // Create role name mapping
+        const roleMap: Record<number, string> = {}
+        data.forEach((role: any) => {
+          roleMap[role.id] = role.name
+        })
+        setRoleNameById(roleMap)
+        console.log('🔍 Roles loaded in modal:', data)
+        console.log('🔍 Role mapping created:', roleMap)
+      }
+    } catch (e) {
+      console.error('Failed to load roles', e)
+    } finally {
+      setRolesLoading(false)
+    }
+  }, [roles.length, rolesLoading])
+
+  // Update roleNameById when passedRoleNameById changes
+  React.useEffect(() => {
+    if (passedRoleNameById) {
+      setRoleNameById(passedRoleNameById)
+      console.log('🔍 Role mapping passed from parent:', passedRoleNameById)
+    }
+  }, [passedRoleNameById])
+
+  const handleAssignRole = React.useCallback(async (roleId: number) => {
+    if (!ticket) return
+    
+    try {
+      const res = await fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'assignRole', userId: ticket.user_id, roleId, ticketId: ticket.id })
+      })
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}))
+        console.log('Role assigned')
+        setIsAssignOpen(false)
+        // Update local ticket with returned fields if present
+        if (data.ticket) {
+          // Update the ticket object with the new role_id
+          const updatedTicket = { ...ticket, role_id: data.ticket.role_id ?? roleId }
+          setDetailedTicket(updatedTicket)
+        }
+      } else {
+        const err = await res.json().catch(() => ({}))
+        console.error('Assign role failed', err)
+      }
+    } catch (e) {
+      console.error('Assign role error', e)
+    }
+  }, [ticket])
 
   return (
     <TooltipProvider>
@@ -581,7 +673,56 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                         )}
                       </div>
                       
-                      {/* 6. Resolved by */}
+                      {/* 6. Assign Role (Admin only) */}
+                      {!isLoading && isAdmin && (
+                        <div className="flex items-center gap-2">
+                          <IconUserCheck className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Assignee:</span>
+                          <Popover open={isAssignOpen} onOpenChange={(open) => { setIsAssignOpen(open); if (open) fetchRoles() }}>
+                            <PopoverTrigger asChild>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-sm h-6 px-2 rounded-lg shadow-none bg-[#f4f4f4] dark:bg-[#363636] text-gray-700 dark:text-white border-[#cecece99] dark:border-[#4f4f4f99] hover:bg-[#e8e8e8] dark:hover:bg-[#404040] hover:border-[#cecece99] dark:hover:border-[#4f4f4f99] inline-flex items-center"
+                              >
+                                <span>{roleNameById && displayTicket?.role_id ? (roleNameById[displayTicket.role_id] || 'Assign Role') : 'Assign Role'}</span>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-56 p-1" onOpenAutoFocus={(e) => e.preventDefault()}>
+                              {rolesLoading ? (
+                                <div className="text-xs text-muted-foreground px-2 py-1.5">Loading...</div>
+                              ) : roles.length === 0 ? (
+                                <div className="text-xs text-muted-foreground px-2 py-1.5">No roles found</div>
+                              ) : (
+                                <div className="max-h-60 overflow-auto space-y-1">
+                                  {roles.map((role) => {
+                                    const isActiveRole = role.id === (displayTicket as any)?.role_id
+                                    return (
+                                      <button
+                                        key={role.id}
+                                        data-state={isActiveRole ? 'checked' : undefined}
+                                        className={`relative w-full text-left text-sm py-1.5 pl-2 pr-8 rounded-lg transition-colors flex items-center hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent/90 ${
+                                          isActiveRole ? 'cursor-default' : ''
+                                        }`}
+                                        onClick={isActiveRole ? undefined : (e) => { e.preventDefault(); e.stopPropagation(); handleAssignRole(role.id) }}
+                                      >
+                                        <span>{role.name}</span>
+                                        {isActiveRole && (
+                                          <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+                                            <IconCheck className="h-4 w-4" />
+                                          </span>
+                                        )}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      )}
+
+                      {/* 7. Resolved by */}
                       {!isLoading && ticket && ticket.status === 'Closed' && ticket.resolved_by && (
                         <div className="flex items-center gap-2">
                           <IconUser className="h-4 w-4 text-muted-foreground" />
@@ -598,7 +739,7 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                         </div>
                       )}
                       
-                      {/* 7. Resolved at */}
+                      {/* 8. Resolved at */}
                       {!isLoading && ticket && ticket.status === 'Closed' && ticket.resolved_at && (
                         <div className="flex items-center gap-2">
                           <IconClock className="h-4 w-4 text-muted-foreground" />
@@ -886,6 +1027,14 @@ export function TicketDetailModal({ ticket, isOpen, onClose, isLoading }: Ticket
                               // Auto-resize the textarea
                               e.target.style.height = 'auto'
                               e.target.style.height = e.target.scrollHeight + 'px'
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault()
+                                if (comment.trim() && !isSubmittingComment) {
+                                  handleCommentSubmit(e)
+                                }
+                              }
                             }}
                             onFocus={(e) => {
                               console.log('Comment focused, setting isCommentFocused to true')

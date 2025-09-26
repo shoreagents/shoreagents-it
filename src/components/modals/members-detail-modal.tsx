@@ -515,6 +515,16 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   }
 
   // Modified close handler with auto-save for company data only
+  const getMissingRequiredFields = () => {
+    const missing: string[] = []
+    
+    if (!formData.company.trim()) {
+      missing.push('Company Name')
+    }
+    
+    return missing
+  }
+
   const handleClose = async () => {
     console.log('🔒 handleClose called:', { 
       companyToEdit: companyToEdit?.id, 
@@ -525,6 +535,17 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       companyToEditLogo: companyToEdit?.logo,
       companyToEditLogoUrl: companyToEdit?.logoUrl
     })
+    
+    // Only check for missing required fields when editing an existing company
+    // For new companies, allow closing without validation
+    if (companyToEdit?.id) {
+      const missingFields = getMissingRequiredFields()
+      if (missingFields.length > 0) {
+        setMissingFields(missingFields)
+        setShowRequiredFieldsWarning(true)
+        return
+      }
+    }
     
     if (companyToEdit?.id && hasUnsavedChanges) {
       // Auto-save company data changes before closing
@@ -1417,8 +1438,11 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.company) {
-      alert('Please fill in the company name')
+    // Check for missing required fields
+    const missingFields = getMissingRequiredFields()
+    if (missingFields.length > 0) {
+      setMissingFields(missingFields)
+      setShowRequiredFieldsWarning(true)
       return
     }
 
@@ -2264,6 +2288,8 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
 
   // Track if there are unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false)
+  const [showRequiredFieldsWarning, setShowRequiredFieldsWarning] = React.useState(false)
+  const [missingFields, setMissingFields] = React.useState<string[]>([])
 
   // Update hasUnsavedChanges when form data or selections change
   React.useEffect(() => {
@@ -2507,7 +2533,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
 
 
             {/* Scrollable Form Content */}
-            <div className="flex-1 px-6 py-5 overflow-y-auto min-h-0">
+            <div className="flex-1 px-6 py-5 overflow-y-auto min-h-0" tabIndex={-1}>
               {isLoadingCompany ? (
                 <div className="space-y-6">
                   {/* Information Section Skeleton */}
@@ -2639,7 +2665,6 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                 formData.country ? 'text-foreground' : 'text-muted-foreground'
                               }`}
                               style={{ backgroundColor: 'transparent' }}
-                              tabIndex={0}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter' || e.key === ' ') {
                                   e.preventDefault()
@@ -2713,7 +2738,6 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                 (localShift !== null ? localShift : formData.shift) ? 'text-foreground' : 'text-muted-foreground'
                               }`}
                               style={{ backgroundColor: 'transparent' }}
-                              tabIndex={0}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter' || e.key === ' ') {
                                   e.preventDefault()
@@ -2764,10 +2788,11 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                           onMouseEnter={() => setIsLogoHovered(true)}
                           onMouseLeave={() => setIsLogoHovered(false)}
                         >
-                          <input id="logo" type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                          <input id="logo" type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" tabIndex={-1} />
                           <label
                             htmlFor="logo"
                             className="w-full cursor-pointer"
+                            tabIndex={-1}
                           >
                             {(formData.logo || formData.logoUrl) ? (
                               <LinkPreview
@@ -2784,6 +2809,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                   readOnly
                                   className="h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none cursor-pointer"
                                   onClick={() => document.getElementById('logo')?.click()}
+                                  tabIndex={-1}
                                 />
                               </LinkPreview>
                             ) : (
@@ -2794,6 +2820,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                 readOnly
                                 className="h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none cursor-pointer"
                                 onClick={() => document.getElementById('logo')?.click()}
+                                tabIndex={-1}
                               />
                             )}
                           </label>
@@ -2806,6 +2833,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                 : 'opacity-0 translate-x-2 pointer-events-none'
                             }`}>
                               <button
+                                tabIndex={-1}
                                 onClick={(e) => {
                                   e.preventDefault()
                                   e.stopPropagation()
@@ -2833,7 +2861,6 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                 }}
                                 className="p-0 hover:text-foreground rounded transition-colors text-muted-foreground"
                                 title="Clear logo"
-                                tabIndex={-1}
                               >
                                 <IconX className="h-4 w-4" />
                               </button>
@@ -2858,6 +2885,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                       </h3>
                                               <button
                           type="button"
+                          tabIndex={-1}
                           onClick={async () => {
                             // Force hover state to false immediately on click
                             setIsAgentsHovered(false)
@@ -2940,6 +2968,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                     </span>
                                   </div>
                                   <button
+                                    tabIndex={-1}
                                                                         onClick={async () => {
                                       const newSelected = new Set(selectedAgents)
                                       newSelected.delete(agent.user_id)
@@ -2992,6 +3021,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                     </h3>
                                           <button
                         type="button"
+                        tabIndex={-1}
                         onClick={async () => {
                           // Force hover state to false immediately on click
                           setIsClientsHovered(false)
@@ -3069,6 +3099,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                   </h4>
                                 </div>
                                 <button
+                                    tabIndex={-1}
                                     onClick={async () => {
                                     const newSelected = new Set(selectedClients)
                                     newSelected.delete(client.user_id)
@@ -3116,8 +3147,8 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
               <div className="flex items-center gap-3">
                 {/* Show Save button only when adding a new company (not editing) AND modal is open */}
                 {isOpen && !companyToEdit?.id && (
-                  <Button type="submit" form="add-company-form" disabled={isSubmitting || !isFormValid()} size="sm">
-                    {isSubmitting ? 'Saving...' : 'Save'}
+                  <Button type="submit" form="add-company-form" disabled={isSubmitting || !isFormValid()} size="sm" tabIndex={-1}>
+                    {isSubmitting ? 'Saving...' : 'Add Company'}
               </Button>
                 )}
 
@@ -3129,8 +3160,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                     onClick={handleDeleteClick}
                     disabled={isDeleting}
                     size="sm"
+                    tabIndex={-1}
                   >
-                    {isDeleting ? 'Deleting...' : 'Delete'}
+                    {isDeleting ? 'Deleting...' : 'Delete Company'}
               </Button>
                 )}
               </div>
@@ -3317,6 +3349,14 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                               e.target.style.height = 'auto'
                               e.target.style.height = e.target.scrollHeight + 'px'
                             }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault()
+                                if (comment.trim() && !isSubmittingComment) {
+                                  handleCommentSubmit(e)
+                                }
+                              }
+                            }}
                             onFocus={(e) => {
                               setIsCommentFocused(true)
                             }}
@@ -3326,6 +3366,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                             className="w-full resize-none border-0 bg-transparent text-foreground px-3 py-2 shadow-none text-sm focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:text-foreground placeholder:text-muted-foreground align-middle transition-all duration-300 ease-in-out min-h-[36px] overflow-hidden"
                             disabled={isSubmittingComment}
                             rows={1}
+                            tabIndex={-1}
                           />
                           
                           {/* Send button - only show when expanded, inside the textarea container */}
@@ -3336,6 +3377,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                                 onClick={handleCommentSubmit}
                                 disabled={!comment.trim() || isSubmittingComment}
                                 className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                                tabIndex={-1}
                               >
                                 {isSubmittingComment ? (
                                   <IconClock className="h-3 w-3 text-muted-foreground animate-spin" />
@@ -3359,7 +3401,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       <Dialog open={showDeleteConfirmation} onOpenChange={setShowDeleteConfirmation}>
         <DialogContent className="sm:max-w-[380px] w-[90vw] rounded-xl [&>button]:hidden">
           <div className="flex flex-col space-y-1.5 text-center sm:text-center">
-            <h2 className="text-lg font-semibold leading-none tracking-tight">Delete</h2>
+            <h2 className="text-lg font-semibold leading-none tracking-tight">Delete Company</h2>
             </div>
           <div className="text-sm space-y-2">
             <p className="text-muted-foreground">Are you sure you want to delete this company? This action cannot be undone and will remove all associated data.</p>
@@ -3368,6 +3410,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             <Button 
               variant="ghost" 
               onClick={() => setShowDeleteConfirmation(false)}
+              tabIndex={-1}
             >
               No
             </Button>
@@ -3375,12 +3418,42 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
               variant="destructive" 
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
+              tabIndex={-1}
             >
               {isDeleting ? 'Deleting...' : 'Yes'}
             </Button>
         </div>
       </DialogContent>
       </Dialog>
+
+      {/* Required Fields Warning Dialog */}
+      <Dialog open={showRequiredFieldsWarning} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-[380px] w-[90vw] rounded-xl [&>button]:hidden">
+          <div className="flex flex-col space-y-1.5 text-center sm:text-center">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">Missing Fields</h2>
+          </div>
+          <div className="text-sm space-y-2">
+            <p className="text-muted-foreground">The following required fields are missing. Please fill in all required fields before saving this company.</p>
+            <ul className="space-y-1">
+              {missingFields.map((field, index) => (
+                <li key={index} className="flex items-center gap-2">
+                  <IconAlertCircle className="h-4 w-4 text-muted-foreground" />
+                  <span>{field} <span style={{ color: 'rgb(239, 68, 68)' }}>(Required)</span></span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="flex justify-center gap-2 pt-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowRequiredFieldsWarning(false)}
+            >
+              OK
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }
+

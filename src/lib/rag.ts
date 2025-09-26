@@ -21,6 +21,30 @@ let qdrantClient: Nullable<QdrantClient> = null
 let initialized = false
 let usedMemoryFallback = false
 
+// Helper function to safely convert any value to string
+function safeStringify(value: any): string {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  if (typeof value === 'string') {
+    return value
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  if (Array.isArray(value)) {
+    return value.map(item => safeStringify(item)).join(', ')
+  }
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return String(value)
+    }
+  }
+  return String(value)
+}
+
 async function ensureEmbeddings(): Promise<OpenAIEmbeddings | null> {
   if (embeddings) return embeddings
   const apiKey = process.env.OPENAI_API_KEY
@@ -156,30 +180,61 @@ export async function indexTalentProfileDoc(talent: {
   ])
 }
 
-// Enhanced function for BPOC talent data
+// Enhanced function for BPOC talent data - using cleaned Applicant interface
 export async function indexBpocTalentProfile(talent: {
-  applicant_id: string
-  first_name?: string | null
-  last_name?: string | null
-  summary?: string | null
-  skills?: string[]
+  id: string
+  user_id: string
+  resume_slug?: string | null
+  details: string | null
+  status: string
+  created_at: string
+  updated_at: string
+  profile_picture: string | null
+  first_name: string | null
+  last_name: string | null
+  full_name?: string | null
+  employee_id: string | null
+  job_title?: string | null
+  company_name?: string | null
+  user_position?: string | null
+  job_ids?: number[] | null
+  video_introduction_url?: string | null
   current_salary?: number | null
   expected_monthly_salary?: number | null
+  shift?: string | null
   all_job_titles?: string[]
   all_companies?: string[]
-  video_introduction_url?: string | null
+  all_job_statuses?: string[]
+  all_job_timestamps?: string[]
+  skills?: string[]
+  interested_clients?: {
+    user_id: number
+    first_name: string | null
+    last_name: string | null
+    profile_picture: string | null
+    employee_id: string | null
+  }[]
+  originalSkillsData?: any
+  summary?: string | null
+  email?: string | null
+  phone?: string | null
+  address?: string | null
   aiAnalysis?: {
     overall_score?: number
     key_strengths?: any[]
+    strengths_analysis?: any
+    improvements?: any[]
+    recommendations?: any[]
     improved_summary?: string
-    career_path?: any
     salary_analysis?: any
+    career_path?: any
+    section_analysis?: any
   } | null
 }): Promise<void> {
   const s = await ensureStore()
   if (!s) return
   
-  const name = `${talent.first_name || ''} ${talent.last_name || ''}`.trim()
+  const name = talent.full_name || `${talent.first_name || ''} ${talent.last_name || ''}`.trim()
   if (!name) return // Skip if no name available
   
   const parts: string[] = []
@@ -187,61 +242,154 @@ export async function indexBpocTalentProfile(talent: {
   // Basic Information
   parts.push(`Name: ${name}`)
   
-  // Professional Summary
+  // Professional Summary (prioritize summary over details)
   if (talent.summary) {
     parts.push(`Professional Summary: ${talent.summary}`)
+  } else if (talent.details) {
+    parts.push(`Professional Summary: ${talent.details}`)
   }
   
-  // Skills
-  if (Array.isArray(talent.skills) && talent.skills.length > 0) {
+  // Position and Experience
+  if (talent.user_position) {
+    parts.push(`Position: ${talent.user_position}`)
+  }
+  if (talent.job_title) {
+    parts.push(`Job Title: ${talent.job_title}`)
+  }
+  
+  // Skills (structured by category if available) - COMPLETELY FIXED
+  if (talent.originalSkillsData && typeof talent.originalSkillsData === 'object' && !Array.isArray(talent.originalSkillsData)) {
+    Object.entries(talent.originalSkillsData).forEach(([category, skills]) => {
+      if (Array.isArray(skills) && skills.length > 0) {
+        // Use safeStringify to handle arrays of objects properly
+        const formattedSkills = skills.map(skill => safeStringify(skill)).join(", ")
+        parts.push(`${category}: ${formattedSkills}`)
+      } else if (typeof skills === 'object' && skills !== null) {
+        // Handle object data (like education, experience) by converting to readable format
+        const formattedData = safeStringify(skills)
+        parts.push(`${category}: ${formattedData}`)
+      }
+    })
+  } else if (Array.isArray(talent.skills) && talent.skills.length > 0) {
     parts.push(`Skills: ${talent.skills.join(", ")}`)
   }
   
   // Salary Information
+  if (talent.current_salary) {
+    parts.push(`Current Salary: ₱${talent.current_salary.toLocaleString()}/month`)
+  }
   if (talent.expected_monthly_salary) {
-    parts.push(`Expected Salary: $${talent.expected_monthly_salary.toLocaleString()}`)
+    parts.push(`Expected Salary: ₱${talent.expected_monthly_salary.toLocaleString()}/month`)
   }
   
+  // Shift Information
+  if (talent.shift) {
+    parts.push(`Shift: ${talent.shift}`)
+  }
   
   // Work Experience
   if (Array.isArray(talent.all_job_titles) && talent.all_job_titles.length > 0) {
     parts.push(`Previous Job Titles: ${talent.all_job_titles.join(", ")}`)
   }
   
-  // AI Analysis
+  // Application Dates (KEEP - useful for recency-based searches)
+  if (Array.isArray(talent.all_job_timestamps) && talent.all_job_timestamps.length > 0) {
+    const formattedDates = talent.all_job_timestamps.map(date => 
+      new Date(date).toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      })
+    )
+    parts.push(`Application Dates: ${formattedDates.join(", ")}`)
+  }
+  
+  // Interested Clients (KEEP - shows demand/interest level)
+  if (talent.interested_clients && talent.interested_clients.length > 0) {
+    const clientNames = talent.interested_clients.map(client => 
+      `${client.first_name || ''} ${client.last_name || ''}`.trim() || `Client ${client.user_id}`
+    ).join(", ")
+    parts.push(`Interested Clients: ${clientNames} (${talent.interested_clients.length} clients)`)
+  }
+  
+  // Resume and Portfolio
+  if (talent.resume_slug) {
+    parts.push(`Resume: Available at https://www.bpoc.io/${talent.resume_slug}`)
+  }
+  
+  // AI Analysis (ENHANCED - detailed analysis content) - FIXED
   if (talent.aiAnalysis) {
     if (talent.aiAnalysis.overall_score) {
       parts.push(`AI Overall Score: ${talent.aiAnalysis.overall_score}/10`)
     }
     if (talent.aiAnalysis.key_strengths && Array.isArray(talent.aiAnalysis.key_strengths)) {
-      const strengths = talent.aiAnalysis.key_strengths.map((s: any) => s.strength || s).join(", ")
+      const strengths = talent.aiAnalysis.key_strengths.map((s: any) => 
+        typeof s === 'string' ? s : (s.strength || safeStringify(s))
+      ).join(", ")
       parts.push(`Key Strengths: ${strengths}`)
     }
     if (talent.aiAnalysis.improved_summary) {
       parts.push(`AI Enhanced Summary: ${talent.aiAnalysis.improved_summary}`)
     }
     if (talent.aiAnalysis.career_path) {
-      parts.push(`Career Path Analysis: ${JSON.stringify(talent.aiAnalysis.career_path)}`)
+      parts.push(`Career Path Analysis: ${safeStringify(talent.aiAnalysis.career_path)}`)
+    }
+    
+    // Detailed AI Analysis - FIXED
+    if (talent.aiAnalysis.strengths_analysis) {
+      if (talent.aiAnalysis.strengths_analysis.topStrengths) {
+        const topStrengths = safeStringify(talent.aiAnalysis.strengths_analysis.topStrengths)
+        parts.push(`Top Strengths: ${topStrengths}`)
+      }
+      if (talent.aiAnalysis.strengths_analysis.coreStrengths) {
+        const coreStrengths = safeStringify(talent.aiAnalysis.strengths_analysis.coreStrengths)
+        parts.push(`Core Strengths: ${coreStrengths}`)
+      }
+    }
+    
+    if (talent.aiAnalysis.improvements && Array.isArray(talent.aiAnalysis.improvements)) {
+      const improvements = talent.aiAnalysis.improvements.map((imp: any) => 
+        safeStringify(imp)
+      ).join(", ")
+      parts.push(`Areas for Improvement: ${improvements}`)
+    }
+    
+    if (talent.aiAnalysis.recommendations && Array.isArray(talent.aiAnalysis.recommendations)) {
+      const recommendations = talent.aiAnalysis.recommendations.map((rec: any) => 
+        safeStringify(rec)
+      ).join(", ")
+      parts.push(`Recommendations: ${recommendations}`)
+    }
+    
+    if (talent.aiAnalysis.salary_analysis) {
+      parts.push(`Salary Analysis: ${safeStringify(talent.aiAnalysis.salary_analysis)}`)
+    }
+    
+    if (talent.aiAnalysis.section_analysis) {
+      parts.push(`Section Analysis: ${safeStringify(talent.aiAnalysis.section_analysis)}`)
     }
   }
   
-  // Video Introduction
-  if (talent.video_introduction_url) {
-    parts.push(`Video Introduction: Available`)
-  }
 
   const pageContent = parts.join("\n")
   
-  // Create comprehensive metadata
+  // Create comprehensive metadata (INCLUDING high-priority fields)
   const metadata = {
-    talentId: talent.applicant_id,
-    type: "bpoc_profile",
+    talentId: talent.id,
     name: name,
+    position: talent.user_position || '',
+    jobTitle: talent.job_title || '',
     skills: talent.skills || [],
+    currentSalary: talent.current_salary || 0,
     expectedSalary: talent.expected_monthly_salary || 0,
+    shift: talent.shift || '',
     jobTitles: talent.all_job_titles || [],
-    hasVideoIntro: !!talent.video_introduction_url,
-    aiScore: talent.aiAnalysis?.overall_score || 0
+    jobTimestamps: talent.all_job_timestamps || [], // KEEP - useful for filtering
+    hasResume: !!talent.resume_slug,
+    status: talent.status,
+    interestedClientsCount: talent.interested_clients?.length || 0,
+    aiScore: talent.aiAnalysis?.overall_score || 0,
+    aiAnalysis: talent.aiAnalysis || null
   }
   
   await s.addDocuments([
@@ -251,7 +399,7 @@ export async function indexBpocTalentProfile(talent: {
     },
   ])
   
-  console.log(`✅ Indexed BPOC talent profile for ${name} (${talent.applicant_id})`)
+  console.log(`✅ Indexed BPOC talent profile for ${name} (${talent.id})`)
 }
 
 export async function retrieveContextForTalent(
@@ -440,6 +588,118 @@ export async function getCollectionStats(): Promise<{
   } catch (error) {
     console.error('Failed to get collection stats:', error)
     return null
+  }
+}
+
+// Search for similar talents based on query
+// Get the vector store instance
+export async function getVectorStore(): Promise<VectorStore | null> {
+  return await ensureStore()
+}
+
+
+export async function searchSimilarTalents(query: string, limit: number = 5): Promise<any[]> {
+  try {
+    console.log('🔍 searchSimilarTalents called with query:', query, 'limit:', limit)
+    const store = await getVectorStore()
+    if (!store) {
+      console.error('❌ Vector store not available')
+      return []
+    }
+    console.log('✅ Vector store available, performing search...')
+
+    // Perform similarity search using the enhanced search function
+    const searchResults = await searchDocuments(query, limit)
+    console.log('🔍 Search results:', searchResults.length, 'results found')
+    
+    // Extract talent data from results with enhanced information
+    const talents = searchResults.map(result => {
+      const metadata = result.metadata || {}
+      const talent = {
+        id: metadata.talentId,
+        full_name: metadata.name || metadata.full_name,
+        skills: metadata.skills || [],
+        summary: metadata.summary,
+        expected_monthly_salary: metadata.expectedSalary || metadata.expected_monthly_salary,
+        address: metadata.address,
+        all_job_titles: metadata.jobTitles || metadata.all_job_titles || [],
+        job_title: metadata.jobTitle || metadata.job_title,
+        position: metadata.position,
+        shift: metadata.shift,
+        current_salary: metadata.currentSalary || metadata.current_salary,
+        status: metadata.status,
+        interestedClientsCount: metadata.interestedClientsCount,
+        aiScore: metadata.aiScore,
+        aiAnalysis: metadata.aiAnalysis,
+        score: result.score || 0
+      }
+      
+      // Debug logging for AI analysis
+      if (talent.full_name) {
+        console.log(`🔍 Talent ${talent.full_name}:`, {
+          aiScore: talent.aiScore,
+          hasAiAnalysis: !!talent.aiAnalysis,
+          aiAnalysisKeys: talent.aiAnalysis ? Object.keys(talent.aiAnalysis) : 'null'
+        })
+      }
+      
+      return talent
+    })
+
+    return talents
+  } catch (error) {
+    console.error('Failed to search similar talents:', error)
+    return []
+  }
+}
+
+// Index all talents from the database using enhanced function
+export async function indexTalentDocuments(): Promise<{
+  success: boolean
+  indexedCount: number
+  error?: string
+}> {
+  try {
+    console.log('Starting enhanced talent indexing...')
+    
+    // Fetch all talents from the database
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}/api/bpoc?status=passed`)
+    if (!response.ok) {
+      throw new Error('Failed to fetch talents from database')
+    }
+    
+    const talents = await response.json()
+    console.log(`Found ${talents.length} talents to index`)
+    
+    if (talents.length === 0) {
+      return { success: true, indexedCount: 0 }
+    }
+    
+    // Process and index each talent using the enhanced function
+    let indexedCount = 0
+    for (const talent of talents) {
+      try {
+        // Use the enhanced indexing function with all the rich data
+        await indexBpocTalentProfile(talent)
+        indexedCount++
+        
+        console.log(`Indexed talent: ${talent.full_name || talent.id}`)
+      } catch (error) {
+        console.error(`Failed to index talent ${talent.id}:`, error)
+        // Continue with other talents
+      }
+    }
+    
+    console.log(`Successfully indexed ${indexedCount} talents with enhanced data`)
+    return { success: true, indexedCount }
+    
+  } catch (error) {
+    console.error('Failed to index talents:', error)
+    return { 
+      success: false, 
+      indexedCount: 0, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }
   }
 }
 

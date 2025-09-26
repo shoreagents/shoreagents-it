@@ -71,11 +71,13 @@ export function ClientSelection({
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-8"
+            tabIndex={-1}
           />
           {searchValue && (
             <button
               onClick={() => onSearchChange('')}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              tabIndex={-1}
             >
               <IconX className="h-4 w-4" />
             </button>
@@ -192,6 +194,7 @@ export function ClientSelection({
         <Button
           onClick={onDone}
           className="w-full"
+          tabIndex={-1}
         >
           Done
         </Button>

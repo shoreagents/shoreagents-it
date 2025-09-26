@@ -20,7 +20,7 @@ async function testFixedAdd() {
     
     const testData = [
       {
-        id: 4,
+        id: 1,
         vector: testVector,
         payload: {
           content: 'John Smith is a senior React developer with 5 years of experience in TypeScript and Node.js.',
@@ -31,7 +31,7 @@ async function testFixedAdd() {
         }
       },
       {
-        id: 5,
+        id: 2,
         vector: testVector,
         payload: {
           content: 'Sarah Johnson is a full-stack developer with 3 years of experience in Python, Django, and PostgreSQL.',
@@ -42,7 +42,7 @@ async function testFixedAdd() {
         }
       },
       {
-        id: 6,
+        id: 3,
         vector: testVector,
         payload: {
           content: 'Mike Chen is a DevOps engineer with 4 years of experience in Kubernetes, Docker, and AWS.',

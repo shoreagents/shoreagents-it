@@ -27,6 +27,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { EventsActivityLog } from "@/components/events-activity-log"
 import { Comment, CommentData } from "@/components/ui/comment"
 import { AgentSelection, type Agent } from "@/components/agent-selection"
+import { useRealtimeEvents } from "@/hooks/use-realtime-events"
 
 interface AddEventModalProps {
   isOpen: boolean
@@ -108,21 +109,114 @@ const convertTo12Hour = (time24: string): string => {
   return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
 }
 
+// Format date consistently without timezone conversion
+const formatDateForDisplay = (date: Date | undefined): string => {
+  if (!date || isNaN(date.getTime())) return ''
+  
+  // Format date as MM/DD/YYYY to avoid timezone conversion issues
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const year = date.getFullYear()
+  
+  return `${month}/${day}/${year}`
+}
+
 
 export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: AddEventModalProps) {
   const { theme } = useTheme()
   const { user } = useAuth()
   
-  // Real-time updates for member changes (not needed for events)
-  // const { isConnected } = useRealtimeMembers()
+  // Real-time updates for events
+  const [currentEvent, setCurrentEvent] = React.useState<EventData | null>(eventToEdit || null)
+  
+  // Initialize currentEvent when eventToEdit changes
+  React.useEffect(() => {
+    if (eventToEdit) {
+      setCurrentEvent(eventToEdit)
+    }
+  }, [eventToEdit])
+  
+  // Helper function to get the current event data (realtime or original)
+  const getCurrentEvent = () => currentEvent || eventToEdit
+  
+  // Realtime events hook to update modal when event data changes
+  useRealtimeEvents({
+    onEventUpdated: (updatedEvent, oldEvent) => {
+      // Only update if this is the event we're currently viewing
+      if (eventToEdit && updatedEvent.id === eventToEdit.id) {
+        console.log('🔄 Modal: Event updated in realtime:', updatedEvent)
+        setCurrentEvent(updatedEvent)
+      }
+    },
+    onEventDeleted: (deletedEvent) => {
+      // Close modal if the event we're viewing was deleted
+      if (eventToEdit && deletedEvent.id === eventToEdit.id) {
+        console.log('🗑️ Modal: Event deleted, closing modal')
+        onClose()
+      }
+    },
+    onEventAttendanceChanged: (attendance) => {
+      // Refresh event data if attendance changed for the current event
+      if (eventToEdit && attendance.event_id === eventToEdit.id) {
+        console.log('👥 Modal: Event attendance changed, refreshing data')
+        // We could fetch fresh data here, but the parent component should handle this
+      }
+    },
+    enableNotifications: false // Don't show notifications in modal
+  })
+
+  // Sync realtime updates to form data when currentEvent changes
+  React.useEffect(() => {
+    if (currentEvent && eventToEdit?.id) {
+      console.log('🔄 Modal: Syncing realtime data to form:', currentEvent)
+      setFormData(prev => ({
+        ...prev,
+        title: currentEvent.title || prev.title,
+        description: currentEvent.description || prev.description,
+        event_date: currentEvent.event_date || prev.event_date,
+        start_time: currentEvent.start_time || prev.start_time,
+        end_time: currentEvent.end_time || prev.end_time,
+        location: currentEvent.location || prev.location,
+        status: currentEvent.status || prev.status,
+        event_type: currentEvent.event_type || prev.event_type,
+        assigned_user_ids: currentEvent.assigned_user_ids || prev.assigned_user_ids,
+        participants_count: (currentEvent as any).participants_count || prev.participants_count
+      }))
+
+      // Also update localEventDate for display
+      if (currentEvent.event_date) {
+        console.log('🔄 Modal: Updating localEventDate from realtime data:', currentEvent.event_date)
+        try {
+          // Parse date string without timezone conversion
+          const dateStr = currentEvent.event_date.split('T')[0] // Remove time component if present
+          const [year, month, day] = dateStr.split('-').map(Number)
+          
+          if (year && month && day) {
+            // Create date in local timezone without conversion
+            const parsedDate = new Date(year, month - 1, day) // month is 0-indexed
+            console.log('🔄 Modal: Parsed realtime date:', parsedDate)
+            setLocalEventDate(parsedDate)
+          } else {
+            console.error('❌ Modal: Invalid realtime date format:', currentEvent.event_date)
+            setLocalEventDate(undefined)
+          }
+        } catch (error) {
+          console.error('❌ Modal: Error parsing realtime date:', error)
+          setLocalEventDate(undefined)
+        }
+      }
+    }
+  }, [currentEvent, eventToEdit?.id])
 
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [isCancelling, setIsCancelling] = React.useState(false)
   const [isDeleting, setIsDeleting] = React.useState(false)
-  const [isRescheduling, setIsRescheduling] = React.useState(false)
+  const [isRecovering, setIsRecovering] = React.useState(false)
   const [showDeleteConfirmation, setShowDeleteConfirmation] = React.useState(false)
-  const [showRescheduleConfirmation, setShowRescheduleConfirmation] = React.useState(false)
   const [showCancelConfirmation, setShowCancelConfirmation] = React.useState(false)
+  const [showRecoverConfirmation, setShowRecoverConfirmation] = React.useState(false)
+  const [showRequiredFieldsWarning, setShowRequiredFieldsWarning] = React.useState(false)
+  const [missingFields, setMissingFields] = React.useState<string[]>([])
   const [comment, setComment] = React.useState("")
   const [isCommentFocused, setIsCommentFocused] = React.useState(false)
   const [isSubmittingComment, setIsSubmittingComment] = React.useState(false)
@@ -166,10 +260,16 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
   const [totalCount, setTotalCount] = React.useState(0)
   const [agentSearch, setAgentSearch] = React.useState('')
   const [isAgentsHovered, setIsAgentsHovered] = React.useState(false)
+  const [companyFilter, setCompanyFilter] = React.useState('all')
+  const [companyOptions, setCompanyOptions] = React.useState<{ id: number; company: string }[]>([])
 
   // Reset editing state when modal opens/closes
   React.useEffect(() => {
     if (isOpen) {
+      // Reset selected agents data when modal opens
+      setSelectedAgentsData([])
+      console.log('🧹 Reset selectedAgentsData when modal opens')
+      
       // When opening for a new event, start in edit mode
       // When opening for an existing event, start in view mode
       setIsEditingEvent(!eventToEdit?.id)
@@ -228,16 +328,26 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
         if (eventToEdit.event_date) {
           console.log('🔄 Parsing event date:', eventToEdit.event_date, 'Type:', typeof eventToEdit.event_date)
           try {
-            // Use the same approach as the main page - create Date directly from string
-            const parsedDate = new Date(eventToEdit.event_date)
-            console.log('🔄 Created date object:', parsedDate)
+            // Parse date string without timezone conversion
+            // Assume event_date is in YYYY-MM-DD format
+            const dateStr = eventToEdit.event_date.split('T')[0] // Remove time component if present
+            const [year, month, day] = dateStr.split('-').map(Number)
             
-            // Validate the created date
-            if (isNaN(parsedDate.getTime())) {
-              console.error('❌ Created date is invalid:', parsedDate)
-              setLocalEventDate(undefined)
+            if (year && month && day) {
+              // Create date in local timezone without conversion
+              const parsedDate = new Date(year, month - 1, day) // month is 0-indexed
+              console.log('🔄 Created date object (timezone-safe):', parsedDate)
+              
+              // Validate the created date
+              if (isNaN(parsedDate.getTime())) {
+                console.error('❌ Created date is invalid:', parsedDate)
+                setLocalEventDate(undefined)
+              } else {
+                setLocalEventDate(parsedDate)
+              }
             } else {
-              setLocalEventDate(parsedDate)
+              console.error('❌ Invalid date format:', eventToEdit.event_date)
+              setLocalEventDate(undefined)
             }
           } catch (error) {
             console.error('❌ Error parsing event date:', error)
@@ -264,8 +374,21 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
       setHasMore(true)
       setTotalCount(0)
       setAgentSearch('')
+      setCompanyFilter('all')
       setIsLoadingAgents(true)
       fetchAgents(1, false, '')
+      
+      // Fetch company options
+      const fetchCompanyOptions = async () => {
+        try {
+          const res = await fetch('/api/agents', { method: 'OPTIONS' })
+          const data = await res.json()
+          setCompanyOptions(data.members || [])
+        } catch (e) {
+          setCompanyOptions([])
+        }
+      }
+      fetchCompanyOptions()
     }
   }, [showAgentSelection])
 
@@ -277,16 +400,17 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
       setCurrentPage(1)
       setHasMore(true)
       setTotalCount(0)
-      fetchAgents(1, false, agentSearch)
+      fetchAgents(1, false, agentSearch, companyFilter)
     }, 300)
 
     return () => clearTimeout(timeoutId)
-  }, [agentSearch, showAgentSelection])
+  }, [agentSearch, companyFilter, showAgentSelection])
 
   // Cleanup effect to reset selection states when modal closes
   React.useEffect(() => {
     if (!isOpen) {
       setShowAgentSelection(false)
+      setSelectedAgentsData([])
       console.log('🧹 Modal closed - resetting all selection states')
     }
   }, [isOpen])
@@ -321,13 +445,13 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
       const normalizeDate = (dateStr: string) => {
         if (!dateStr) return ''
         try {
-          const date = new Date(dateStr)
-          if (isNaN(date.getTime())) return dateStr
-          // Use timezone-safe date formatting to avoid day shift
-          const year = date.getFullYear()
-          const month = String(date.getMonth() + 1).padStart(2, '0')
-          const day = String(date.getDate()).padStart(2, '0')
-          return `${year}-${month}-${day}`
+          // Extract date part directly without creating Date object to avoid timezone conversion
+          const dateMatch = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/)
+          if (dateMatch) {
+            return `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`
+          }
+          // If no date pattern found, return the original string
+          return dateStr
         } catch {
           return dateStr
         }
@@ -365,17 +489,15 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
       // Normalize date format for database (timezone-safe)
       const normalizeDateForDB = (dateStr: string) => {
         if (!dateStr) return ''
-        try {
-          const date = new Date(dateStr)
-          if (isNaN(date.getTime())) return dateStr
-          // Use timezone-safe date formatting to avoid day shift
-          const year = date.getFullYear()
-          const month = String(date.getMonth() + 1).padStart(2, '0')
-          const day = String(date.getDate()).padStart(2, '0')
-          return `${year}-${month}-${day}` // Ensure YYYY-MM-DD format
-        } catch {
-          return dateStr
+        
+        // Extract date part from any format without timezone conversion
+        const dateMatch = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/)
+        if (dateMatch) {
+          return `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`
         }
+        
+        // If no date pattern found, return the original string
+        return dateStr
       }
       
       const updateData = {
@@ -413,13 +535,47 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
     }
   }
 
+  // Function to determine event status based on user's local timezone and event_date
+  const getEventStatusByDate = (eventDate: string, currentStatus: string) => {
+    // Don't change cancelled events - preserve manual cancellations
+    if (currentStatus === 'cancelled') {
+      return 'cancelled'
+    }
+
+    // Get current date in user's local timezone
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    const today = `${year}-${month}-${day}` // YYYY-MM-DD format
+    
+    // Ensure eventDate is in YYYY-MM-DD format (remove any time component)
+    const eventDateOnly = eventDate.split('T')[0]
+    
+    // Compare event_date with today's date
+    if (eventDateOnly > today) {
+      return 'upcoming'  // Future events
+    } else if (eventDateOnly === today) {
+      return 'today'     // Events happening today
+    } else {
+      return 'ended'     // Past events
+    }
+  }
+
   const handleInputChange = (field: keyof EventData, value: string | null | number[]) => {
     console.log(`🔄 handleInputChange called with field: ${field}, value:`, value)
     console.log(`🔍 Current formData.${field}:`, formData[field])
     
-    const newData = {
+    let newData = {
       ...formData,
       [field]: value
+    }
+    
+    // If event_date is being changed, automatically update the status based on the new date
+    if (field === 'event_date' && typeof value === 'string' && value) {
+      const newStatus = getEventStatusByDate(value, formData.status)
+      console.log(`📅 Date changed to ${value}, updating status from ${formData.status} to ${newStatus}`)
+      newData.status = newStatus as 'upcoming' | 'today' | 'cancelled' | 'ended'
     }
     
     console.log(`📝 Setting new formData for ${field}:`, newData[field])
@@ -431,15 +587,51 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
     console.log('🔒 handleClose called:', { 
       eventToEdit: eventToEdit?.id, 
       hasUnsavedChanges, 
-      isOpen
+      isOpen,
+      currentStatus: formData.status
     })
     
-    if (eventToEdit?.id && hasUnsavedChanges) {
-      // Auto-save event data changes before closing
+    if (eventToEdit?.id) {
+      // Skip auto-sync for cancelled or ended events since there's no new data to sync
+      if (formData.status === 'cancelled' || formData.status === 'ended') {
+        console.log('🔒 Skipping auto-sync for cancelled/ended event - no new data to sync')
+        onClose() // Call the original onClose prop
+        return
+      }
+      
+      // For existing events, check for missing required fields (including invitees)
+      const missingFields = getMissingRequiredFields()
+      if (missingFields.length > 0) {
+        setMissingFields(missingFields)
+        setShowRequiredFieldsWarning(true)
+        return
+      }
+      
+      // For existing events, always update status based on current browser date and auto-save if needed
       try {
-        console.log('🔄 Auto-saving event changes before close...')
-        await updateDatabase(formData)
-        console.log('✅ Event data saved successfully')
+        // Calculate current status based on browser date
+        const currentStatus = getEventStatusByDate(formData.event_date, formData.status)
+        
+        // Create updated form data with current status
+        const updatedFormData = {
+          ...formData,
+          status: currentStatus as 'upcoming' | 'today' | 'cancelled' | 'ended'
+        }
+        
+        // Check if status changed or there are other unsaved changes
+        const statusChanged = currentStatus !== formData.status
+        const needsUpdate = hasUnsavedChanges || statusChanged
+        
+        if (needsUpdate) {
+          console.log('🔄 Auto-saving event changes and updating status before close...', {
+            oldStatus: formData.status,
+            newStatus: currentStatus,
+            hasOtherChanges: hasUnsavedChanges
+          })
+          await updateDatabase(updatedFormData)
+          console.log('✅ Event data and status saved successfully')
+        }
+        
         setHasUnsavedChanges(false) // Reset unsaved changes flag
         
         // Notify parent of changes
@@ -454,8 +646,8 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
         return
       }
     } else {
-      // No unsaved changes or not in edit mode, just close
-      console.log('🔒 Closing without auto-save - no changes detected')
+      // New event or no existing event, just close
+      console.log('🔒 Closing without auto-save - new event or no event')
       onClose() // Call the original onClose prop
     }
   }
@@ -464,6 +656,14 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
     e.preventDefault()
     
     if (isSubmitting) return
+    
+    // Check for missing required fields (including invitees)
+    const missingFields = getMissingRequiredFields()
+    if (missingFields.length > 0) {
+      setMissingFields(missingFields)
+      setShowRequiredFieldsWarning(true)
+      return
+    }
     
     setIsSubmitting(true)
     
@@ -507,11 +707,43 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
     }
   }
 
+  const getMissingRequiredFields = () => {
+    const missing: string[] = []
+    
+    if (!formData.title.trim()) {
+      missing.push('Title')
+    }
+    if (!formData.event_date) {
+      missing.push('Event Date')
+    }
+    if (!formData.start_time) {
+      missing.push('Start Time')
+    }
+    if (!formData.end_time) {
+      missing.push('End Time')
+    }
+    if (!formData.assigned_user_ids || formData.assigned_user_ids.length === 0) {
+      missing.push('Invitees')
+    }
+    
+    return missing
+  }
+
   const isFormValid = () => {
-    return formData.title.trim() !== '' && 
-           formData.event_date !== '' && 
-           formData.start_time !== '' && 
-           formData.end_time !== ''
+    const basicValidation = formData.title.trim() !== '' && 
+                           formData.event_date !== '' && 
+                           formData.start_time !== '' && 
+                           formData.end_time !== ''
+    
+    // For new events, require at least one invitee
+    if (!eventToEdit?.id) {
+      return basicValidation && 
+             formData.assigned_user_ids && 
+             formData.assigned_user_ids.length > 0
+    }
+    
+    // For existing events, basic validation is enough
+    return basicValidation
   }
 
   const handleCancel = async () => {
@@ -577,37 +809,90 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
     setShowDeleteConfirmation(false)
   }
 
-  const handleReschedule = async () => {
-    if (!eventToEdit?.id) return
-
-    setIsRescheduling(true)
-    try {
-      const updatedFormData = {
-        ...formData,
-        status: 'upcoming' as const
-      }
-
-      await updateDatabase(updatedFormData)
-      
-      // Update local state
-      setFormData(prev => ({ ...prev, status: 'upcoming' }))
-      
-    } catch (error) {
-      console.error('Error rescheduling event:', error)
-      alert('Failed to reschedule the event. Please try again.')
-    } finally {
-      setIsRescheduling(false)
-    }
-  }
-
-  const handleRescheduleConfirm = async () => {
-    await handleReschedule()
-    setShowRescheduleConfirmation(false)
-  }
 
   const handleCancelConfirm = async () => {
     await handleCancel()
     setShowCancelConfirmation(false)
+  }
+
+  const handleRecover = async () => {
+    if (!eventToEdit?.id) return
+
+    setIsRecovering(true)
+    try {
+      // Get the correct status based on event date for recovery (ignores current cancelled status)
+      const getRecoveryStatus = (eventDate: string) => {
+        // Get current date in user's local timezone
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = String(now.getMonth() + 1).padStart(2, '0')
+        const day = String(now.getDate()).padStart(2, '0')
+        const today = `${year}-${month}-${day}` // YYYY-MM-DD format
+        
+        // Ensure eventDate is in YYYY-MM-DD format (remove any time component)
+        const eventDateOnly = eventDate.split('T')[0]
+        
+        console.log('🔄 Recovery date comparison:', {
+          eventDateOnly,
+          today,
+          comparison: {
+            'eventDateOnly > today': eventDateOnly > today,
+            'eventDateOnly === today': eventDateOnly === today,
+            'eventDateOnly < today': eventDateOnly < today
+          }
+        })
+        
+        // Compare event_date with today's date
+        if (eventDateOnly > today) {
+          return 'upcoming'  // Future events
+        } else if (eventDateOnly === today) {
+          return 'today'     // Events happening today
+        } else {
+          return 'ended'     // Past events
+        }
+      }
+      
+      const correctStatus = getRecoveryStatus(formData.event_date)
+      
+      console.log('🔄 Recovery debug:', {
+        eventDate: formData.event_date,
+        currentStatus: formData.status,
+        recoveredStatus: correctStatus,
+        currentTime: new Date().toLocaleString(),
+        currentDate: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`
+      })
+      
+      // Use the existing updateDatabase function to change status to the correct one
+      const updatedFormData = {
+        ...formData,
+        status: correctStatus as 'upcoming' | 'today' | 'ended'
+      }
+      
+      await updateDatabase(updatedFormData)
+      
+      console.log('✅ Event recovered successfully with status:', correctStatus)
+      
+      // Update the form data to reflect the recovered status
+      setFormData(prev => ({
+        ...prev,
+        status: correctStatus
+      }))
+      
+      // Notify parent of changes
+      if (onEventAdded) {
+        onEventAdded({ ...eventToEdit, status: correctStatus })
+      }
+      
+    } catch (error) {
+      console.error('❌ Recover error:', error)
+    } finally {
+      setIsRecovering(false)
+    }
+  }
+
+  const handleRecoverConfirm = async () => {
+    await handleRecover()
+    setShowRecoverConfirmation(false)
   }
 
   const fetchParticipantsForEvent = async (eventId: number) => {
@@ -769,7 +1054,7 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
   }
 
   // Fetch agents function
-  const fetchAgents = async (page: number = 1, append: boolean = false, searchQuery: string = '') => {
+  const fetchAgents = async (page: number = 1, append: boolean = false, searchQuery: string = '', companyId: string = 'all') => {
     if (isLoadingMore) return
     
     try {
@@ -779,7 +1064,16 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
         setIsLoadingMore(true)
       }
       
-      const response = await fetch(`/api/agents/modal?page=${page}&limit=20&search=${encodeURIComponent(searchQuery)}`)
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: '20',
+        search: searchQuery
+      })
+      if (companyId !== 'all') {
+        params.append('memberId', companyId)
+      }
+      
+      const response = await fetch(`/api/agents/modal?${params.toString()}`)
       if (!response.ok) {
         throw new Error(`Failed to fetch agents: ${response.status}`)
       }
@@ -811,12 +1105,146 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
   // Load more agents function
   const loadMoreAgents = () => {
     if (hasMore && !isLoadingMore) {
-      fetchAgents(currentPage + 1, true, agentSearch)
+      fetchAgents(currentPage + 1, true, agentSearch, companyFilter)
     }
   }
 
+  // Handle company filter change
+  const handleCompanyFilterChange = (companyId: string) => {
+    setCompanyFilter(companyId)
+    setCurrentPage(1)
+    setHasMore(true)
+    setTotalCount(0)
+    fetchAgents(1, false, agentSearch, companyId)
+  }
+
+  // Select all agents function
+  const handleSelectAllAgents = async () => {
+    try {
+      // Fetch all agents from the database (not just paginated ones)
+      const params = new URLSearchParams({
+        page: '1',
+        limit: '1000',
+        search: agentSearch
+      })
+      if (companyFilter !== 'all') {
+        params.append('memberId', companyFilter)
+      }
+      
+      const response = await fetch(`/api/agents/modal?${params.toString()}`)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch all agents: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      const allAgents = data.agents || []
+      const allAgentIds = allAgents.map((agent: any) => agent.user_id)
+      const newAssignedIds = [...new Set([...(formData.assigned_user_ids || []), ...allAgentIds])]
+      
+      // Update form data
+      handleInputChange('assigned_user_ids', newAssignedIds)
+      
+      // Update local state immediately for responsive UI - merge with existing selected agents
+      setSelectedAgentsData(prev => {
+        const existingIds = new Set(prev.map(agent => agent.user_id))
+        const newAgents = allAgents.filter((agent: any) => !existingIds.has(agent.user_id))
+        return [...prev, ...newAgents]
+      })
+    } catch (error) {
+      console.error('❌ Error selecting all agents:', error)
+      // Fallback to selecting only currently loaded agents
+      const allAgentIds = agents.map(agent => agent.user_id)
+      const newAssignedIds = [...new Set([...(formData.assigned_user_ids || []), ...allAgentIds])]
+      handleInputChange('assigned_user_ids', newAssignedIds)
+      
+      // Update local state - merge with existing selected agents
+      setSelectedAgentsData(prev => {
+        const existingIds = new Set(prev.map(agent => agent.user_id))
+        const newAgents = agents.filter(agent => !existingIds.has(agent.user_id))
+        return [...prev, ...newAgents]
+      })
+    }
+  }
+
+  // Deselect all agents function
+  const handleDeselectAllAgents = async () => {
+    if (companyFilter === 'all') {
+      // When in "All Companies" filter, deselect ALL agents from database
+      try {
+        // Fetch all agents from the database to get complete list
+        const params = new URLSearchParams({
+          page: '1',
+          limit: '1000',
+          search: agentSearch
+        })
+        
+        const response = await fetch(`/api/agents/modal?${params.toString()}`)
+        if (response.ok) {
+          const data = await response.json()
+          const allAgents = data.agents || []
+          const allAgentIds = allAgents.map((agent: any) => agent.user_id)
+          
+          // Remove all agents from selection
+          const newAssignedIds = (formData.assigned_user_ids || []).filter(id => !allAgentIds.includes(id))
+          
+          // Update form data
+          handleInputChange('assigned_user_ids', newAssignedIds)
+          
+          // Update local state - remove all agents
+          setSelectedAgentsData(prev => prev.filter(agent => !allAgentIds.includes(agent.user_id)))
+        } else {
+          // Fallback to current agents if API fails
+          const currentAgentIds = agents.map(agent => agent.user_id)
+          const newAssignedIds = (formData.assigned_user_ids || []).filter(id => !currentAgentIds.includes(id))
+          handleInputChange('assigned_user_ids', newAssignedIds)
+          setSelectedAgentsData(prev => prev.filter(agent => !currentAgentIds.includes(agent.user_id)))
+        }
+      } catch (error) {
+        console.error('❌ Error deselecting all agents:', error)
+        // Fallback to current agents
+        const currentAgentIds = agents.map(agent => agent.user_id)
+        const newAssignedIds = (formData.assigned_user_ids || []).filter(id => !currentAgentIds.includes(id))
+        handleInputChange('assigned_user_ids', newAssignedIds)
+        setSelectedAgentsData(prev => prev.filter(agent => !currentAgentIds.includes(agent.user_id)))
+      }
+    } else {
+      // When in specific company filter, deselect only agents from that company
+      const currentAgentIds = agents.map(agent => agent.user_id)
+      
+      // Remove only the current agents from selection, keep others
+      const newAssignedIds = (formData.assigned_user_ids || []).filter(id => !currentAgentIds.includes(id))
+      
+      // Update form data
+      handleInputChange('assigned_user_ids', newAssignedIds)
+      
+      // Update local state - remove only current agents
+      setSelectedAgentsData(prev => prev.filter(agent => !currentAgentIds.includes(agent.user_id)))
+    }
+  }
+
+  // Remove all agents from a specific company
+  const handleRemoveCompanyAgents = (companyName: string) => {
+    // Get all agents from the specified company
+    const companyAgentIds = selectedAgentsData
+      .filter(agent => agent.member_company === companyName)
+      .map(agent => agent.user_id)
+    
+    // Remove these agents from the assigned user IDs
+    const newAssignedIds = formData.assigned_user_ids?.filter(id => !companyAgentIds.includes(id)) || []
+    
+    // Update form data
+    handleInputChange('assigned_user_ids', newAssignedIds)
+    
+    // Update local state immediately for responsive UI
+    setSelectedAgentsData(prev => prev.filter(agent => agent.member_company !== companyName))
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        handleClose()
+      }
+    }}>
       <DialogContent
         className="max-w-7xl max-h-[95vh] overflow-hidden p-0 rounded-xl"
         style={{ backgroundColor: theme === 'dark' ? '#111111' : '#f8f9fa' }}
@@ -829,7 +1257,7 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
             <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border">
               <div className="flex items-center gap-3">
                 <Badge className="text-xs h-6 flex items-center rounded-[6px]">
-                  Event
+                  Event & Activity
                 </Badge>
               </div>
             </div>
@@ -843,8 +1271,9 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                     type="text"
                     value={formData.title || ''}
                     onChange={(e) => handleInputChange('title', e.target.value)}
-                    placeholder="Event Title"
+                    placeholder="Event/Activity Title"
                     autoFocus
+                    readOnly={formData.status === 'cancelled' || formData.status === 'ended'}
                     className="text-2xl font-semibold h-auto px-3 py-0 !border !border-sidebar-border dark:!border-border !bg-[#ebebeb] dark:!bg-[#0a0a0a] rounded-lg transition-colors duration-200 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
                     style={{ minHeight: '2.5rem' }}
                     onBlur={() => {
@@ -876,14 +1305,19 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                 </div>
               ) : (
                 <div 
-                  className="text-2xl font-semibold mb-4 px-3 py-0 cursor-pointer hover:bg-[#ebebeb] dark:hover:bg-[#0a0a0a] rounded-lg transition-colors duration-200 flex items-center border border-transparent"
+                  className={`text-2xl font-semibold mb-4 px-3 py-0 rounded-lg transition-colors duration-200 flex items-center border border-transparent ${
+                    formData.status === 'cancelled' || formData.status === 'ended'
+                      ? 'cursor-default'
+                      : 'cursor-pointer hover:bg-[#ebebeb] dark:hover:bg-[#0a0a0a]'
+                  }`}
                   style={{ minHeight: '2.5rem' }}
                   onClick={() => {
-                    // Always allow editing when clicked
-                    setIsEditingEvent(true)
+                    if (formData.status !== 'cancelled' && formData.status !== 'ended') {
+                      setIsEditingEvent(true)
+                    }
                   }}
                 >
-                  {formData.title || 'Event Title'}
+                  {formData.title || 'Event/Activity Title'}
                 </div>
               )}
               
@@ -893,40 +1327,51 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                 <div className="flex items-center gap-2">
                   <IconTag className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Type:</span>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Badge 
-                        variant="outline" 
-                        className={`px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center ${
-                          formData.event_type ? getEventTypeBadgeClass(formData.event_type) : 'text-muted-foreground'
-                        }`}
-                      >
-                        {formData.event_type ? eventTypeOptions.find(opt => opt.value === formData.event_type)?.label || formData.event_type : 'Set Type'}
-                      </Badge>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-32 p-2">
-                      {eventTypeOptions.map((option) => {
-                        const isCurrentType = formData.event_type === option.value;
-                        return (
-                          <PopoverItem
-                            key={option.value}
-                            variant="primary"
-                            isSelected={isCurrentType}
-                            onClick={() => handleInputChange('event_type', option.value)}
-                          >
-                            {option.value === 'event' ? (
-                              <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                            ) : option.value === 'activity' ? (
-                              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                            ) : (
-                              <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-                            )}
-                            <span className="text-sm font-medium">{option.label}</span>
-                          </PopoverItem>
-                        );
-                      })}
-                    </PopoverContent>
-                  </Popover>
+                  {formData.status === 'cancelled' || formData.status === 'ended' ? (
+                    <Badge 
+                      variant="outline" 
+                      className={`px-3 py-1 font-medium flex items-center justify-center ${
+                        formData.event_type ? getEventTypeBadgeClass(formData.event_type) : 'text-muted-foreground'
+                      }`}
+                    >
+                      {formData.event_type ? eventTypeOptions.find(opt => opt.value === formData.event_type)?.label || formData.event_type : 'Set Type'}
+                    </Badge>
+                  ) : (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Badge 
+                          variant="outline" 
+                          className={`px-3 py-1 font-medium cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center ${
+                            formData.event_type ? getEventTypeBadgeClass(formData.event_type) : 'text-muted-foreground'
+                          }`}
+                        >
+                          {formData.event_type ? eventTypeOptions.find(opt => opt.value === formData.event_type)?.label || formData.event_type : 'Set Type'}
+                        </Badge>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-32 p-2">
+                        {eventTypeOptions.map((option) => {
+                          const isCurrentType = formData.event_type === option.value;
+                          return (
+                            <PopoverItem
+                              key={option.value}
+                              variant="primary"
+                              isSelected={isCurrentType}
+                              onClick={() => handleInputChange('event_type', option.value)}
+                            >
+                              {option.value === 'event' ? (
+                                <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                              ) : option.value === 'activity' ? (
+                                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                              ) : (
+                                <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                              )}
+                              <span className="text-sm font-medium">{option.label}</span>
+                            </PopoverItem>
+                          );
+                        })}
+                      </PopoverContent>
+                    </Popover>
+                  )}
                 </div>
                 
                 {/* Event Status */}
@@ -943,35 +1388,6 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                 </div>
               </div>
 
-              {/* Participants Row */}
-              <div className="flex items-center gap-2 text-sm mt-4">
-                <IconUsers className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Participants:</span>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer" onClick={async (e) => { e.stopPropagation(); if (formData.id) await fetchParticipantsForEvent(formData.id) }}>
-                      {formData.participants_count || 0}
-                    </button>
-                  </PopoverTrigger>
-                <PopoverContent align="end" sideOffset={6} className="w-80 p-2">
-                  <div className="flex flex-wrap gap-2 items-center justify-center min-h-10">
-                    {loadingParticipantsKey === `event:${formData.id}` && !eventParticipantsCache[`event:${formData.id}`] && (
-                      <div className="w-full flex items-center justify-center py-2 gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0s' }} />
-                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.2s' }} />
-                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.4s' }} />
-                      </div>
-                    )}
-                    {(eventParticipantsCache[`event:${formData.id}`]?.users || []).map(u => (
-                      <UserTooltip key={u.user_id} user={u} showEmployeeId={true} />
-                    ))}
-                    {loadingParticipantsKey !== `event:${formData.id}` && (!eventParticipantsCache[`event:${formData.id}`]?.users || eventParticipantsCache[`event:${formData.id}`]?.users.length === 0) && (
-                      <div className="text-xs text-muted-foreground w-full text-center">No Participants</div>
-                    )}
-                  </div>
-                </PopoverContent>
-                </Popover>
-              </div>
             </div>
 
             {/* Scrollable Form Content */}
@@ -1093,8 +1509,9 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                        <Textarea
                          value={formData.description || ''}
                          onChange={(e) => handleInputChange('description', e.target.value)}
-                         placeholder="Enter event description..."
+                         placeholder="Enter event/activity description..."
                          tabIndex={-1}
+                         readOnly={formData.status === 'cancelled' || formData.status === 'ended'}
                          className="min-h-[120px] resize-none border-0 bg-transparent dark:bg-transparent text-foreground placeholder:text-muted-foreground shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0 text-sm leading-relaxed w-full rounded-none"
                        />
                      </div>
@@ -1113,45 +1530,46 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                       icon={<IconCalendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
                       label="Event Date"
                       fieldName="event_date"
-                      value={localEventDate && !isNaN(localEventDate.getTime()) ? localEventDate.toLocaleDateString() : ''}
+                      value={formatDateForDisplay(localEventDate)}
                       onSave={() => {}}
                       placeholder="-"
-                      customInput={
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              tabIndex={-1}
-                              className={`h-[33px] w-full justify-start font-normal border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none hover:bg-muted/50 ${
-                                localEventDate ? 'text-foreground' : 'text-muted-foreground'
-                              }`}
-                            >
-                               {localEventDate && !isNaN(localEventDate.getTime()) ? localEventDate.toLocaleDateString() : "-"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={localEventDate}
-                               onSelect={(date) => {
-                                 console.log('🔄 Calendar onSelect triggered with date:', date)
-                                 setLocalEventDate(date)
-                                 if (date) {
-                                   // Use timezone-safe date formatting to avoid day shift
-                                   const year = date.getFullYear()
-                                   const month = String(date.getMonth() + 1).padStart(2, '0')
-                                   const day = String(date.getDate()).padStart(2, '0')
-                                   const dateStr = `${year}-${month}-${day}`
-                                   console.log('🔄 Converting date to string:', dateStr)
-                                   handleInputChange('event_date', dateStr)
-                                 }
-                                 console.log('Event date changed to:', date)
-                               }}
-                              captionLayout="dropdown"
+                      readOnly={formData.status === 'cancelled' || formData.status === 'ended'}
+                      customInput={formData.status !== 'cancelled' && formData.status !== 'ended' ? (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                tabIndex={-1}
+                                className={`h-[33px] w-full justify-start font-normal border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none hover:bg-muted/50 ${
+                                  localEventDate ? 'text-foreground' : 'text-muted-foreground'
+                                }`}
+                              >
+                                 {formatDateForDisplay(localEventDate) || "-"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={localEventDate}
+                                 onSelect={(date) => {
+                                   console.log('🔄 Calendar onSelect triggered with date:', date)
+                                   setLocalEventDate(date)
+                                   if (date) {
+                                     // Extract date components directly to avoid timezone conversion
+                                     const year = date.getFullYear()
+                                     const month = String(date.getMonth() + 1).padStart(2, '0')
+                                     const day = String(date.getDate()).padStart(2, '0')
+                                     const dateStr = `${year}-${month}-${day}`
+                                     console.log('🔄 Converting date to string (timezone-safe):', dateStr)
+                                     handleInputChange('event_date', dateStr)
+                                   }
+                                   console.log('Event date changed to:', date)
+                                 }}
+                                captionLayout="dropdown"
                             />
                           </PopoverContent>
                         </Popover>
-                      }
+                        ) : undefined}
                     />
 
                       {/* Start Time */}
@@ -1159,40 +1577,41 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                         icon={<IconClock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
                         label="Start Time"
                         fieldName="start_time"
-                        value={formData.start_time || ''}
+                        value={formData.start_time ? convertTo12Hour(formData.start_time) : ''}
                         onSave={() => {}}
                         placeholder="-"
-                        customInput={
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                tabIndex={-1}
-                                className={`h-[33px] w-full justify-start font-normal border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none hover:bg-muted/50 ${
-                                  formData.start_time ? 'text-foreground' : 'text-muted-foreground'
-                                }`}
-                                onClick={() => {
-                                  console.log('🔄 Start time popover opened, current value:', formData.start_time)
-                                }}
-                              >
-                                {formData.start_time ? convertTo12Hour(formData.start_time) : "-"}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Input
-                                type="time"
-                                value={formData.start_time || ''}
-                                onChange={(e) => {
-                                  console.log('🔄 Start time changed:', e.target.value)
-                                  handleInputChange('start_time', e.target.value)
-                                }}
-                                className="w-full"
-                                autoFocus
-                                placeholder=""
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        }
+                        readOnly={formData.status === 'cancelled' || formData.status === 'ended'}
+                        customInput={formData.status !== 'cancelled' && formData.status !== 'ended' ? (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  tabIndex={-1}
+                                  className={`h-[33px] w-full justify-start font-normal border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none hover:bg-muted/50 ${
+                                    formData.start_time ? 'text-foreground' : 'text-muted-foreground'
+                                  }`}
+                                  onClick={() => {
+                                    console.log('🔄 Start time popover opened, current value:', formData.start_time)
+                                  }}
+                                >
+                                  {formData.start_time ? convertTo12Hour(formData.start_time) : "-"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Input
+                                  type="time"
+                                  value={formData.start_time || ''}
+                                  onChange={(e) => {
+                                    console.log('🔄 Start time changed:', e.target.value)
+                                    handleInputChange('start_time', e.target.value)
+                                  }}
+                                  className="w-full"
+                                  autoFocus
+                                  placeholder=""
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          ) : undefined}
                       />
 
                       {/* End Time */}
@@ -1200,40 +1619,41 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                         icon={<IconClock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
                         label="End Time"
                         fieldName="end_time"
-                        value={formData.end_time || ''}
+                        value={formData.end_time ? convertTo12Hour(formData.end_time) : ''}
                         onSave={() => {}}
                         placeholder="-"
-                        customInput={
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                tabIndex={-1}
-                                className={`h-[33px] w-full justify-start font-normal border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none hover:bg-muted/50 ${
-                                  formData.end_time ? 'text-foreground' : 'text-muted-foreground'
-                                }`}
-                                onClick={() => {
-                                  console.log('🔄 End time popover opened, current value:', formData.end_time)
-                                }}
-                              >
-                                {formData.end_time ? convertTo12Hour(formData.end_time) : "-"}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Input
-                                type="time"
-                                value={formData.end_time || ''}
-                                onChange={(e) => {
-                                  console.log('🔄 End time changed:', e.target.value)
-                                  handleInputChange('end_time', e.target.value)
-                                }}
-                                className="w-full"
-                                autoFocus
-                                placeholder=""
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        }
+                        readOnly={formData.status === 'cancelled' || formData.status === 'ended'}
+                        customInput={formData.status !== 'cancelled' && formData.status !== 'ended' ? (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  tabIndex={-1}
+                                  className={`h-[33px] w-full justify-start font-normal border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none hover:bg-muted/50 ${
+                                    formData.end_time ? 'text-foreground' : 'text-muted-foreground'
+                                  }`}
+                                  onClick={() => {
+                                    console.log('🔄 End time popover opened, current value:', formData.end_time)
+                                  }}
+                                >
+                                  {formData.end_time ? convertTo12Hour(formData.end_time) : "-"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Input
+                                  type="time"
+                                  value={formData.end_time || ''}
+                                  onChange={(e) => {
+                                    console.log('🔄 End time changed:', e.target.value)
+                                    handleInputChange('end_time', e.target.value)
+                                  }}
+                                  className="w-full"
+                                  autoFocus
+                                  placeholder=""
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          ) : undefined}
                       />
 
                     {/* Location */}
@@ -1245,6 +1665,7 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                       onSave={(fieldName, value) => handleInputChange(fieldName as keyof EventData, value)}
                       placeholder="-"
                       isLast={true}
+                      readOnly={formData.status === 'cancelled' || formData.status === 'ended'}
                     />
 
                   </div>
@@ -1261,18 +1682,19 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                          </span>
                        )}
                     </h3>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        // Force hover state to false immediately on click
-                        setIsAgentsHovered(false)
-                        // Small delay to ensure state update, then open selection
-                        setTimeout(() => openAgentSelection(), 100)
-                      }}
-                      onMouseEnter={() => setIsAgentsHovered(true)}
-                      onMouseLeave={() => setIsAgentsHovered(false)}
-                      className="text-sm text-primary hover:text-primary/80 transition-all duration-300 cursor-pointer flex items-center gap-2 group"
-                    >
+                    {(formData.status !== 'cancelled' && formData.status !== 'ended') && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          // Force hover state to false immediately on click
+                          setIsAgentsHovered(false)
+                          // Small delay to ensure state update, then open selection
+                          setTimeout(() => openAgentSelection(), 100)
+                        }}
+                        onMouseEnter={() => setIsAgentsHovered(true)}
+                        onMouseLeave={() => setIsAgentsHovered(false)}
+                        className="text-sm transition-all duration-300 flex items-center gap-2 group text-primary hover:text-primary/80 cursor-pointer"
+                      >
                       <AnimatePresence>
                         {isAgentsHovered && (
                           <motion.span
@@ -1299,7 +1721,8 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                           </motion.div>
                         )}
                       </AnimatePresence>
-                    </button>
+                      </button>
+                    )}
                   </div>
                   
                   <div className="rounded-lg border border-[#cecece99] dark:border-border">
@@ -1344,23 +1767,28 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                                       {agent.employee_id || 'No ID'}
                                     </span>
                                   </div>
-                                  <button
-                                    onClick={async () => {
-                                      const newAssignedIds = formData.assigned_user_ids?.filter(id => id !== agent.user_id) || []
-                                      
-                                      // Update form data
-                                      handleInputChange('assigned_user_ids', newAssignedIds)
-                                      
-                                      // Update local state immediately for responsive UI
-                                      setSelectedAgentsData(prev => prev.filter(a => a.user_id !== agent.user_id))
-                                    }}
-                                    className="absolute -top-2 -right-2 w-5 h-5 text-white rounded-full flex items-center justify-center transition-colors duration-200 flex-shrink-0 shadow-sm border-0"
-                                    style={{ backgroundColor: theme === 'dark' ? '#626262' : '#888787' }}
-                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#7a7a7a' : '#9a9a9a'}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#626262' : '#888787'}
-                                  >
-                                    <IconMinus className="h-3 w-3" />
-                                  </button>
+                                  {(formData.status !== 'cancelled' && formData.status !== 'ended') && (
+                                    <button
+                                      onClick={async (e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        
+                                        const newAssignedIds = formData.assigned_user_ids?.filter(id => id !== agent.user_id) || []
+                                        
+                                        // Update form data
+                                        handleInputChange('assigned_user_ids', newAssignedIds)
+                                        
+                                        // Update local state immediately for responsive UI
+                                        setSelectedAgentsData(prev => prev.filter(a => a.user_id !== agent.user_id))
+                                      }}
+                                      className="absolute -top-2 -right-2 w-5 h-5 text-white rounded-full flex items-center justify-center transition-colors duration-200 flex-shrink-0 shadow-sm border-0"
+                                      style={{ backgroundColor: theme === 'dark' ? '#626262' : '#888787' }}
+                                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#7a7a7a' : '#9a9a9a'}
+                                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#626262' : '#888787'}
+                                    >
+                                      <IconMinus className="h-3 w-3" />
+                                    </button>
+                                  )}
                                 </div>
                               )) : (
                                 <div className="text-center py-4 text-muted-foreground">
@@ -1398,6 +1826,21 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                                           {companyCounts[company]}
                                         </span>
                                       </div>
+                                      {(formData.status !== 'cancelled' && formData.status !== 'ended') && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            handleRemoveCompanyAgents(company)
+                                          }}
+                                          className="absolute -top-2 -right-2 w-5 h-5 text-white rounded-full flex items-center justify-center transition-colors duration-200 flex-shrink-0 shadow-sm border-0"
+                                          style={{ backgroundColor: theme === 'dark' ? '#626262' : '#888787' }}
+                                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#7a7a7a' : '#9a9a9a'}
+                                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme === 'dark' ? '#626262' : '#888787'}
+                                        >
+                                          <IconMinus className="h-3 w-3" />
+                                        </button>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -1424,11 +1867,11 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                 {/* Show Save button only when adding a new event (not editing) AND modal is open */}
                 {isOpen && !eventToEdit?.id && (
                   <Button type="submit" form="add-event-form" disabled={isSubmitting || !isFormValid()} size="sm">
-                    {isSubmitting ? 'Saving...' : 'Save'}
+                    {isSubmitting ? 'Saving...' : 'Add Event'}
               </Button>
                 )}
 
-                {/* Show Cancel/Delete button only when editing an existing event AND modal is open */}
+                {/* Show Cancel/Delete/Recover button only when editing an existing event AND modal is open */}
                 {isOpen && eventToEdit?.id && (
                   <div className="flex gap-2">
                     {formData.status === 'cancelled' && (
@@ -1436,20 +1879,20 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                         type="button" 
                         variant="default" 
                         size="sm"
-                        onClick={() => setShowRescheduleConfirmation(true)}
-                        disabled={isRescheduling || isDeleting}
+                        onClick={() => setShowRecoverConfirmation(true)}
+                        disabled={isRecovering || isDeleting}
                       >
-                        {isRescheduling ? 'Rescheduling...' : 'Reschedule'}
+                        {isRecovering ? 'Recovering...' : 'Recover Event'}
                       </Button>
                     )}
                     <Button 
                       type="button" 
                       variant="destructive" 
                       size="sm"
-                      onClick={formData.status === 'cancelled' ? () => setShowDeleteConfirmation(true) : () => setShowCancelConfirmation(true)}
-                      disabled={isCancelling || isDeleting || isRescheduling}
+                      onClick={formData.status === 'cancelled' || formData.status === 'ended' ? () => setShowDeleteConfirmation(true) : () => setShowCancelConfirmation(true)}
+                      disabled={isCancelling || isDeleting || isRecovering}
                     >
-                      {isCancelling ? 'Cancelling...' : isDeleting ? 'Deleting...' : formData.status === 'cancelled' ? 'Delete' : 'Cancel Event'}
+                      {isCancelling ? 'Cancelling...' : isDeleting ? 'Deleting...' : formData.status === 'cancelled' || formData.status === 'ended' ? 'Delete Event' : 'Cancel Event'}
                     </Button>
                   </div>
                 )}
@@ -1503,6 +1946,12 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                   onLoadMore={loadMoreAgents}
                   onDone={closeSelectionContainers}
                   showDisabledStyling={false}
+                  onSelectAll={handleSelectAllAgents}
+                  onDeselectAll={handleDeselectAllAgents}
+                  totalCount={totalCount}
+                  companyFilter={companyFilter}
+                  onCompanyFilterChange={handleCompanyFilterChange}
+                  companyOptions={companyOptions}
                 />
               ) : (
                 // Activity Content - Shows event activity and recent changes
@@ -1510,7 +1959,7 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                 {eventToEdit?.id ? (
                   <EventsActivityLog 
                     eventId={eventToEdit.id} 
-                    eventTitle={eventToEdit.title || 'Unknown Event'} 
+                    eventTitle={getCurrentEvent()?.title || 'Unknown Event'} 
                       onRefresh={() => {
                         // Real-time updates handle refresh automatically
                       }}
@@ -1543,6 +1992,14 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                               // Auto-resize the textarea
                               e.target.style.height = 'auto'
                               e.target.style.height = e.target.scrollHeight + 'px'
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault()
+                                if (comment.trim() && !isSubmittingComment) {
+                                  handleCommentSubmit(e)
+                                }
+                              }
                             }}
                             onFocus={(e) => {
                               setIsCommentFocused(true)
@@ -1609,32 +2066,6 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
         </DialogContent>
       </Dialog>
 
-      {/* Reschedule Confirmation Dialog */}
-      <Dialog open={showRescheduleConfirmation} onOpenChange={setShowRescheduleConfirmation}>
-        <DialogContent className="sm:max-w-[380px] w-[90vw] rounded-xl [&>button]:hidden">
-          <div className="flex flex-col space-y-1.5 text-center sm:text-center">
-            <h2 className="text-lg font-semibold leading-none tracking-tight">Reschedule Event</h2>
-          </div>
-          <div className="text-sm space-y-2">
-            <p className="text-muted-foreground">Are you sure you want to reschedule this event? This will change the status from cancelled back to upcoming.</p>
-          </div>
-          <div className="flex justify-center gap-2 pt-2">
-            <Button 
-              variant="ghost" 
-              onClick={() => setShowRescheduleConfirmation(false)}
-            >
-              No
-            </Button>
-            <Button 
-              variant="default" 
-              onClick={handleRescheduleConfirm}
-              disabled={isRescheduling}
-            >
-              {isRescheduling ? 'Rescheduling...' : 'Yes'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Cancel Confirmation Dialog */}
       <Dialog open={showCancelConfirmation} onOpenChange={setShowCancelConfirmation}>
@@ -1653,11 +2084,66 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
               No
             </Button>
             <Button 
-              variant="destructive" 
+              variant="destructive"
               onClick={handleCancelConfirm}
               disabled={isCancelling}
             >
               {isCancelling ? 'Cancelling...' : 'Yes'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Recover Confirmation Dialog */}
+      <Dialog open={showRecoverConfirmation} onOpenChange={setShowRecoverConfirmation}>
+        <DialogContent className="sm:max-w-[380px] w-[90vw] rounded-xl [&>button]:hidden">
+          <div className="flex flex-col space-y-1.5 text-center sm:text-center">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">Recover Event</h2>
+          </div>
+          <div className="text-sm space-y-2">
+            <p className="text-muted-foreground">Are you sure you want to recover this event? This will change the status from cancelled to the appropriate status based on the event date.</p>
+          </div>
+          <div className="flex justify-center gap-2 pt-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowRecoverConfirmation(false)}
+            >
+              No
+            </Button>
+            <Button 
+              variant="default"
+              onClick={handleRecoverConfirm}
+              disabled={isRecovering}
+            >
+              {isRecovering ? 'Recovering...' : 'Yes'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Required Fields Warning Dialog */}
+      <Dialog open={showRequiredFieldsWarning} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-[380px] w-[90vw] rounded-xl [&>button]:hidden">
+          <div className="flex flex-col space-y-1.5 text-center sm:text-center">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">Missing Fields</h2>
+          </div>
+          <div className="text-sm space-y-2">
+            <p className="text-muted-foreground">The following required fields are missing. Please fill in all required fields before saving this event.</p>
+            <ul className="space-y-1">
+              {missingFields.map((field, index) => (
+                <li key={index} className="flex items-center gap-2">
+                  <IconAlertCircle className="h-4 w-4 text-muted-foreground" />
+                  <span>{field} <span style={{ color: 'rgb(239, 68, 68)' }}>(Required)</span></span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="flex justify-center gap-2 pt-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowRequiredFieldsWarning(false)}
+            >
+              OK
             </Button>
           </div>
         </DialogContent>

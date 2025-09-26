@@ -375,7 +375,7 @@ export default function CompaniesPage() {
                     onClick={() => setIsAddCompanyModalOpen(true)} 
                   >
                     <IconPlus className="h-4 w-4" />
-                    Add Company
+                    Add New
                   </Button>
                 </div>
               </div>

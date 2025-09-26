@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { useRealtimeApplicants } from './use-realtime-applicants'
 import { useRealtimeTickets } from './use-realtime-tickets'
+import { useRealtimeEvents } from './use-realtime-events'
 
 // Types for the hook configuration
-type CountType = 'applicants' | 'tickets'
+type CountType = 'applicants' | 'tickets' | 'events' | 'announcements'
 
 interface CountConfig {
   type: CountType
@@ -33,6 +34,20 @@ const COUNT_CONFIGS: Record<CountType, CountConfig> = {
     statusFilter: 'Approved', // Default for IT users
     adminParam: '&admin=true',
     roleFilter: true,
+  },
+  events: {
+    type: 'events',
+    localStorageKey: 'todayEventsCount',
+    localStorageTimestampKey: 'todayEventsCountTimestamp',
+    apiEndpoint: '/api/events/counts',
+    statusFilter: 'today',
+  },
+  announcements: {
+    type: 'announcements',
+    localStorageKey: 'activeAnnouncementsCount',
+    localStorageTimestampKey: 'activeAnnouncementsCountTimestamp',
+    apiEndpoint: '/api/announcements/counts',
+    statusFilter: 'active',
   }
 }
 
@@ -116,7 +131,19 @@ export function useRealtimeCount(countType: CountType) {
       
       if (response.ok) {
         const data = await response.json()
-        const count = data.length
+        let count: number
+        
+        if (countType === 'events') {
+          // Events API returns { today: number }
+          count = data.today || 0
+        } else if (countType === 'announcements') {
+          // Announcements API returns { active: number }
+          count = data.active || 0
+        } else {
+          // Other APIs return arrays
+          count = data.length
+        }
+        
         updateCount(count)
         setError(null)
       } else {
@@ -201,8 +228,40 @@ export function useRealtimeCount(countType: CountType) {
     roleFilter: null
   })
 
+  // Real-time updates for events
+  const { isConnected: eventsConnected } = useRealtimeEvents({
+    onEventCreated: (newEvent) => {
+      if (countType === 'events' && newEvent.status === 'today') {
+        updateCount(prev => prev + 1)
+      }
+    },
+    onEventUpdated: (updatedEvent, oldEvent) => {
+      if (countType === 'events') {
+        const oldStatusToday = oldEvent?.status === 'today'
+        const newStatusToday = updatedEvent.status === 'today'
+        
+        if (oldStatusToday !== newStatusToday) {
+          if (newStatusToday) {
+            updateCount(prev => prev + 1)
+          } else {
+            updateCount(prev => Math.max(0, prev - 1))
+          }
+        }
+      }
+    },
+    onEventDeleted: (deletedEvent) => {
+      if (countType === 'events' && deletedEvent?.status === 'today') {
+        updateCount(prev => Math.max(0, prev - 1))
+      }
+    },
+    enableNotifications: false // Don't show notifications for count updates
+  })
+
   // Get the appropriate connection status
-  const isConnected = countType === 'applicants' ? applicantsConnected : ticketsConnected
+  const isConnected = countType === 'applicants' ? applicantsConnected : 
+                     countType === 'tickets' ? ticketsConnected : 
+                     countType === 'events' ? eventsConnected :
+                     false // Announcements don't have real-time yet, will use polling
 
   // Initial fetch
   useEffect(() => {
@@ -254,6 +313,26 @@ export function useNewTicketsCount() {
     loading: result.loading,
     error: result.error,
     isConnected: result.isConnected
+  }
+}
+
+export function useTodayEventsCount() {
+  const result = useRealtimeCount('events')
+  return {
+    todayEventsCount: result.count,
+    error: result.error,
+    isConnected: result.isConnected,
+    refetch: result.refetch
+  }
+}
+
+export function useActiveAnnouncementsCount() {
+  const result = useRealtimeCount('announcements')
+  return {
+    activeAnnouncementsCount: result.count,
+    error: result.error,
+    isConnected: result.isConnected,
+    refetch: result.refetch
   }
 }
 

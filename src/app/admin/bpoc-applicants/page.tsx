@@ -114,6 +114,14 @@ interface Applicant {
     career_path?: any
     section_analysis?: any
   } | null
+  // Interested clients data
+  interested_clients?: {
+    user_id: number
+    first_name: string | null
+    last_name: string | null
+    profile_picture: string | null
+    employee_id: string | null
+  }[]
 }
 
 interface SortableApplicantProps {
@@ -688,6 +696,8 @@ export default function BPOCApplicantsPage() {
          address: rawData.address,
          // AI analysis data from BPOC database
          aiAnalysis: rawData.aiAnalysis,
+         // Interested clients data
+         interested_clients: rawData.interested_clients || [],
   }), [])
 
   // Helper function to update job status in local state only

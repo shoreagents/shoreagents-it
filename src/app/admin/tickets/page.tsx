@@ -20,8 +20,6 @@ import { IconSearch, IconFilter, IconGripVertical, IconCalendar, IconClock, Icon
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { useRealtimeTickets } from "@/hooks/use-realtime-tickets"
-import { NotificationDebug } from "@/components/notification-debug"
-import { ChevronDown, ChevronUp } from "lucide-react"
 import {
   DndContext,
   closestCorners,
@@ -655,7 +653,6 @@ export default function TicketsPage() {
   const [showClearConfirmation, setShowClearConfirmation] = useState(false)
   const [clearStatus, setClearStatus] = useState<string>('')
   const [clearCount, setClearCount] = useState(0)
-  const [showNotificationTest, setShowNotificationTest] = useState(false)
   const { user } = useAuth()
   
 
@@ -1623,24 +1620,10 @@ export default function TicketsPage() {
                     <p className="text-sm text-muted-foreground">Drag and drop tickets to manage their status.</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowNotificationTest(!showNotificationTest)}
-                      className="flex items-center gap-2"
-                    >
-                      {showNotificationTest ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      Test Notifications
-                    </Button>
                     <ReloadButton onReload={fetchTickets} loading={loading} className="flex-1" />
                   </div>
                 </div>
                 
-                {showNotificationTest && (
-                  <div className="mb-6">
-                    <NotificationDebug />
-                  </div>
-                )}
 
                 <div className="flex items-center gap-4">
                   <div className="relative flex-1">
@@ -1863,6 +1846,7 @@ export default function TicketsPage() {
         isOpen={isModalOpen}
         onClose={handleModalClose}
         isLoading={loading}
+        roleNameById={roleNameById}
       />
 
       {/* Clear All Confirmation Dialog */}

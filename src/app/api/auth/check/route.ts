@@ -11,7 +11,17 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const sessionData = JSON.parse(authSession.value)
+    // Parse session data with error handling
+    let sessionData
+    try {
+      sessionData = JSON.parse(authSession.value)
+    } catch (parseError) {
+      console.error('JSON parse error for auth session:', parseError)
+      return NextResponse.json(
+        { error: 'Invalid session data' },
+        { status: 401 }
+      )
+    }
 
     if (!sessionData.isAuthenticated) {
       return NextResponse.json(

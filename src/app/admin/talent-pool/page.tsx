@@ -25,7 +25,9 @@ import {
   DollarSign,
   Mail,
   Phone,
-  AlertCircle
+  AlertCircle,
+  SendHorizontal,
+  Clock
 } from "lucide-react"
 
 // Use the same Applicant interface as BPOC applicants page
@@ -122,6 +124,23 @@ export default function TalentPoolPage() {
   const [sortBy, setSortBy] = useState("rating")
   const [selectedTalent, setSelectedTalent] = useState<Applicant | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isCommentFocused, setIsCommentFocused] = useState(false)
+  const [comment, setComment] = useState("")
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+  const [chatMessages, setChatMessages] = useState<Array<{
+    id: string
+    type: 'user' | 'ai'
+    message: string
+    timestamp: string
+    talents?: any[]
+  }>>([
+    {
+      id: '1',
+      type: 'ai',
+      message: "Hi! I'm your AI talent assistant. I can help you find the perfect candidates based on your requirements. What kind of talent are you looking for?",
+      timestamp: new Date().toISOString()
+    }
+  ])
 
   // Data mapping function
   const mapApplicantData = useCallback((rawData: any): Applicant => {
@@ -434,6 +453,68 @@ export default function TalentPoolPage() {
     }
   }, [selectedTalent])
 
+  // Handle comment submission
+  const handleCommentSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!comment.trim() || isSubmittingComment) return
+
+    const userMessage = comment.trim()
+    setIsSubmittingComment(true)
+
+    // Add user message to chat
+    const userMessageId = Date.now().toString()
+    setChatMessages(prev => [...prev, {
+      id: userMessageId,
+      type: 'user',
+      message: userMessage,
+      timestamp: new Date().toISOString()
+    }])
+
+    // Clear the input immediately
+    setComment("")
+
+    try {
+      // Call AI chat API
+      const response = await fetch('/api/ai-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: userMessage }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response')
+      }
+
+      const data = await response.json()
+      
+      // Add AI response to chat
+      const aiMessageId = (Date.now() + 1).toString()
+      setChatMessages(prev => [...prev, {
+        id: aiMessageId,
+        type: 'ai',
+        message: data.message,
+        timestamp: data.timestamp,
+        talents: data.talents
+      }])
+
+    } catch (error) {
+      console.error('Error submitting comment:', error)
+      
+      // Add error message to chat
+      const errorMessageId = (Date.now() + 1).toString()
+      setChatMessages(prev => [...prev, {
+        id: errorMessageId,
+        type: 'ai',
+        message: "Sorry, I'm having trouble processing your request. Please try again.",
+        timestamp: new Date().toISOString()
+      }])
+    } finally {
+      setIsSubmittingComment(false)
+    }
+  }, [comment, isSubmittingComment])
+
   return (
     <>
       <AppSidebar variant="inset" />
@@ -443,14 +524,12 @@ export default function TalentPoolPage() {
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
               <div className="px-4 lg:px-6">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-4">
                   <div>
                     <h1 className="text-2xl font-bold">Talent Pool</h1>
-                    <p className="text-sm text-muted-foreground">
-                      Discover and connect with top freelancers and professionals.
-                    </p>
+                    <p className="text-sm text-muted-foreground">Discover and connect with top freelancers and professionals.</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex gap-2">
                     <Badge className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
                       {(applicants?.length ?? 0)} talents
@@ -820,29 +899,167 @@ export default function TalentPoolPage() {
                     )}
                   </div>
 
-                  {/* Right Column - AI Assistant */}
+                  {/* Right Column - AI Assistant Chatbot */}
                   <div className="lg:col-span-1">
-                    <Card className="rounded-xl sticky top-6">
-                      <CardHeader>
-                        <h3 className="text-lg font-semibold">AI Assistant</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Get help finding the perfect talent
-                        </p>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="text-center">
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-3">
-                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                            </svg>
+                    <Card 
+                      className="sticky top-6 h-[calc(100vh-240px)] flex flex-col"
+                      style={{ borderRadius: '0.75rem' }}
+                    >
+                      <div className="p-4 bg-sidebar border-b border-[#cecece99] dark:border-border rounded-t-xl">
+                        <div>
+                          <h3 className="text-lg font-semibold">AI Assistant</h3>
+                        </div>
+                      </div>
+                      <CardContent className="flex-1 flex flex-col p-0 min-h-0">
+                        {/* Chat Messages Area */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+                          {chatMessages.map((message) => (
+                            <div
+                              key={message.id}
+                              className={`rounded-lg p-4 ${
+                                message.type === 'user'
+                                  ? 'bg-blue-500/10 border border-blue-500/20 ml-8'
+                                  : 'bg-sidebar border'
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                  message.type === 'user'
+                                    ? 'bg-blue-500'
+                                    : 'bg-gradient-to-r from-blue-500 to-purple-600'
+                                }`}>
+                                  {message.type === 'user' ? (
+                                    <span className="text-white text-sm font-medium">U</span>
+                                  ) : (
+                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                    </svg>
+                                  )}
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-sm font-medium">
+                                      {message.type === 'user' ? 'You' : 'AI Assistant'}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {new Date(message.timestamp).toLocaleTimeString('en-US', {
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </span>
+                                  </div>
+                                  <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                                    {message.message}
+                                  </div>
+                                  
+                                  {/* Show recommended talents if available */}
+                                  {message.type === 'ai' && message.talents && message.talents.length > 0 && (
+                                    <div className="mt-3 space-y-2">
+                                      <p className="text-xs font-medium text-muted-foreground">Recommended Talents:</p>
+                                      <div className="space-y-1">
+                                        {message.talents.slice(0, 3).map((talent, index) => (
+                                          <div key={index} className="text-xs text-muted-foreground p-2 bg-muted/50 rounded">
+                                            <div className="font-medium text-foreground">{talent.full_name}</div>
+                                            <div>Skills: {talent.skills?.slice(0, 3).join(', ')}</div>
+                                            <div>Salary: ₱{talent.expected_monthly_salary}/month</div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* Quick Suggestions - only show if no messages yet */}
+                          {chatMessages.length === 1 && (
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground font-medium">Quick suggestions:</p>
+                              <div className="flex flex-wrap gap-2">
+                                <button 
+                                  onClick={() => setComment("Find Python developers")}
+                                  className="text-xs bg-muted hover:bg-muted/80 px-3 py-1.5 rounded-full transition-colors"
+                                >
+                                  Find Python developers
+                                </button>
+                                <button 
+                                  onClick={() => setComment("Show senior level talents")}
+                                  className="text-xs bg-muted hover:bg-muted/80 px-3 py-1.5 rounded-full transition-colors"
+                                >
+                                  Show senior level talents
+                                </button>
+                                <button 
+                                  onClick={() => setComment("Filter by location")}
+                                  className="text-xs bg-muted hover:bg-muted/80 px-3 py-1.5 rounded-full transition-colors"
+                                >
+                                  Filter by location
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Chat Input */}
+                        <div className="border-t p-4 rounded-b-xl">
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <form onSubmit={handleCommentSubmit}>
+                                <div className={`border rounded-lg bg-sidebar overflow-hidden transition-all duration-300 ease-in-out [&>*]:border-none [&>*]:outline-none [&>textarea]:transition-all [&>textarea]:duration-300 [&>textarea]:ease-in-out ${
+                                  isCommentFocused || comment.trim() 
+                                    ? 'border-muted-foreground' 
+                                    : 'border-border'
+                                }`}>
+                                  <textarea 
+                                    placeholder="Ask about talents, skills, or requirements..." 
+                                    value={comment}
+                                    onChange={(e) => {
+                                      setComment(e.target.value)
+                                      // Auto-resize the textarea with max height constraint
+                                      e.target.style.height = 'auto'
+                                      const newHeight = Math.min(e.target.scrollHeight, 120) // Max 120px height
+                                      e.target.style.height = newHeight + 'px'
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault()
+                                        if (comment.trim() && !isSubmittingComment) {
+                                          handleCommentSubmit(e)
+                                        }
+                                      }
+                                    }}
+                                    onFocus={(e) => {
+                                      setIsCommentFocused(true)
+                                    }}
+                                    onBlur={(e) => {
+                                      setIsCommentFocused(false)
+                                    }}
+                                    className="w-full resize-none border-0 bg-transparent text-foreground px-3 py-2 shadow-none text-sm focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:text-foreground placeholder:text-muted-foreground align-middle transition-all duration-300 ease-in-out min-h-[36px] max-h-[120px] overflow-y-auto"
+                                    disabled={isSubmittingComment}
+                                    rows={1}
+                                  />
+                                  
+                                  {/* Send button - only show when expanded, inside the textarea container */}
+                                  {(isCommentFocused || comment.trim()) && (
+                                    <div className="p-1 flex justify-end animate-in fade-in duration-300">
+                                      <button
+                                        type="submit"
+                                        onClick={handleCommentSubmit}
+                                        disabled={!comment.trim() || isSubmittingComment}
+                                        className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                                      >
+                                        {isSubmittingComment ? (
+                                          <Clock className="h-3 w-3 text-muted-foreground animate-spin" />
+                                        ) : (
+                                          <SendHorizontal className="h-4 w-4 text-muted-foreground" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </form>
+                            </div>
                           </div>
-                          <h4 className="font-medium mb-2">Smart Talent Matching</h4>
-                          <p className="text-sm text-muted-foreground mb-4">
-                            Describe your project requirements and let AI find the best candidates
-                          </p>
-                          <Button className="w-full" size="sm">
-                            Start AI Search
-                          </Button>
                         </div>
                       </CardContent>
                     </Card>

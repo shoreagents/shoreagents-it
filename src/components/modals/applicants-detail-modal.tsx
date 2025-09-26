@@ -38,43 +38,22 @@ interface StatusOption {
 
 interface Applicant {
   id: string
-  ticket_id: string
   user_id: string
   resume_slug?: string | null
-  concern: string
   details: string | null
-  category: string
-  category_id: number | null
-  category_name?: string
   status: string
-  position: number
-  resolved_by: string | null
-  resolved_at: string | null
   created_at: string
   updated_at: string
-  role_id: number | null
-  station_id: string | null
   profile_picture: string | null
   first_name: string | null
   last_name: string | null
   full_name?: string | null
   employee_id: string | null
-  resolver_first_name?: string | null
-  resolver_last_name?: string | null
-  user_type?: string | null
-  member_name?: string | null
-  member_color?: string | null
   job_title?: string | null
   company_name?: string | null
   user_position?: string | null
   // Additional fields from recruits table
-  bpoc_application_ids?: string[] | null
-  applicant_id?: string | null
   job_ids?: number[] | null
-  resume_slug_recruits?: string | null
-  status_recruits?: string | null
-  created_at_recruits?: string | null
-  updated_at_recruits?: string | null
   video_introduction_url?: string | null
   current_salary?: number | null
   expected_monthly_salary?: number | null
@@ -452,8 +431,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
         all_job_statuses: applicant.all_job_statuses,
         all_job_titles: applicant.all_job_titles,
         all_companies: applicant.all_companies,
-        job_ids: applicant.job_ids,
-        bpoc_application_ids: applicant.bpoc_application_ids
+        job_ids: applicant.job_ids
       })
       
 
@@ -967,7 +945,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
               <div className="flex items-center justify-between px-6 py-5 bg-sidebar h-16 border-b border-[#cecece99] dark:border-border">
                 <div className="flex items-center gap-3">
                   <Badge className="text-xs h-6 flex items-center rounded-[6px]">
-                    Applicant
+                    {pageContext === 'talent-pool' ? 'Talent Pool' : 'Applicant'}
                   </Badge>
 
                 </div>
@@ -1601,7 +1579,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                           <div className="flex items-center justify-between min-h-[40px]">
                             <h3 className="text-lg font-medium text-muted-foreground">Resume Score</h3>
                           </div>
-                          <div className="rounded-lg p-6 border flex-1 shadow-sm">
+                          <div className="rounded-lg p-6 border flex-1 shadow-sm flex flex-col items-center justify-center text-center">
                             {/* Overall Resume Score with View Resume Button */}
                             {localApplicant.aiAnalysis?.overall_score ? (
                               <div className="space-y-4">
@@ -1609,7 +1587,7 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                   {localApplicant.aiAnalysis.overall_score}/100
                                 </div>
                                 <p className="text-sm text-muted-foreground">
-                                  AI-powered resume quality assessment
+                                  AI-Powered Resume Quality Assessment
                                 </p>
                                 
                                 {/* View Resume Button */}
@@ -1617,10 +1595,10 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                                   <div className="mt-4">
                                     <Button 
                                       onClick={() => window.open(`https://www.bpoc.io/${localApplicant.resume_slug}`, '_blank')}
-                                      className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white border-0"
+                                      variant="default"
+                                      className="w-fit"
                                       size="sm"
                                     >
-                                      <IconFile className="h-4 w-4 mr-2" />
                                       View Resume
                                     </Button>
                                   </div>
@@ -2114,6 +2092,14 @@ export function ApplicantsDetailModal({ applicant, isOpen, onClose, onStatusUpda
                             // Auto-resize the textarea
                             e.target.style.height = 'auto'
                             e.target.style.height = e.target.scrollHeight + 'px'
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              if (comment.trim() && !isSubmittingComment) {
+                                handleCommentSubmit(e)
+                              }
+                            }
                           }}
                           onFocus={(e) => {
                             setIsCommentFocused(true)

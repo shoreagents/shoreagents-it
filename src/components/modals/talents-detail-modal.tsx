@@ -755,6 +755,14 @@ export function TalentsDetailModal({ talent, isOpen, onClose }: TalentsDetailMod
                           placeholder="Write a comment..." 
                           value={comment}
                           onChange={(e) => setComment(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              if (comment.trim() && !isSubmittingComment) {
+                                handleCommentSubmit(e)
+                              }
+                            }
+                          }}
                           className="text-sm"
                           disabled={isSubmittingComment}
                         />

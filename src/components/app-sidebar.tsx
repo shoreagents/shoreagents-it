@@ -23,11 +23,11 @@ import { IdCardIcon } from "@/components/icons/id-card-icon"
 import { FilePenLineIcon } from "@/components/icons/file-pen-line-icon"
 import { SparklesIcon } from "@/components/icons/sparkles-icon"
 import { HomeIcon } from "@/components/icons/home-icon"
-import { ClockIcon, BarChart3Icon } from "lucide-react"
+import { ClockIcon, BarChart3Icon, MegaphoneIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useNewTicketsCount, useNewApplicantsCount } from "@/hooks/use-realtime-count"
+import { useNewTicketsCount, useNewApplicantsCount, useTodayEventsCount, useActiveAnnouncementsCount } from "@/hooks/use-realtime-count"
 
 import { NavMain } from "@/components/nav/nav-main"
 import { NavMainWithSubgroups } from "@/components/nav/nav-main-with-subgroups"
@@ -49,6 +49,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user, loading } = useAuth()
   const { newTicketsCount, error: ticketsError, isConnected } = useNewTicketsCount()
   const { newApplicantsCount, error: applicantsError, isConnected: applicantsIsConnected } = useNewApplicantsCount()
+  const { todayEventsCount, error: eventsError, isConnected: eventsIsConnected } = useTodayEventsCount()
+  const { activeAnnouncementsCount, error: announcementsError, isConnected: announcementsIsConnected } = useActiveAnnouncementsCount()
 
   const role = (user as any)?.roleName?.toLowerCase() || "it"
   const isAdmin = role === "admin"
@@ -63,6 +65,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   console.log('AppSidebar: NewApplicantsCount:', newApplicantsCount)
   console.log('AppSidebar: ApplicantsError:', applicantsError || 'None')
   console.log('AppSidebar: ApplicantsWebSocket Connected:', applicantsIsConnected)
+  console.log('AppSidebar: TodayEventsCount:', todayEventsCount)
+  console.log('AppSidebar: EventsError:', eventsError || 'None')
+  console.log('AppSidebar: EventsWebSocket Connected:', eventsIsConnected)
+  console.log('AppSidebar: ActiveAnnouncementsCount:', activeAnnouncementsCount)
+  console.log('AppSidebar: AnnouncementsError:', announcementsError || 'None')
+  console.log('AppSidebar: AnnouncementsWebSocket Connected:', announcementsIsConnected)
   
 
 
@@ -254,10 +262,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         )}
         {isAdmin && (
           <SidebarGroup className="p-0">
-            <SidebarGroupLabel>FUN</SidebarGroupLabel>
+            <SidebarGroupLabel>HAPPENINGS</SidebarGroupLabel>
             <NavMain
               items={[
-                { title: "Events", url: "/admin/events", icon: CalendarIcon },
+                { title: "Announcements", url: "/admin/announcements", icon: MegaphoneIcon, badge: activeAnnouncementsCount > 0 ? activeAnnouncementsCount : undefined },
+                { title: "Events & Activities", url: "/admin/events", icon: CalendarIcon, badge: todayEventsCount > 0 ? todayEventsCount : undefined },
               ]}
             />
           </SidebarGroup>

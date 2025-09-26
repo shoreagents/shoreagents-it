@@ -50,27 +50,6 @@ interface ClientRecord {
   department_name: string | null
 }
 
-// Static client data for fallback
-const staticClientData = {
-  id: "CL001",
-  first_name: "Jane",
-  middle_name: "Elizabeth",
-  last_name: "Doe",
-  nickname: "Jane",
-  profile_picture: null,
-  member_id: 12346,
-  member_company: "ClientCorp Solutions",
-  member_badge_color: "#10B981",
-  member_name: "Jane Doe",
-  department: "Client Services",
-  email: "jane.doe@clientcorp.com",
-  phone: "+1 (555) 987-6543",
-  birthday: "1985-08-20",
-  address: "456 Client Street, Suite 200",
-  city: "New York",
-  gender: "Female",
-  status: "Active"
-}
 
 export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: ClientsDetailModalProps) {
   const { theme } = useTheme()
@@ -322,7 +301,26 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
     address: inputValues.address || currentClientData.address || null,
     gender: localGender !== null ? localGender : (currentClientData.gender || null),
     status: "Active"
-  } : staticClientData
+  } : {
+    id: "N/A",
+    first_name: "Unknown",
+    middle_name: null,
+    last_name: "Client",
+    nickname: null,
+    profile_picture: null,
+    member_id: null,
+    member_company: null,
+    member_badge_color: null,
+    member_name: null,
+    department: "Not Specified",
+    email: "No email",
+    phone: "No phone",
+    birthday: null,
+    city: null,
+    address: null,
+    gender: null,
+    status: "Unknown"
+  }
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = React.useMemo(() => {
@@ -1082,6 +1080,14 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
                             // Auto-resize the textarea
                             e.target.style.height = 'auto'
                             e.target.style.height = e.target.scrollHeight + 'px'
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              if (comment.trim() && !isSubmittingComment) {
+                                handleCommentSubmit(e)
+                              }
+                            }
                           }}
                           onFocus={(e) => {
                             setIsCommentFocused(true)

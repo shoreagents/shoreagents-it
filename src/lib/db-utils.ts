@@ -3542,6 +3542,21 @@ export async function updateRecruitStatusAndSyncBpoc(id: number, status: string)
           all_job_titles: applicant.all_job_titles,
           all_companies: applicant.all_companies,
           video_introduction_url: applicant.video_introduction_url,
+          // Additional modal data (if available)
+          hourlyRate: applicant.hourlyRate,
+          rating: applicant.rating,
+          description: applicant.description,
+          position: applicant.position,
+          experience: applicant.experience,
+          education: applicant.education,
+          languages: applicant.languages,
+          certifications: applicant.certifications,
+          projects: applicant.projects,
+          portfolio: applicant.portfolio,
+          resumeSlug: applicant.resumeSlug,
+          availability: applicant.availability,
+          location: applicant.location,
+          originalSkillsData: applicant.originalSkillsData,
           aiAnalysis: applicant.aiAnalysis
         })
         console.log(`✅ Indexed talent profile to Qdrant for ${applicant.full_name || applicant.applicant_id}`)
@@ -4980,7 +4995,7 @@ export async function getEventsPaginated({
         e.id,
         e.title,
         e.description,
-        e.event_date,
+        TO_CHAR(e.event_date, 'YYYY-MM-DD') as event_date,
         e.start_time,
         e.end_time,
         e.location,
@@ -5080,7 +5095,7 @@ export async function createEvent(event: {
     const query = `
       INSERT INTO events (title, description, event_date, start_time, end_time, location, event_type, status, assigned_user_ids, created_by)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING *
+      RETURNING id, title, description, TO_CHAR(event_date, 'YYYY-MM-DD') as event_date, start_time, end_time, location, status, event_type, assigned_user_ids, created_by, created_at, updated_at
     `
 
     const result = await pool.query(query, [
@@ -5128,7 +5143,7 @@ export async function updateEvent(eventId: number, event: {
           assigned_user_ids = $9,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = $10
-      RETURNING *
+      RETURNING id, title, description, TO_CHAR(event_date, 'YYYY-MM-DD') as event_date, start_time, end_time, location, status, event_type, assigned_user_ids, created_by, created_at, updated_at
     `
 
     const result = await pool.query(query, [

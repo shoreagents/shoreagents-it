@@ -23,6 +23,7 @@ export function NavMain({
     url: string
     icon?: LucideIcon | any
     badge?: number
+    badgeLabel?: string
   }[]
   className?: string
 }) {
@@ -64,7 +65,6 @@ export function NavMain({
                       <>
                         {/* Full badge for expanded sidebar */}
                         <div className="ml-auto flex items-center gap-1 group-data-[collapsible=icon]:hidden">
-                          <span className="text-xs font-medium" style={{ color: 'rgb(239 68 68)' }}>New</span>
                           <Badge 
                             variant="outline" 
                             className="text-xs w-5 h-5 rounded-full flex items-center justify-center p-0 min-w-0 border-0" 

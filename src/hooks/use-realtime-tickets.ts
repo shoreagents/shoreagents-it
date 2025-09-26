@@ -129,7 +129,9 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
       switch (action) {
         case 'INSERT':
           // Fetch complete ticket data with user information for new tickets
-          fetch(`/api/tickets/${record.id}`)
+          // Use admin=true for admin board (roleFilter == null) to get tickets from all roles
+          const insertUrl = roleFilter == null ? `/api/tickets/${record.id}?admin=true` : `/api/tickets/${record.id}`
+          fetch(insertUrl)
             .then(res => {
               if (!res.ok) {
                 throw new Error(`HTTP error! status: ${res.status}`)
@@ -143,14 +145,13 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
               if (enableNotifications && isSupported) {
                 console.log('🔔 Attempting to show notification for new ticket:', completeTicket.id)
                 
-                // Format name from available fields
+                // Format name from available fields - only personal names, no company fallback
                 const getName = () => {
-                  if (completeTicket.member_name) {
-                    return completeTicket.member_name
-                  }
+                  // First priority: Use personal name (first_name + last_name)
                   if (completeTicket.first_name && completeTicket.last_name) {
                     return `${completeTicket.first_name} ${completeTicket.last_name}`
                   }
+                  // Second priority: Use just first name
                   if (completeTicket.first_name) {
                     return completeTicket.first_name
                   }
@@ -160,13 +161,28 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
                 const ticketTitle = completeTicket.concern || 'New Ticket'
                 const userName = getName()
                 
+                // Convert icon to local file path for Electron notifications
+                const getIconPath = () => {
+                  if (completeTicket.profile_picture) {
+                    // If it's already a local path, use it
+                    if (completeTicket.profile_picture.startsWith('/')) {
+                      return completeTicket.profile_picture
+                    }
+                    // If it's a URL, we can't use it in Electron notifications
+                    // Fall back to default icon
+                  }
+                  // Use local file path for default icon
+                  return '/avatars/shadcn.png'
+                }
+                
                 showInfoNotification(
-                  `TICKETS - ${userName}`,
+                  `New Ticket - ${userName}`,
                   ticketTitle,
                   {
                     id: `ticket-${completeTicket.id}-${Date.now()}`,
                     urgency: 'normal',
-                    onClick: true
+                    onClick: true,
+                    icon: getIconPath()
                   }
                 ).then(result => {
                   console.log('✅ Notification sent successfully:', result)
@@ -186,14 +202,13 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
               if (enableNotifications && isSupported) {
                 console.log('🔔 Attempting to show notification with basic record data:', record.id)
                 
-                // Format name from available fields (fallback)
+                // Format name from available fields (fallback) - only personal names, no company fallback
                 const getName = () => {
-                  if (record.member_name) {
-                    return record.member_name
-                  }
+                  // First priority: Use personal name (first_name + last_name)
                   if (record.first_name && record.last_name) {
                     return `${record.first_name} ${record.last_name}`
                   }
+                  // Second priority: Use just first name
                   if (record.first_name) {
                     return record.first_name
                   }
@@ -203,13 +218,28 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
                 const ticketTitle = record.title || record.concern || 'New Ticket'
                 const userName = getName()
                 
+                // Convert icon to local file path for Electron notifications (fallback)
+                const getIconPath = () => {
+                  if (record.profile_picture) {
+                    // If it's already a local path, use it
+                    if (record.profile_picture.startsWith('/')) {
+                      return record.profile_picture
+                    }
+                    // If it's a URL, we can't use it in Electron notifications
+                    // Fall back to default icon
+                  }
+                  // Use local file path for default icon
+                  return '/avatars/shadcn.png'
+                }
+                
                 showInfoNotification(
-                  `TICKETS - ${userName}`,
+                  `New Ticket - ${userName}`,
                   ticketTitle,
                   {
                     id: `ticket-${record.id}-${Date.now()}`,
                     urgency: 'normal',
-                    onClick: true
+                    onClick: true,
+                    icon: getIconPath()
                   }
                 ).then(result => {
                   console.log('✅ Fallback notification sent successfully:', result)

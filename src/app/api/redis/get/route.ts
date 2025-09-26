@@ -20,8 +20,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: null })
     }
     
-    // Parse JSON data
-    const parsedData = JSON.parse(data)
+    // Parse JSON data with error handling
+    let parsedData
+    try {
+      parsedData = JSON.parse(data)
+    } catch (parseError) {
+      console.error('JSON parse error for Redis data:', parseError)
+      return NextResponse.json({ error: 'Invalid JSON data in Redis' }, { status: 500 })
+    }
     
     return NextResponse.json({ data: parsedData })
   } catch (error) {

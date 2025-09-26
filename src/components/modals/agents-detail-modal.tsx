@@ -147,43 +147,6 @@ const combineShiftTime = (startTime: string, endTime: string): string => {
   return `${start12} - ${end12}`
 }
 
-// Static agent data for fallback
-const staticAgentData = {
-  id: "AG001",
-  first_name: "John",
-  middle_name: "Michael",
-  last_name: "Smith",
-  nickname: "Johnny",
-  profile_picture: null,
-  employee_id: "EMP-2024-001",
-  member_id: 12345,
-  member_company: "TechCorp Solutions",
-  member_badge_color: "#3B82F6",
-  member_name: "John Smith",
-  job_title: "Senior Software Engineer",
-  department: "Engineering",
-  email: "john.smith@company.com",
-  phone: "+1 (555) 123-4567",
-  birthday: "1990-05-15",
-  address: "123 Main Street, Suite 100",
-  city: "San Francisco",
-  state: "CA",
-  country: "United States",
-  postal_code: "94105",
-  gender: "Male",
-  hire_date: "2024-01-15",
-  start_date: "2024-01-15",
-  exit_date: null,
-  work_email: "john.smith@company.com",
-  shift_period: "Day",
-  shift_schedule: "Monday-Friday",
-  shift_time: "9:00 AM - 6:00 PM",
-  work_setup: "On-site",
-  employment_status: "Full-time",
-  hire_type: "Direct Hire",
-  staff_source: "Internal",
-  status: "Active"
-}
 
 export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: AgentsDetailModalProps) {
   const { theme } = useTheme()
@@ -368,7 +331,38 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     hire_type: inputValues.hire_type || currentAgentData.hire_type || null,
     staff_source: inputValues.staff_source || currentAgentData.staff_source || null,
     status: currentAgentData.exit_date ? "Inactive" : "Active"
-  } : staticAgentData
+  } : {
+    id: "N/A",
+    first_name: "Unknown",
+    middle_name: null,
+    last_name: "Agent",
+    nickname: null,
+    profile_picture: null,
+    employee_id: "N/A",
+    member_id: null,
+    member_company: null,
+    member_badge_color: null,
+    member_name: null,
+    job_title: "Not Specified",
+    department: "Not Specified",
+    email: "No email",
+    phone: "No phone",
+    birthday: null,
+    city: null,
+    address: null,
+    gender: null,
+    start_date: null,
+    exit_date: null,
+    work_email: null,
+    shift_period: null,
+    shift_schedule: null,
+    shift_time: null,
+    work_setup: null,
+    employment_status: null,
+    hire_type: null,
+    staff_source: null,
+    status: "Unknown"
+  }
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = React.useMemo(() => {
@@ -1796,6 +1790,14 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                             // Auto-resize the textarea
                             e.target.style.height = 'auto'
                             e.target.style.height = e.target.scrollHeight + 'px'
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              if (comment.trim() && !isSubmittingComment) {
+                                handleCommentSubmit(e)
+                              }
+                            }
                           }}
                           onFocus={(e) => {
                             setIsCommentFocused(true)

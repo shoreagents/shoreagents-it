@@ -121,9 +121,12 @@ export const useElectronNotifications = () => {
     }
 
     try {
+      console.log('🔔 Frontend: Sending notification with options:', JSON.stringify(options, null, 2));
       const result = await window.electronAPI.showNotification(options);
+      console.log('🔔 Frontend: Notification result:', result);
       return result;
     } catch (error) {
+      console.error('🔔 Frontend: Notification error:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }, []);

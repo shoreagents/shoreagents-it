@@ -8,6 +8,7 @@ type Tab = {
   title: string;
   value: string;
   content?: string | React.ReactNode | any;
+  badge?: number;
 };
 
 export const AnimatedTabs = ({
@@ -71,8 +72,13 @@ export const AnimatedTabs = ({
               />
             )}
 
-            <span className="relative block text-black dark:text-white">
+            <span className="relative block text-black dark:text-white flex items-center justify-center gap-2">
               {tab.title}
+              {tab.badge && tab.badge > 0 && (
+                <span className="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
+                  {tab.badge}
+                </span>
+              )}
             </span>
           </button>
         ))}

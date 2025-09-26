@@ -8,11 +8,11 @@ import { SidebarInset } from "@/components/ui/sidebar"
 import { useAuth } from "@/contexts/auth-context"
 import { useRealtimeBreaks, BreakSession as RealtimeBreakSession } from "@/hooks/use-realtime-breaks"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator, SelectGroup, SelectLabel } from "@/components/ui/select"
 import { 
   UserIcon, 
   ClockIcon, 
@@ -47,6 +47,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { ReloadButton } from "@/components/ui/reload-button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator, SelectGroup, SelectLabel } from "@/components/ui/select"
 
 interface BreakSession {
   id: number
@@ -70,22 +72,37 @@ interface BreakSession {
 }
 
 interface Employee {
-  id: string
-  firstName: string
-  lastName: string
+  user_id: number
   email: string
-  phone?: string
-  department: string
-  position: string
-  hireDate?: string
-  avatar?: string
-  departmentId?: number
-  workEmail?: string
-  birthday?: string
-  city?: string
-  address?: string
-  gender?: string
-  shift?: string
+  user_type: string
+  first_name: string | null
+  middle_name: string | null
+  last_name: string | null
+  nickname: string | null
+  profile_picture: string | null
+  phone: string | null
+  address: string | null
+  city: string | null
+  gender: string | null
+  birthday: string | null
+  employee_id: string | null
+  job_title: string | null
+  work_email: string | null
+  start_date: string | null
+  exit_date: string | null
+  shift_period: string | null
+  shift_schedule: string | null
+  shift_time: string | null
+  work_setup: string | null
+  employment_status: string | null
+  hire_type: string | null
+  staff_source: string | null
+  member_id: number | null
+  member_company: string | null
+  member_badge_color: string | null
+  department_id: number | null
+  department_name: string | null
+  station_id: string | null
 }
 
 export default function BreaksPage() {
@@ -101,13 +118,55 @@ export default function BreaksPage() {
     averageDuration: 0,
     totalAgents: 0
   })
+
+  // Calculate filtered stats based on member selection
+  const getFilteredStats = () => {
+    let filteredEmployees = employees
+    let filteredBreakSessions = breakSessions
+    
+    if (memberId !== 'all') {
+      if (memberId === 'none') {
+        // Show only employees with no member assignment
+        filteredEmployees = employees.filter(emp => !emp.member_id)
+        filteredBreakSessions = breakSessions.filter(session => {
+          const employee = employees.find(emp => emp.user_id === session.agent_user_id)
+          return employee && !employee.member_id
+        })
+      } else {
+        // Show only employees from the selected member company
+        const selectedMemberId = parseInt(memberId)
+        filteredEmployees = employees.filter(emp => emp.member_id === selectedMemberId)
+        filteredBreakSessions = breakSessions.filter(session => {
+          const employee = employees.find(emp => emp.user_id === session.agent_user_id)
+          return employee && employee.member_id === selectedMemberId
+        })
+      }
+    }
+    
+    const activeSessions = filteredBreakSessions.filter(session => !session.end_time)
+    const totalDuration = filteredBreakSessions
+      .filter(session => session.duration_minutes)
+      .reduce((sum, session) => sum + (session.duration_minutes || 0), 0)
+    const completedSessions = filteredBreakSessions.filter(session => session.end_time)
+    
+    return {
+      total: filteredBreakSessions.length,
+      active: activeSessions.length,
+      today: filteredBreakSessions.length, // All sessions are from today
+      averageDuration: completedSessions.length > 0 ? totalDuration / completedSessions.length : 0,
+      totalAgents: filteredEmployees.length
+    }
+  }
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [memberId, setMemberId] = useState<string>('all')
-  const [memberOptions, setMemberOptions] = useState<{ id: number; company: string }[]>([])
+  const [reloading, setReloading] = useState(false)
 
   // Sorting state
   const [sortField, setSortField] = useState<'name' | 'department' | 'position'>('name')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
+  // Member filter state
+  const [memberId, setMemberId] = useState<string>('all')
+  const [memberOptions, setMemberOptions] = useState<{ id: number; company: string }[]>([])
 
   // Real-time updates for break sessions
   const { isConnected: isRealtimeConnected } = useRealtimeBreaks({
@@ -191,6 +250,7 @@ export default function BreaksPage() {
         const data = await res.json()
         setMemberOptions(data.members || [])
       } catch (e) {
+        console.error('❌ Failed to fetch members:', e)
         setMemberOptions([])
       }
     }
@@ -200,37 +260,28 @@ export default function BreaksPage() {
   // Fetch employees data
   useEffect(() => {
     const fetchEmployees = async () => {
+      if (!user) {
+        return
+      }
+
       try {
-        const response = await fetch(`/api/agents?memberId=${memberId}&limit=1000`)
+        // Build query parameters
+        const params = new URLSearchParams({
+          limit: '1000'
+        })
+        
+        if (memberId !== 'all') {
+          params.append('memberId', memberId)
+        }
+
+        const response = await fetch(`/api/agents?${params.toString()}`)
         
         if (!response.ok) {
           throw new Error(`Failed to fetch employees: ${response.status}`)
         }
 
         const data = await response.json()
-        console.log('✅ Employees data received:', data)
-        
-        // Transform agents data to match Employee interface
-        const transformedEmployees = (data.agents || []).map((agent: any) => ({
-          id: agent.user_id?.toString() || agent.id?.toString(),
-          firstName: agent.first_name || '',
-          lastName: agent.last_name || '',
-          email: agent.email || '',
-          phone: agent.phone || '',
-          department: agent.department_name || 'Unknown',
-          position: agent.job_title || 'Agent',
-          hireDate: agent.start_date || '',
-          avatar: agent.profile_picture || '',
-          departmentId: agent.department_id,
-          workEmail: agent.work_email || agent.email,
-          birthday: agent.birthday || '',
-          city: agent.city || '',
-          address: agent.address || '',
-          gender: agent.gender || '',
-          shift: agent.shift_period || 'Day'
-        }))
-        
-        setEmployees(transformedEmployees)
+        setEmployees(data.agents)
       } catch (err) {
         console.error('❌ Employees fetch error:', err)
         // Don't set error state for employees fetch failure, just log it
@@ -243,53 +294,75 @@ export default function BreaksPage() {
   }, [user, memberId])
 
   // Fetch break sessions data
-  useEffect(() => {
-    const fetchBreakSessions = async () => {
-      console.log('🔍 Fetching all break sessions')
-      
-      // Clear any previous errors and set loading
-      setError(null)
-      setLoading(true)
-
-      try {
-        console.log('📡 Making API request to /api/breaks')
-        // Get today's date in Asia/Manila timezone to match database calculations
-        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) // YYYY-MM-DD format
-        const response = await fetch(`/api/breaks?memberId=${memberId}&date=${today}`)
-        
-        console.log('📊 Response status:', response.status)
-        
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.log('❌ API error:', errorText)
-          throw new Error(`Failed to fetch break sessions: ${response.status}`)
-        }
-
-        const data = await response.json()
-        console.log('✅ Break sessions data received:', data)
-        
-        setBreakSessions(data.breakSessions)
-        setStats({
-          total: data.stats.total,
-          active: data.stats.active,
-          today: data.stats.today,
-          averageDuration: data.stats.averageDuration,
-          totalAgents: data.stats.totalAgents
-        })
-        setError(null) // Clear any previous errors
-      } catch (err) {
-        console.error('❌ Fetch error:', err)
-        setError(err instanceof Error ? err.message : 'Failed to fetch break sessions')
-      } finally {
-        setLoading(false)
-      }
+  const fetchBreakSessions = async () => {
+    console.log('🔍 Fetching break sessions for user:', user?.userType)
+    console.log('🔍 Full user data:', user)
+    
+    // Clear any previous errors and set loading
+    setError(null)
+    setLoading(true)
+    
+    if (!user) {
+      console.log('❌ No user found')
+      setError('User not found')
+      setLoading(false)
+      return
     }
 
+    try {
+      console.log('📡 Making API request to /api/breaks')
+      // For internal users, fetch all break sessions. For others, this would need to be adjusted based on your business logic
+      const memberId = 'all'
+      // Get today's date in Asia/Manila timezone to match database calculations
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) // YYYY-MM-DD format
+      const response = await fetch(`/api/breaks?memberId=${memberId}&date=${today}`)
+      
+      console.log('📊 Response status:', response.status)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.log('❌ API error:', errorText)
+        throw new Error(`Failed to fetch break sessions: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log('✅ Break sessions data received:', data)
+      
+      setBreakSessions(data.breakSessions)
+      setStats({
+        total: data.stats.total,
+        active: data.stats.active,
+        today: data.stats.today,
+        averageDuration: data.stats.averageDuration,
+        totalAgents: data.stats.totalAgents
+      })
+      setError(null) // Clear any previous errors
+    } catch (err) {
+      console.error('❌ Fetch error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch break sessions')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     // Only fetch if user is available
     if (user) {
       fetchBreakSessions()
     }
-  }, [user, memberId])
+  }, [user])
+
+  // Reload function
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      await fetchBreakSessions()
+    } catch (err) {
+      console.error('❌ Reload error:', err)
+    } finally {
+      setReloading(false)
+    }
+  }
 
   const getBreakTypeIcon = (breakType: string) => {
     switch (breakType) {
@@ -430,32 +503,32 @@ export default function BreaksPage() {
     const percentage = (activeCount / totalAgents) * 100
     
     if (percentage === 0) return "No one is currently on break."
-    if (percentage > 0 && percentage < 20) return "A few agents are currently on break."
-    if (percentage >= 20 && percentage < 40) return "Several agents are currently on break."
-    if (percentage >= 40 && percentage < 70) return "Half the agents are currently taking this break."
-    if (percentage >= 70 && percentage < 100) return "Most of the agents are currently on break."
+    if (percentage > 0 && percentage < 20) return "A few team members are currently on break."
+    if (percentage >= 20 && percentage < 40) return "Several team members are currently on break."
+    if (percentage >= 40 && percentage < 70) return "Half the team is currently taking this break."
+    if (percentage >= 70 && percentage < 100) return "Most of the team is currently on break."
     if (percentage === 100) return "Everyone is currently on break."
     
     return "No one is currently on break."
   }
 
   // Helper function to get break session for a specific employee and break type
-  const getEmployeeBreakSession = (employeeId: string, breakType: string) => {
+  const getEmployeeBreakSession = (employeeId: number, breakType: string) => {
     return breakSessions.find(session => 
-      session.agent_user_id.toString() === employeeId && session.break_type === breakType
+      session.agent_user_id === employeeId && session.break_type === breakType
     )
   }
 
   // Helper function to get all break sessions for an employee
-  const getEmployeeBreakSessions = (employeeId: string) => {
+  const getEmployeeBreakSessions = (employeeId: number) => {
     return breakSessions.filter(session => 
-      session.agent_user_id.toString() === employeeId
+      session.agent_user_id === employeeId
     )
   }
 
   // Helper function to determine which break columns to show based on shift
   const getBreakColumnsForShift = (shift: string | undefined) => {
-    if (shift === 'Night') {
+    if (shift === 'Night' || shift === 'night') {
       return ['NightFirst', 'NightMeal', 'NightSecond']
     } else {
       // Default to Day shift columns
@@ -465,12 +538,12 @@ export default function BreaksPage() {
 
   // Helper function to get all unique break columns needed for the table
   const getAllBreakColumns = () => {
-    const allShifts = employees.map(emp => emp.shift)
+    const allShifts = employees.map(emp => emp.shift_period || emp.shift_schedule || 'Day')
     const uniqueShifts = [...new Set(allShifts)]
     
     const allColumns = new Set<string>()
     uniqueShifts.forEach(shift => {
-      getBreakColumnsForShift(shift).forEach(column => allColumns.add(column))
+      getBreakColumnsForShift(shift || 'Day').forEach(column => allColumns.add(column))
     })
     
     return Array.from(allColumns)
@@ -478,7 +551,27 @@ export default function BreaksPage() {
 
   // Helper function to get break type card data
   const getBreakTypeCardData = (breakType: string) => {
-    const activeSessions = breakSessions.filter(session => session.break_type === breakType && !session.end_time)
+    // Filter break sessions by member selection
+    let filteredSessions = breakSessions
+    
+    if (memberId !== 'all') {
+      if (memberId === 'none') {
+        // Show only sessions for employees with no member assignment
+        filteredSessions = breakSessions.filter(session => {
+          const employee = employees.find(emp => emp.user_id === session.agent_user_id)
+          return employee && !employee.member_id
+        })
+      } else {
+        // Show only sessions for employees from the selected member company
+        const selectedMemberId = parseInt(memberId)
+        filteredSessions = breakSessions.filter(session => {
+          const employee = employees.find(emp => emp.user_id === session.agent_user_id)
+          return employee && employee.member_id === selectedMemberId
+        })
+      }
+    }
+    
+    const activeSessions = filteredSessions.filter(session => session.break_type === breakType && !session.end_time)
     const count = activeSessions.length
     
     let icon, color, description
@@ -548,17 +641,17 @@ export default function BreaksPage() {
   }
 
   // Helper function to check if employee is currently on break
-  const isEmployeeOnBreak = (employeeId: string) => {
+  const isEmployeeOnBreak = (employeeId: number) => {
     return breakSessions.some(session => 
-      session.agent_user_id.toString() === employeeId && !session.end_time
+      session.agent_user_id === employeeId && !session.end_time
     )
   }
 
   // Sort employees based on current sort settings
   const sortedEmployees = [...employees].sort((a, b) => {
     // Always sort by active status first (active employees first), then by the selected field
-    const aIsActive = isEmployeeOnBreak(a.id)
-    const bIsActive = isEmployeeOnBreak(b.id)
+    const aIsActive = isEmployeeOnBreak(a.user_id)
+    const bIsActive = isEmployeeOnBreak(b.user_id)
     
     // If one is active and the other isn't, active comes first
     if (aIsActive !== bIsActive) {
@@ -571,16 +664,16 @@ export default function BreaksPage() {
 
     switch (sortField) {
       case 'name':
-        aValue = `${a.firstName} ${a.lastName}`.toLowerCase()
-        bValue = `${b.firstName} ${b.lastName}`.toLowerCase()
+        aValue = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase()
+        bValue = `${b.first_name || ''} ${b.last_name || ''}`.toLowerCase()
         break
       case 'department':
-        aValue = a.department.toLowerCase()
-        bValue = b.department.toLowerCase()
+        aValue = (a.department_name || '').toLowerCase()
+        bValue = (b.department_name || '').toLowerCase()
         break
       case 'position':
-        aValue = a.position.toLowerCase()
-        bValue = b.position.toLowerCase()
+        aValue = (a.job_title || '').toLowerCase()
+        bValue = (b.job_title || '').toLowerCase()
         break
       default:
         return 0
@@ -636,9 +729,45 @@ export default function BreaksPage() {
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col py-4 md:py-6">
+              {/* Employee Breaks Header Section */}
+              <div className="px-4 lg:px-6 mb-4 min-h-[72px]">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl font-bold">Breaks</h1>
+                    <p className="text-sm text-muted-foreground">
+                      Monitor all employees and their break session status across all break types including morning, lunch, afternoon, and night shifts.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="w-56">
+                      <Select value={memberId} onValueChange={(v: string) => setMemberId(v)}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Filter by member" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Employees</SelectItem>
+                          <SelectItem value="none">No Assigned Members</SelectItem>
+                          <SelectSeparator className="bg-border mx-2" />
+                          <SelectGroup>
+                            <SelectLabel className="text-muted-foreground">Members</SelectLabel>
+                            {memberOptions.map((m) => (
+                              <SelectItem key={m.id} value={String(m.id)}>{m.company}</SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <ReloadButton 
+                      loading={reloading} 
+                      onReload={handleReload}
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Two Column Layout */}
               <div className="px-4 lg:px-6">
-                {loading ? (
+                {loading || employees.length === 0 ? (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Column 1: Employee Break Sessions Table Skeleton */}
                     <div className="order-3 lg:order-1">
@@ -649,12 +778,12 @@ export default function BreaksPage() {
                               <TableRow variant="no-hover" className="h-12">
                                 <TableHead className="w-48">
                                   <div className="flex items-center gap-1">
-                                    <div className="h-4 bg-gray-200 rounded animate-pulse w-16"></div>
+                                    <Skeleton className="h-4 w-16" />
                                   </div>
                                 </TableHead>
                                 {[...Array(3)].map((_, i) => (
                                   <TableHead key={i} className="text-center w-32">
-                                    <div className="h-4 bg-gray-200 rounded animate-pulse w-20 mx-auto"></div>
+                                    <Skeleton className="h-4 w-20 mx-auto" />
                                   </TableHead>
                                 ))}
                               </TableRow>
@@ -664,13 +793,13 @@ export default function BreaksPage() {
                                 <TableRow key={i} className="h-20">
                                   <TableCell>
                                     <div className="flex items-center gap-3">
-                                      <div className="h-10 w-10 rounded-full bg-gray-200 animate-pulse"></div>
-                                      <div className="h-5 bg-gray-200 rounded animate-pulse w-28"></div>
+                                      <Skeleton className="h-10 w-10 rounded-full" />
+                                      <Skeleton className="h-5 w-28" />
                                     </div>
                                   </TableCell>
                                   {[...Array(3)].map((_, j) => (
                                     <TableCell key={j} className="text-center">
-                                      <div className="h-7 bg-gray-200 rounded animate-pulse w-20 mx-auto"></div>
+                                      <Skeleton className="h-7 w-20 mx-auto" />
                                     </TableCell>
                                   ))}
                                 </TableRow>
@@ -688,33 +817,33 @@ export default function BreaksPage() {
                           <Card key={i} className="bg-white dark:bg-card">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                               <div>
-                                <div className="h-4 bg-gray-200 rounded animate-pulse w-24 mb-2"></div>
+                                <Skeleton className="h-4 w-24 mb-2" />
                                 <div className="text-2xl font-semibold tabular-nums flex items-center gap-2 mt-2">
                                   <UserIcon className="h-5 w-5" />
-                                  <div className="h-8 bg-gray-200 rounded animate-pulse w-8"></div>
+                                  <Skeleton className="h-8 w-8" />
                                 </div>
                               </div>
-                              <div className="h-6 w-6 bg-gray-200 rounded animate-pulse"></div>
+                              <Skeleton className="h-6 w-6" />
                             </CardHeader>
                             <CardContent>
                               <div className="space-y-3">
-                                <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
+                                <Skeleton className="h-4 w-3/4" />
                                 <div className="border-t border-border mt-3 pt-3">
                                   <div className="space-y-2">
                                     <div className="grid grid-cols-[2fr_1fr_1fr] gap-4 text-xs text-muted-foreground font-medium">
-                                      <div className="h-3 bg-gray-200 rounded animate-pulse w-12"></div>
-                                      <div className="h-3 bg-gray-200 rounded animate-pulse w-16 mx-auto"></div>
-                                      <div className="h-3 bg-gray-200 rounded animate-pulse w-20 ml-auto"></div>
+                                      <Skeleton className="h-3 w-12" />
+                                      <Skeleton className="h-3 w-16 mx-auto" />
+                                      <Skeleton className="h-3 w-20 ml-auto" />
                                     </div>
                                     <div className="max-h-48 overflow-y-auto space-y-2">
                                       {[...Array(3)].map((_, j) => (
                                         <div key={j} className="grid grid-cols-[2fr_1fr_1fr] gap-4 items-center">
                                           <div className="flex items-center gap-2">
-                                            <div className="h-6 w-6 rounded-full bg-gray-200 animate-pulse"></div>
-                                            <div className="h-4 bg-gray-200 rounded animate-pulse w-20"></div>
+                                            <Skeleton className="h-6 w-6 rounded-full" />
+                                            <Skeleton className="h-4 w-20" />
                                           </div>
-                                          <div className="h-3 bg-gray-200 rounded animate-pulse w-12 mx-auto"></div>
-                                          <div className="h-3 bg-gray-200 rounded animate-pulse w-16 ml-auto"></div>
+                                          <Skeleton className="h-3 w-12 mx-auto" />
+                                          <Skeleton className="h-3 w-16 ml-auto" />
                                         </div>
                                       ))}
                                     </div>
@@ -727,44 +856,10 @@ export default function BreaksPage() {
                       </div>
                     </div>
                   </div>
-                ) : employees.length === 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="order-3 lg:order-1">
-                      <Card>
-                        <CardContent className="flex items-center justify-center h-64">
-                          <div className="text-center">
-                            <UserIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                            <p className="text-lg font-medium">No Employees Found</p>
-                            <p className="text-sm text-muted-foreground">
-                              No employees are available to display break sessions.
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                    <div className="order-2 lg:order-2">
-                      <div className="space-y-4">
-                        <Card>
-                          <CardContent className="flex items-center justify-center h-32">
-                            <div className="text-center">
-                              <ClockIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                              <p className="text-sm text-muted-foreground">No break data available</p>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    </div>
-                  </div>
                 ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Column 1: Employee Break Sessions Table */}
                   <div className="order-3 lg:order-1">
-                    <div className="mb-4 h-20 flex flex-col justify-center">
-                      <h1 className="text-2xl font-bold">Employee Breaks</h1>
-                      <p className="text-sm text-muted-foreground">
-                        Monitor all employees and their break session status across all break types including morning, lunch, afternoon, and night shifts.
-                      </p>
-                    </div>
                     <Card className="overflow-hidden">
                       <CardContent className="p-0">
                         <div className="">
@@ -794,31 +889,31 @@ export default function BreaksPage() {
                             </TableHeader>
                             <TableBody>
                               {sortedEmployees.map((employee) => (
-                                <TableRow key={employee.id} className="h-14">
+                                <TableRow key={employee.user_id} className="h-14">
                                   <TableCell>
                                     <div className="flex items-center gap-3">
                                       <Avatar className="h-8 w-8">
-                                        <AvatarImage src={employee.avatar || undefined} alt={`${employee.firstName} ${employee.lastName}`} />
+                                        <AvatarImage src={employee.profile_picture || undefined} alt={`${employee.first_name} ${employee.last_name}`} />
                                         <AvatarFallback>
-                                          {employee.firstName?.[0]}{employee.lastName?.[0]}
+                                          {employee.first_name?.[0]}{employee.last_name?.[0]}
                                         </AvatarFallback>
                                       </Avatar>
                                       <div>
-                                        <div className="font-medium">{employee.firstName} {employee.lastName}</div>
+                                        <div className="font-medium">{employee.first_name} {employee.last_name}</div>
                                       </div>
                                     </div>
                                   </TableCell>
                                    
                                   {/* Dynamic Break Columns based on shift */}
                                   {getAllBreakColumns().map((breakType) => {
-                                    const employeeBreakColumns = getBreakColumnsForShift(employee.shift)
+                                    const employeeBreakColumns = getBreakColumnsForShift(employee.shift_period || employee.shift_schedule || 'Day')
                                     const shouldShowColumn = employeeBreakColumns.includes(breakType)
                                     
                                     if (!shouldShowColumn) {
                                       return <TableCell key={breakType} className="text-center">-</TableCell>
                                     }
                                     
-                                    const breakSession = getEmployeeBreakSession(employee.id, breakType)
+                                    const breakSession = getEmployeeBreakSession(employee.user_id, breakType)
                                     if (!breakSession) return <TableCell key={breakType} className="text-center"><span className="text-muted-foreground text-sm">-</span></TableCell>
                                     
                                        return (
@@ -828,57 +923,69 @@ export default function BreaksPage() {
                                              <TooltipTrigger>
                                               {getStatusBadge(breakSession)}
                                              </TooltipTrigger>
-                                              <TooltipContent className="w-auto">
-                                               {breakSession.end_time ? (
-                                                 <div className="space-y-2">
-                                                   <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
-                                                     <span>Completed:</span>
-                                                     <div className="space-y-1">
-                                                       <div className="font-bold">
-                                                         {formatTimeOnly(breakSession.start_time)} - {formatTimeOnly(breakSession.end_time)}
-                                                       </div>
-                                                     </div>
-                                                   </div>
-                                                   <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
-                                                     <span>Duration:</span>
-                                                     <span className="font-bold">{formatDuration(breakSession.duration_minutes)}</span>
-                                                   </div>
-                                                 </div>
-                                               ) : breakSession.pause_time && !breakSession.resume_time ? (
-                                                 <div className="space-y-2">
-                                                   <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
-                                                     <span>Paused Since:</span>
-                                                     <div className="space-y-1">
-                                                       <div className="font-bold">
-                                                         {formatTimeOnly(breakSession.pause_time)}
-                                                       </div>
-                                                     </div>
-                                                   </div>
-                                                   <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
-                                                     <span>Started:</span>
-                                                     <div className="space-y-1">
-                                                       <div className="font-bold">
-                                                         {formatTimeOnly(breakSession.start_time)}
-                                                       </div>
-                                                     </div>
-                                                   </div>
-                                                 </div>
-                                               ) : (
-                                                 <div className="space-y-2">
-                                                   <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
-                                                     <span>Started:</span>
-                                                     <div className="space-y-1">
-                                                       <div className="font-bold">
-                                                         {formatTimeOnly(breakSession.start_time)}
-                                                       </div>
-                                                     </div>
-                                                   </div>
-                                                   <div className="grid grid-cols-[auto_1fr] gap-2 text-sm">
-                                                     <span>Elapsed:</span>
-                                                     <span className="font-bold">{getElapsedTime(breakSession)}</span>
-                                                   </div>
-                                                 </div>
-                                               )}
+                                              <TooltipContent className="min-w-[12rem]">
+                                              {breakSession.end_time ? (
+                                                <div className="flex w-full flex-col gap-1">
+                                                  <div className="grid grid-cols-[1fr_2fr] gap-4 w-full">
+                                                    <span className="text-muted-foreground">Completed:</span>
+                                                    <div className="flex flex-col items-start">
+                                                      <span className="font-bold">
+                                                        Local: {formatTimeOnlyLocal(breakSession.start_time)} - {formatTimeOnlyLocal(breakSession.end_time)}
+                                                      </span>
+                                                      <span className="font-bold text-muted-foreground text-xs">
+                                                        PH: {formatTimeOnly(breakSession.start_time)} - {formatTimeOnly(breakSession.end_time)}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                  <div className="grid grid-cols-[1fr_2fr] gap-4 w-full">
+                                                    <span className="text-muted-foreground">Duration:</span>
+                                                    <span className="font-bold">{formatDuration(breakSession.duration_minutes)}</span>
+                                                  </div>
+                                                </div>
+                                              ) : breakSession.pause_time && !breakSession.resume_time ? (
+                                                <div className="flex w-full flex-col gap-1">
+                                                  <div className="grid grid-cols-[1fr_2fr] gap-4 w-full">
+                                                    <span className="text-muted-foreground">Started:</span>
+                                                    <div className="flex flex-col items-start">
+                                                      <span className="font-bold">
+                                                        Local: {formatTimeOnlyLocal(breakSession.start_time)}
+                                                      </span>
+                                                      <span className="font-bold text-muted-foreground text-xs">
+                                                        PH: {formatTimeOnly(breakSession.start_time)}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                  <div className="grid grid-cols-[1fr_2fr] gap-4 w-full">
+                                                    <span className="text-muted-foreground">Paused Since:</span>
+                                                    <div className="flex flex-col items-start">
+                                                      <span className="font-bold">
+                                                        Local: {formatTimeOnlyLocal(breakSession.pause_time)}
+                                                      </span>
+                                                      <span className="font-bold text-muted-foreground text-xs">
+                                                        PH: {formatTimeOnly(breakSession.pause_time)}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <div className="flex w-full flex-col gap-1">
+                                                  <div className="grid grid-cols-[1fr_2fr] gap-4 w-full">
+                                                    <span className="text-muted-foreground">Started:</span>
+                                                    <div className="flex flex-col items-start">
+                                                      <span className="font-bold">
+                                                        Local: {formatTimeOnlyLocal(breakSession.start_time)}
+                                                      </span>
+                                                      <span className="font-bold text-muted-foreground text-xs">
+                                                        PH: {formatTimeOnly(breakSession.start_time)}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                  <div className="grid grid-cols-[1fr_2fr] gap-4 w-full">
+                                                    <span className="text-muted-foreground">Elapsed:</span>
+                                                    <span className="font-bold">{getElapsedTime(breakSession)}</span>
+                                                  </div>
+                                                </div>
+                                              )}
                                             </TooltipContent>
                                           </Tooltip>
                                         </TooltipProvider>
@@ -896,24 +1003,6 @@ export default function BreaksPage() {
 
                   {/* Column 2: Break Type Cards (sticky) */}
                   <div className="order-2 lg:order-2 lg:sticky lg:top-16 lg:self-start">
-                    <div className="mb-4 h-20 flex items-center justify-end">
-                      <Select value={memberId} onValueChange={(v: string) => { setMemberId(v) }}>
-                        <SelectTrigger className="w-auto min-w-[200px]">
-                          <SelectValue placeholder="Filter by member" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Employees</SelectItem>
-                          <SelectItem value="none">No Assigned Members</SelectItem>
-                          <SelectSeparator className="bg-border mx-2" />
-                          <SelectGroup>
-                            <SelectLabel className="text-muted-foreground">Members</SelectLabel>
-                            {memberOptions.map((m) => (
-                              <SelectItem key={m.id} value={String(m.id)}>{m.company}</SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </div>
                     <div className="space-y-4">
                       {getAllBreakColumns().map((breakType) => {
                         const cardData = getBreakTypeCardData(breakType)
@@ -932,7 +1021,7 @@ export default function BreaksPage() {
                             </CardHeader>
                             <CardContent>
                               <CardTitle className="text-sm font-medium">
-                                {getBreakStatusText(cardData.count, stats.totalAgents)}
+                                {getBreakStatusText(cardData.count, getFilteredStats().totalAgents)}
                               </CardTitle>
                               {cardData.count > 0 && (
                                 <div className="border-t border-border mt-3 pt-3">

@@ -614,11 +614,50 @@ ipcMain.handle('show-notification', async (event, options) => {
     // Create and show notification
     console.log('🔔 App name:', app.getName());
     console.log('🔔 Notification title:', options.title);
+    console.log('🔔 Notification icon:', options.icon);
+    console.log('🔔 Full options:', JSON.stringify(options, null, 2));
     
-    const notification = new Notification({
+    // Resolve icon path properly
+    let iconPath = options.icon || path.join(__dirname, '../public/icon.png');
+    
+    // If icon is a relative path starting with '/', resolve it from the app directory
+    if (iconPath.startsWith('/')) {
+      iconPath = path.join(__dirname, '..', 'public', iconPath);
+    }
+    
+    console.log('🔔 Resolved icon path:', iconPath);
+    console.log('🔔 Icon file exists:', require('fs').existsSync(iconPath));
+    
+    // For Windows notifications, try using NativeImage
+    const isWindows = process.platform === 'win32';
+    let finalIcon = null;
+    
+    if (isWindows) {
+      // On Windows, try using NativeImage for better compatibility
+      try {
+        if (require('fs').existsSync(iconPath)) {
+          const { nativeImage } = require('electron');
+          finalIcon = nativeImage.createFromPath(iconPath);
+          console.log('🔔 Windows - Created NativeImage from path:', iconPath);
+          console.log('🔔 NativeImage isEmpty:', finalIcon.isEmpty());
+        } else {
+          console.log('🔔 Windows - Icon file does not exist, using system default');
+        }
+      } catch (error) {
+        console.log('🔔 Windows - Error creating NativeImage:', error.message);
+      }
+    } else {
+      // On other platforms, use the file path directly
+      finalIcon = require('fs').existsSync(iconPath) ? iconPath : null;
+      console.log('🔔 Non-Windows platform - using file path:', finalIcon);
+    }
+    
+    console.log('🔔 Platform:', process.platform);
+    console.log('🔔 Final icon type:', typeof finalIcon);
+    
+    const notificationOptions = {
       title: options.title || 'ShoreAgents AI',
       body: options.body || '',
-      icon: options.icon || path.join(__dirname, '../public/icon.png'),
       silent: options.silent || false,
       urgency: options.urgency || 'normal', // 'critical', 'normal', 'low'
       timeoutType: options.timeoutType || 'default', // 'default', 'never'
@@ -627,7 +666,14 @@ ipcMain.handle('show-notification', async (event, options) => {
       replyPlaceholder: options.replyPlaceholder || 'Type a reply...',
       sound: options.sound || 'default',
       ...options
-    });
+    };
+    
+    // Only add icon if we have a valid icon
+    if (finalIcon) {
+      notificationOptions.icon = finalIcon;
+    }
+    
+    const notification = new Notification(notificationOptions);
 
     // Handle notification events
     notification.on('click', () => {

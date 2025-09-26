@@ -67,7 +67,6 @@ export function NavSecondary({
                           <>
                             {/* Full badge for expanded sidebar */}
                             <div className="ml-auto flex items-center gap-1 group-data-[collapsible=icon]:hidden">
-                              <span className="text-xs font-medium text-red-500">New</span>
                               <Badge className="bg-red-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center p-0 min-w-0">
                                 {item.badge > 99 ? '99+' : item.badge}
                               </Badge>

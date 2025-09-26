@@ -94,6 +94,14 @@ interface Applicant {
     career_path?: any
     section_analysis?: any
   } | null
+  // Interested clients data
+  interested_clients?: {
+    user_id: number
+    first_name: string | null
+    last_name: string | null
+    profile_picture: string | null
+    employee_id: string | null
+  }[]
 }
 
 function ApplicantsTable({ applicants, onSort, sortField, sortDirection, onRowClick }: { 
@@ -353,6 +361,8 @@ export default function ApplicantsRecordsPage() {
          address: rawData.address,
          // AI analysis data from BPOC database
          aiAnalysis: rawData.aiAnalysis,
+         // Interested clients data
+         interested_clients: rawData.interested_clients || [],
   }), [])
 
   // Real-time updates for BPOC applications

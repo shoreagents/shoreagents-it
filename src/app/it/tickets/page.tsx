@@ -19,7 +19,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 
 import { IconSearch, IconFilter, IconGripVertical, IconCalendar, IconClock, IconEye, IconMessage } from "@tabler/icons-react"
-import { ChevronDown, ChevronUp } from "lucide-react"
 import { useRealtimeTickets } from "@/hooks/use-realtime-tickets"
 import {
   DndContext,
@@ -46,8 +45,6 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/contexts/auth-context"
-import { TicketNotificationTest } from "@/components/ticket-notification-test"
-import { NotificationDebug } from "@/components/notification-debug"
 
 type TicketStatus = 'On Hold' | 'In Progress' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
 interface TicketCategory {
@@ -604,7 +601,6 @@ export default function TicketsPage() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(1)
-  const [showNotificationTest, setShowNotificationTest] = useState(false)
 
   const { user } = useAuth()
   
@@ -1005,25 +1001,10 @@ export default function TicketsPage() {
                     <p className="text-sm text-muted-foreground">Drag and drop tickets to manage their status.</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowNotificationTest(!showNotificationTest)}
-                      className="flex items-center gap-2"
-                    >
-                      {showNotificationTest ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      Test Notifications
-                    </Button>
                     <ReloadButton onReload={fetchTickets} loading={loading} className="flex-1" />
                   </div>
                 </div>
 
-                {showNotificationTest && (
-                  <div className="mb-6 space-y-4">
-                    <NotificationDebug />
-                    <TicketNotificationTest />
-                  </div>
-                )}
 
                 <div className="flex items-center gap-4">
                   <div className="relative flex-1">
