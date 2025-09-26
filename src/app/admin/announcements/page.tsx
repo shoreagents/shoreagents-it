@@ -129,6 +129,49 @@ export default function AnnouncementsPage() {
     try {
       setLoading(true)
       setError(null)
+      
+      // First, update announcement statuses in database based on current date
+      try {
+        console.log('Updating announcement statuses based on current date...')
+        
+        // Get browser's current date to send to API
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = String(now.getMonth() + 1).padStart(2, '0')
+        const day = String(now.getDate()).padStart(2, '0')
+        const browserDate = `${year}-${month}-${day}` // YYYY-MM-DD format
+        
+        const updateResponse = await fetch('/api/announcements/update-statuses', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ date: browserDate })
+        })
+        
+        if (updateResponse.ok) {
+          const updateData = await updateResponse.json()
+          console.log('Announcement statuses updated successfully:', updateData)
+          
+          // Log detailed update information
+          if (updateData.updates) {
+            console.log('Update summary:', {
+              activated: updateData.updates.activated,
+              expired: updateData.updates.expired,
+              quickExpired: updateData.updates.quickExpired,
+              rescheduled: updateData.updates.rescheduled,
+              date: updateData.date
+            })
+          }
+        } else {
+          const errorData = await updateResponse.json().catch(() => ({}))
+          console.warn('Failed to update announcement statuses:', errorData)
+        }
+      } catch (updateError) {
+        console.warn('Error updating announcement statuses:', updateError)
+        // Continue with fetching announcements even if status update fails
+      }
+      
       const params = new URLSearchParams({
         page: String(currentPage),
         limit: '20',
