@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import {
   ChartConfig,
@@ -99,6 +100,26 @@ export function AgentActivityData({
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [chartLoading, setChartLoading] = useState(false)
   const [chartError, setChartError] = useState<string | null>(null)
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })
+
+  // Generate month options for dropdown
+  const generateMonthOptions = () => {
+    const now = new Date()
+    const options = []
+    
+    // Add current month and previous 6 months
+    for (let i = 0; i <= 6; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      const label = date.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+      options.push({ value, label })
+    }
+    
+    return options
+  }
 
   // Fetch chart data from API when employee is selected
   const fetchChartData = async (employeeId: string) => {
@@ -108,10 +129,11 @@ export function AgentActivityData({
     setChartError(null)
 
     try {
-      // Get current month date range
-      const now = new Date()
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      // Get date range based on selected month
+      // Handle month format (e.g., "2024-01")
+      const [year, month] = selectedMonth.split('-').map(Number)
+      const startOfMonth = new Date(year, month - 1, 1)
+      const endOfMonth = new Date(year, month, 0)
       
       const startDate = startOfMonth.toLocaleDateString('en-CA')
       const endDate = endOfMonth.toLocaleDateString('en-CA')
@@ -207,13 +229,13 @@ export function AgentActivityData({
     }
   }
 
-  // Fetch chart data when employee is selected
+  // Fetch chart data when employee is selected or month changes
   useEffect(() => {
     if (selectedEmployee) {
       const employeeId = selectedEmployee.user_id || selectedEmployee.id
       fetchChartData(employeeId.toString())
     }
-  }, [selectedEmployee?.user_id || selectedEmployee?.id, user?.id])
+  }, [selectedEmployee?.user_id || selectedEmployee?.id, user?.id, selectedMonth])
 
   const tabs = [
     {
@@ -320,7 +342,9 @@ export function AgentActivityData({
           
           {/* This Month */}
           <div>
-            <div className="text-sm font-medium text-muted-foreground mb-2">This Month</div>
+            <div className="text-sm font-medium text-muted-foreground mb-2">
+              {new Date(selectedMonth + '-01').toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Card>
                 <CardContent className="p-3">
@@ -449,7 +473,9 @@ export function AgentActivityData({
         
         {/* This Month */}
         <div>
-          <div className="text-sm font-medium text-muted-foreground mb-2">This Month</div>
+          <div className="text-sm font-medium text-muted-foreground mb-2">
+            {new Date(selectedMonth + '-01').toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Card>
               <CardContent className="p-3">
@@ -677,8 +703,20 @@ export function AgentActivityData({
     <Card className="bg-transparent border-0 shadow-none">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div>
-            <CardDescription>Metrics and analytics for daily, weekly, and monthly activity data.</CardDescription>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Filter by:</span>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select month" />
+              </SelectTrigger>
+              <SelectContent>
+                {generateMonthOptions().map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="ml-4">
             <AnimatedTabs
