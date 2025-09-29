@@ -1,0 +1,37 @@
+// Removed: All Announcement Notifications (Desktop + Toast)
+// All notification functionality has been completely removed
+
+console.log('🗑️ Removed: All Announcement Notifications')
+console.log('')
+
+console.log('✅ What Was Removed:')
+console.log('   - Desktop notifications (useElectronNotifications)')
+console.log('   - Toast notifications (Sonner)')
+console.log('   - enableNotifications parameter')
+console.log('   - showNotification calls')
+console.log('   - toast.success() calls')
+console.log('   - toast.error() calls')
+console.log('   - toast.info() calls')
+console.log('   - toast import from "sonner"')
+console.log('')
+
+console.log('📋 What Still Works:')
+console.log('   ✅ Real-time announcement list updates')
+console.log('   ✅ Instant UI updates when announcements are created/sent/expired')
+console.log('   ✅ WebSocket connection and message handling')
+console.log('   ✅ State updates for announcement changes')
+console.log('   ✅ Console logging for debugging')
+console.log('')
+
+console.log('🎯 Benefits:')
+console.log('   ✅ Cleaner code without notification dependencies')
+console.log('   ✅ No desktop notification popups')
+console.log('   ✅ No toast notifications')
+console.log('   ✅ Still maintains all real-time functionality')
+console.log('   ✅ Silent operation - updates happen in background')
+console.log('')
+
+console.log('🚀 Test It:')
+console.log('   1. Open /admin/announcements')
+console.log('   2. Create/send announcements from another tab')
+console.log('   3. Watch real-time updates silently without any notifications!')

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { usePathname } from "next/navigation"
-import { useRef } from "react"
+import { useRef, useMemo } from "react"
 import {
   UserCircleIcon,
   Building2Icon,
@@ -44,7 +44,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { user, loading } = useAuth()
   const { newTicketsCount, error: ticketsError, isConnected } = useNewTicketsCount()
@@ -55,31 +55,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const role = (user as any)?.roleName?.toLowerCase() || "it"
   const isAdmin = role === "admin"
   
-  // Debug logging
-  console.log('AppSidebar: User:', user)
-  console.log('AppSidebar: Role:', role)
-  console.log('AppSidebar: IsAdmin:', isAdmin)
-  console.log('AppSidebar: NewTicketsCount:', newTicketsCount)
-  console.log('AppSidebar: TicketsError:', ticketsError || 'None')
-  console.log('AppSidebar: TicketsWebSocket Connected:', isConnected)
-  console.log('AppSidebar: NewApplicantsCount:', newApplicantsCount)
-  console.log('AppSidebar: ApplicantsError:', applicantsError || 'None')
-  console.log('AppSidebar: ApplicantsWebSocket Connected:', applicantsIsConnected)
-  console.log('AppSidebar: TodayEventsCount:', todayEventsCount)
-  console.log('AppSidebar: EventsError:', eventsError || 'None')
-  console.log('AppSidebar: EventsWebSocket Connected:', eventsIsConnected)
-  console.log('AppSidebar: ActiveAnnouncementsCount:', activeAnnouncementsCount)
-  console.log('AppSidebar: AnnouncementsError:', announcementsError || 'None')
-  console.log('AppSidebar: AnnouncementsWebSocket Connected:', announcementsIsConnected)
-  
 
 
-  const navMain: Array<{
-    title: string
-    url: string
-    icon?: any
-    badge?: number
-  }> = isAdmin
+  const navMain = useMemo(() => isAdmin
     ? [
         {
           title: "Dashboard",
@@ -93,14 +71,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           url: "/it/dashboard",
           icon: GripDashboardIcon,
         },
-      ]
+      ], [isAdmin])
 
-  const navSupport: Array<{
-    title: string
-    url: string
-    icon?: any
-    badge?: number
-  }> = isAdmin
+  const navSupport = useMemo(() => isAdmin
     ? [
         {
           title: "Tickets",
@@ -126,20 +99,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           url: "/it/past-tickets",
           icon: HistoryIcon,
         },
-      ]
+      ], [isAdmin, newTicketsCount])
 
-  const navSecondary: Array<{
-    title: string
-    url: string
-    icon?: any
-    badge?: number
-  }> = [
+  const navSecondary = useMemo(() => [
     {
       title: "Settings",
       url: "#",
       icon: SettingsGearIcon,
     },
-  ]
+  ], [])
 
   // Loading skeleton to avoid role flicker
   if (loading) {
@@ -278,7 +246,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <NavMain
               items={[
                 { title: "Breaks", url: "/admin/breaks", icon: ClockIcon },
-                { title: "Activity Data", url: "#", icon: BarChart3Icon },
+                { title: "Activity", url: "/admin/activities", icon: BarChart3Icon },
               ]}
             />
           </SidebarGroup>
@@ -288,4 +256,4 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
     </Sidebar>
   )
-}
+})

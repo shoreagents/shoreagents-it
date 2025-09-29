@@ -430,7 +430,7 @@ export default function EventsPage() {
                     <h1 className="text-2xl font-bold">Events & Activities</h1>
                     <p className="text-sm text-muted-foreground">Discover and track all company events and activities in one place.</p>
                   </div>
-                  <ReloadButton onReload={fetchEvents} loading={loading} />
+                  <ReloadButton onReload={() => fetchEvents(selectedStatus)} loading={loading} />
                 </div>
               </div>
 

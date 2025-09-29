@@ -154,39 +154,37 @@ export function NavMainWithSubgroups({
                                   ease: "easeOut"
                                 }}
                               >
-                                <SidebarMenuItem>
-                                  <SidebarMenuButton 
-                                    asChild 
-                                    tooltip={subItem.title}
-                                    className={`${isActive ? "bg-teal-600/50 dark:bg-teal-600/30 focus:bg-teal-600/50 dark:focus:bg-teal-600/30 active:bg-teal-600/50 dark:active:bg-teal-600/30 text-sidebar-accent-foreground dark:text-sidebar-accent-foreground" : "text-sidebar-accent-foreground hover:bg-primary/5 hover:text-sidebar-accent-foreground"} ${isActive ? "hover:!bg-teal-600/50 dark:hover:!bg-teal-600/30" : ""} group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center relative overflow-visible`}
-                                  >
-                                    <Link href={subItem.url} className="flex items-center gap-2 justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-full">
-                                      <div className="flex items-center group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center">
-                                        <span className="group-data-[collapsible=icon]:hidden">{subItem.title}</span>
-                                      </div>
-                                      {subItem.badge && subItem.badge > 0 && (
-                                        <>
-                                          {/* Full badge for expanded sidebar */}
-                                          <div className="ml-auto flex items-center gap-1 group-data-[collapsible:icon]:hidden">
-                                            <Badge 
-                                              variant="outline" 
-                                              className="text-xs w-5 h-5 rounded-full flex items-center justify-center p-0 min-w-0 border-0" 
-                                              style={{ backgroundColor: 'rgb(239 68 68)', color: 'white' }}
-                                            >
-                                              {subItem.badge > 99 ? '99+' : subItem.badge}
-                                            </Badge>
-                                          </div>
-                                          {/* Small circle badge for collapsed sidebar */}
-                                          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center group-data-[collapsible=icon]:flex hidden" style={{ backgroundColor: 'rgb(239 68 68)' }}>
-                                            <span className="text-[10px] text-white font-bold">
-                                              {subItem.badge > 99 ? '99+' : subItem.badge}
-                                            </span>
-                                          </div>
-                                        </>
-                                      )}
-                                    </Link>
-                                  </SidebarMenuButton>
-                                </SidebarMenuItem>
+                                <SidebarMenuButton 
+                                  asChild 
+                                  tooltip={subItem.title}
+                                  className={`${isActive ? "bg-teal-600/50 dark:bg-teal-600/30 focus:bg-teal-600/50 dark:focus:bg-teal-600/30 active:bg-teal-600/50 dark:active:bg-teal-600/30 text-sidebar-accent-foreground dark:text-sidebar-accent-foreground" : "text-sidebar-accent-foreground hover:bg-primary/5 hover:text-sidebar-accent-foreground"} ${isActive ? "hover:!bg-teal-600/50 dark:hover:!bg-teal-600/30" : ""} group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center relative overflow-visible`}
+                                >
+                                  <Link href={subItem.url} className="flex items-center gap-2 justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-full">
+                                    <div className="flex items-center group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center">
+                                      <span className="group-data-[collapsible=icon]:hidden">{subItem.title}</span>
+                                    </div>
+                                    {subItem.badge && subItem.badge > 0 && (
+                                      <>
+                                        {/* Full badge for expanded sidebar */}
+                                        <div className="ml-auto flex items-center gap-1 group-data-[collapsible:icon]:hidden">
+                                          <Badge 
+                                            variant="outline" 
+                                            className="text-xs w-5 h-5 rounded-full flex items-center justify-center p-0 min-w-0 border-0" 
+                                            style={{ backgroundColor: 'rgb(239 68 68)', color: 'white' }}
+                                          >
+                                            {subItem.badge > 99 ? '99+' : subItem.badge}
+                                          </Badge>
+                                        </div>
+                                        {/* Small circle badge for collapsed sidebar */}
+                                        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center group-data-[collapsible=icon]:flex hidden" style={{ backgroundColor: 'rgb(239 68 68)' }}>
+                                          <span className="text-[10px] text-white font-bold">
+                                            {subItem.badge > 99 ? '99+' : subItem.badge}
+                                          </span>
+                                        </div>
+                                      </>
+                                    )}
+                                  </Link>
+                                </SidebarMenuButton>
                               </motion.div>
                             )
                           })}

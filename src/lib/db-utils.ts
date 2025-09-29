@@ -1121,7 +1121,7 @@ export async function getAgentsPaginated({
     }
   }
 
-  // Count query
+  // Count query - Optimized (removed unnecessary joins)
   const countQuery = `
     SELECT COUNT(*) AS count
     FROM public.users u
@@ -1129,54 +1129,31 @@ export async function getAgentsPaginated({
     LEFT JOIN public.personal_info pi ON u.id = pi.user_id
     LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
     LEFT JOIN public.members m ON a.member_id = m.id
-    LEFT JOIN public.departments d ON a.department_id = d.id
-    LEFT JOIN public.stations s ON u.id = s.assigned_user_id
     WHERE ${whereClause}
   `
   const countResult = await pool.query(countQuery, params)
   const totalCount = parseInt(countResult.rows?.[0]?.count || '0', 10)
 
-  // Data query
+  // Data query - Optimized for page load (only essential fields)
   const dataQuery = `
     SELECT 
         u.id AS user_id,
         u.email,
-        u.user_type,
         pi.first_name,
-        pi.middle_name,
         pi.last_name,
-        pi.nickname,
         pi.profile_picture,
         pi.phone,
-        pi.address,
-        pi.city,
-        pi.gender,
-        to_char(pi.birthday, 'YYYY-MM-DD') AS birthday,
         ji.employee_id,
         ji.job_title,
         ji.work_email,
-        to_char(ji.start_date, 'YYYY-MM-DD') AS start_date,
-        to_char(ji.exit_date, 'YYYY-MM-DD') AS exit_date,
-        ji.shift_period,
-        ji.shift_schedule,
-        ji.shift_time,
-        ji.work_setup,
-        ji.employment_status,
-        ji.hire_type,
-        ji.staff_source,
         m.id AS member_id,
         m.company AS member_company,
-        m.badge_color AS member_badge_color,
-        d.id AS department_id,
-        d.name AS department_name,
-        s.station_id
+        m.badge_color AS member_badge_color
      FROM public.users u
      INNER JOIN public.agents a ON u.id = a.user_id
      LEFT JOIN public.personal_info pi ON u.id = pi.user_id
      LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
      LEFT JOIN public.members m ON a.member_id = m.id
-     LEFT JOIN public.departments d ON a.department_id = d.id
-     LEFT JOIN public.stations s ON u.id = s.assigned_user_id
      WHERE ${whereClause}
      ORDER BY ${getSortField(sortField)} ${sortDirection.toUpperCase()}
      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -1451,6 +1428,54 @@ export async function getAgentById(userId: number): Promise<any> {
     return result.rows[0]
   } catch (error) {
     console.error('Error fetching agent by ID:', error)
+    throw error
+  }
+}
+
+// Optimized function to fetch only missing fields for modal
+export async function getAgentDetailsById(userId: number): Promise<any> {
+  try {
+    const query = `
+      SELECT 
+        a.user_id,
+        a.member_id,
+        a.department_id,
+        a.created_at,
+        a.updated_at,
+        u.user_type,
+        pi.middle_name,
+        pi.nickname,
+        pi.address,
+        pi.city,
+        pi.gender,
+        to_char(pi.birthday, 'YYYY-MM-DD') AS birthday,
+        to_char(ji.start_date, 'YYYY-MM-DD') AS start_date,
+        to_char(ji.exit_date, 'YYYY-MM-DD') AS exit_date,
+        ji.shift_period,
+        ji.shift_schedule,
+        ji.shift_time,
+        ji.work_setup,
+        ji.employment_status,
+        ji.hire_type,
+        ji.staff_source,
+        d.name AS department_name
+      FROM public.agents a
+      INNER JOIN public.users u ON a.user_id = u.id
+      LEFT JOIN public.personal_info pi ON a.user_id = pi.user_id
+      LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
+      LEFT JOIN public.departments d ON a.department_id = d.id
+      WHERE a.user_id = $1
+    `
+    
+    const result = await pool.query(query, [userId])
+    
+    if (result.rows.length === 0) {
+      return null
+    }
+    
+    return result.rows[0]
+  } catch (error) {
+    console.error('Error fetching agent details by ID:', error)
     throw error
   }
 }
@@ -5301,4 +5326,117 @@ export async function getBreakStats(memberId: string, date: string) {
   }
 }
 
+export async function getActivitiesByDate(memberId: string, startDate: string, endDate: string) {
+  const query = `
+    SELECT 
+      ad.id,
+      ad.user_id,
+      ad.today_date,
+      ad.today_active_seconds,
+      ad.today_inactive_seconds,
+      ad.is_currently_active,
+      ad.last_session_start,
+      ad.created_at,
+      ad.updated_at,
+      pi.first_name,
+      pi.last_name,
+      u.email,
+      pi.profile_picture,
+      d.name as department_name,
+      CASE 
+        WHEN bs.id IS NOT NULL AND bs.end_time IS NULL THEN true
+        ELSE false
+      END as is_on_break,
+      bs.break_type as current_break_type,
+      bs.start_time as break_start_time,
+      bs.pause_time,
+      bs.resume_time,
+      CASE 
+        WHEN m.id IS NOT NULL AND m.is_in_meeting = true AND m.status = 'in-progress' THEN true
+        ELSE false
+      END as is_in_meeting,
+      m.title as meeting_title,
+      m.meeting_type,
+      m.start_time as meeting_start_time,
+      CASE 
+        WHEN ea.id IS NOT NULL AND ea.is_going = true AND ea.is_back = false THEN true
+        ELSE false
+      END as is_in_event,
+      e.title as event_title,
+      e.location as event_location,
+      (e.event_date + e.start_time) as event_start_time,
+      (e.event_date + e.end_time) as event_end_time,
+      ea.is_going,
+      ea.is_back,
+      ea.going_at,
+      ea.back_at,
+      CASE 
+        WHEN ars.id IS NOT NULL AND ars.is_in_restroom = true THEN true
+        ELSE false
+      END as is_in_restroom,
+      COALESCE(ars.restroom_count, 0) as restroom_count,
+      COALESCE(ars.daily_restroom_count, 0) as daily_restroom_count,
+      ars.created_at as restroom_went_at,
+      -- Clinic statistics
+      COALESCE(hcr.in_clinic, false) as is_in_clinic,
+      hcr.in_clinic_at,
+      hcr.status as clinic_request_status,
+      hcr.priority as clinic_priority,
+      hcr.complaint as clinic_complaint
+    FROM activity_data ad
+    JOIN users u ON ad.user_id = u.id
+    LEFT JOIN personal_info pi ON u.id = pi.user_id
+    LEFT JOIN agents a ON u.id = a.user_id
+    LEFT JOIN departments d ON a.department_id = d.id
+    LEFT JOIN break_sessions bs ON ad.user_id = bs.agent_user_id 
+      AND bs.break_date = ad.today_date 
+      AND bs.end_time IS NULL
+    LEFT JOIN meetings m ON ad.user_id = m.agent_user_id 
+      AND m.is_in_meeting = true 
+      AND m.status = 'in-progress'
+      AND DATE(m.start_time) = ad.today_date
+    LEFT JOIN event_attendance ea ON ad.user_id = ea.user_id 
+      AND ea.is_going = true 
+      AND ea.is_back = false
+    LEFT JOIN events e ON ea.event_id = e.id 
+      AND e.event_date = ad.today_date
+      AND e.status = 'today'
+    LEFT JOIN agent_restroom_status ars ON ad.user_id = ars.agent_user_id
+    LEFT JOIN health_check_requests hcr ON ad.user_id = hcr.user_id 
+      AND hcr.status IN ('pending', 'approved', 'completed')
+      AND hcr.done = false
+      AND hcr.in_clinic = true
+    WHERE ad.today_date BETWEEN $1 AND $2
+      AND ($3 = 'all' OR u.id IN (
+        SELECT user_id FROM agents WHERE member_id = $3::int
+      ))
+    ORDER BY ad.today_date DESC, ad.today_active_seconds DESC
+  `
+  
+  const result = await pool.query(query, [startDate, endDate, memberId])
+  return result.rows
+}
+
+export async function getActivityStats(memberId: string, startDate: string, endDate: string) {
+  const query = `
+    SELECT 
+      COUNT(DISTINCT ad.user_id) as total_users,
+      COUNT(DISTINCT ad.today_date) as total_days,
+      SUM(ad.today_active_seconds) as total_active_seconds,
+      SUM(ad.today_inactive_seconds) as total_inactive_seconds,
+      AVG(ad.today_active_seconds) as avg_active_seconds,
+      AVG(ad.today_inactive_seconds) as avg_inactive_seconds,
+      MAX(ad.today_active_seconds) as max_active_seconds,
+      MIN(ad.today_active_seconds) as min_active_seconds
+    FROM activity_data ad
+    JOIN users u ON ad.user_id = u.id
+    WHERE ad.today_date BETWEEN $1 AND $2
+      AND ($3 = 'all' OR u.id IN (
+        SELECT user_id FROM agents WHERE member_id = $3::int
+      ))
+  `
+  
+  const result = await pool.query(query, [startDate, endDate, memberId])
+  return result.rows[0] || {}
+}
 

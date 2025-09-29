@@ -3839,13 +3839,19 @@ BEGIN
         notification_payload := notification_payload || jsonb_build_object(
             'message', NEW.message,
             'priority', NEW.priority,
-            'scheduled_at', NEW.scheduled_at
+            'scheduled_at', NEW.scheduled_at,
+            'assigned_user_ids', NEW.assigned_user_ids
         );
     ELSIF TG_OP = 'UPDATE' THEN
         notification_payload := notification_payload || jsonb_build_object(
             'old_status', OLD.status,
             'new_status', NEW.status,
-            'status_changed', OLD.status != NEW.status
+            'status_changed', OLD.status != NEW.status,
+            'assigned_user_ids', NEW.assigned_user_ids
+        );
+    ELSIF TG_OP = 'DELETE' THEN
+        notification_payload := notification_payload || jsonb_build_object(
+            'assigned_user_ids', OLD.assigned_user_ids
         );
     END IF;
     

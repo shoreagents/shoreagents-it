@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
     let queryParams: string[] = []
     
     // If we have data in the calculated range, use it; otherwise get all data
+    let rawData: any[] = []
     if (checkSample.length > 0) {
       const latestDataDate = new Date(checkSample[0].latest)
       const earliestDataDate = new Date(checkSample[0].earliest)
@@ -63,17 +64,14 @@ export async function GET(request: NextRequest) {
       // If our calculated range doesn't overlap with actual data, use all data
       if (latestDataDate < startDate || earliestDataDate > endDate) {
         console.log('Date range mismatch, using all available data')
-        const rows = await getResolverStatsRange()
-        rawData = rows
+        rawData = await getResolverStatsRange()
       } else {
         console.log('Using calculated date range')
-        const rows = await getResolverStatsRange(startDate.toISOString(), endDate.toISOString())
-        rawData = rows
+        rawData = await getResolverStatsRange(startDate.toISOString(), endDate.toISOString())
       }
     } else {
       console.log('No data found, using all available data')
-      const rows = await getResolverStatsRange()
-      rawData = rows
+      rawData = await getResolverStatsRange()
     }
     console.log('Query result:', rawData)
     

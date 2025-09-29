@@ -51,8 +51,8 @@ export async function POST(
     
     const updateResult = await pool.query(updateQuery, [id])
     
-    // Here you would typically send real-time notifications
-    // For now, we'll just return success
+    // Call the database function to send notifications
+    await pool.query('SELECT send_announcement($1)', [id])
     
     return NextResponse.json({
       message: 'Announcement sent successfully',

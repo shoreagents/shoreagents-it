@@ -240,8 +240,23 @@ export default function AgentsPage() {
     }
   })
 
-  const handleRowClick = (agent: AgentRecord) => {
-    setSelectedAgent(agent)
+  const handleRowClick = async (agent: AgentRecord) => {
+    try {
+      // Fetch only missing fields (21 fields) and merge with existing data
+      const response = await fetch(`/api/agents/${agent.user_id}/details`)
+      if (response.ok) {
+        const data = await response.json()
+        // Merge existing 12 fields with 21 new fields
+        setSelectedAgent({ ...agent, ...data.agent })
+      } else {
+        // Fallback to basic data if fetch fails
+        setSelectedAgent(agent)
+      }
+    } catch (error) {
+      console.error('Failed to fetch agent details:', error)
+      // Fallback to basic data if fetch fails
+      setSelectedAgent(agent)
+    }
     setIsModalOpen(true)
   }
 

@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { useRealtimeApplicants } from './use-realtime-applicants'
 import { useRealtimeTickets } from './use-realtime-tickets'
 import { useRealtimeEvents } from './use-realtime-events'
+import { useRealtimeAnnouncements } from './use-realtime-announcements'
 
 // Types for the hook configuration
 type CountType = 'applicants' | 'tickets' | 'events' | 'announcements'
@@ -258,18 +259,48 @@ export function useRealtimeCount(countType: CountType) {
     enableNotifications: false // Don't show notifications for count updates
   })
 
+  // Real-time updates for announcements
+  const { isConnected: announcementsConnected } = useRealtimeAnnouncements({
+    onAnnouncementSent: (announcement) => {
+      if (countType === 'announcements' && announcement.status === 'active') {
+        updateCount(prev => prev + 1)
+      }
+    },
+    onAnnouncementExpired: (announcement) => {
+      if (countType === 'announcements' && announcement.status === 'expired') {
+        updateCount(prev => Math.max(0, prev - 1))
+      }
+    },
+    onAnnouncementUpdated: (announcement, oldAnnouncement) => {
+      if (countType === 'announcements') {
+        const oldStatusActive = oldAnnouncement?.status === 'active'
+        const newStatusActive = announcement.status === 'active'
+        
+        if (oldStatusActive !== newStatusActive) {
+          if (newStatusActive) {
+            updateCount(prev => prev + 1)
+          } else {
+            updateCount(prev => Math.max(0, prev - 1))
+          }
+        }
+      }
+    },
+    autoConnect: countType === 'announcements'
+  })
+
   // Get the appropriate connection status
   const isConnected = countType === 'applicants' ? applicantsConnected : 
                      countType === 'tickets' ? ticketsConnected : 
                      countType === 'events' ? eventsConnected :
-                     false // Announcements don't have real-time yet, will use polling
+                     countType === 'announcements' ? announcementsConnected :
+                     false
 
   // Initial fetch
   useEffect(() => {
     if (user?.id) {
       fetchCount()
     }
-  }, [user?.id, user?.roleName, fetchCount])
+  }, [user?.id, user?.roleName])
 
   // Real-time updates and polling fallback
   useEffect(() => {
@@ -277,10 +308,14 @@ export function useRealtimeCount(countType: CountType) {
       // WebSocket connected, using real-time updates
     } else {
       // WebSocket not connected, using polling fallback
-      const interval = setInterval(fetchCount, 30000)
+      const interval = setInterval(() => {
+        if (user?.id) {
+          fetchCount()
+        }
+      }, 30000)
       return () => clearInterval(interval)
     }
-  }, [isConnected, fetchCount])
+  }, [isConnected, user?.id])
 
   // Cleanup when user changes
   useEffect(() => {

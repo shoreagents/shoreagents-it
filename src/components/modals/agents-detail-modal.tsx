@@ -29,6 +29,7 @@ import { ColorPicker } from "@/components/ui/color-picker"
 import { LinkPreview } from "@/components/ui/link-preview"
 import { MembersActivityLog } from "@/components/members-activity-log"
 import { Comment } from "@/components/ui/comment"
+import { AgentActivityData } from "@/components/agent-activity-data"
 
 interface AgentsDetailModalProps {
   isOpen: boolean
@@ -151,6 +152,123 @@ const combineShiftTime = (startTime: string, endTime: string): string => {
 export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: AgentsDetailModalProps) {
   const { theme } = useTheme()
   const { user } = useAuth()
+
+  // Fetch activity data when agent data changes
+  React.useEffect(() => {
+    const fetchActivityData = async () => {
+      if (!agentData || !user) return
+      
+      setActivityLoading(true)
+      
+      try {
+        const memberId = user.userType === 'Internal' ? 'all' : user.id
+        
+        // Get date ranges
+        const today = new Date()
+        
+        // Yesterday's date
+        const yesterday = new Date(today)
+        yesterday.setDate(today.getDate() - 1)
+        const yesterdayStr = yesterday.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+        
+        // Week range (Sunday to Saturday)
+        const startOfWeek = new Date(today)
+        startOfWeek.setDate(today.getDate() - today.getDay()) // Start from Sunday
+        const endOfWeek = new Date(today)
+        endOfWeek.setDate(today.getDate() + (6 - today.getDay())) // End on Saturday
+        
+        const startDate = startOfWeek.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+        const endDate = endOfWeek.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+        
+        // Month range
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+        
+        const monthStartDate = startOfMonth.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+        const monthEndDate = endOfMonth.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+        
+        // Today's date
+        const todayStr = today.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+        
+        // Fetch activity data
+        const [todayResponse, yesterdayResponse, weekResponse, monthResponse] = await Promise.all([
+          fetch(`/api/activities?memberId=${memberId}&date=${todayStr}`),
+          fetch(`/api/activities?memberId=${memberId}&date=${yesterdayStr}`),
+          fetch(`/api/activities?memberId=${memberId}&startDate=${startDate}&endDate=${endDate}`),
+          fetch(`/api/activities?memberId=${memberId}&startDate=${monthStartDate}&endDate=${monthEndDate}`)
+        ])
+        
+        // Process responses
+        const [todayData, yesterdayData, weekData, monthData] = await Promise.all([
+          todayResponse.ok ? todayResponse.json() : { activities: [] },
+          yesterdayResponse.ok ? yesterdayResponse.json() : { activities: [] },
+          weekResponse.ok ? weekResponse.json() : { activities: [] },
+          monthResponse.ok ? monthResponse.json() : { activities: [] }
+        ])
+        
+        setTodayActivities(todayData.activities || [])
+        setYesterdayActivities(yesterdayData.activities || [])
+        setWeekActivities(weekData.activities || [])
+        setMonthActivities(monthData.activities || [])
+        
+      } catch (err) {
+        console.error('❌ Activity data fetch error:', err)
+        setTodayActivities([])
+        setYesterdayActivities([])
+        setWeekActivities([])
+        setMonthActivities([])
+      } finally {
+        setActivityLoading(false)
+      }
+    }
+
+    fetchActivityData()
+  }, [agentData, user])
+
+  // Helper functions for activity data
+  const getTodayActivityData = (employee: any) => {
+    const employeeId = employee.user_id || employee.id
+    const todayActivity = todayActivities.find(a => a.user_id.toString() === employeeId.toString())
+    return todayActivity || {
+      today_active_seconds: 0,
+      today_inactive_seconds: 0
+    }
+  }
+
+  const getYesterdayActivityData = (employee: any) => {
+    const employeeId = employee.user_id || employee.id
+    const yesterdayActivity = yesterdayActivities.find(a => a.user_id.toString() === employeeId.toString())
+    return yesterdayActivity || {
+      today_active_seconds: 0,
+      today_inactive_seconds: 0
+    }
+  }
+
+  const getWeekActivityData = (employee: any) => {
+    const employeeId = employee.user_id || employee.id
+    const weekEmployeeActivities = weekActivities.filter(a => a.user_id.toString() === employeeId.toString())
+    
+    const totalActive = weekEmployeeActivities.reduce((sum, activity) => sum + activity.today_active_seconds, 0)
+    const totalInactive = weekEmployeeActivities.reduce((sum, activity) => sum + activity.today_inactive_seconds, 0)
+    
+    return {
+      total_active_seconds: totalActive,
+      total_inactive_seconds: totalInactive
+    }
+  }
+
+  const getMonthActivityData = (employee: any) => {
+    const employeeId = employee.user_id || employee.id
+    const monthEmployeeActivities = monthActivities.filter(a => a.user_id.toString() === employeeId.toString())
+    
+    const totalActive = monthEmployeeActivities.reduce((sum, activity) => sum + activity.today_active_seconds, 0)
+    const totalInactive = monthEmployeeActivities.reduce((sum, activity) => sum + activity.today_inactive_seconds, 0)
+    
+    return {
+      total_active_seconds: totalActive,
+      total_inactive_seconds: totalInactive
+    }
+  }
   
   // Helper function to create colors with alpha transparency
   function withAlpha(hex: string, alpha: number): string {
@@ -168,6 +286,13 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
   const [isSubmittingComment, setIsSubmittingComment] = React.useState(false)
       const [commentsList, setCommentsList] = React.useState<Array<{id: string, comment: string, user_name: string, created_at: string}>>([])
     const [localGender, setLocalGender] = React.useState<string | null>(null)
+    
+    // Activity data states
+    const [todayActivities, setTodayActivities] = React.useState<any[]>([])
+    const [yesterdayActivities, setYesterdayActivities] = React.useState<any[]>([])
+    const [weekActivities, setWeekActivities] = React.useState<any[]>([])
+    const [monthActivities, setMonthActivities] = React.useState<any[]>([])
+    const [activityLoading, setActivityLoading] = React.useState(false)
     const [localBirthday, setLocalBirthday] = React.useState<Date | undefined>(undefined)
     const [localStartDate, setLocalStartDate] = React.useState<Date | undefined>(undefined)
     const [localExitDate, setLocalExitDate] = React.useState<Date | undefined>(undefined)
@@ -1067,14 +1192,31 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                       ? 'bg-white/5 border border-white/10' 
                       : 'bg-gray-100/80 border border-gray-200'
                   }`}>
-                    <AnimatedTabs
-                      tabs={[
+                    <div className="flex gap-1 relative">
+                      {[
                         { title: "Personal Info", value: "information" },
-                        { title: "Job Info", value: "ai-analysis" }
-                      ]}
-                      containerClassName="grid grid-cols-2 w-fit"
-                      onTabChange={(tab) => setActiveTab(tab.value)}
-                    />
+                        { title: "Job Info", value: "job-info" },
+                        { title: "Activity Data", value: "activity-data" }
+                      ].map((tab, idx) => (
+                        <button
+                          key={tab.value}
+                          onClick={() => setActiveTab(tab.value)}
+                          className="relative px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 text-black dark:text-white hover:text-foreground"
+                          style={{ transformStyle: "preserve-3d" }}
+                        >
+                          {activeTab === tab.value && (
+                            <motion.div
+                              layoutId="modalClickedButton"
+                              transition={{ type: "spring", bounce: 0.3, duration: 0.6 }}
+                              className="absolute inset-0 bg-primary/10 rounded-lg"
+                            />
+                          )}
+                          <span className="relative block text-black dark:text-white flex items-center justify-center gap-2">
+                            {tab.title}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -1274,7 +1416,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                  </TabsContent>
 
                                  {/* Job Info Tab */}
-                 <TabsContent value="ai-analysis" className="space-y-6 overflow-y-auto flex-1 min-h-0">
+                 <TabsContent value="job-info" className="space-y-6 overflow-y-auto flex-1 min-h-0">
                    <div>
                      <div className="flex items-center justify-between min-h-[40px]">
                        <h3 className="text-lg font-medium text-muted-foreground">Job Information</h3>
@@ -1646,6 +1788,56 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                              </PopoverContent>
                            </Popover>
                          }
+                       />
+                     </div>
+                   </div>
+                 </TabsContent>
+
+                 {/* Activity Data Tab */}
+                 <TabsContent value="activity-data" className="space-y-6 overflow-y-auto flex-1 min-h-0">
+                   <div>
+                     <div className="flex items-center justify-between min-h-[40px]">
+                       <h3 className="text-lg font-medium text-muted-foreground">Activity Data</h3>
+                     </div>
+                     <div className="rounded-lg border border-[#cecece99] dark:border-border overflow-hidden">
+                       <AgentActivityData 
+                         selectedEmployee={agentData ? {
+                           id: agentData.user_id.toString(),
+                           firstName: agentData.first_name || '',
+                           lastName: agentData.last_name || '',
+                           email: agentData.email,
+                           phone: agentData.phone || '',
+                           department: agentData.department_name || '',
+                           position: agentData.job_title || '',
+                           hireDate: agentData.start_date || '',
+                           avatar: agentData.profile_picture || '',
+                           departmentId: agentData.department_id || 0,
+                           workEmail: agentData.email,
+                           birthday: agentData.birthday || '',
+                           city: agentData.city || '',
+                           address: agentData.address || '',
+                           gender: agentData.gender || '',
+                           shift: agentData.shift_period || '',
+                           user_id: agentData.user_id,
+                           first_name: agentData.first_name || undefined,
+                           last_name: agentData.last_name || undefined,
+                           member_id: agentData.member_id || undefined,
+                           member_company: agentData.member_company || undefined,
+                           activity: getTodayActivityData({
+                             user_id: agentData.user_id,
+                             id: agentData.user_id.toString()
+                           })
+                         } : null}
+                         formatTime={(seconds: number) => {
+                           const hours = Math.floor(seconds / 3600)
+                           const minutes = Math.floor((seconds % 3600) / 60)
+                           return `${hours}h ${minutes}m`
+                         }}
+                         detailLoading={activityLoading}
+                         getYesterdayActivityData={getYesterdayActivityData}
+                         getWeekActivityData={getWeekActivityData}
+                         getMonthActivityData={getMonthActivityData}
+                         user={user}
                        />
                      </div>
                    </div>

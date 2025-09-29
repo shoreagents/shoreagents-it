@@ -35,8 +35,8 @@ import {
 } from "@/components/ui/pagination"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
-import { toast } from "sonner"
 import { useActiveAnnouncementsCount } from "@/hooks/use-realtime-count"
+import { useRealtimeAnnouncements } from "@/hooks/use-realtime-announcements"
 
 interface Announcement {
   id?: number
@@ -110,6 +110,72 @@ export default function AnnouncementsPage() {
   const { user } = useAuth()
   const { activeAnnouncementsCount } = useActiveAnnouncementsCount()
   const [mounted, setMounted] = useState(false)
+  
+  // Real-time announcements hook
+  const { isConnected: announcementsConnected } = useRealtimeAnnouncements({
+    onAnnouncementSent: (announcement) => {
+      console.log('📢 New announcement sent:', announcement)
+      // Update the announcements list directly instead of refreshing
+      setAnnouncements(prev => {
+        const exists = prev.find(a => a.id === announcement.announcement_id)
+        if (!exists) {
+          // Add new announcement to the list (for INSERT operations)
+          const newAnnouncement = {
+            id: announcement.announcement_id,
+            title: announcement.title,
+            message: announcement.message,
+            priority: announcement.priority,
+            status: announcement.status || 'draft',
+            created_by: announcement.created_by,
+            created_at: announcement.created_at,
+            updated_at: announcement.updated_at,
+            scheduled_at: announcement.scheduled_at,
+            expires_at: announcement.expires_at,
+            sent_at: announcement.sent_at,
+            assigned_user_ids: announcement.assigned_user_ids || []
+          }
+          return [newAnnouncement, ...prev]
+        }
+        return prev.map(a => 
+          a.id === announcement.announcement_id ? { 
+            ...a, 
+            ...announcement, 
+            status: 'active',
+            assigned_user_ids: announcement.assigned_user_ids || a.assigned_user_ids
+          } : a
+        )
+      })
+    },
+    onAnnouncementExpired: (announcement) => {
+      console.log('⏰ Announcement expired:', announcement)
+      // Update the announcement status directly
+      setAnnouncements(prev => 
+        prev.map(a => 
+          a.id === announcement.announcement_id ? { ...a, status: 'expired' } : a
+        )
+      )
+    },
+    onAnnouncementUpdated: (announcement, oldAnnouncement) => {
+      console.log('🔄 Announcement updated:', announcement)
+      // Update the announcement in the list directly
+      setAnnouncements(prev => 
+        prev.map(a => 
+          a.id === announcement.announcement_id ? { 
+            ...a, 
+            ...announcement,
+            assigned_user_ids: announcement.assigned_user_ids || a.assigned_user_ids
+          } : a
+        )
+      )
+    },
+    onAnnouncementDeleted: (announcement) => {
+      console.log('🗑️ Announcement deleted:', announcement)
+      // Remove the announcement from the list
+      setAnnouncements(prev => 
+        prev.filter(a => a.id !== announcement.announcement_id)
+      )
+    }
+  })
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -247,8 +313,9 @@ export default function AnnouncementsPage() {
 
   // Handle announcement added/updated from modal (modal already handles API calls)
   const handleAnnouncementAdded = async (announcement: Announcement) => {
-    // Modal already handled the API call, just refresh the list
-    fetchAnnouncements()
+    // Don't refresh announcements - real-time updates handle this automatically
+    // The useRealtimeAnnouncements hook already updates the announcements list when changes occur
+    console.log('Announcement saved, realtime updates will handle the refresh')
   }
 
   // Delete announcement
@@ -261,13 +328,10 @@ export default function AnnouncementsPage() {
       })
 
       if (response.ok) {
-        fetchAnnouncements()
-      } else {
-        toast.error("Failed to delete announcement")
+        // Real-time hook will handle the removal automatically
       }
     } catch (error) {
       console.error("Error deleting announcement:", error)
-      toast.error("Error deleting announcement")
     }
   }
 
@@ -279,13 +343,17 @@ export default function AnnouncementsPage() {
       })
 
       if (response.ok) {
-        fetchAnnouncements()
-      } else {
-        toast.error("Failed to send announcement")
+        // Update the announcement status directly in the state
+        setAnnouncements(prev => 
+          prev.map(announcement => 
+            announcement.id === id 
+              ? { ...announcement, status: 'active' as const, sent_at: new Date().toISOString() }
+              : announcement
+          )
+        )
       }
     } catch (error) {
       console.error("Error sending announcement:", error)
-      toast.error("Error sending announcement")
     }
   }
 
