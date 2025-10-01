@@ -3840,6 +3840,7 @@ BEGIN
             'message', NEW.message,
             'priority', NEW.priority,
             'scheduled_at', NEW.scheduled_at,
+            'expires_at', NEW.expires_at,
             'assigned_user_ids', NEW.assigned_user_ids
         );
     ELSIF TG_OP = 'UPDATE' THEN
@@ -3851,6 +3852,7 @@ BEGIN
         );
     ELSIF TG_OP = 'DELETE' THEN
         notification_payload := notification_payload || jsonb_build_object(
+            'status', OLD.status,
             'assigned_user_ids', OLD.assigned_user_ids
         );
     END IF;

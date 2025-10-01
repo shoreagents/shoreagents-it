@@ -416,14 +416,14 @@ export function AddAnnouncementModal({ isOpen, onClose, onAnnouncementAdded, ann
       
       const normalizedFormData = {
         ...formData,
-        scheduled_at: normalizeDate(formData.scheduled_at),
+        scheduled_at: normalizeDate(formData.scheduled_at || ''),
         expires_at: normalizeDate(formData.expires_at || '')
       }
       
       const normalizedOriginalData = {
         ...originalData,
-        announcement_date: normalizeDate(originalData.announcement_date),
-        expiry_date: normalizeDate(originalData.expiry_date || '')
+        scheduled_at: normalizeDate(originalData.scheduled_at || ''),
+        expires_at: normalizeDate(originalData.expires_at || '')
       }
       
       const hasChanges = JSON.stringify(normalizedFormData) !== JSON.stringify(normalizedOriginalData)
@@ -461,7 +461,7 @@ export function AddAnnouncementModal({ isOpen, onClose, onAnnouncementAdded, ann
       const updateData = {
         title: data.title,
         message: data.message,
-        scheduled_at: normalizeDateForDB(data.scheduled_at),
+        scheduled_at: normalizeDateForDB(data.scheduled_at || ''),
         expires_at: data.expires_at ? normalizeDateForDB(data.expires_at) : null,
         priority: data.priority,
         status: data.status,
@@ -532,8 +532,8 @@ export function AddAnnouncementModal({ isOpen, onClose, onAnnouncementAdded, ann
     // If announcement_date or expiry_date is being changed, automatically update the status based on the new dates
     // BUT only if the announcement is NOT in draft status AND it's a quick announcement (preserve draft status when editing dates)
     if ((field === 'scheduled_at' || field === 'expires_at') && typeof value === 'string' && formData.status !== 'draft' && announcementType === 'quick') {
-      const scheduledDate = field === 'scheduled_at' ? value : formData.scheduled_at
-      const expiryDate = field === 'expires_at' ? value : formData.expires_at
+      const scheduledDate = field === 'scheduled_at' ? value : (formData.scheduled_at || '')
+      const expiryDate = field === 'expires_at' ? value : (formData.expires_at || '')
       const newStatus = getAnnouncementStatusByDate(scheduledDate, expiryDate, formData.status)
       console.log(`📅 Date changed for quick announcement, updating status from ${formData.status} to ${newStatus}`)
       newData.status = newStatus as 'draft' | 'scheduled' | 'active' | 'expired' | 'cancelled'
@@ -552,7 +552,7 @@ export function AddAnnouncementModal({ isOpen, onClose, onAnnouncementAdded, ann
     if (!formData.title.trim()) {
       missing.push('Title')
     }
-    if (!formData.message.trim()) {
+    if (!formData.message || !formData.message.trim()) {
       missing.push('Message')
     }
     if (!formData.assigned_user_ids || formData.assigned_user_ids.length === 0) {
@@ -656,22 +656,39 @@ export function AddAnnouncementModal({ isOpen, onClose, onAnnouncementAdded, ann
           }
         }
         
-        // Determine status based on scheduled date for new announcements
-        const scheduledDate = formData.scheduled_at || new Date().toISOString().split('T')[0]
-        const expiryDate = formData.expires_at
-        const autoStatus = getAnnouncementStatusByDate(scheduledDate, expiryDate, formData.status)
-        
-        console.log(`📅 Creating announcement - scheduled: ${scheduledDate}, auto-status: ${autoStatus}`)
-        
-        const createData = {
-          title: formData.title,
-          message: formData.message,
-          scheduled_at: normalizeDateForDB(formData.scheduled_at), 
-          expires_at: normalizeDateForDB(formData.expires_at || ''),
-          priority: formData.priority,
-          status: autoStatus, // Use auto-determined status instead of form status
-          assigned_user_ids: formData.assigned_user_ids && formData.assigned_user_ids.length > 0 ? formData.assigned_user_ids : [1],
-          created_by: formData.created_by
+        // Determine status and data based on announcement type
+        let createData
+        if (announcementType === 'quick') {
+          // For quick announcements, don't set scheduled_at or expires_at
+          createData = {
+            title: formData.title,
+            message: formData.message,
+            scheduled_at: null, // No scheduled date for quick announcements
+            expires_at: null,   // No expiry date for quick announcements
+            priority: formData.priority,
+            status: 'active',   // Quick announcements are immediately active
+            assigned_user_ids: formData.assigned_user_ids && formData.assigned_user_ids.length > 0 ? formData.assigned_user_ids : [1],
+            created_by: formData.created_by
+          }
+          console.log(`📅 Creating quick announcement - status: active`)
+        } else {
+          // For scheduled announcements, use date logic
+          const scheduledDate = formData.scheduled_at || new Date().toISOString().split('T')[0]
+          const expiryDate = formData.expires_at
+          const autoStatus = getAnnouncementStatusByDate(scheduledDate, expiryDate, formData.status)
+          
+          console.log(`📅 Creating scheduled announcement - scheduled: ${scheduledDate}, auto-status: ${autoStatus}`)
+          
+          createData = {
+            title: formData.title,
+            message: formData.message,
+            scheduled_at: normalizeDateForDB(formData.scheduled_at || ''), 
+            expires_at: normalizeDateForDB(formData.expires_at || ''),
+            priority: formData.priority,
+            status: autoStatus,
+            assigned_user_ids: formData.assigned_user_ids && formData.assigned_user_ids.length > 0 ? formData.assigned_user_ids : [1],
+            created_by: formData.created_by
+          }
         }
         
         const response = await fetch('/api/announcements', {
@@ -737,7 +754,7 @@ export function AddAnnouncementModal({ isOpen, onClose, onAnnouncementAdded, ann
         const createData = {
           title: formData.title || 'Untitled',
           message: formData.message || '',
-          scheduled_at: normalizeDateForDB(formData.scheduled_at), 
+          scheduled_at: normalizeDateForDB(formData.scheduled_at || ''), 
           expires_at: normalizeDateForDB(formData.expires_at || ''),
           priority: formData.priority,
           status: 'draft' as const,
@@ -955,7 +972,7 @@ export function AddAnnouncementModal({ isOpen, onClose, onAnnouncementAdded, ann
         }
       }
       
-      const correctStatus = getRecoveryStatus(formData.scheduled_at, formData.expires_at)
+      const correctStatus = getRecoveryStatus(formData.scheduled_at || '', formData.expires_at || '')
       
       console.log('🔄 Recovery debug:', {
         scheduledDate: formData.scheduled_at,
@@ -1413,7 +1430,7 @@ export function AddAnnouncementModal({ isOpen, onClose, onAnnouncementAdded, ann
       </Dialog>
 
       {/* Main Announcement Modal */}
-      <Dialog open={isOpen && (announcementType !== null || announcementToEdit?.id)} onOpenChange={(open) => {
+      <Dialog open={isOpen && (announcementType !== null || !!announcementToEdit?.id)} onOpenChange={(open: boolean) => {
         if (!open) {
           handleClose()
         }
@@ -1705,8 +1722,8 @@ export function AddAnnouncementModal({ isOpen, onClose, onAnnouncementAdded, ann
                       value={localAnnouncementDate && !isNaN(localAnnouncementDate.getTime()) ? localAnnouncementDate.toLocaleDateString() : ''}
                       onSave={() => {}}
                       placeholder="-"
-                      readOnly={formData.status === 'cancelled' || formData.status === 'expired'}
-                      customInput={formData.status !== 'cancelled' && formData.status !== 'expired' ? (
+                      readOnly={(formData.status as 'draft' | 'scheduled' | 'active' | 'expired' | 'cancelled') === 'cancelled' || (formData.status as 'draft' | 'scheduled' | 'active' | 'expired' | 'cancelled') === 'expired'}
+                      customInput={(formData.status as 'draft' | 'scheduled' | 'active' | 'expired' | 'cancelled') !== 'cancelled' && (formData.status as 'draft' | 'scheduled' | 'active' | 'expired' | 'cancelled') !== 'expired' ? (
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button
@@ -1753,8 +1770,8 @@ export function AddAnnouncementModal({ isOpen, onClose, onAnnouncementAdded, ann
                         onSave={() => {}}
                         placeholder="-"
                         isLast={true}
-                        readOnly={formData.status === 'cancelled' || formData.status === 'expired'}
-                        customInput={formData.status !== 'cancelled' && formData.status !== 'expired' ? (
+                        readOnly={(formData.status as 'draft' | 'scheduled' | 'active' | 'expired' | 'cancelled') === 'cancelled' || (formData.status as 'draft' | 'scheduled' | 'active' | 'expired' | 'cancelled') === 'expired'}
+                        customInput={(formData.status as 'draft' | 'scheduled' | 'active' | 'expired' | 'cancelled') !== 'cancelled' && (formData.status as 'draft' | 'scheduled' | 'active' | 'expired' | 'cancelled') !== 'expired' ? (
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button

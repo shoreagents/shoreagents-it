@@ -285,6 +285,11 @@ export function useRealtimeCount(countType: CountType) {
         }
       }
     },
+    onAnnouncementDeleted: (announcement) => {
+      if (countType === 'announcements' && announcement?.status === 'active') {
+        updateCount(prev => Math.max(0, prev - 1))
+      }
+    },
     autoConnect: countType === 'announcements'
   })
 

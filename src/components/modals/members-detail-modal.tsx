@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconWorld, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconSun, IconMoon } from "@tabler/icons-react"
+import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconWorld, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconSun, IconMoon, IconTrophy, IconMedal, IconCrown, IconStar } from "@tabler/icons-react"
 import { useRealtimeMembers } from '@/hooks/use-realtime-members'
 import { SendHorizontal, Target } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataFieldRow } from "@/components/ui/fields"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import { Popover, PopoverContent, PopoverTrigger, PopoverItem } from "@/components/ui/popover"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -2290,6 +2291,86 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false)
   const [showRequiredFieldsWarning, setShowRequiredFieldsWarning] = React.useState(false)
   const [missingFields, setMissingFields] = React.useState<string[]>([])
+  
+  // Tab state
+  const [activeTab, setActiveTab] = React.useState("information")
+  
+  // Productivity scores state
+  const [productivityScores, setProductivityScores] = React.useState<any[]>([])
+  const [productivityStats, setProductivityStats] = React.useState<any>(null)
+  const [productivityLoading, setProductivityLoading] = React.useState(false)
+  const [productivityError, setProductivityError] = React.useState<string | null>(null)
+  const [selectedMonth, setSelectedMonth] = React.useState<number>(() => {
+    const now = new Date()
+    return now.getMonth() + 1
+  })
+  const [selectedYear, setSelectedYear] = React.useState<number>(() => {
+    const now = new Date()
+    return Math.max(now.getFullYear(), 2025)
+  })
+
+  // Handler functions for removing agents and clients
+  const handleRemoveAgent = (agentId: number) => {
+    setSelectedAgents(prev => {
+      const newSelected = new Set(prev)
+      newSelected.delete(agentId)
+      return newSelected
+    })
+    setSelectedAgentsData(prev => prev.filter(a => a.user_id !== agentId))
+  }
+
+  const handleRemoveClient = (clientId: number) => {
+    setSelectedClients(prev => {
+      const newSelected = new Set(prev)
+      newSelected.delete(clientId)
+      return newSelected
+    })
+    setSelectedClientsData(prev => prev.filter(c => c.user_id !== clientId))
+  }
+
+  // Fetch productivity scores when modal opens or month/year changes
+  React.useEffect(() => {
+    const fetchProductivityScores = async () => {
+      if (!companyToEdit?.id || !user) return
+      
+      setProductivityLoading(true)
+      setProductivityError(null)
+      
+      try {
+        const monthYear = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
+        
+        console.log('📊 Fetching productivity scores for member:', companyToEdit.id, 'monthYear:', monthYear)
+        
+        const params = new URLSearchParams({
+          memberId: String(companyToEdit.id),
+          timeframe: 'monthly',
+          monthYear: monthYear
+        })
+        
+        const response = await fetch(`/api/productivity-scores?${params}`)
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch productivity scores: ${response.status}`)
+        }
+        
+        const data = await response.json()
+        console.log('✅ Productivity scores data received:', data)
+        
+        setProductivityScores(data.productivityScores || [])
+        setProductivityStats(data.stats || null)
+        
+      } catch (err) {
+        console.error('❌ Productivity scores fetch error:', err)
+        setProductivityError(err instanceof Error ? err.message : 'Failed to fetch productivity scores')
+        setProductivityScores([])
+        setProductivityStats(null)
+      } finally {
+        setProductivityLoading(false)
+      }
+    }
+
+    fetchProductivityScores()
+  }, [companyToEdit?.id, user, selectedMonth, selectedYear])
 
   // Update hasUnsavedChanges when form data or selections change
   React.useEffect(() => {
@@ -2534,75 +2615,62 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
 
             {/* Scrollable Form Content */}
             <div className="flex-1 px-6 py-5 overflow-y-auto min-h-0" tabIndex={-1}>
-              {isLoadingCompany ? (
-                <div className="space-y-6">
-                  {/* Information Section Skeleton */}
-                  <div className="space-y-2">
-                    <Skeleton className="h-6 w-32" />
-                    <div className="rounded-lg border border-[#cecece99] dark:border-border space-y-0">
-                      {[...Array(7)].map((_, index) => (
-                        <div key={index} className={`grid grid-cols-[180px_auto_1fr] gap-2 h-[33px] items-center ${index === 6 ? '' : 'border-b border-[#cecece99] dark:border-border'}`}>
-                          <div className="flex items-center gap-3 min-w-0 px-2">
-                            <Skeleton className="h-4 w-24" />
-                          </div>
-                          <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
-                          <div className="min-w-0 flex items-center relative">
-                          </div>
-                        </div>
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col">
+                <div className="mb-6 flex-shrink-0">
+                  <div className={`rounded-xl p-1 w-fit ${
+                    theme === 'dark' 
+                      ? 'bg-white/5 border border-white/10' 
+                      : 'bg-gray-100/80 border border-gray-200'
+                  }`}>
+                    <div className="flex gap-1 relative">
+                      {[
+                        { title: "Information", value: "information" },
+                        { title: "Leaderboard", value: "leaderboard" }
+                      ].map((tab, idx) => (
+                        <button
+                          key={tab.value}
+                          onClick={() => setActiveTab(tab.value)}
+                          className="relative px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 text-black dark:text-white hover:text-foreground"
+                          style={{ transformStyle: "preserve-3d" }}
+                        >
+                          {activeTab === tab.value && (
+                            <motion.div
+                              layoutId="modalClickedButton"
+                              transition={{ type: "spring", bounce: 0.3, duration: 0.6 }}
+                              className="absolute inset-0 bg-primary/10 rounded-lg"
+                            />
+                          )}
+                          <span className="relative block text-black dark:text-white flex items-center justify-center gap-2">
+                            {tab.title}
+                          </span>
+                        </button>
                       ))}
                     </div>
                   </div>
-                  
-                  {/* Agents Section Skeleton */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between min-h-[40px]">
-                      <Skeleton className="h-6 w-16" />
-                      <Skeleton className="h-9 w-24" />
-                    </div>
-                    <div className="rounded-lg border border-[#cecece99] dark:border-border p-4">
+                </div>
+                {/* Information Tab */}
+                <TabsContent value="information" className="space-y-6">
+                  {isLoadingCompany ? (
+                    <div className="space-y-6">
+                      {/* Information Section Skeleton */}
                       <div className="space-y-2">
-                        <div className="flex flex-wrap gap-2">
-                          {[...Array(5)].map((_, index) => (
-                            <div key={index} className="flex items-center gap-2 p-2 bg-primary/5 border border-primary/20 rounded-lg">
-                              <Skeleton className="w-5 h-5 rounded-full flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <Skeleton className="h-3 w-16 mb-1" />
-                                <Skeleton className="h-2 w-12" />
+                        <Skeleton className="h-6 w-32" />
+                        <div className="rounded-lg border border-[#cecece99] dark:border-border space-y-0">
+                          {[...Array(7)].map((_, index) => (
+                            <div key={index} className={`grid grid-cols-[180px_auto_1fr] gap-2 h-[33px] items-center ${index === 6 ? '' : 'border-b border-[#cecece99] dark:border-border'}`}>
+                              <div className="flex items-center gap-3 min-w-0 px-2">
+                                <Skeleton className="h-4 w-24" />
                               </div>
-                              <Skeleton className="w-3 h-3" />
+                              <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                              <div className="min-w-0 flex items-center relative">
+                              </div>
                             </div>
                           ))}
                         </div>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Clients Section Skeleton */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between min-h-[40px]">
-                      <Skeleton className="h-6 w-16" />
-                      <Skeleton className="h-9 w-24" />
-                </div>
-                    <div className="rounded-lg border border-[#cecece99] dark:border-border p-4">
-                  <div className="space-y-2">
-                        <div className="flex flex-wrap gap-2">
-                          {[...Array(3)].map((_, index) => (
-                            <div key={index} className="flex items-center gap-2 p-2 bg-primary/5 border border-primary/20 rounded-lg">
-                              <Skeleton className="w-5 h-5 rounded-full flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <Skeleton className="h-3 w-20 mb-1" />
-                                <Skeleton className="h-2 w-14" />
-                            </div>
-                              <Skeleton className="w-3 h-3" />
-                                </div>
-                              ))}
-                            </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <form id="add-company-form" onSubmit={handleSubmit} className="space-y-6">
+                  ) : (
+                    <form id="add-company-form" onSubmit={handleSubmit} className="space-y-6">
                   {/* Information Section */}
                   <div>
                     <div className="flex items-center justify-between min-h-[40px]">
@@ -3139,7 +3207,155 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                   </div>
                 </div>
                               </form>
-              )}
+                  )}
+                </TabsContent>
+
+                {/* Leaderboard Tab */}
+                <TabsContent value="leaderboard" className="space-y-6 overflow-y-auto flex-1 min-h-0">
+                  <div>
+                    <div className="flex items-center justify-between min-h-[40px]">
+                      <h3 className="text-lg font-medium text-muted-foreground">Leaderboard</h3>
+                    </div>
+                    <div className="rounded-lg border border-[#cecece99] dark:border-border overflow-hidden">
+                      {productivityLoading ? (
+                        <div className="p-6 text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                          <p className="text-sm text-muted-foreground">Loading productivity scores...</p>
+                        </div>
+                      ) : productivityError ? (
+                        <div className="p-6 text-center">
+                          <IconAlertCircle className="h-8 w-8 text-destructive mx-auto mb-4" />
+                          <p className="text-sm text-destructive">{productivityError}</p>
+                        </div>
+                      ) : (
+                        <div className="p-0">
+                          {/* Top Performers */}
+                          <div className="p-6">
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="font-semibold flex items-center gap-2">
+                                <IconTrophy className="h-5 w-5 text-primary" />
+                                Ranks
+                              </h4>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Date:</span>
+                                <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue placeholder="Month" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {[
+                                      { value: 1, label: 'January' },
+                                      { value: 2, label: 'February' },
+                                      { value: 3, label: 'March' },
+                                      { value: 4, label: 'April' },
+                                      { value: 5, label: 'May' },
+                                      { value: 6, label: 'June' },
+                                      { value: 7, label: 'July' },
+                                      { value: 8, label: 'August' },
+                                      { value: 9, label: 'September' },
+                                      { value: 10, label: 'October' },
+                                      { value: 11, label: 'November' },
+                                      { value: 12, label: 'December' },
+                                    ].map((option) => (
+                                      <SelectItem key={option.value} value={option.value.toString()}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+                                  <SelectTrigger className="w-24">
+                                    <SelectValue placeholder="Year" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {(() => {
+                                      const currentYear = new Date().getFullYear()
+                                      const startYear = 2025
+                                      const options = []
+                                      for (let year = currentYear; year >= startYear; year--) {
+                                        options.push({ value: year, label: year.toString() })
+                                      }
+                                      return options
+                                    })().map((option) => (
+                                      <SelectItem key={option.value} value={option.value.toString()}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <div className="space-y-3">
+                              {productivityScores.map((score: any, index: number) => {
+                                const rank = index + 1
+                                
+                                return (
+                                  <div 
+                                    key={score.user_id} 
+                                    className="flex items-center justify-between p-3 rounded-lg border bg-muted/20 border-border"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className="flex items-center gap-2 w-8">
+                                        <span className={`text-sm font-medium ${
+                                          rank === 1 ? 'text-yellow-500' :
+                                          rank === 2 ? 'text-gray-500' :
+                                          rank === 3 ? 'text-amber-600' :
+                                          rank === 4 ? 'text-blue-500' :
+                                          rank === 5 ? 'text-purple-500' :
+                                          'text-muted-foreground'
+                                        }`}>#{rank}</span>
+                                      </div>
+                                      <Avatar className="h-8 w-8">
+                                        <AvatarImage src={score.profile_picture || undefined} alt={`${score.first_name} ${score.last_name}`} />
+                                        <AvatarFallback>
+                                          {score.first_name?.[0]}{score.last_name?.[0]}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div>
+                                        <div className="font-medium text-sm flex items-center gap-2">
+                                          {score.first_name} {score.last_name}
+                                          {rank === 1 && <IconCrown className="h-4 w-4 text-yellow-500" />}
+                                          {rank === 2 && <IconMedal className="h-4 w-4 text-gray-500" />}
+                                          {rank === 3 && <IconTrophy className="h-4 w-4 text-amber-600" />}
+                                          {rank === 4 && <IconStar className="h-4 w-4 text-blue-500" />}
+                                          {rank === 5 && <IconStar className="h-4 w-4 text-purple-500" />}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">{score.department_name || 'No Department'}</div>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="flex items-center gap-4">
+                                        <div className="text-center">
+                                          <div className="text-sm font-medium">{score.productivity_score.toFixed(2)}</div>
+                                          <div className="text-xs text-muted-foreground">Points</div>
+                                        </div>
+                                        <div className="text-center">
+                                          <div className="text-sm font-medium">{(() => {
+                                            const hours = Math.floor((score.total_active_seconds || 0) / 3600)
+                                            const minutes = Math.floor(((score.total_active_seconds || 0) % 3600) / 60)
+                                            return `${hours}h ${minutes}m`
+                                          })()}</div>
+                                          <div className="text-xs text-muted-foreground">Total Active Time</div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                              
+                              {productivityScores.length === 0 && (
+                                <div className="text-center py-8 text-muted-foreground">
+                                  <p className="text-sm">No productivity data available</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
 
             {/* Actions Footer */}

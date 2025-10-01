@@ -35,7 +35,6 @@ import {
 } from "@/components/ui/pagination"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
-import { useActiveAnnouncementsCount } from "@/hooks/use-realtime-count"
 import { useRealtimeAnnouncements } from "@/hooks/use-realtime-announcements"
 
 interface Announcement {
@@ -89,7 +88,7 @@ const statusConfig = {
     icon: IconBell
   },
     active: { 
-      label: 'Today', 
+      label: 'Active', 
       color: 'text-green-700 dark:text-white border-green-600/20 bg-green-50 dark:bg-green-600/20',
       icon: IconCheck
     },
@@ -108,7 +107,7 @@ const statusConfig = {
 export default function AnnouncementsPage() {
   const { theme, resolvedTheme } = useTheme()
   const { user } = useAuth()
-  const { activeAnnouncementsCount } = useActiveAnnouncementsCount()
+  const [activeAnnouncementsCount, setActiveAnnouncementsCount] = useState<number>(0)
   const [mounted, setMounted] = useState(false)
   
   // Real-time announcements hook
@@ -145,6 +144,8 @@ export default function AnnouncementsPage() {
           } : a
         )
       })
+      // Refresh active count when new announcement is sent
+      fetchActiveCount()
     },
     onAnnouncementExpired: (announcement) => {
       console.log('⏰ Announcement expired:', announcement)
@@ -154,6 +155,8 @@ export default function AnnouncementsPage() {
           a.id === announcement.announcement_id ? { ...a, status: 'expired' } : a
         )
       )
+      // Refresh active count when announcement expires
+      fetchActiveCount()
     },
     onAnnouncementUpdated: (announcement, oldAnnouncement) => {
       console.log('🔄 Announcement updated:', announcement)
@@ -167,6 +170,8 @@ export default function AnnouncementsPage() {
           } : a
         )
       )
+      // Refresh active count when announcement status might have changed
+      fetchActiveCount()
     },
     onAnnouncementDeleted: (announcement) => {
       console.log('🗑️ Announcement deleted:', announcement)
@@ -174,6 +179,8 @@ export default function AnnouncementsPage() {
       setAnnouncements(prev => 
         prev.filter(a => a.id !== announcement.announcement_id)
       )
+      // Refresh active count when announcement is deleted
+      fetchActiveCount()
     }
   })
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
@@ -189,6 +196,22 @@ export default function AnnouncementsPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>('scheduled')
   const [loadingUsersKey, setLoadingUsersKey] = useState<string | null>(null)
   const [announcementUsersCache, setAnnouncementUsersCache] = useState<Record<string, { users: { user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, employee_id: string | null }[] }>>({})
+
+  // Fetch active announcements count
+  const fetchActiveCount = async () => {
+    try {
+      const res = await fetch('/api/announcements/counts')
+      if (res.ok) {
+        const data = await res.json()
+        setActiveAnnouncementsCount(data.active || 0)
+        console.log('Active announcements count fetched:', data.active)
+      } else {
+        console.warn('Failed to fetch active announcements count')
+      }
+    } catch (error) {
+      console.error('Error fetching active announcements count:', error)
+    }
+  }
 
   // Fetch announcements
   const fetchAnnouncements = async () => {
@@ -261,6 +284,9 @@ export default function AnnouncementsPage() {
       setAnnouncements(data.announcements || data || [])
       setTotalCount(data.pagination?.totalCount || data.length || 0)
       setTotalPages(data.pagination?.totalPages || 1)
+      
+      // Fetch active count after loading announcements
+      fetchActiveCount()
     } catch (e: any) {
       console.error('Error fetching announcements:', e)
       setError(e?.message || "Failed to fetch announcements")
@@ -396,7 +422,7 @@ export default function AnnouncementsPage() {
       content: null
     },
     {
-      title: 'Today',
+      title: 'Active',
       value: 'active',
       content: null,
       badge: activeAnnouncementsCount > 0 ? activeAnnouncementsCount : undefined
@@ -517,61 +543,45 @@ export default function AnnouncementsPage() {
                                 </div>
                               </div>
                               
-                              <div className="mt-3 space-y-2 text-sm">
-                                {/* For Today tab (active), show sent_at if available, otherwise scheduled_at */}
-                                {selectedStatus === 'active' ? (
-                                  announcement.sent_at ? (
-                                    <div className="flex items-center gap-2 text-muted-foreground truncate">
-                                      <IconSend className="h-4 w-4" />
-                                      <span className="truncate">
-                                        {format(new Date(announcement.sent_at), 'MMMM d, yyyy')}
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-2 text-muted-foreground truncate">
-                                      <IconCalendar className="h-4 w-4" />
-                                      <span className="truncate">
-                                        {announcement.scheduled_at ? format(new Date(announcement.scheduled_at), 'MMMM d, yyyy') : '-'}
-                                        {announcement.expires_at && announcement.status !== 'expired' && ` - ${format(new Date(announcement.expires_at), 'MMMM d, yyyy')}`}
-                                      </span>
-                                    </div>
-                                  )
-                                ) : (
-                                  /* For all other tabs, prioritize sent_at over scheduled_at */
-                                  /* Special case: For expired announcements, show both dates like scheduled tab */
-                                  announcement.status === 'expired' && announcement.expires_at ? (
-                                    <div className="flex items-center gap-2 text-muted-foreground truncate">
-                                      <IconCalendar className="h-4 w-4" />
-                                      <span className="truncate">
-                                        {announcement.sent_at 
-                                          ? `${format(new Date(announcement.sent_at), 'MMMM d, yyyy')} - ${format(new Date(announcement.expires_at), 'MMMM d, yyyy')}`
-                                          : announcement.scheduled_at 
-                                          ? `${format(new Date(announcement.scheduled_at), 'MMMM d, yyyy')} - ${format(new Date(announcement.expires_at), 'MMMM d, yyyy')}`
-                                          : `Expired: ${format(new Date(announcement.expires_at), 'MMMM d, yyyy')}`
-                                        }
-                                      </span>
-                                    </div>
-                                  ) : announcement.sent_at && !announcement.scheduled_at ? (
-                                    <div className="flex items-center gap-2 text-muted-foreground truncate">
-                                      <IconSend className="h-4 w-4" />
-                                      <span className="truncate">
-                                        {format(new Date(announcement.sent_at), 'MMMM d, yyyy')}
-                                      </span>
-                                    </div>
-                                  ) : announcement.scheduled_at ? (
-                                    <div className="flex items-center gap-2 text-muted-foreground truncate">
-                                      <IconCalendar className="h-4 w-4" />
-                                      <span className="truncate">
-                                        {format(new Date(announcement.scheduled_at), 'MMMM d, yyyy')}
-                                        {announcement.expires_at && announcement.status !== 'expired' && ` - ${format(new Date(announcement.expires_at), 'MMMM d, yyyy')}`}
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-2 text-muted-foreground truncate">
-                                      <IconCalendar className="h-4 w-4" />
-                                      <span className="truncate">-</span>
-                                    </div>
-                                  )
+                              <div className="mt-3 space-y-1 text-sm">
+                                {/* Schedule and Expiry in single row */}
+                                <div className="flex items-center justify-between gap-2">
+                                  {/* Scheduled At */}
+                                  <div className="flex items-center gap-2 min-w-0 flex-1 text-muted-foreground">
+                                    <IconCalendar className="h-4 w-4 flex-shrink-0" />
+                                    <span className="text-sm font-medium">
+                                      {announcement.sent_at ? 'Sent:' : 'Scheduled:'}
+                                    </span>
+                                    <span className="text-sm truncate">
+                                      {announcement.sent_at 
+                                        ? format(new Date(announcement.sent_at), 'MMMM d')
+                                        : announcement.scheduled_at 
+                                        ? format(new Date(announcement.scheduled_at), 'MMMM d')
+                                        : '-'
+                                      }
+                                    </span>
+                                  </div>
+                                  
+                                   {/* Expires At */}
+                                   {announcement.expires_at && (
+                                     <div className="flex items-center gap-2 min-w-0 flex-1 text-muted-foreground">
+                                       <IconClock className="h-4 w-4 flex-shrink-0" />
+                                       <span className="text-sm font-medium">
+                                         {isExpired ? 'Expired:' : 'Expires:'}
+                                       </span>
+                                       <span className="text-sm truncate">
+                                         {format(new Date(announcement.expires_at), 'MMMM d')}
+                                       </span>
+                                     </div>
+                                   )}
+                                </div>
+                                
+                                {/* Show status indicator for expired announcements */}
+                                {isExpired && (
+                                  <div className="flex items-center gap-1 text-red-500 text-xs">
+                                    <IconAlertCircle className="h-3 w-3" />
+                                    <span className="font-medium">This announcement has expired</span>
+                                  </div>
                                 )}
                               </div>
                               

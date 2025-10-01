@@ -52,6 +52,7 @@ async function startListening() {
     await notificationClient.query('LISTEN member_changes')
     await notificationClient.query('LISTEN member_comment_changes')
     await notificationClient.query('LISTEN member_activity_changes')
+    await notificationClient.query('LISTEN activity_data_change')
     await notificationClient.query('LISTEN agent_assignment_changes')
     await notificationClient.query('LISTEN client_assignment_changes')
     await notificationClient.query('LISTEN client_changes')
@@ -130,6 +131,8 @@ async function startListening() {
           messageType = 'member_comment_update'
         } else if (msg.channel === 'member_activity_changes') {
           messageType = 'member_activity_update'
+        } else if (msg.channel === 'activity_data_change') {
+          messageType = 'activity_update'
         } else if (msg.channel === 'agent_assignment_changes') {
           messageType = 'agent_update'
         } else if (msg.channel === 'client_assignment_changes') {

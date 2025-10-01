@@ -5440,3 +5440,411 @@ export async function getActivityStats(memberId: string, startDate: string, endD
   return result.rows[0] || {}
 }
 
+export async function getDailyProductivityTrend(memberId: string, monthYear: string) {
+  const dailyProductivityQueryAll = `
+    WITH base AS (
+      SELECT ps.user_id,
+             ps.month_year,
+             ps.productivity_score,
+             ps.total_active_seconds,
+             ps.total_inactive_seconds
+      FROM productivity_scores ps
+      JOIN users u ON ps.user_id = u.id
+      JOIN agents ag ON ag.user_id = u.id
+      WHERE u.user_type = 'Agent'
+        AND ps.month_year = $1
+    ),
+    totals_by_month AS (
+      SELECT month_year,
+             SUM(productivity_score)::numeric(10,2) AS total_productivity_score,
+             SUM(total_active_seconds)::int AS total_active_seconds,
+             SUM(total_inactive_seconds)::int AS total_inactive_seconds
+      FROM base
+      GROUP BY month_year
+    ),
+    ranked AS (
+      SELECT b.user_id,
+             b.productivity_score,
+             ROW_NUMBER() OVER (ORDER BY b.productivity_score DESC) AS rn
+      FROM base b
+    )
+    SELECT t.month_year AS date,
+           t.total_productivity_score,
+           t.total_active_seconds,
+           t.total_inactive_seconds,
+           (MAX(CASE WHEN r.rn = 1 THEN (
+               json_build_object(
+                 'user_id', r.user_id,
+                 'first_name', pi.first_name,
+                 'last_name', pi.last_name,
+                 'profile_picture', pi.profile_picture,
+                 'points', r.productivity_score
+               )::text
+           ) END))::json AS top1,
+           (MAX(CASE WHEN r.rn = 2 THEN (
+               json_build_object(
+                 'user_id', r.user_id,
+                 'first_name', pi.first_name,
+                 'last_name', pi.last_name,
+                 'profile_picture', pi.profile_picture,
+                 'points', r.productivity_score
+               )::text
+           ) END))::json AS top2,
+           (MAX(CASE WHEN r.rn = 3 THEN (
+               json_build_object(
+                 'user_id', r.user_id,
+                 'first_name', pi.first_name,
+                 'last_name', pi.last_name,
+                 'profile_picture', pi.profile_picture,
+                 'points', r.productivity_score
+               )::text
+           ) END))::json AS top3,
+           (MAX(CASE WHEN r.rn = 4 THEN (
+               json_build_object(
+                 'user_id', r.user_id,
+                 'first_name', pi.first_name,
+                 'last_name', pi.last_name,
+                 'profile_picture', pi.profile_picture,
+                 'points', r.productivity_score
+               )::text
+           ) END))::json AS top4,
+           (MAX(CASE WHEN r.rn = 5 THEN (
+               json_build_object(
+                 'user_id', r.user_id,
+                 'first_name', pi.first_name,
+                 'last_name', pi.last_name,
+                 'profile_picture', pi.profile_picture,
+                 'points', r.productivity_score
+               )::text
+           ) END))::json AS top5
+    FROM ranked r
+    JOIN personal_info pi ON pi.user_id = r.user_id
+    JOIN totals_by_month t ON t.month_year = $1
+    GROUP BY t.month_year, t.total_productivity_score, t.total_active_seconds, t.total_inactive_seconds
+    ORDER BY t.month_year
+  `
+
+  const dailyProductivityQueryByMember = `
+    WITH base AS (
+      SELECT ps.user_id,
+             ps.month_year,
+             ps.productivity_score,
+             ps.total_active_seconds,
+             ps.total_inactive_seconds
+      FROM productivity_scores ps
+      JOIN users u ON ps.user_id = u.id
+      JOIN agents ag ON ag.user_id = u.id
+      WHERE u.user_type = 'Agent'
+        AND ag.member_id = $2
+        AND ps.month_year = $1
+    ),
+    totals_by_month AS (
+      SELECT month_year,
+             SUM(productivity_score)::numeric(10,2) AS total_productivity_score,
+             SUM(total_active_seconds)::int AS total_active_seconds,
+             SUM(total_inactive_seconds)::int AS total_inactive_seconds
+      FROM base
+      GROUP BY month_year
+    ),
+    ranked AS (
+      SELECT b.user_id,
+             b.productivity_score,
+             ROW_NUMBER() OVER (ORDER BY b.productivity_score DESC) AS rn
+      FROM base b
+    )
+    SELECT t.month_year AS date,
+           t.total_productivity_score,
+           t.total_active_seconds,
+           t.total_inactive_seconds,
+           (MAX(CASE WHEN r.rn = 1 THEN (
+               json_build_object(
+                 'user_id', r.user_id,
+                 'first_name', pi.first_name,
+                 'last_name', pi.last_name,
+                 'profile_picture', pi.profile_picture,
+                 'points', r.productivity_score
+               )::text
+           ) END))::json AS top1,
+           (MAX(CASE WHEN r.rn = 2 THEN (
+               json_build_object(
+                 'user_id', r.user_id,
+                 'first_name', pi.first_name,
+                 'last_name', pi.last_name,
+                 'profile_picture', pi.profile_picture,
+                 'points', r.productivity_score
+               )::text
+           ) END))::json AS top2,
+           (MAX(CASE WHEN r.rn = 3 THEN (
+               json_build_object(
+                 'user_id', r.user_id,
+                 'first_name', pi.first_name,
+                 'last_name', pi.last_name,
+                 'profile_picture', pi.profile_picture,
+                 'points', r.productivity_score
+               )::text
+           ) END))::json AS top3,
+           (MAX(CASE WHEN r.rn = 4 THEN (
+               json_build_object(
+                 'user_id', r.user_id,
+                 'first_name', pi.first_name,
+                 'last_name', pi.last_name,
+                 'profile_picture', pi.profile_picture,
+                 'points', r.productivity_score
+               )::text
+           ) END))::json AS top4,
+           (MAX(CASE WHEN r.rn = 5 THEN (
+               json_build_object(
+                 'user_id', r.user_id,
+                 'first_name', pi.first_name,
+                 'last_name', pi.last_name,
+                 'profile_picture', pi.profile_picture,
+                 'points', r.productivity_score
+               )::text
+           ) END))::json AS top5
+    FROM ranked r
+    JOIN personal_info pi ON pi.user_id = r.user_id
+    JOIN totals_by_month t ON t.month_year = $1
+    GROUP BY t.month_year, t.total_productivity_score, t.total_active_seconds, t.total_inactive_seconds
+    ORDER BY t.month_year
+  `
+
+  const result = memberId === 'all'
+    ? await pool.query(dailyProductivityQueryAll, [monthYear])
+    : await pool.query(dailyProductivityQueryByMember, [monthYear, memberId])
+
+  return result.rows
+}
+
+export async function getWeeklyTrend(memberId: string, startISO: string, endISO: string) {
+  const weeklyTrendQueryAll = `
+    WITH base AS (
+      SELECT was.user_id,
+             was.week_start_date,
+             was.week_end_date,
+             COALESCE(was.total_active_seconds, 0)   AS total_active_seconds,
+             COALESCE(was.total_inactive_seconds, 0) AS total_inactive_seconds
+      FROM weekly_activity_summary was
+      JOIN users u ON was.user_id = u.id
+      JOIN agents ag ON ag.user_id = u.id
+      WHERE u.user_type = 'Agent'
+        AND was.week_start_date <= $2
+        AND was.week_end_date >= $1
+    ),
+    avg_by_week AS (
+      SELECT week_start_date,
+             week_end_date,
+             AVG(total_active_seconds)::int   AS avg_active_seconds,
+             AVG(total_inactive_seconds)::int AS avg_inactive_seconds
+      FROM base
+      GROUP BY week_start_date, week_end_date
+    ),
+    ranked AS (
+      SELECT b.week_start_date,
+             b.week_end_date,
+             b.user_id,
+             b.total_active_seconds,
+             ROW_NUMBER() OVER (
+               PARTITION BY b.week_start_date, b.week_end_date
+               ORDER BY b.total_active_seconds DESC
+             ) AS rn
+      FROM base b
+    )
+    SELECT r.week_start_date,
+           r.week_end_date,
+           a.avg_active_seconds,
+           a.avg_inactive_seconds,
+           MAX(CASE WHEN r.rn = 1 THEN json_build_object(
+             'user_id', r.user_id,
+             'first_name', pi1.first_name,
+             'last_name', pi1.last_name,
+             'profile_picture', pi1.profile_picture,
+             'points', r.total_active_seconds
+           ) END) AS top1,
+           MAX(CASE WHEN r.rn = 2 THEN json_build_object(
+             'user_id', r.user_id,
+             'first_name', pi2.first_name,
+             'last_name', pi2.last_name,
+             'profile_picture', pi2.profile_picture,
+             'points', r.total_active_seconds
+           ) END) AS top2,
+           MAX(CASE WHEN r.rn = 3 THEN json_build_object(
+             'user_id', r.user_id,
+             'first_name', pi3.first_name,
+             'last_name', pi3.last_name,
+             'profile_picture', pi3.profile_picture,
+             'points', r.total_active_seconds
+           ) END) AS top3
+    FROM ranked r
+    LEFT JOIN personal_info pi1 ON (r.rn = 1 AND pi1.user_id = r.user_id)
+    LEFT JOIN personal_info pi2 ON (r.rn = 2 AND pi2.user_id = r.user_id)
+    LEFT JOIN personal_info pi3 ON (r.rn = 3 AND pi3.user_id = r.user_id)
+    JOIN avg_by_week a ON a.week_start_date = r.week_start_date AND a.week_end_date = r.week_end_date
+    GROUP BY r.week_start_date, r.week_end_date, a.avg_active_seconds, a.avg_inactive_seconds
+    ORDER BY r.week_start_date
+  `
+
+  const weeklyTrendQueryByMember = `
+    WITH base AS (
+      SELECT was.user_id,
+             was.week_start_date,
+             was.week_end_date,
+             COALESCE(was.total_active_seconds, 0)   AS total_active_seconds,
+             COALESCE(was.total_inactive_seconds, 0) AS total_inactive_seconds
+      FROM weekly_activity_summary was
+      JOIN users u ON was.user_id = u.id
+      JOIN agents ag ON ag.user_id = u.id
+      WHERE u.user_type = 'Agent'
+        AND ag.member_id = $3
+        AND was.week_start_date <= $2
+        AND was.week_end_date >= $1
+    ),
+    avg_by_week AS (
+      SELECT week_start_date,
+             week_end_date,
+             AVG(total_active_seconds)::int   AS avg_active_seconds,
+             AVG(total_inactive_seconds)::int AS avg_inactive_seconds
+      FROM base
+      GROUP BY week_start_date, week_end_date
+    ),
+    ranked AS (
+      SELECT b.week_start_date,
+             b.week_end_date,
+             b.user_id,
+             b.total_active_seconds,
+             ROW_NUMBER() OVER (
+               PARTITION BY b.week_start_date, b.week_end_date
+               ORDER BY b.total_active_seconds DESC
+             ) AS rn
+      FROM base b
+    )
+    SELECT r.week_start_date,
+           r.week_end_date,
+           a.avg_active_seconds,
+           a.avg_inactive_seconds,
+           MAX(CASE WHEN r.rn = 1 THEN json_build_object(
+             'user_id', r.user_id,
+             'first_name', pi1.first_name,
+             'last_name', pi1.last_name,
+             'profile_picture', pi1.profile_picture,
+             'points', r.total_active_seconds
+           ) END) AS top1,
+           MAX(CASE WHEN r.rn = 2 THEN json_build_object(
+             'user_id', r.user_id,
+             'first_name', pi2.first_name,
+             'last_name', pi2.last_name,
+             'profile_picture', pi2.profile_picture,
+             'points', r.total_active_seconds
+           ) END) AS top2,
+           MAX(CASE WHEN r.rn = 3 THEN json_build_object(
+             'user_id', r.user_id,
+             'first_name', pi3.first_name,
+             'last_name', pi3.last_name,
+             'profile_picture', pi3.profile_picture,
+             'points', r.total_active_seconds
+           ) END) AS top3
+    FROM ranked r
+    LEFT JOIN personal_info pi1 ON (r.rn = 1 AND pi1.user_id = r.user_id)
+    LEFT JOIN personal_info pi2 ON (r.rn = 2 AND pi2.user_id = r.user_id)
+    LEFT JOIN personal_info pi3 ON (r.rn = 3 AND pi3.user_id = r.user_id)
+    JOIN avg_by_week a ON a.week_start_date = r.week_start_date AND a.week_end_date = r.week_end_date
+    GROUP BY r.week_start_date, r.week_end_date, a.avg_active_seconds, a.avg_inactive_seconds
+    ORDER BY r.week_start_date
+  `
+
+  const result = memberId === 'all'
+    ? await pool.query(weeklyTrendQueryAll, [startISO, endISO])
+    : await pool.query(weeklyTrendQueryByMember, [startISO, endISO, memberId])
+  return result.rows
+}
+
+export async function getProductivityScoresRows(memberId: string, monthYear: string, limit?: number) {
+  const limitClause = limit ? `LIMIT ${parseInt(String(limit))}` : ''
+  const query = memberId === 'all' ? `
+    SELECT 
+      COALESCE(ps.id, 0) as id,
+      u.id as user_id,
+      $1 as month_year,
+      COALESCE(ps.productivity_score, 0) as productivity_score,
+      COALESCE(ps.total_active_seconds, 0) as total_active_seconds,
+      COALESCE(ps.total_inactive_seconds, 0) as total_inactive_seconds,
+      COALESCE(ps.total_seconds, 0) as total_seconds,
+      COALESCE(ps.active_percentage, 0) as active_percentage,
+      COALESCE(ps.created_at, NOW()) as created_at,
+      COALESCE(ps.updated_at, NOW()) as updated_at,
+      pi.first_name,
+      pi.last_name,
+      pi.profile_picture,
+      u.email,
+      d.name as department_name
+    FROM users u
+    LEFT JOIN personal_info pi ON u.id = pi.user_id
+    LEFT JOIN agents a ON u.id = a.user_id
+    LEFT JOIN departments d ON a.department_id = d.id
+    LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
+    WHERE u.user_type = 'Agent'
+    ORDER BY COALESCE(ps.productivity_score, 0) DESC, COALESCE(ps.active_percentage, 0) DESC
+    ${limitClause}
+  ` : `
+    SELECT 
+      COALESCE(ps.id, 0) as id,
+      u.id as user_id,
+      $1 as month_year,
+      COALESCE(ps.productivity_score, 0) as productivity_score,
+      COALESCE(ps.total_active_seconds, 0) as total_active_seconds,
+      COALESCE(ps.total_inactive_seconds, 0) as total_inactive_seconds,
+      COALESCE(ps.total_seconds, 0) as total_seconds,
+      COALESCE(ps.active_percentage, 0) as active_percentage,
+      COALESCE(ps.created_at, NOW()) as created_at,
+      COALESCE(ps.updated_at, NOW()) as updated_at,
+      pi.first_name,
+      pi.last_name,
+      pi.profile_picture,
+      u.email,
+      d.name as department_name
+    FROM users u
+    LEFT JOIN personal_info pi ON u.id = pi.user_id
+    LEFT JOIN agents a ON u.id = a.user_id
+    LEFT JOIN departments d ON a.department_id = d.id
+    LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
+    WHERE u.user_type = 'Agent'
+      AND a.member_id = $2
+    ORDER BY COALESCE(ps.productivity_score, 0) DESC, COALESCE(ps.active_percentage, 0) DESC
+    ${limitClause}
+  `
+  const result = memberId === 'all'
+    ? await pool.query(query, [monthYear])
+    : await pool.query(query, [monthYear, memberId])
+  return result.rows
+}
+
+export async function getProductivityStatsRow(memberId: string, monthYear: string) {
+  const query = memberId === 'all' ? `
+    SELECT 
+      COUNT(u.id) as total_agents,
+      AVG(COALESCE(ps.productivity_score, 0)) as average_productivity,
+      AVG(COALESCE(ps.active_percentage, 0)) as average_active_percentage,
+      MAX(COALESCE(ps.productivity_score, 0)) as highest_productivity,
+      MIN(COALESCE(ps.productivity_score, 0)) as lowest_productivity
+    FROM users u
+    LEFT JOIN agents a ON u.id = a.user_id
+    LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
+    WHERE u.user_type = 'Agent'
+  ` : `
+    SELECT 
+      COUNT(u.id) as total_agents,
+      AVG(COALESCE(ps.productivity_score, 0)) as average_productivity,
+      AVG(COALESCE(ps.active_percentage, 0)) as average_active_percentage,
+      MAX(COALESCE(ps.productivity_score, 0)) as highest_productivity,
+      MIN(COALESCE(ps.productivity_score, 0)) as lowest_productivity
+    FROM users u
+    LEFT JOIN agents a ON u.id = a.user_id
+    LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
+    WHERE u.user_type = 'Agent'
+      AND a.member_id = $2
+  `
+  const result = memberId === 'all'
+    ? await pool.query(query, [monthYear])
+    : await pool.query(query, [monthYear, memberId])
+  return result.rows[0] || null
+}
+

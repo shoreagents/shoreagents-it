@@ -26,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
+import { NoData } from "@/components/ui/no-data"
 import {
   Tooltip,
   TooltipContent,
@@ -271,9 +272,40 @@ export default function ActivitiesPage() {
   const handleReload = async () => {
     setReloading(true)
     try {
-      await fetchActivities()
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+      
+      const params = new URLSearchParams({
+        limit: '1000'
+      })
+      
+      if (memberId !== 'all') {
+        params.append('memberId', memberId)
+      }
+
+      const response = await fetch(`/api/agents?${params.toString()}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      setEmployees(data.agents || [])
+      
+      // Fetch activities data
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+      const activitiesResponse = await fetch(`/api/activities?memberId=${memberId}&date=${today}`)
+      
+      if (!activitiesResponse.ok) {
+        throw new Error(`HTTP error! status: ${activitiesResponse.status}`)
+      }
+      
+      const activitiesData = await activitiesResponse.json()
+      setActivities(activitiesData.activities || [])
+      setStats(activitiesData.stats || null)
+      
     } catch (err) {
       console.error('❌ Reload error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to reload data')
     } finally {
       setReloading(false)
     }
@@ -1118,10 +1150,34 @@ const getActivityStatus = (isActive: boolean, lastSessionStart: string | null, h
                         Track user activities and productivity metrics by date.
                       </p>
                     </div>
-                    <ReloadButton 
-                      loading={reloading} 
-                      onReload={handleReload}
-                    />
+                    <div className="flex gap-2">
+                      <div className="w-56">
+                        <Select value={memberId} onValueChange={(v: string) => setMemberId(v)}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Filter by member">
+                              {memberId === 'all' ? 'All Employees' : 
+                               memberId === 'none' ? 'No Assigned Members' :
+                               memberOptions.find(m => String(m.id) === memberId)?.company || 'Filter by member'}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Employees</SelectItem>
+                            <SelectItem value="none">No Assigned Members</SelectItem>
+                            <SelectSeparator className="bg-border mx-2" />
+                            <SelectGroup>
+                              <SelectLabel className="text-muted-foreground">Members</SelectLabel>
+                              {memberOptions.map((m) => (
+                                <SelectItem key={m.id} value={String(m.id)}>{m.company}</SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <ReloadButton 
+                        loading={reloading} 
+                        onReload={handleReload}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1149,7 +1205,7 @@ const getActivityStatus = (isActive: boolean, lastSessionStart: string | null, h
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {[...Array(8)].map((_, i) => (
+                              {[...Array(12)].map((_, i) => (
                                 <TableRow key={i} className="h-20">
                                   <TableCell>
                                     <div className="flex items-center gap-3">
@@ -1201,7 +1257,7 @@ const getActivityStatus = (isActive: boolean, lastSessionStart: string | null, h
                         </CardHeader>
                         <CardContent className="pt-0">
                           <div className="space-y-4">
-                            {[...Array(4)].map((_, i) => (
+                            {[...Array(6)].map((_, i) => (
                               <div key={i}>
                                 <Skeleton className="h-3 w-16 mb-2" />
                                 <div className="grid grid-cols-2 gap-3">
@@ -1357,10 +1413,8 @@ const getActivityStatus = (isActive: boolean, lastSessionStart: string | null, h
                              <TableBody>
                                {sortedActivities.length === 0 ? (
                                 <TableRow>
-                                  <TableCell colSpan={4} className="text-center py-8">
-                                    <div className="text-muted-foreground">
-                                      {employees.length === 0 ? 'No employees found' : 'No activity data available'}
-                                    </div>
+                                  <TableCell colSpan={4} className="p-0">
+                                    <NoData message={employees.length === 0 ? 'No employees found' : 'No Activity Data'} />
                                   </TableCell>
                                 </TableRow>
                               ) : (
@@ -1391,14 +1445,14 @@ const getActivityStatus = (isActive: boolean, lastSessionStart: string | null, h
             </TableCell>
                                   <TableCell className="text-center">
                                     {employee.activity.today_active_seconds > 0 ? (
-                                      <span className="font-mono text-sm">{formatTime(employee.activity.today_active_seconds)}</span>
+                                      <span className="text-sm">{formatTime(employee.activity.today_active_seconds)}</span>
                                     ) : (
                                       <span className="text-muted-foreground text-sm">-</span>
                                     )}
                                   </TableCell>
                                    <TableCell className="text-center">
                                      {employee.activity.today_inactive_seconds > 0 ? (
-                                       <span className="font-mono text-sm">{formatTime(employee.activity.today_inactive_seconds)}</span>
+                                       <span className="text-sm">{formatTime(employee.activity.today_inactive_seconds)}</span>
                                      ) : (
                                        <span className="text-muted-foreground text-sm">-</span>
                                      )}

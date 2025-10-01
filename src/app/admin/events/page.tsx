@@ -512,7 +512,7 @@ export default function EventsPage() {
                               </div>
                             </div>
                             
-                            <div className="mt-3 space-y-2 text-sm">
+                            <div className="mt-3 space-y-1 text-sm">
                               <div className="flex items-center gap-2 text-muted-foreground truncate">
                                 <IconCalendar className="h-4 w-4" />
                                 <span className="truncate">{formatDate(event.event_date)}</span>

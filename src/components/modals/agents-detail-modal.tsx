@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconGenderMale, IconGenderFemale, IconGenderNeutrois, IconHelp, IconSun, IconMoon, IconClockHour4, IconUsers, IconHome, IconDeviceLaptop } from "@tabler/icons-react"
+import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconGenderMale, IconGenderFemale, IconGenderNeutrois, IconHelp, IconSun, IconMoon, IconClockHour4, IconUsers, IconHome, IconDeviceLaptop, IconTrophy, IconMedal, IconCrown, IconStar, IconChartBar } from "@tabler/icons-react"
 import { useRealtimeMembers } from '@/hooks/use-realtime-members'
 import { SendHorizontal, Target } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataFieldRow } from "@/components/ui/fields"
 import { Calendar } from "@/components/ui/calendar"
+import { NoData } from "@/components/ui/no-data"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
 
@@ -153,77 +154,73 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
   const { theme } = useTheme()
   const { user } = useAuth()
 
-  // Fetch activity data when agent data changes
-  React.useEffect(() => {
-    const fetchActivityData = async () => {
-      if (!agentData || !user) return
+  // Activity data fetching function (to be called lazily)
+  const fetchActivityData = async () => {
+    if (!agentData || !user) return
+    
+    setActivityLoading(true)
+    
+    try {
+      const memberId = user.userType === 'Internal' ? 'all' : user.id
       
-      setActivityLoading(true)
+      // Get date ranges
+      const today = new Date()
       
-      try {
-        const memberId = user.userType === 'Internal' ? 'all' : user.id
-        
-        // Get date ranges
-        const today = new Date()
-        
-        // Yesterday's date
-        const yesterday = new Date(today)
-        yesterday.setDate(today.getDate() - 1)
-        const yesterdayStr = yesterday.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
-        
-        // Week range (Sunday to Saturday)
-        const startOfWeek = new Date(today)
-        startOfWeek.setDate(today.getDate() - today.getDay()) // Start from Sunday
-        const endOfWeek = new Date(today)
-        endOfWeek.setDate(today.getDate() + (6 - today.getDay())) // End on Saturday
-        
-        const startDate = startOfWeek.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
-        const endDate = endOfWeek.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
-        
-        // Month range
-        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
-        
-        const monthStartDate = startOfMonth.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
-        const monthEndDate = endOfMonth.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
-        
-        // Today's date
-        const todayStr = today.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
-        
-        // Fetch activity data
-        const [todayResponse, yesterdayResponse, weekResponse, monthResponse] = await Promise.all([
-          fetch(`/api/activities?memberId=${memberId}&date=${todayStr}`),
-          fetch(`/api/activities?memberId=${memberId}&date=${yesterdayStr}`),
-          fetch(`/api/activities?memberId=${memberId}&startDate=${startDate}&endDate=${endDate}`),
-          fetch(`/api/activities?memberId=${memberId}&startDate=${monthStartDate}&endDate=${monthEndDate}`)
-        ])
-        
-        // Process responses
-        const [todayData, yesterdayData, weekData, monthData] = await Promise.all([
-          todayResponse.ok ? todayResponse.json() : { activities: [] },
-          yesterdayResponse.ok ? yesterdayResponse.json() : { activities: [] },
-          weekResponse.ok ? weekResponse.json() : { activities: [] },
-          monthResponse.ok ? monthResponse.json() : { activities: [] }
-        ])
-        
-        setTodayActivities(todayData.activities || [])
-        setYesterdayActivities(yesterdayData.activities || [])
-        setWeekActivities(weekData.activities || [])
-        setMonthActivities(monthData.activities || [])
-        
-      } catch (err) {
-        console.error('❌ Activity data fetch error:', err)
-        setTodayActivities([])
-        setYesterdayActivities([])
-        setWeekActivities([])
-        setMonthActivities([])
-      } finally {
-        setActivityLoading(false)
-      }
+      // Yesterday's date
+      const yesterday = new Date(today)
+      yesterday.setDate(today.getDate() - 1)
+      const yesterdayStr = yesterday.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+      
+      // Week range (Sunday to Saturday)
+      const startOfWeek = new Date(today)
+      startOfWeek.setDate(today.getDate() - today.getDay()) // Start from Sunday
+      const endOfWeek = new Date(today)
+      endOfWeek.setDate(today.getDate() + (6 - today.getDay())) // End on Saturday
+      
+      const startDate = startOfWeek.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+      const endDate = endOfWeek.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+      
+      // Month range
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+      
+      const monthStartDate = startOfMonth.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+      const monthEndDate = endOfMonth.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+      
+      // Today's date
+      const todayStr = today.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+      
+      // Fetch activity data in parallel
+      const [todayResponse, yesterdayResponse, weekResponse, monthResponse] = await Promise.all([
+        fetch(`/api/activities?memberId=${memberId}&date=${todayStr}`),
+        fetch(`/api/activities?memberId=${memberId}&date=${yesterdayStr}`),
+        fetch(`/api/activities?memberId=${memberId}&startDate=${startDate}&endDate=${endDate}`),
+        fetch(`/api/activities?memberId=${memberId}&startDate=${monthStartDate}&endDate=${monthEndDate}`)
+      ])
+      
+      // Process responses
+      const [todayData, yesterdayData, weekData, monthData] = await Promise.all([
+        todayResponse.ok ? todayResponse.json() : { activities: [] },
+        yesterdayResponse.ok ? yesterdayResponse.json() : { activities: [] },
+        weekResponse.ok ? weekResponse.json() : { activities: [] },
+        monthResponse.ok ? monthResponse.json() : { activities: [] }
+      ])
+      
+      setTodayActivities(todayData.activities || [])
+      setYesterdayActivities(yesterdayData.activities || [])
+      setWeekActivities(weekData.activities || [])
+      setMonthActivities(monthData.activities || [])
+      
+    } catch (err) {
+      console.error('❌ Activity data fetch error:', err)
+      setTodayActivities([])
+      setYesterdayActivities([])
+      setWeekActivities([])
+      setMonthActivities([])
+    } finally {
+      setActivityLoading(false)
     }
-
-    fetchActivityData()
-  }, [agentData, user])
+  }
 
   // Helper functions for activity data
   const getTodayActivityData = (employee: any) => {
@@ -287,6 +284,13 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       const [commentsList, setCommentsList] = React.useState<Array<{id: string, comment: string, user_name: string, created_at: string}>>([])
     const [localGender, setLocalGender] = React.useState<string | null>(null)
     
+    // Lazy loading states
+    const [activityDataLoaded, setActivityDataLoaded] = React.useState(false)
+    const [productivityDataLoaded, setProductivityDataLoaded] = React.useState(false)
+    
+    // Progressive loading state for additional agent data
+    const [isLoadingAdditionalData, setIsLoadingAdditionalData] = React.useState(false)
+    
     // Activity data states
     const [todayActivities, setTodayActivities] = React.useState<any[]>([])
     const [yesterdayActivities, setYesterdayActivities] = React.useState<any[]>([])
@@ -306,6 +310,20 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     const [isLoadingCompanies, setIsLoadingCompanies] = React.useState(false)
     const [isHovered, setIsHovered] = React.useState(false)
     const [localAgentData, setLocalAgentData] = React.useState<AgentRecord | null>(null)
+    
+    // Productivity scores state
+    const [productivityScores, setProductivityScores] = React.useState<any[]>([])
+    const [productivityStats, setProductivityStats] = React.useState<any>(null)
+    const [productivityLoading, setProductivityLoading] = React.useState(false)
+    const [productivityError, setProductivityError] = React.useState<string | null>(null)
+    const [selectedMonth, setSelectedMonth] = React.useState<number>(() => {
+      const now = new Date()
+      return now.getMonth() + 1
+    })
+    const [selectedYear, setSelectedYear] = React.useState<number>(() => {
+      const now = new Date()
+      return Math.max(now.getFullYear(), 2025)
+    })
 
     // Add local state for editable text fields
     const [inputValues, setInputValues] = React.useState<Record<string, string>>({
@@ -313,6 +331,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       middle_name: '',
       last_name: '',
       nickname: '',
+      email: '',
       phone: '',
       address: '',
       city: '',
@@ -330,6 +349,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       middle_name: '',
       last_name: '',
       nickname: '',
+      email: '',
       phone: '',
       address: '',
       city: '',
@@ -350,6 +370,10 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       if (isOpen && agentData) {
         // Reset active tab to Personal Info when modal opens
         setActiveTab("information")
+        
+        // Reset lazy loading states when modal opens
+        setActivityDataLoaded(false)
+        setProductivityDataLoaded(false)
         
         // Initialize local agent data
         setLocalAgentData(agentData)
@@ -392,6 +416,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
           middle_name: agentData.middle_name || '',
           last_name: agentData.last_name || '',
           nickname: agentData.nickname || '',
+          email: agentData.email || '',
           phone: agentData.phone || '',
           address: agentData.address || '',
           city: agentData.city || '',
@@ -414,6 +439,187 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       fetchCompanies(companySearch)
     }
   }, [showCompanySelection, companySearch])
+
+  // Lazy load activity data when tab is clicked
+  React.useEffect(() => {
+    if (activeTab === 'activity-data' && !activityDataLoaded && agentData && user) {
+      fetchActivityData()
+      setActivityDataLoaded(true)
+    }
+  }, [activeTab, activityDataLoaded, agentData, user])
+
+  // Productivity scores fetching function (to be called lazily)
+    const fetchProductivityScores = async () => {
+      if (!agentData?.user_id || !user) return
+      
+      setProductivityLoading(true)
+      setProductivityError(null)
+      
+      try {
+        const memberId = user.userType === 'Internal' ? 'all' : user.id
+        const allMonthsData = []
+        
+        console.log('📊 Fetching productivity scores for user:', agentData.user_id, 'memberId:', memberId, 'year:', selectedYear)
+        
+        const currentYear = new Date().getFullYear()
+        
+        // If viewing past years, first fetch current year's current month data
+        if (selectedYear !== currentYear) {
+          const currentMonth = new Date().getMonth() + 1
+          const currentMonthYear = `${currentYear}-${String(currentMonth).padStart(2, '0')}`
+          
+          const params = new URLSearchParams({
+            memberId: String(memberId),
+            timeframe: 'monthly',
+            monthYear: currentMonthYear
+          })
+          
+          const response = await fetch(`/api/productivity-scores?${params}`)
+          
+          if (response.ok) {
+            const data = await response.json()
+            const userScore = data.productivityScores.find((score: any) => score.user_id === agentData.user_id)
+            const userRank = data.productivityScores.findIndex((score: any) => score.user_id === agentData.user_id) + 1
+            
+            if (userScore && userScore.productivity_score > 0) {
+              userScore.rank = userRank
+              userScore.month = currentMonth
+              userScore.monthName = new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'long' })
+              userScore.isCurrentMonth = true
+              allMonthsData.push(userScore)
+            }
+          }
+        }
+        
+      // 🚀 OPTIMIZATION: Fetch all 12 months in parallel instead of sequential!
+      const monthPromises = Array.from({ length: 12 }, (_, i) => {
+        const month = i + 1
+          const monthYear = `${selectedYear}-${String(month).padStart(2, '0')}`
+          
+          const params = new URLSearchParams({
+            memberId: String(memberId),
+            timeframe: 'monthly',
+            monthYear: monthYear
+          })
+          
+        return fetch(`/api/productivity-scores?${params}`)
+      })
+      
+      // Execute all 12 API calls in parallel
+      const responses = await Promise.all(monthPromises)
+      
+      // Process all responses
+      for (let i = 0; i < responses.length; i++) {
+        const response = responses[i]
+        const month = i + 1
+          
+          if (!response.ok) {
+          console.warn(`Failed to fetch data for ${selectedYear}-${String(month).padStart(2, '0')}`)
+            continue
+          }
+          
+          const data = await response.json()
+          
+          // Find the current user's score for this month
+          const userScore = data.productivityScores.find((score: any) => score.user_id === agentData.user_id)
+          const userRank = data.productivityScores.findIndex((score: any) => score.user_id === agentData.user_id) + 1
+          
+          // Only add months that have actual data (userScore exists and has productivity data)
+          if (userScore && userScore.productivity_score > 0) {
+            userScore.rank = userRank
+            userScore.month = month
+            userScore.monthName = new Date(selectedYear, month - 1).toLocaleString('default', { month: 'long' })
+            allMonthsData.push(userScore)
+          }
+        }
+        
+        console.log('✅ All months productivity data received:', allMonthsData)
+        
+        // Sort by month (December first, January last)
+        // If viewing past years, prioritize current month at the top
+        allMonthsData.sort((a, b) => {
+          if (a.isCurrentMonth && selectedYear !== currentYear) return -1
+          if (b.isCurrentMonth && selectedYear !== currentYear) return 1
+          return b.month - a.month
+        })
+        
+        setProductivityScores(allMonthsData)
+        setProductivityStats(null) // No stats needed for individual user data
+        
+      } catch (err) {
+        console.error('❌ Productivity scores fetch error:', err)
+        setProductivityError(err instanceof Error ? err.message : 'Failed to fetch productivity scores')
+        setProductivityScores([])
+        setProductivityStats(null)
+      } finally {
+        setProductivityLoading(false)
+      }
+    }
+
+  // Lazy load productivity scores when leaderboard tab is clicked
+  React.useEffect(() => {
+    if (activeTab === 'leaderboard' && !productivityDataLoaded && agentData && user) {
+    fetchProductivityScores()
+      setProductivityDataLoaded(true)
+    }
+  }, [activeTab, productivityDataLoaded, agentData, user, selectedYear])
+
+  // Handle year changes - refetch data when year changes
+  React.useEffect(() => {
+    if (activeTab === 'leaderboard' && productivityDataLoaded && agentData && user) {
+      fetchProductivityScores()
+    }
+  }, [selectedYear])
+
+  // Detect when additional agent data is being loaded
+  React.useEffect(() => {
+    if (agentData) {
+      // Check if we have basic data only by looking for meaningful data in additional fields
+      // We'll consider data "loaded" if we have at least 3 meaningful additional fields
+      const additionalFields = [
+        agentData.middle_name,
+        agentData.nickname,
+        agentData.birthday,
+        agentData.city,
+        agentData.address,
+        agentData.gender,
+        agentData.employee_id,
+        agentData.work_email,
+        agentData.shift_schedule,
+        agentData.shift_time,
+        agentData.work_setup,
+        agentData.hire_type,
+        agentData.staff_source,
+        agentData.start_date,
+        agentData.exit_date,
+        agentData.member_badge_color,
+        agentData.station_id,
+        agentData.department_name
+      ]
+      
+      // Count fields that have meaningful data (not null, undefined, or empty string)
+      const meaningfulFieldsCount = additionalFields.filter(field => 
+        field && typeof field === 'string' && field.trim() !== ''
+      ).length
+      
+      // If we have less than 5 meaningful additional fields, show skeleton
+      // This accounts for agents who might have naturally sparse data
+      const hasBasicDataOnly = meaningfulFieldsCount < 5
+
+      console.log('🔍 Loading state check:', {
+        hasBasicDataOnly,
+        meaningfulFieldsCount,
+        totalAdditionalFields: additionalFields.length,
+        additionalFields: additionalFields.map((field, index) => ({
+          index,
+          value: field,
+          hasValue: field && typeof field === 'string' && field.trim() !== ''
+        }))
+      })
+
+      setIsLoadingAdditionalData(hasBasicDataOnly)
+    }
+  }, [agentData])
 
   // Use local agent data if available, otherwise use original agent data, fallback to static data
   const currentAgentData = localAgentData || agentData
@@ -1106,6 +1312,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                 <Badge className="text-xs h-6 flex items-center rounded-[6px]">
                   Agent
                 </Badge>
+                {/* Removed loader - skeleton loading in Personal Info and Job Info provides better feedback */}
               </div>
             </div>
 
@@ -1196,7 +1403,8 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                       {[
                         { title: "Personal Info", value: "information" },
                         { title: "Job Info", value: "job-info" },
-                        { title: "Activity Data", value: "activity-data" }
+                        { title: "Activity Data", value: "activity-data" },
+                        { title: "Leaderboard", value: "leaderboard" }
                       ].map((tab, idx) => (
                         <button
                           key={tab.value}
@@ -1227,8 +1435,275 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                        <h3 className="text-lg font-medium text-muted-foreground">Personal Information</h3>
                      </div>
                      <div className="rounded-lg border border-[#cecece99] dark:border-border overflow-hidden">
+                       {isLoadingAdditionalData ? (
+                         <div className="space-y-0">
+                           {/* Show skeleton only for missing fields, real data for existing fields */}
                                               {/* First Name */}
                        <DataFieldRow
+                         icon={<IconUser className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                         label="First Name"
+                         fieldName="first_name"
+                         value={inputValues.first_name}
+                         onSave={handleInputChange}
+                         placeholder="-"
+                       />
+
+                       {/* Middle Name */}
+                           {!inputValues.middle_name || inputValues.middle_name.trim() === '' ? (
+                             <div className="grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden border-b border-[#cecece99] dark:border-border">
+                               <div className="flex items-center gap-3 min-w-0 px-4">
+                                 <IconUser className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                 <span className="text-sm text-foreground">Middle Name</span>
+                               </div>
+                               <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                               <div className="min-w-0 flex items-center pl-2 pr-2 h-full">
+                                 <Skeleton className="h-3 w-16" />
+                               </div>
+                             </div>
+                           ) : (
+                       <DataFieldRow
+                         icon={<IconUser className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                         label="Middle Name"
+                         fieldName="middle_name"
+                         value={inputValues.middle_name}
+                         onSave={handleInputChange}
+                         placeholder="-"
+                       />
+                           )}
+
+                       {/* Last Name */}
+                       <DataFieldRow
+                         icon={<IconUser className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                         label="Last Name"
+                         fieldName="last_name"
+                         value={inputValues.last_name}
+                         onSave={handleInputChange}
+                         placeholder="-"
+                       />
+
+                       {/* Nickname */}
+                           {!inputValues.nickname || inputValues.nickname.trim() === '' ? (
+                             <div className="grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden border-b border-[#cecece99] dark:border-border">
+                               <div className="flex items-center gap-3 min-w-0 px-4">
+                                 <IconUser className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                 <span className="text-sm text-foreground">Nickname</span>
+                               </div>
+                               <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                               <div className="min-w-0 flex items-center pl-2 pr-2 h-full">
+                                 <Skeleton className="h-3 w-16" />
+                               </div>
+                             </div>
+                           ) : (
+                       <DataFieldRow
+                         icon={<IconUser className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                         label="Nickname"
+                         fieldName="nickname"
+                         value={inputValues.nickname}
+                         onSave={handleInputChange}
+                         placeholder="-"
+                       />
+                           )}
+
+                           {/* Email */}
+                       <DataFieldRow
+                         icon={<IconMail className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                         label="Email"
+                         fieldName="email"
+                             value={inputValues.email}
+                             onSave={handleInputChange}
+                         placeholder="-"
+                       />
+
+                       {/* Phone */}
+                       <DataFieldRow
+                         icon={<IconPhone className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                         label="Phone"
+                         fieldName="phone"
+                         value={inputValues.phone}
+                         onSave={handleInputChange}
+                         placeholder="-"
+                       />
+
+                       {/* Birthday */}
+                           {!displayData.birthday || displayData.birthday.trim() === '' ? (
+                             <div className="grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden border-b border-[#cecece99] dark:border-border">
+                               <div className="flex items-center gap-3 min-w-0 px-4">
+                                 <IconCalendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                 <span className="text-sm text-foreground">Birthday</span>
+                               </div>
+                               <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                               <div className="min-w-0 flex items-center pl-2 pr-2 h-full">
+                                 <Skeleton className="h-3 w-16" />
+                               </div>
+                             </div>
+                           ) : (
+                       <DataFieldRow
+                         icon={<IconCalendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                         label="Birthday"
+                         fieldName="birthday"
+                         value={displayData.birthday}
+                         onSave={() => {}}
+                         placeholder="-"
+                         customInput={
+                           <Popover>
+                             <PopoverTrigger asChild>
+                               <Button
+                                 variant="outline"
+                                 className={`h-[33px] w-full justify-start font-normal border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none hover:bg-muted/50 ${
+                                   localBirthday ? 'text-foreground' : 'text-muted-foreground'
+                                 }`}
+                               >
+                                 {localBirthday ? localBirthday.toLocaleDateString() : "-"}
+                               </Button>
+                             </PopoverTrigger>
+                             <PopoverContent className="w-auto p-0" align="start">
+                               <Calendar
+                                 mode="single"
+                                 selected={localBirthday}
+                                 onSelect={(date) => {
+                                   setLocalBirthday(date)
+                                   console.log('Birthday changed to:', date)
+                                 }}
+                                 captionLayout="dropdown"
+                               />
+                             </PopoverContent>
+                           </Popover>
+                         }
+                       />
+                           )}
+                           
+                           {/* City */}
+                           {!inputValues.city || inputValues.city.trim() === '' ? (
+                             <div className="grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden border-b border-[#cecece99] dark:border-border">
+                               <div className="flex items-center gap-3 min-w-0 px-4">
+                                 <IconMapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                 <span className="text-sm text-foreground">City</span>
+                               </div>
+                               <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                               <div className="min-w-0 flex items-center pl-2 pr-2 h-full">
+                                 <Skeleton className="h-3 w-16" />
+                               </div>
+                             </div>
+                           ) : (
+                             <DataFieldRow
+                               icon={<IconMapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                               label="City"
+                               fieldName="city"
+                               value={inputValues.city}
+                               onSave={handleInputChange}
+                               placeholder="-"
+                             />
+                           )}
+                           
+                           {/* Address */}
+                           {!inputValues.address || inputValues.address.trim() === '' ? (
+                             <div className="grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden border-b border-[#cecece99] dark:border-border">
+                               <div className="flex items-center gap-3 min-w-0 px-4">
+                                 <IconMapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                 <span className="text-sm text-foreground">Address</span>
+                               </div>
+                               <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                               <div className="min-w-0 flex items-center pl-2 pr-2 h-full">
+                                 <Skeleton className="h-3 w-16" />
+                               </div>
+                             </div>
+                           ) : (
+                             <DataFieldRow
+                               icon={<IconMapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                               label="Address"
+                               fieldName="address"
+                               value={inputValues.address}
+                               onSave={handleInputChange}
+                               placeholder="-"
+                             />
+                           )}
+
+                       {/* Gender */}
+                           {!displayData.gender || displayData.gender.trim() === '' ? (
+                             <div className="grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden">
+                               <div className="flex items-center gap-3 min-w-0 px-4">
+                                 <IconUser className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                 <span className="text-sm text-foreground">Gender</span>
+                               </div>
+                               <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                               <div className="min-w-0 flex items-center pl-2 pr-2 h-full">
+                                 <Skeleton className="h-3 w-16" />
+                               </div>
+                             </div>
+                           ) : (
+                       <DataFieldRow
+                         icon={<IconUser className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                         label="Gender"
+                         fieldName="gender"
+                         value={displayData.gender}
+                         onSave={() => {}}
+                         placeholder="-"
+                               isLast={true}
+                         customInput={
+                           <Popover>
+                             <PopoverTrigger asChild>
+                                                               <div 
+                                  className={`h-[33px] w-full text-sm border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none justify-start text-left font-normal cursor-pointer select-none flex items-center ${
+                                    displayData.gender ? 'text-foreground' : 'text-muted-foreground'
+                                  }`}
+                                  style={{ backgroundColor: 'transparent' }}
+                                  tabIndex={0}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault()
+                                    }
+                                  }}
+                                >
+                                  <span className="text-sm">
+                                    {(() => {
+                                      const genderOption = [
+                                        { value: 'Male', label: 'Male' },
+                                        { value: 'Female', label: 'Female' },
+                                        { value: 'Other', label: 'Other' },
+                                        { value: 'Prefer not to say', label: 'Prefer Not To Say' }
+                                      ].find(option => option.value === displayData.gender);
+                                      return genderOption ? genderOption.label : (displayData.gender || '-');
+                                    })()}
+                                  </span>
+                                </div>
+                             </PopoverTrigger>
+                             <PopoverContent className="w-48 p-2" align="start" side="bottom" sideOffset={4}>
+                               {[
+                                   { value: 'Male', label: 'Male', icon: <IconGenderMale className="h-4 w-4 text-muted-foreground" /> },
+                                   { value: 'Female', label: 'Female', icon: <IconGenderFemale className="h-4 w-4 text-muted-foreground" /> },
+                                   { value: 'Other', label: 'Other', icon: <IconUser className="h-4 w-4 text-muted-foreground" /> },
+                                   { value: 'Prefer not to say', label: 'Prefer Not To Say', icon: <IconMinus className="h-4 w-4 text-muted-foreground" /> }
+                                 ].map((genderOption) => {
+                                   const isCurrentGender = displayData.gender === genderOption.value;
+                                   return (
+                                     <PopoverItem
+                                       key={genderOption.value}
+                                       isSelected={isCurrentGender}
+                                                                        onClick={() => {
+                                   // Update the gender value
+                                   if (displayData.gender !== genderOption.value) {
+                                     setLocalGender(genderOption.value)
+                                     console.log('Gender changed to:', genderOption.value)
+                                   }
+                                 }}
+                                     >
+                                             <div className="flex items-center gap-2">
+                                               {genderOption.icon}
+                                               <span className="text-sm">{genderOption.label}</span>
+                                             </div>
+                                     </PopoverItem>
+                                         )
+                                 })}
+                             </PopoverContent>
+                           </Popover>
+                         }
+                             />
+                           )}
+                         </div>
+                       ) : (
+                         <>
+                           {/* First Name */}
+                           <DataFieldRow
                          icon={<IconUser className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
                          label="First Name"
                          fieldName="first_name"
@@ -1323,6 +1798,26 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                          }
                        />
 
+                       {/* City */}
+                       <DataFieldRow
+                         icon={<IconMapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                         label="City"
+                         fieldName="city"
+                         value={inputValues.city}
+                         onSave={handleInputChange}
+                         placeholder="-"
+                       />
+
+                       {/* Address */}
+                       <DataFieldRow
+                         icon={<IconMapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                         label="Address"
+                         fieldName="address"
+                         value={inputValues.address}
+                         onSave={handleInputChange}
+                         placeholder="-"
+                       />
+
                        {/* Gender */}
                        <DataFieldRow
                          icon={<IconUser className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
@@ -1331,6 +1826,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                          value={displayData.gender}
                          onSave={() => {}}
                          placeholder="-"
+                         isLast={true}
                          customInput={
                            <Popover>
                              <PopoverTrigger asChild>
@@ -1388,29 +1884,8 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                            </Popover>
                          }
                        />
-
-                       {/* Address */}
-                       <DataFieldRow
-                         icon={<IconMapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                         label="Address"
-                         fieldName="address"
-                         value={inputValues.address}
-                         onSave={handleInputChange}
-                         placeholder="-"
-                       />
-
-                       {/* City */}
-                       <DataFieldRow
-                         icon={<IconMapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                         label="City"
-                         fieldName="city"
-                         value={inputValues.city}
-                         onSave={handleInputChange}
-                         placeholder="-"
-                         isLast={true}
-                       />
-
-
+                         </>
+                       )}
                      </div>
                    </div>
                  </TabsContent>
@@ -1422,6 +1897,97 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                        <h3 className="text-lg font-medium text-muted-foreground">Job Information</h3>
                      </div>
                      <div className="rounded-lg border border-[#cecece99] dark:border-border overflow-hidden">
+                       {isLoadingAdditionalData ? (
+                         <div className="space-y-0">
+                           {/* Show skeleton only for missing fields, real data for existing fields */}
+                           {/* Job Info skeleton fields - showing real icons/labels, skeleton only for missing data */}
+                           
+                           {/* Employee ID */}
+                           <div className="grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden border-b border-[#cecece99] dark:border-border">
+                             <div className="flex items-center gap-3 min-w-0 px-4">
+                               <IconId className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                               <span className="text-sm text-foreground">Employee ID</span>
+                             </div>
+                             <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                             <div className="min-w-0 flex items-center pl-2 pr-2 h-full">
+                               <Skeleton className="h-3 w-16" />
+                             </div>
+                           </div>
+                           
+                           {/* Job Title */}
+                           <div className="grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden border-b border-[#cecece99] dark:border-border">
+                             <div className="flex items-center gap-3 min-w-0 px-4">
+                               <IconBriefcase className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                               <span className="text-sm text-foreground">Job Title</span>
+                             </div>
+                             <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                             <div className="min-w-0 flex items-center pl-2 pr-2 h-full">
+                               <Skeleton className="h-3 w-16" />
+                             </div>
+                           </div>
+                           
+                           {/* Work Email */}
+                           <div className="grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden border-b border-[#cecece99] dark:border-border">
+                             <div className="flex items-center gap-3 min-w-0 px-4">
+                               <IconMail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                               <span className="text-sm text-foreground">Work Email</span>
+                             </div>
+                             <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                             <div className="min-w-0 flex items-center pl-2 pr-2 h-full">
+                               <Skeleton className="h-3 w-16" />
+                             </div>
+                           </div>
+                           
+                           {/* Shift Period */}
+                           <div className="grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden border-b border-[#cecece99] dark:border-border">
+                             <div className="flex items-center gap-3 min-w-0 px-4">
+                               <IconClock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                               <span className="text-sm text-foreground">Shift Period</span>
+                             </div>
+                             <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                             <div className="min-w-0 flex items-center pl-2 pr-2 h-full">
+                               <Skeleton className="h-3 w-16" />
+                             </div>
+                           </div>
+                           
+                           {/* Employment Status */}
+                           <div className="grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden border-b border-[#cecece99] dark:border-border">
+                             <div className="flex items-center gap-3 min-w-0 px-4">
+                               <IconBuilding className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                               <span className="text-sm text-foreground">Employment Status</span>
+                             </div>
+                             <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                             <div className="min-w-0 flex items-center pl-2 pr-2 h-full">
+                               <Skeleton className="h-3 w-16" />
+                             </div>
+                           </div>
+                           
+                           {/* Start Date */}
+                           <div className="grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden border-b border-[#cecece99] dark:border-border">
+                             <div className="flex items-center gap-3 min-w-0 px-4">
+                               <IconCalendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                               <span className="text-sm text-foreground">Start Date</span>
+                             </div>
+                             <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                             <div className="min-w-0 flex items-center pl-2 pr-2 h-full">
+                               <Skeleton className="h-3 w-16" />
+                             </div>
+                           </div>
+                           
+                           {/* Exit Date */}
+                           <div className="grid grid-cols-[180px_auto_1fr] h-[33px] items-center overflow-hidden">
+                             <div className="flex items-center gap-3 min-w-0 px-4">
+                               <IconCalendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                               <span className="text-sm text-foreground">Exit Date</span>
+                             </div>
+                             <div className="w-px bg-[#cecece99] dark:bg-border h-full"></div>
+                             <div className="min-w-0 flex items-center pl-2 pr-2 h-full">
+                               <Skeleton className="h-3 w-16" />
+                             </div>
+                           </div>
+                         </div>
+                       ) : (
+                         <>
                        {/* Employee ID */}
                        <DataFieldRow
                          icon={<IconId className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
@@ -1789,6 +2355,8 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                            </Popover>
                          }
                        />
+                         </>
+                       )}
                      </div>
                    </div>
                  </TabsContent>
@@ -1800,6 +2368,12 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                        <h3 className="text-lg font-medium text-muted-foreground">Activity Data</h3>
                      </div>
                      <div className="rounded-lg border border-[#cecece99] dark:border-border overflow-hidden">
+                       {!activityDataLoaded && !activityLoading ? (
+                         <div className="p-6 text-center">
+                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                           <p className="text-sm text-muted-foreground">Loading activity data...</p>
+                         </div>
+                       ) : (
                        <AgentActivityData 
                          selectedEmployee={agentData ? {
                            id: agentData.user_id.toString(),
@@ -1839,6 +2413,503 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                          getMonthActivityData={getMonthActivityData}
                          user={user}
                        />
+                       )}
+                     </div>
+                   </div>
+                 </TabsContent>
+
+                 {/* Leaderboard Tab */}
+                 <TabsContent value="leaderboard" className="space-y-6 overflow-y-auto flex-1 min-h-0">
+                   <div>
+                     <div className="flex items-center justify-between min-h-[40px]">
+                       <h3 className="text-lg font-medium text-muted-foreground">Leaderboard</h3>
+                     </div>
+                     <div className="rounded-lg border border-[#cecece99] dark:border-border overflow-hidden">
+                       {!productivityDataLoaded && !productivityLoading ? (
+                         <div className="p-0">
+                           {/* Current Month Skeleton */}
+                           <div className="p-6 border-b border-[#cecece99] dark:border-border bg-gradient-to-r from-primary/5 to-primary/10">
+                             <div className="flex items-center justify-between">
+                               <span className="text-sm font-medium text-muted-foreground">Current</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                               <div className="flex items-center gap-4">
+                                 <div className="flex items-center gap-2">
+                                   <Skeleton className="h-6 w-8" />
+                                 </div>
+                                 <div>
+                                   <Skeleton className="h-6 w-32 mb-1" />
+                                 </div>
+                               </div>
+                               <div className="text-right">
+                                 <div className="flex items-center gap-6">
+                                   <div className="text-center">
+                                     <Skeleton className="h-6 w-16 mb-1" />
+                                     <span className="text-sm text-muted-foreground">Points</span>
+                                   </div>
+                                 </div>
+                               </div>
+                             </div>
+                           </div>
+                           
+                           {/* Summary Section Skeleton */}
+                           <div className="p-6">
+                             <div className="flex items-center justify-between">
+                               <span className="text-sm font-medium text-muted-foreground">Summary</span>
+                               <div className="flex items-center gap-2">
+                                 <span className="text-sm text-muted-foreground">Year:</span>
+                                 <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+                                   <SelectTrigger className="w-24">
+                                     <SelectValue placeholder="Year" />
+                                   </SelectTrigger>
+                                   <SelectContent>
+                                     {(() => {
+                                       const currentYear = new Date().getFullYear()
+                                       const startYear = 2025
+                                       const options = []
+                                       for (let year = currentYear; year >= startYear; year--) {
+                                         options.push({ value: year, label: year.toString() })
+                                       }
+                                       return options
+                                     })().map((option) => (
+                                       <SelectItem key={option.value} value={option.value.toString()}>
+                                         {option.label}
+                                       </SelectItem>
+                                     ))}
+                                   </SelectContent>
+                                 </Select>
+                               </div>
+                             </div>
+                             
+                             {/* Monthly Scores Skeleton */}
+                             <div className="mb-6">
+                               <div className="flex items-center justify-between mb-4">
+                                 <div className="flex items-center gap-2">
+                                   <IconTrophy className="h-5 w-5 text-primary" />
+                                   <span className="text-sm font-medium">Monthly Scores</span>
+                                 </div>
+                               </div>
+                               <div className="space-y-3">
+                                 {Array.from({ length: 6 }).map((_, index) => (
+                                   <div key={index} className="flex items-center justify-between p-3 rounded-lg border bg-muted/20 border-border">
+                                     <div className="flex items-center gap-3">
+                                       <div className="flex items-center gap-2 w-8">
+                                         <Skeleton className="h-4 w-6" />
+                                       </div>
+                                       <div>
+                                         <Skeleton className="h-4 w-24" />
+                                       </div>
+                                     </div>
+                                     <div className="text-right">
+                                       <div className="flex items-center gap-4">
+                                         <div className="text-center">
+                                           <Skeleton className="h-4 w-12 mb-1" />
+                                           <span className="text-xs text-muted-foreground">Points</span>
+                                         </div>
+                                       </div>
+                                     </div>
+                                   </div>
+                                 ))}
+                               </div>
+                             </div>
+                             
+                             {/* Statistics Skeleton */}
+                             <div>
+                               <div className="flex items-center gap-2 mb-4">
+                                 <IconChartBar className="h-5 w-5 text-primary" />
+                                 <span className="text-sm font-medium">Statistics</span>
+                               </div>
+                               <div className="grid grid-cols-2 gap-8">
+                                 <div className="space-y-2">
+                                   <div className="flex justify-between items-center">
+                                     <span className="text-sm text-muted-foreground">Best Score</span>
+                                     <Skeleton className="h-4 w-12" />
+                                   </div>
+                                   <div className="flex justify-between items-center">
+                                     <span className="text-sm text-muted-foreground">Best Rank</span>
+                                     <Skeleton className="h-4 w-16" />
+                                   </div>
+                                 </div>
+                                 <div className="space-y-2">
+                                   <div className="flex justify-between items-center">
+                                     <span className="text-sm text-muted-foreground">Lowest Score</span>
+                                     <Skeleton className="h-4 w-12" />
+                                   </div>
+                                   <div className="flex justify-between items-center">
+                                     <span className="text-sm text-muted-foreground">Worst Rank</span>
+                                     <Skeleton className="h-4 w-16" />
+                                   </div>
+                                 </div>
+                               </div>
+                             </div>
+                           </div>
+                         </div>
+                       ) : productivityLoading ? (
+                         <div className="p-0">
+                           {/* Current Month Skeleton */}
+                           <div className="p-6 border-b border-[#cecece99] dark:border-border bg-gradient-to-r from-primary/5 to-primary/10">
+                             <div className="flex items-center justify-between">
+                               <span className="text-sm font-medium text-muted-foreground">Current</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                               <div className="flex items-center gap-4">
+                                 <div className="flex items-center gap-2">
+                                   <Skeleton className="h-6 w-8" />
+                                 </div>
+                                 <div>
+                                   <Skeleton className="h-6 w-32 mb-1" />
+                                 </div>
+                               </div>
+                               <div className="text-right">
+                                 <div className="flex items-center gap-6">
+                                   <div className="text-center">
+                                     <Skeleton className="h-6 w-16 mb-1" />
+                                     <span className="text-sm text-muted-foreground">Points</span>
+                                   </div>
+                                 </div>
+                               </div>
+                             </div>
+                           </div>
+                           
+                           {/* Summary Section Skeleton */}
+                           <div className="p-6">
+                             <div className="flex items-center justify-between">
+                               <span className="text-sm font-medium text-muted-foreground">Summary</span>
+                               <div className="flex items-center gap-2">
+                                 <span className="text-sm text-muted-foreground">Year:</span>
+                                 <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+                                   <SelectTrigger className="w-24">
+                                     <SelectValue placeholder="Year" />
+                                   </SelectTrigger>
+                                   <SelectContent>
+                                     {(() => {
+                                       const currentYear = new Date().getFullYear()
+                                       const startYear = 2025
+                                       const options = []
+                                       for (let year = currentYear; year >= startYear; year--) {
+                                         options.push({ value: year, label: year.toString() })
+                                       }
+                                       return options
+                                     })().map((option) => (
+                                       <SelectItem key={option.value} value={option.value.toString()}>
+                                         {option.label}
+                                       </SelectItem>
+                                     ))}
+                                   </SelectContent>
+                                 </Select>
+                               </div>
+                             </div>
+                             
+                             {/* Monthly Scores Skeleton */}
+                             <div className="mb-6">
+                               <div className="flex items-center justify-between mb-4">
+                                 <div className="flex items-center gap-2">
+                                   <IconTrophy className="h-5 w-5 text-primary" />
+                                   <span className="text-sm font-medium">Monthly Scores</span>
+                                 </div>
+                               </div>
+                               <div className="space-y-3">
+                                 {Array.from({ length: 6 }).map((_, index) => (
+                                   <div key={index} className="flex items-center justify-between p-3 rounded-lg border bg-muted/20 border-border">
+                                     <div className="flex items-center gap-3">
+                                       <div className="flex items-center gap-2 w-8">
+                                         <Skeleton className="h-4 w-6" />
+                                       </div>
+                                       <div>
+                                         <Skeleton className="h-4 w-24" />
+                                       </div>
+                                     </div>
+                                     <div className="text-right">
+                                       <div className="flex items-center gap-4">
+                                         <div className="text-center">
+                                           <Skeleton className="h-4 w-12 mb-1" />
+                                           <span className="text-xs text-muted-foreground">Points</span>
+                                         </div>
+                                       </div>
+                                     </div>
+                                   </div>
+                                 ))}
+                               </div>
+                             </div>
+                             
+                             {/* Statistics Skeleton */}
+                             <div>
+                               <div className="flex items-center gap-2 mb-4">
+                                 <IconChartBar className="h-5 w-5 text-primary" />
+                                 <span className="text-sm font-medium">Statistics</span>
+                               </div>
+                               <div className="grid grid-cols-2 gap-8">
+                                 <div className="space-y-2">
+                                   <div className="flex justify-between items-center">
+                                     <span className="text-sm text-muted-foreground">Best Score</span>
+                                     <Skeleton className="h-4 w-12" />
+                                   </div>
+                                   <div className="flex justify-between items-center">
+                                     <span className="text-sm text-muted-foreground">Best Rank</span>
+                                     <Skeleton className="h-4 w-16" />
+                                   </div>
+                                 </div>
+                                 <div className="space-y-2">
+                                   <div className="flex justify-between items-center">
+                                     <span className="text-sm text-muted-foreground">Lowest Score</span>
+                                     <Skeleton className="h-4 w-12" />
+                                   </div>
+                                   <div className="flex justify-between items-center">
+                                     <span className="text-sm text-muted-foreground">Worst Rank</span>
+                                     <Skeleton className="h-4 w-16" />
+                                   </div>
+                                 </div>
+                               </div>
+                             </div>
+                           </div>
+                         </div>
+                       ) : productivityError ? (
+                         <div className="p-6 text-center">
+                           <IconAlertCircle className="h-8 w-8 text-destructive mx-auto mb-4" />
+                           <p className="text-sm text-destructive">{productivityError}</p>
+                         </div>
+                       ) : (
+                         <div className="p-0">
+                           {/* Current Month Section */}
+                           {(() => {
+                             if (!productivityScores || productivityScores.length === 0) {
+                                 return (
+                                   <div className="p-6">
+                                     <div className="space-y-4">
+                                       <NoData message="No Activity Data" />
+                                     </div>
+                                   </div>
+                                 )
+                             }
+                             
+                             const currentYear = new Date().getFullYear()
+                             
+                             // Always show the first item (which will be current month when viewing past years)
+                             const currentMonthScore = productivityScores[0]
+                             
+                             return (
+                               <div className="p-6 border-b border-[#cecece99] dark:border-border bg-gradient-to-r from-primary/5 to-primary/10">
+                                 <div className="flex items-center justify-between">
+                                   <span className="text-sm font-medium text-muted-foreground">Current</span>
+                                 </div>
+                                 <div className="flex items-center justify-between">
+                                   <div className="flex items-center gap-4">
+                                     <div className="flex items-center gap-2">
+                                       <span className={`text-lg font-bold ${
+                                         currentMonthScore.rank === 1 ? 'text-yellow-500' :
+                                         currentMonthScore.rank === 2 ? 'text-gray-500' :
+                                         currentMonthScore.rank === 3 ? 'text-amber-600' :
+                                         currentMonthScore.rank === 4 ? 'text-blue-500' :
+                                         currentMonthScore.rank === 5 ? 'text-purple-500' :
+                                         'text-muted-foreground'
+                                       }`}>#{currentMonthScore.rank}</span>
+                                     </div>
+                                     <div>
+                                       <h4 className="font-semibold text-lg flex items-center gap-2">
+                                         {currentMonthScore.monthName}
+                                         {currentMonthScore.rank === 1 && <IconCrown className="h-5 w-5 text-yellow-500" />}
+                                         {currentMonthScore.rank === 2 && <IconMedal className="h-5 w-5 text-gray-500" />}
+                                         {currentMonthScore.rank === 3 && <IconTrophy className="h-5 w-5 text-amber-600" />}
+                                         {currentMonthScore.rank === 4 && <IconStar className="h-5 w-5 text-blue-500" />}
+                                         {currentMonthScore.rank === 5 && <IconStar className="h-5 w-5 text-purple-500" />}
+                                       </h4>
+                                     </div>
+                                   </div>
+                                   <div className="text-right">
+                                     <div className="flex items-center gap-6">
+                                       <div className="text-center">
+                                         <div className="text-lg font-bold text-primary">{currentMonthScore.productivity_score.toFixed(2)}</div>
+                                         <div className="text-sm text-muted-foreground">Points</div>
+                                       </div>
+                                     </div>
+                                   </div>
+                                 </div>
+                               </div>
+                             )
+                           })()}
+                           
+                           {/* Summary Section - Only show when there's data */}
+                           {productivityScores && productivityScores.length > 0 && (
+                           <div className="p-6">
+                             <div className="flex items-center justify-between">
+                               <span className="text-sm font-medium text-muted-foreground">Summary</span>
+                               <div className="flex items-center gap-2">
+                                 <span className="text-sm text-muted-foreground">Year:</span>
+                                 <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+                                   <SelectTrigger className="w-24">
+                                     <SelectValue placeholder="Year" />
+                                   </SelectTrigger>
+                                   <SelectContent>
+                                     {(() => {
+                                       const currentYear = new Date().getFullYear()
+                                       const startYear = 2025
+                                       const options = []
+                                       for (let year = currentYear; year >= startYear; year--) {
+                                         options.push({ value: year, label: year.toString() })
+                                       }
+                                       return options
+                                     })().map((option) => (
+                                       <SelectItem key={option.value} value={option.value.toString()}>
+                                         {option.label}
+                                       </SelectItem>
+                                     ))}
+                                   </SelectContent>
+                                 </Select>
+                               </div>
+                             </div>
+                             
+                             {/* Monthly Score Section */}
+                             <div className="mb-6">
+                               <div className="flex items-center justify-between mb-4">
+                                 <h4 className="font-semibold flex items-center gap-2">
+                                   <IconTrophy className="h-5 w-5 text-primary" />
+                                   Monthly Scores
+                                 </h4>
+                             </div>
+                             
+                             <div className="space-y-3">
+                               {(() => {
+                                 // Always exclude the first item (current month) from Previous Monthly Scores
+                                 return productivityScores.slice(1).map((score: any, index: number) => (
+                                 <div 
+                                   key={`${score.month}-${score.user_id}`}
+                                   className="flex items-center justify-between p-3 rounded-lg border bg-muted/20 border-border"
+                                 >
+                                   <div className="flex items-center gap-3">
+                                     <div className="flex items-center gap-2 w-8">
+                                       <span className={`text-sm font-medium ${
+                                         score.rank === 1 ? 'text-yellow-500' :
+                                         score.rank === 2 ? 'text-gray-500' :
+                                         score.rank === 3 ? 'text-amber-600' :
+                                         score.rank === 4 ? 'text-blue-500' :
+                                         score.rank === 5 ? 'text-purple-500' :
+                                         'text-muted-foreground'
+                                       }`}>#{score.rank}</span>
+                                     </div>
+                                     <div>
+                                       <div className="font-medium text-sm flex items-center gap-2">
+                                         {score.monthName}
+                                         {score.rank === 1 && <IconCrown className="h-4 w-4 text-yellow-500" />}
+                                         {score.rank === 2 && <IconMedal className="h-4 w-4 text-gray-500" />}
+                                         {score.rank === 3 && <IconTrophy className="h-4 w-4 text-amber-600" />}
+                                         {score.rank === 4 && <IconStar className="h-4 w-4 text-blue-500" />}
+                                         {score.rank === 5 && <IconStar className="h-4 w-4 text-purple-500" />}
+                                       </div>
+                                     </div>
+                                   </div>
+                                   <div className="text-right">
+                                     <div className="text-center">
+                                       <div className="text-sm font-medium">{score.productivity_score.toFixed(2)}</div>
+                                       <div className="text-xs text-muted-foreground">Points</div>
+                                     </div>
+                                   </div>
+                                 </div>
+                               ))
+                               })()}
+                             </div>
+                             </div>
+                             
+                             {/* Statistics Section */}
+                             {(() => {
+                               const hasData = productivityScores && productivityScores.length > 0
+                               
+                               const stats = hasData ? {
+                                 totalMonths: productivityScores.length,
+                                 averageScore: productivityScores.reduce((sum, score) => sum + score.productivity_score, 0) / productivityScores.length,
+                                 bestScore: Math.max(...productivityScores.map(score => score.productivity_score)),
+                                 worstScore: Math.min(...productivityScores.map(score => score.productivity_score)),
+                                 totalActiveTime: productivityScores.reduce((sum, score) => sum + (score.total_active_seconds || 0), 0),
+                                 bestRank: Math.min(...productivityScores.map(score => score.rank)),
+                                 worstRank: Math.max(...productivityScores.map(score => score.rank))
+                               } : {
+                                 totalMonths: 0,
+                                 averageScore: 0,
+                                 bestScore: 0,
+                                 worstScore: 0,
+                                 totalActiveTime: 0,
+                                 bestRank: 0,
+                                 worstRank: 0
+                               }
+                               
+                               return (
+                                 <div>
+                                   <h4 className="font-semibold flex items-center gap-2 mb-4">
+                                     <IconChartBar className="h-5 w-5 text-primary" />
+                                     Statistics
+                                   </h4>
+                                   <div className="grid grid-cols-2 gap-8">
+                                     <div className="space-y-2">
+                                       <div className="flex justify-between items-center">
+                                         <span className="text-sm text-muted-foreground">Best Score</span>
+                                         <span className="font-semibold">{hasData ? <span className="text-green-600">{stats.bestScore.toFixed(2)}</span> : "-"}</span>
+                                       </div>
+                                       <div className="flex justify-between items-center">
+                                         <span className="text-sm text-muted-foreground">Best Rank</span>
+                                         <span className="font-semibold flex items-center gap-1">
+                                           {hasData ? (() => {
+                                             const bestRankMonth = productivityScores.find(score => score.rank === stats.bestRank)
+                                             return (
+                                               <>
+                                                 <span className={`${
+                                                   stats.bestRank === 1 ? 'text-yellow-500' :
+                                                   stats.bestRank === 2 ? 'text-gray-500' :
+                                                   stats.bestRank === 3 ? 'text-amber-600' :
+                                                   stats.bestRank === 4 ? 'text-blue-500' :
+                                                   stats.bestRank === 5 ? 'text-purple-500' :
+                                                   'text-muted-foreground'
+                                                 }`}>#{stats.bestRank}</span>
+                                                 <span className="text-sm">{bestRankMonth ? bestRankMonth.monthName : ""}</span>
+                                                 {stats.bestRank === 1 && <IconCrown className="h-4 w-4 text-yellow-500" />}
+                                                 {stats.bestRank === 2 && <IconMedal className="h-4 w-4 text-gray-500" />}
+                                                 {stats.bestRank === 3 && <IconTrophy className="h-4 w-4 text-amber-600" />}
+                                                 {stats.bestRank === 4 && <IconStar className="h-4 w-4 text-blue-500" />}
+                                                 {stats.bestRank === 5 && <IconStar className="h-4 w-4 text-purple-500" />}
+                                               </>
+                                             )
+                                           })() : "-"}
+                                         </span>
+                                       </div>
+                                     </div>
+                                     <div className="space-y-2">
+                                       <div className="flex justify-between items-center">
+                                         <span className="text-sm text-muted-foreground">Lowest Score</span>
+                                         <span className="font-semibold">{hasData ? <span className="text-red-600">{stats.worstScore.toFixed(2)}</span> : "-"}</span>
+                                       </div>
+                                       <div className="flex justify-between items-center">
+                                         <span className="text-sm text-muted-foreground">Worst Rank</span>
+                                         <span className="font-semibold flex items-center gap-1">
+                                           {hasData ? (() => {
+                                             const worstRankMonth = productivityScores.find(score => score.rank === stats.worstRank)
+                                             return (
+                                               <>
+                                                 <span className={`${
+                                                   stats.worstRank === 1 ? 'text-yellow-500' :
+                                                   stats.worstRank === 2 ? 'text-gray-500' :
+                                                   stats.worstRank === 3 ? 'text-amber-600' :
+                                                   stats.worstRank === 4 ? 'text-blue-500' :
+                                                   stats.worstRank === 5 ? 'text-purple-500' :
+                                                   'text-muted-foreground'
+                                                 }`}>#{stats.worstRank}</span>
+                                                 <span className="text-sm">{worstRankMonth ? worstRankMonth.monthName : ""}</span>
+                                                 {stats.worstRank === 1 && <IconCrown className="h-4 w-4 text-yellow-500" />}
+                                                 {stats.worstRank === 2 && <IconMedal className="h-4 w-4 text-gray-500" />}
+                                                 {stats.worstRank === 3 && <IconTrophy className="h-4 w-4 text-amber-600" />}
+                                                 {stats.worstRank === 4 && <IconStar className="h-4 w-4 text-blue-500" />}
+                                                 {stats.worstRank === 5 && <IconStar className="h-4 w-4 text-purple-500" />}
+                                               </>
+                                             )
+                                           })() : "-"}
+                                         </span>
+                                       </div>
+                                     </div>
+                                   </div>
+                                 </div>
+                               )
+                             })()}
+                           </div>
+                           )}
+                         </div>
+                       )}
                      </div>
                    </div>
                  </TabsContent>

@@ -356,9 +356,40 @@ export default function BreaksPage() {
   const handleReload = async () => {
     setReloading(true)
     try {
-      await fetchBreakSessions()
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+      
+      console.log('📡 Making API request to /api/breaks')
+      // For internal users, fetch all break sessions. For others, this would need to be adjusted based on your business logic
+      const memberId = 'all'
+      // Get today's date in Asia/Manila timezone to match database calculations
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) // YYYY-MM-DD format
+      const response = await fetch(`/api/breaks?memberId=${memberId}&date=${today}`)
+      
+      console.log('📊 Response status:', response.status)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.log('❌ API error:', errorText)
+        throw new Error(`Failed to fetch break sessions: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log('✅ Break sessions data received:', data)
+      
+      setBreakSessions(data.breakSessions)
+      setStats({
+        total: data.stats.total,
+        active: data.stats.active,
+        today: data.stats.today,
+        averageDuration: data.stats.averageDuration,
+        totalAgents: data.stats.totalAgents
+      })
+      setError(null) // Clear any previous errors
+      
     } catch (err) {
       console.error('❌ Reload error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to reload break sessions')
     } finally {
       setReloading(false)
     }
@@ -742,7 +773,11 @@ export default function BreaksPage() {
                     <div className="w-56">
                       <Select value={memberId} onValueChange={(v: string) => setMemberId(v)}>
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Filter by member" />
+                          <SelectValue placeholder="Filter by member">
+                            {memberId === 'all' ? 'All Employees' : 
+                             memberId === 'none' ? 'No Assigned Members' :
+                             memberOptions.find(m => String(m.id) === memberId)?.company || 'Filter by member'}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Employees</SelectItem>
@@ -789,7 +824,7 @@ export default function BreaksPage() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {[...Array(8)].map((_, i) => (
+                              {[...Array(12)].map((_, i) => (
                                 <TableRow key={i} className="h-20">
                                   <TableCell>
                                     <div className="flex items-center gap-3">

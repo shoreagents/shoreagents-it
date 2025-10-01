@@ -187,8 +187,8 @@ export function useRealtimeAnnouncements(options: UseRealtimeAnnouncementsOption
           }
         }
         
-        // Always call the general update callback
-        if (onAnnouncementUpdated) {
+        // Only call the general update callback for UPDATE operations, not INSERT
+        if (message.data.action === 'UPDATE' && onAnnouncementUpdated) {
           onAnnouncementUpdated(message.data, { status: message.data.old_status })
         }
         break

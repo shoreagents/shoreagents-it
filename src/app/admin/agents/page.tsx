@@ -241,23 +241,26 @@ export default function AgentsPage() {
   })
 
   const handleRowClick = async (agent: AgentRecord) => {
+    // 🚀 INSTANT: Open modal immediately with basic data (12 fields)
+    setSelectedAgent(agent)
+    setIsModalOpen(true)
+    
+    // 🔄 BACKGROUND: Fetch additional data (21 fields) and update
     try {
-      // Fetch only missing fields (21 fields) and merge with existing data
+      console.log('🔄 Fetching additional agent details in background...')
       const response = await fetch(`/api/agents/${agent.user_id}/details`)
       if (response.ok) {
         const data = await response.json()
         // Merge existing 12 fields with 21 new fields
         setSelectedAgent({ ...agent, ...data.agent })
+        console.log('✅ Additional agent details loaded successfully')
       } else {
-        // Fallback to basic data if fetch fails
-        setSelectedAgent(agent)
+        console.warn('⚠️ Failed to fetch additional details, using basic data')
       }
     } catch (error) {
-      console.error('Failed to fetch agent details:', error)
-      // Fallback to basic data if fetch fails
-      setSelectedAgent(agent)
+      console.error('❌ Failed to fetch agent details:', error)
+      // Modal stays open with basic data - no user impact
     }
-    setIsModalOpen(true)
   }
 
   const handleCloseModal = () => {

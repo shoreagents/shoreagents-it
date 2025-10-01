@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { AnimatedTabs } from "@/components/ui/animated-tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import {
@@ -59,7 +58,7 @@ interface AgentActivityDataProps {
 
 // Helper function to format dates consistently
 const formatDateForDisplay = (dateString: string, format: 'short' | 'long' = 'short') => {
-  if (!dateString || typeof dateString !== 'string') return ''
+  if (!dateString || typeof dateString !== 'string') return 'No date available'
   
   // Handle both YYYY-MM-DD and ISO timestamp formats
   let date: Date
@@ -71,7 +70,7 @@ const formatDateForDisplay = (dateString: string, format: 'short' | 'long' = 'sh
     date = new Date(dateString + 'T00:00:00')
   }
   
-  if (isNaN(date.getTime())) return dateString // Return original value if invalid date
+  if (isNaN(date.getTime())) return 'Invalid date' // Return meaningful message for invalid date
   
   if (format === 'long') {
     return date.toLocaleDateString("en-US", {
@@ -96,29 +95,50 @@ export function AgentActivityData({
   getMonthActivityData,
   user
 }: AgentActivityDataProps) {
-  const [activeTab, setActiveTab] = useState("data")
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [chartLoading, setChartLoading] = useState(false)
   const [chartError, setChartError] = useState<string | null>(null)
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+  const [selectedYear, setSelectedYear] = useState<number>(() => {
     const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    return Math.max(now.getFullYear(), 2025)
+  })
+  const [selectedMonth, setSelectedMonth] = useState<number>(() => {
+    const now = new Date()
+    return now.getMonth() + 1 // JavaScript months are 0-based
   })
 
-  // Generate month options for dropdown
-  const generateMonthOptions = () => {
-    const now = new Date()
+  // Generate year options for dropdown
+  const generateYearOptions = () => {
+    const currentYear = new Date().getFullYear()
+    const startYear = 2025
     const options = []
     
-    // Add current month and previous 6 months
-    for (let i = 0; i <= 6; i++) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-      const label = date.toLocaleDateString("en-US", { month: "long", year: "numeric" })
-      options.push({ value, label })
+    // Generate years from current year down to 2025
+    for (let year = currentYear; year >= startYear; year--) {
+      options.push({ value: year.toString(), label: year.toString() })
     }
     
     return options
+  }
+
+  // Generate month options for dropdown
+  const generateMonthOptions = () => {
+    const months = [
+      { value: "1", label: "January" },
+      { value: "2", label: "February" },
+      { value: "3", label: "March" },
+      { value: "4", label: "April" },
+      { value: "5", label: "May" },
+      { value: "6", label: "June" },
+      { value: "7", label: "July" },
+      { value: "8", label: "August" },
+      { value: "9", label: "September" },
+      { value: "10", label: "October" },
+      { value: "11", label: "November" },
+      { value: "12", label: "December" }
+    ]
+    
+    return months
   }
 
   // Fetch chart data from API when employee is selected
@@ -129,11 +149,9 @@ export function AgentActivityData({
     setChartError(null)
 
     try {
-      // Get date range based on selected month
-      // Handle month format (e.g., "2024-01")
-      const [year, month] = selectedMonth.split('-').map(Number)
-      const startOfMonth = new Date(year, month - 1, 1)
-      const endOfMonth = new Date(year, month, 0)
+      // Get date range based on selected year and month
+      const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1)
+      const endOfMonth = new Date(selectedYear, selectedMonth, 0)
       
       const startDate = startOfMonth.toLocaleDateString('en-CA')
       const endDate = endOfMonth.toLocaleDateString('en-CA')
@@ -235,281 +253,9 @@ export function AgentActivityData({
       const employeeId = selectedEmployee.user_id || selectedEmployee.id
       fetchChartData(employeeId.toString())
     }
-  }, [selectedEmployee?.user_id || selectedEmployee?.id, user?.id, selectedMonth])
+  }, [selectedEmployee?.user_id || selectedEmployee?.id, user?.id, selectedYear, selectedMonth])
 
-  const tabs = [
-    {
-      title: "View Data",
-      value: "data",
-      content: null
-    },
-    {
-      title: "View Charts", 
-      value: "charts",
-      content: null
-    }
-  ]
 
-  // Handle tab change
-  const handleTabChange = (tabValue: string) => {
-    setActiveTab(tabValue)
-  }
-
-  const renderDataContent = () => {
-    if (!selectedEmployee) {
-      return (
-        <div className="space-y-4">
-          {/* Today - Default with no data */}
-          <div>
-            <div className="text-sm font-medium text-muted-foreground mb-2">Today</div>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <CardContent className="p-3">
-                  <div>
-                    <span className="text-xs text-muted-foreground">Total Active Time</span>
-                  </div>
-                  <div className="text-lg font-semibold tabular-nums mt-1">
-                    0h 0m
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-3">
-                  <div>
-                    <span className="text-xs text-muted-foreground">Total Inactive Time</span>
-                  </div>
-                  <div className="text-lg font-semibold tabular-nums mt-1">
-                    0h 0m
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-          
-          {/* Yesterday */}
-          <div>
-            <div className="text-sm font-medium text-muted-foreground mb-2">Yesterday</div>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <CardContent className="p-3">
-                  <div>
-                    <span className="text-xs text-muted-foreground">Total Active Time</span>
-                  </div>
-                  <div className="text-lg font-semibold tabular-nums mt-1">
-                    0h 0m
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-3">
-                  <div>
-                    <span className="text-xs text-muted-foreground">Total Inactive Time</span>
-                  </div>
-                  <div className="text-lg font-semibold tabular-nums mt-1">
-                    0h 0m
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-          
-          {/* This Week */}
-          <div>
-            <div className="text-sm font-medium text-muted-foreground mb-2">This Week</div>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <CardContent className="p-3">
-                  <div>
-                    <span className="text-xs text-muted-foreground">Total Active Time</span>
-                  </div>
-                  <div className="text-lg font-semibold tabular-nums mt-1">
-                    0h 0m
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-3">
-                  <div>
-                    <span className="text-xs text-muted-foreground">Total Inactive Time</span>
-                  </div>
-                  <div className="text-lg font-semibold tabular-nums mt-1">
-                    0h 0m
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-          
-          {/* This Month */}
-          <div>
-            <div className="text-sm font-medium text-muted-foreground mb-2">
-              {new Date(selectedMonth + '-01').toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <CardContent className="p-3">
-                  <div>
-                    <span className="text-xs text-muted-foreground">Total Active Time</span>
-                  </div>
-                  <div className="text-lg font-semibold tabular-nums mt-1">
-                    0h 0m
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-3">
-                  <div>
-                    <span className="text-xs text-muted-foreground">Total Inactive Time</span>
-                  </div>
-                  <div className="text-lg font-semibold tabular-nums mt-1">
-                    0h 0m
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
-      )
-    }
-
-    return (
-      <div className="space-y-4">
-        {/* Today - Always available, no loading state needed */}
-        <div>
-          <div className="text-sm font-medium text-muted-foreground mb-2">Today</div>
-          <div className="grid grid-cols-2 gap-3">
-            <Card>
-              <CardContent className="p-3">
-                <div>
-                  <span className="text-xs text-muted-foreground">Total Active Time</span>
-                </div>
-                <div className="text-lg font-semibold tabular-nums mt-1">
-                  {formatTime(selectedEmployee.activity?.today_active_seconds || 0)}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <div>
-                  <span className="text-xs text-muted-foreground">Total Inactive Time</span>
-                </div>
-                <div className="text-lg font-semibold tabular-nums mt-1">
-                  {formatTime(selectedEmployee.activity?.today_inactive_seconds || 0)}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-        
-        {/* Yesterday */}
-        <div>
-          <div className="text-sm font-medium text-muted-foreground mb-2">Yesterday</div>
-          <div className="grid grid-cols-2 gap-3">
-            <Card>
-              <CardContent className="p-3">
-                <div>
-                  <span className="text-xs text-muted-foreground">Total Active Time</span>
-                </div>
-                <div className="text-lg font-semibold tabular-nums mt-1">
-                  {detailLoading ? (
-                    <Skeleton className="h-6 w-16" />
-                  ) : (
-                    formatTime(getYesterdayActivityData(selectedEmployee).today_active_seconds)
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <div>
-                  <span className="text-xs text-muted-foreground">Total Inactive Time</span>
-                </div>
-                <div className="text-lg font-semibold tabular-nums mt-1">
-                  {detailLoading ? (
-                    <Skeleton className="h-6 w-16" />
-                  ) : (
-                    formatTime(getYesterdayActivityData(selectedEmployee).today_inactive_seconds)
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-        
-        {/* This Week */}
-        <div>
-          <div className="text-sm font-medium text-muted-foreground mb-2">This Week</div>
-          <div className="grid grid-cols-2 gap-3">
-            <Card>
-              <CardContent className="p-3">
-                <div>
-                  <span className="text-xs text-muted-foreground">Total Active Time</span>
-                </div>
-                <div className="text-lg font-semibold tabular-nums mt-1">
-                  {detailLoading ? (
-                    <Skeleton className="h-6 w-16" />
-                  ) : (
-                    formatTime(getWeekActivityData(selectedEmployee).total_active_seconds)
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <div>
-                  <span className="text-xs text-muted-foreground">Total Inactive Time</span>
-                </div>
-                <div className="text-lg font-semibold tabular-nums mt-1">
-                  {detailLoading ? (
-                    <Skeleton className="h-6 w-16" />
-                  ) : (
-                    formatTime(getWeekActivityData(selectedEmployee).total_inactive_seconds)
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-        
-        {/* This Month */}
-        <div>
-          <div className="text-sm font-medium text-muted-foreground mb-2">
-            {new Date(selectedMonth + '-01').toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Card>
-              <CardContent className="p-3">
-                <div>
-                  <span className="text-xs text-muted-foreground">Total Active Time</span>
-                </div>
-                <div className="text-lg font-semibold tabular-nums mt-1">
-                  {detailLoading ? (
-                    <Skeleton className="h-6 w-16" />
-                  ) : (
-                    formatTime(getMonthActivityData(selectedEmployee).total_active_seconds)
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <div>
-                  <span className="text-xs text-muted-foreground">Total Inactive Time</span>
-                </div>
-                <div className="text-lg font-semibold tabular-nums mt-1">
-                  {detailLoading ? (
-                    <Skeleton className="h-6 w-16" />
-                  ) : (
-                    formatTime(getMonthActivityData(selectedEmployee).total_inactive_seconds)
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   const renderChartsContent = () => {
     if (!selectedEmployee) {
@@ -534,6 +280,35 @@ export function AgentActivityData({
         color: "hsl(0 84% 60%)",
       },
     } satisfies ChartConfig
+
+    // Calculate most active and most inactive times
+    const calculatePeakTimes = () => {
+      if (!chartData || chartData.length === 0) {
+        return {
+          mostActive: null,
+          mostInactive: null
+        }
+      }
+
+      let mostActive = chartData[0]
+      let mostInactive = chartData[0]
+
+      chartData.forEach(dataPoint => {
+        if (dataPoint.active > mostActive.active) {
+          mostActive = dataPoint
+        }
+        if (dataPoint.inactive > mostInactive.inactive) {
+          mostInactive = dataPoint
+        }
+      })
+
+      return {
+        mostActive: mostActive.active > 0 ? mostActive : null,
+        mostInactive: mostInactive.inactive > 0 ? mostInactive : null
+      }
+    }
+
+    const peakTimes = calculatePeakTimes()
 
     if (chartLoading) {
       return (
@@ -572,10 +347,8 @@ export function AgentActivityData({
     if (chartData.length === 0) {
       return (
         <div className="space-y-4">
-          <div className="text-center py-8">
-            <div className="text-muted-foreground">
-              No activity data available for this employee this month.
-            </div>
+          <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded-xl bg-muted/20">
+            <p className="text-sm font-medium">No Activity Data</p>
           </div>
         </div>
       )
@@ -615,24 +388,25 @@ export function AgentActivityData({
                       <ChartTooltipContent
                         className="min-w-[16rem]"
                         labelClassName="text-center w-full"
-                        labelFormatter={(value) => {
-                          const dateText = formatDateForDisplay(value, 'long')
-                          if (dateText === value) {
-                            // If formatting failed, return original value with styling
+                          labelFormatter={(value) => {
+                            const dateText = formatDateForDisplay(value, 'long')
+                            // Check if formatting failed by looking for our error messages
+                            if (dateText === 'No date available' || dateText === 'Invalid date') {
+                              // If formatting failed, return original value with styling
+                              return (
+                                <div className="flex w-full flex-col items-center">
+                                  <span>{value}</span>
+                                  <div className="h-px w-full bg-foreground/20 my-1" />
+                                </div>
+                              )
+                            }
                             return (
                               <div className="flex w-full flex-col items-center">
-                                <span>{value}</span>
+                                <span>{dateText}</span>
                                 <div className="h-px w-full bg-foreground/20 my-1" />
                               </div>
                             )
-                          }
-                          return (
-                            <div className="flex w-full flex-col items-center">
-                              <span>{dateText}</span>
-                              <div className="h-px w-full bg-foreground/20 my-1" />
-                            </div>
-                          )
-                        }}
+                          }}
                         indicator="dot"
                         formatter={(val, name, item, _idx, point: any) => {
                           // Only render once for the first series (active) to avoid duplication
@@ -656,7 +430,7 @@ export function AgentActivityData({
                                   <div className="h-2 w-2 rounded-full bg-orange-500"></div>
                                   Active
                                 </span>
-                                <span className="font-mono">
+                                <span>
                                   {activeHours}h {activeMinutes}m
                                 </span>
                               </div>
@@ -665,7 +439,7 @@ export function AgentActivityData({
                                   <div className="h-2 w-2 rounded-full bg-red-500"></div>
                                   Inactive
                                 </span>
-                                <span className="font-mono">
+                                <span>
                                   {inactiveHours}h {inactiveMinutes}m
                                 </span>
                               </div>
@@ -695,19 +469,80 @@ export function AgentActivityData({
             </CardContent>
           </Card>
         </div>
+
       </div>
     )
   }
 
+  // Calculate most active and most inactive times (moved outside renderChartsContent)
+  const calculatePeakTimes = () => {
+    if (!chartData || chartData.length === 0) {
+      return {
+        mostActive: null,
+        mostInactive: null
+      }
+    }
+
+    let mostActive = chartData[0]
+    let mostInactive = chartData[0]
+
+    chartData.forEach(dataPoint => {
+      if (dataPoint.active > mostActive.active) {
+        mostActive = dataPoint
+      }
+      if (dataPoint.inactive > mostInactive.inactive) {
+        mostInactive = dataPoint
+      }
+    })
+
+    return {
+      mostActive: mostActive.active > 0 ? mostActive : null,
+      mostInactive: mostInactive.inactive > 0 ? mostInactive : null
+    }
+  }
+
+  const peakTimes = calculatePeakTimes()
+
   return (
-    <Card className="bg-transparent border-0 shadow-none">
+    <>
       <CardHeader>
         <div className="flex items-center justify-between">
+          {/* Left side - Activity totals */}
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-orange-500"></div>
+              <span className="text-sm text-muted-foreground">Total Active Time:</span>
+              <span className="text-sm font-semibold">
+                {chartLoading ? (
+                  <Skeleton className="h-4 w-16" />
+                ) : chartData && chartData.length > 0 ? (
+                  formatTime(chartData.reduce((sum, day) => sum + day.active, 0))
+                ) : (
+                  "0h 0m"
+                )}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-red-500"></div>
+              <span className="text-sm text-muted-foreground">Total Inactive Time:</span>
+              <span className="text-sm font-semibold">
+                {chartLoading ? (
+                  <Skeleton className="h-4 w-16" />
+                ) : chartData && chartData.length > 0 ? (
+                  formatTime(chartData.reduce((sum, day) => sum + day.inactive, 0))
+                ) : (
+                  "0h 0m"
+                )}
+              </span>
+            </div>
+          </div>
+          
+          {/* Right side - Date filters */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Filter by:</span>
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select month" />
+            <span className="text-sm text-muted-foreground">Date:</span>
+            <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Month" />
               </SelectTrigger>
               <SelectContent>
                 {generateMonthOptions().map((option) => (
@@ -717,21 +552,121 @@ export function AgentActivityData({
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="ml-4">
-            <AnimatedTabs
-              tabs={tabs}
-              containerClassName="flex flex-row items-center justify-end"
-              activeTabClassName=""
-              tabClassName="px-3 py-1 text-sm font-medium"
-              onTabChange={(tab) => handleTabChange(tab.value)}
-            />
+            <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+              <SelectTrigger className="w-[100px]">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {generateYearOptions().map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        {activeTab === "data" ? renderDataContent() : renderChartsContent()}
+        <div className="space-y-4">
+          {/* Tab Content */}
+          {renderChartsContent()}
+        </div>
       </CardContent>
-    </Card>
+      
+      {/* Peak Times Summary - Outside tab content and padding container */}
+      {(() => {
+        // If no employee is selected, don't show peak cards
+        if (!selectedEmployee) {
+          return null
+        }
+
+        // Check if there's chart data available for the selected period
+        const hasChartData = chartData && chartData.length > 0
+
+        // Only show peak cards if there's chart data or if loading
+        if (!hasChartData && !detailLoading && !chartLoading) {
+          return null
+        }
+
+        return (
+        <div className="bg-gradient-to-r from-primary/5 to-primary/10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
+            {/* Most Active Time */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center">
+                    <svg className="h-7 w-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold">Most Active Time</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {detailLoading || chartLoading ? (
+                        <Skeleton className="h-4 w-32" />
+                      ) : peakTimes.mostActive ? (
+                        formatDateForDisplay(peakTimes.mostActive.date, 'long')
+                      ) : (
+                        "No data available"
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-green-600">
+                      {detailLoading || chartLoading ? (
+                        <Skeleton className="h-6 w-16" />
+                      ) : peakTimes.mostActive ? (
+                        formatTime(peakTimes.mostActive.active)
+                      ) : (
+                        "—"
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Most Inactive Time */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center">
+                    <svg className="h-7 w-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold">Most Inactive Time</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {detailLoading || chartLoading ? (
+                        <Skeleton className="h-4 w-32" />
+                      ) : peakTimes.mostInactive ? (
+                        formatDateForDisplay(peakTimes.mostInactive.date, 'long')
+                      ) : (
+                        "No data available"
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-red-600">
+                      {detailLoading || chartLoading ? (
+                        <Skeleton className="h-6 w-16" />
+                      ) : peakTimes.mostInactive ? (
+                        formatTime(peakTimes.mostInactive.inactive)
+                      ) : (
+                        "—"
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+        )
+      })()}
+    </>
   )
 }

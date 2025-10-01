@@ -300,7 +300,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
             start_time: start_time,
             end_time: end_time,
             location: location,
-            status: status
+            status: status || data?.status || record?.status
           }
           onEventDeleted?.(deletedEventData)
           break

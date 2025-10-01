@@ -23,7 +23,7 @@ import { IdCardIcon } from "@/components/icons/id-card-icon"
 import { FilePenLineIcon } from "@/components/icons/file-pen-line-icon"
 import { SparklesIcon } from "@/components/icons/sparkles-icon"
 import { HomeIcon } from "@/components/icons/home-icon"
-import { ClockIcon, BarChart3Icon, MegaphoneIcon } from "lucide-react"
+import { ClockIcon, BarChart3Icon, MegaphoneIcon, TrophyIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -133,7 +133,6 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
             <SidebarGroupLabel>MAIN</SidebarGroupLabel>
             <div className="flex flex-col gap-2 px-2 py-2">
               <Skeleton className="h-8 w-full rounded-lg" />
-              <Skeleton className="h-8 w-4/5 rounded-lg" />
             </div>
           </SidebarGroup>
           <SidebarGroup className="p-0">
@@ -144,12 +143,49 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
             </div>
           </SidebarGroup>
           <SidebarGroup className="p-0">
+            <SidebarGroupLabel>EMPLOYEES</SidebarGroupLabel>
+            <div className="flex flex-col gap-2 px-2 py-2">
+              <Skeleton className="h-8 w-4/5 rounded-lg" />
+              <Skeleton className="h-8 w-3/5 rounded-lg" />
+            </div>
+          </SidebarGroup>
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel>MEMBERS</SidebarGroupLabel>
+            <div className="flex flex-col gap-2 px-2 py-2">
+              <Skeleton className="h-8 w-4/5 rounded-lg" />
+              <Skeleton className="h-8 w-3/5 rounded-lg" />
+              <Skeleton className="h-8 w-2/5 rounded-lg" />
+            </div>
+          </SidebarGroup>
+          <SidebarGroup className="p-0">
             <SidebarGroupLabel>TRACKING</SidebarGroupLabel>
             <div className="flex flex-col gap-2 px-2 py-2">
               <Skeleton className="h-8 w-4/5 rounded-lg" />
               <Skeleton className="h-8 w-3/5 rounded-lg" />
             </div>
           </SidebarGroup>
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel>RECRUITMENT</SidebarGroupLabel>
+            <div className="flex flex-col gap-2 px-2 py-2">
+              <Skeleton className="h-8 w-3/5 rounded-lg" />
+              <div className="ml-4 flex flex-col gap-1">
+                <Skeleton className="h-6 w-4/5 rounded-lg" />
+                <Skeleton className="h-6 w-3/5 rounded-lg" />
+              </div>
+              <Skeleton className="h-8 w-4/5 rounded-lg" />
+            </div>
+          </SidebarGroup>
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel>HAPPENINGS</SidebarGroupLabel>
+            <div className="flex flex-col gap-2 px-2 py-2">
+              <Skeleton className="h-8 w-full rounded-lg" />
+              <Skeleton className="h-8 w-4/5 rounded-lg" />
+              <Skeleton className="h-8 w-3/5 rounded-lg" />
+            </div>
+          </SidebarGroup>
+          <div className="mt-auto px-2 py-2">
+            <Skeleton className="h-8 w-3/5 rounded-lg" />
+          </div>
         </SidebarContent>
       </Sidebar>
     )
@@ -212,6 +248,17 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
         )}
         {isAdmin && (
           <SidebarGroup className="p-0">
+            <SidebarGroupLabel>TRACKING</SidebarGroupLabel>
+            <NavMain
+              items={[
+                { title: "Breaks", url: "/admin/breaks", icon: ClockIcon },
+                { title: "Activity", url: "/admin/activities", icon: BarChart3Icon },
+              ]}
+            />
+          </SidebarGroup>
+        )}
+        {isAdmin && (
+          <SidebarGroup className="p-0">
             <SidebarGroupLabel>RECRUITMENT</SidebarGroupLabel>
             <NavMainWithSubgroups
               items={[
@@ -234,19 +281,9 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
             <SidebarGroupLabel>HAPPENINGS</SidebarGroupLabel>
             <NavMain
               items={[
+                { title: "Leaderboard", url: "/admin/leaderboard", icon: TrophyIcon },
                 { title: "Announcements", url: "/admin/announcements", icon: MegaphoneIcon, badge: activeAnnouncementsCount > 0 ? activeAnnouncementsCount : undefined },
                 { title: "Events & Activities", url: "/admin/events", icon: CalendarIcon, badge: todayEventsCount > 0 ? todayEventsCount : undefined },
-              ]}
-            />
-          </SidebarGroup>
-        )}
-        {isAdmin && (
-          <SidebarGroup className="p-0">
-            <SidebarGroupLabel>TRACKING</SidebarGroupLabel>
-            <NavMain
-              items={[
-                { title: "Breaks", url: "/admin/breaks", icon: ClockIcon },
-                { title: "Activity", url: "/admin/activities", icon: BarChart3Icon },
               ]}
             />
           </SidebarGroup>
