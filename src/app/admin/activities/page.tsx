@@ -1334,7 +1334,7 @@ const getActivityStatus = (isActive: boolean, lastSessionStart: string | null, h
                       Track user activities and productivity metrics by date.
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 items-center">
                     <div className="w-56">
                       <Select value={memberId} onValueChange={(v: string) => setMemberId(v)}>
                         <SelectTrigger className="w-full">
@@ -1353,8 +1353,8 @@ const getActivityStatus = (isActive: boolean, lastSessionStart: string | null, h
                         </SelectContent>
                       </Select>
                     </div>
-                    <ReloadButton 
-                      loading={reloading} 
+                    <ReloadButton
+                      loading={reloading}
                       onReload={handleReload}
                     />
                   </div>

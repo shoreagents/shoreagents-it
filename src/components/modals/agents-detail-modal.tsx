@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
-import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconGenderMale, IconGenderFemale, IconGenderNeutrois, IconHelp, IconSun, IconMoon, IconClockHour4, IconUsers, IconHome, IconDeviceLaptop, IconTrophy, IconMedal, IconCrown, IconStar, IconChartBar } from "@tabler/icons-react"
+import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconGenderMale, IconGenderFemale, IconGenderNeutrois, IconHelp, IconSun, IconMoon, IconClockHour4, IconUsers, IconHome, IconDeviceLaptop, IconTrophy, IconMedal, IconCrown, IconStar, IconChartBar, IconRefresh } from "@tabler/icons-react"
 import { useRealtimeMembers } from '@/hooks/use-realtime-members'
 import { SendHorizontal, Target } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -37,6 +37,22 @@ interface AgentsDetailModalProps {
   onClose: () => void
   agentId?: string
   agentData?: AgentRecord
+}
+
+interface ChartDataPoint {
+  date: string
+  active: number
+  inactive: number
+}
+
+interface ProductivityScore {
+  user_id: number
+  productivity_score: number
+  rank: number
+  month: number
+  monthName: string
+  isCurrentMonth?: boolean
+  total_active_seconds?: number
 }
 
 interface AgentRecord {
@@ -365,6 +381,44 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     const [hasChanges, setHasChanges] = React.useState(false)
     const [isSaving, setIsSaving] = React.useState(false)
 
+    // Chart data cache for AgentActivityData component
+    const [chartDataCache, setChartDataCache] = React.useState<Record<string, ChartDataPoint[]>>({})
+
+    // Leaderboard data cache for productivity scores by year
+    const [leaderboardDataCache, setLeaderboardDataCache] = React.useState<Record<string, ProductivityScore[]>>({})
+    
+    // Leaderboard chart data cache (similar to Activity Data)
+    const [leaderboardChartCache, setLeaderboardChartCache] = React.useState<Record<string, ChartDataPoint[]>>({})
+
+    // Function to clear leaderboard cache (useful for manual refresh)
+    const clearLeaderboardCache = () => {
+      setLeaderboardDataCache({})
+      setLeaderboardChartCache({})
+      console.log('🗑️ Cleared leaderboard cache')
+    }
+
+    // Function to clear all caches
+    const clearAllCaches = () => {
+      setChartDataCache({})
+      setLeaderboardDataCache({})
+      setLeaderboardChartCache({})
+      console.log('🗑️ Cleared all caches')
+    }
+
+    // Clear all caches when modal closes
+    React.useEffect(() => {
+      if (!isOpen) {
+        clearAllCaches()
+      }
+    }, [isOpen])
+
+    // Clear all caches when switching agents
+    React.useEffect(() => {
+      if (isOpen && agentData) {
+        clearAllCaches()
+      }
+    }, [agentData?.user_id])
+
     // Initialize input values when modal opens
     React.useEffect(() => {
       if (isOpen && agentData) {
@@ -452,12 +506,21 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     const fetchProductivityScores = async () => {
       if (!agentData?.user_id || !user) return
       
+      // Check if data is already cached for this year
+      const cacheKey = `${agentData.user_id}-${selectedYear}`
+      if (leaderboardDataCache[cacheKey]) {
+        console.log('📊 Using cached productivity data for year:', selectedYear)
+        setProductivityScores(leaderboardDataCache[cacheKey])
+        setProductivityDataLoaded(true)
+        return
+      }
+      
       setProductivityLoading(true)
       setProductivityError(null)
       
       try {
         const memberId = user.userType === 'Internal' ? 'all' : user.id
-        const allMonthsData = []
+        const allMonthsData: ProductivityScore[] = []
         
         console.log('📊 Fetching productivity scores for user:', agentData.user_id, 'memberId:', memberId, 'year:', selectedYear)
         
@@ -546,6 +609,14 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
         setProductivityScores(allMonthsData)
         setProductivityStats(null) // No stats needed for individual user data
         
+        // Cache the fetched data for this year
+        setLeaderboardDataCache(prev => ({
+          ...prev,
+          [cacheKey]: allMonthsData
+        }))
+        
+        console.log('💾 Cached productivity data for year:', selectedYear)
+        
       } catch (err) {
         console.error('❌ Productivity scores fetch error:', err)
         setProductivityError(err instanceof Error ? err.message : 'Failed to fetch productivity scores')
@@ -564,9 +635,20 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     }
   }, [activeTab, productivityDataLoaded, agentData, user, selectedYear])
 
-  // Handle year changes - refetch data when year changes
+  // Handle year changes - use cache if available, otherwise refetch data
   React.useEffect(() => {
     if (activeTab === 'leaderboard' && productivityDataLoaded && agentData && user) {
+      const cacheKey = `${agentData.user_id}-${selectedYear}`
+      
+      // Check if we have cached data for this year
+      if (leaderboardDataCache[cacheKey]) {
+        console.log('📊 Using cached data for year change:', selectedYear)
+        setProductivityScores(leaderboardDataCache[cacheKey])
+        return
+      }
+      
+      // If no cached data, fetch it
+      console.log('📊 No cached data found, fetching for year:', selectedYear)
       fetchProductivityScores()
     }
   }, [selectedYear])
@@ -2412,6 +2494,8 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                          getWeekActivityData={getWeekActivityData}
                          getMonthActivityData={getMonthActivityData}
                          user={user}
+                         chartDataCache={chartDataCache}
+                         setChartDataCache={setChartDataCache}
                        />
                        )}
                      </div>
@@ -2422,7 +2506,19 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                  <TabsContent value="leaderboard" className="space-y-6 overflow-y-auto flex-1 min-h-0">
                    <div>
                      <div className="flex items-center justify-between min-h-[40px]">
-                       <h3 className="text-lg font-medium text-muted-foreground">Leaderboard</h3>
+                       <div className="flex items-center gap-2">
+                         <h3 className="text-lg font-medium text-muted-foreground">Leaderboard</h3>
+                         {(() => {
+                           const cacheKey = agentData ? `${agentData.user_id}-${selectedYear}` : ''
+                           const isCached = leaderboardDataCache[cacheKey]
+                           return isCached ? (
+                             <Badge variant="secondary" className="text-xs">
+                               <IconRefresh className="h-3 w-3 mr-1" />
+                               Cached
+                             </Badge>
+                           ) : null
+                         })()}
+                       </div>
                      </div>
                      <div className="rounded-lg border border-[#cecece99] dark:border-border overflow-hidden">
                        {!productivityDataLoaded && !productivityLoading ? (

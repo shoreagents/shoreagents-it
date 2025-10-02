@@ -54,6 +54,8 @@ interface AgentActivityDataProps {
   getWeekActivityData: (employee: Employee) => { total_active_seconds: number; total_inactive_seconds: number }
   getMonthActivityData: (employee: Employee) => { total_active_seconds: number; total_inactive_seconds: number }
   user: any
+  chartDataCache: Record<string, ChartDataPoint[]>
+  setChartDataCache: React.Dispatch<React.SetStateAction<Record<string, ChartDataPoint[]>>>
 }
 
 // Helper function to format dates consistently
@@ -93,7 +95,9 @@ export function AgentActivityData({
   getYesterdayActivityData,
   getWeekActivityData,
   getMonthActivityData,
-  user
+  user,
+  chartDataCache,
+  setChartDataCache
 }: AgentActivityDataProps) {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [chartLoading, setChartLoading] = useState(false)
@@ -156,11 +160,14 @@ export function AgentActivityData({
       const startDate = startOfMonth.toLocaleDateString('en-CA')
       const endDate = endOfMonth.toLocaleDateString('en-CA')
       
-      // Use the same memberId as the parent component
+      // For IT users, fetch data for the specific employee
+      // For Internal users, they can see all data but we need to filter by specific employee
       const memberId = user.userType === 'Internal' ? 'all' : user.id
       
-      console.log('📊 Fetching chart data for date range:', startDate, 'to', endDate, 'memberId:', memberId)
+      console.log('📊 Fetching chart data for date range:', startDate, 'to', endDate, 'memberId:', memberId, 'employeeId:', employeeId)
 
+      // Fetch activities - the API will return all activities for the memberId
+      // We'll filter by employeeId on the frontend since the API doesn't support userId parameter
       const response = await fetch(`/api/activities?memberId=${memberId}&startDate=${startDate}&endDate=${endDate}`)
 
       if (!response.ok) {
@@ -177,15 +184,22 @@ export function AgentActivityData({
         stats: data.stats
       })
 
-      // Extract activities from API response
+      // Extract activities from API response and filter by specific employee
       const allActivities = data.activities || []
-      console.log('📊 All activities from API:', allActivities)
-
-      // Filter activities for the selected employee
-      const activities = allActivities.filter((activity: any) => 
-        activity.user_id.toString() === employeeId
-      )
-      console.log('📊 Filtered activities for employee:', activities)
+      
+      // Filter activities by the specific employee ID
+      const activities = allActivities.filter((activity: any) => {
+        // Check if the activity belongs to the selected employee
+        // The activity should have a user_id or member_id field that matches our employeeId
+        const activityUserId = activity.user_id || activity.member_id || activity.id
+        return activityUserId === parseInt(employeeId) || activityUserId === employeeId
+      })
+      
+      console.log('📊 All activities:', allActivities.length, 'Filtered activities for employee:', activities.length)
+      console.log('📊 Employee ID being filtered:', employeeId, 'Type:', typeof employeeId)
+      if (allActivities.length > 0) {
+        console.log('📊 Sample activity structure:', allActivities[0])
+      }
 
       // Check if there are any activities
       if (!Array.isArray(activities) || activities.length === 0) {
@@ -237,6 +251,14 @@ export function AgentActivityData({
 
       const chartData = generateDailyChartData(activities)
       console.log('📊 Chart data generated:', chartData.length, 'data points')
+      
+      // Store data in cache
+      const cacheKey = `${employeeId}-${selectedYear}-${selectedMonth}`
+      setChartDataCache(prevCache => ({
+        ...prevCache,
+        [cacheKey]: chartData
+      }))
+      
       setChartData(chartData)
 
     } catch (err) {
@@ -247,11 +269,22 @@ export function AgentActivityData({
     }
   }
 
-  // Fetch chart data when employee is selected or month changes
+  // Fetch chart data when employee is selected or month changes (with caching)
   useEffect(() => {
     if (selectedEmployee) {
       const employeeId = selectedEmployee.user_id || selectedEmployee.id
-      fetchChartData(employeeId.toString())
+      const cacheKey = `${employeeId}-${selectedYear}-${selectedMonth}`
+      
+      // Check if data is already cached
+      if (chartDataCache[cacheKey]) {
+        console.log('📊 Using cached data for:', cacheKey)
+        setChartData(chartDataCache[cacheKey])
+        setChartLoading(false)
+        setChartError(null)
+      } else {
+        console.log('📊 Fetching new data for:', cacheKey)
+        fetchChartData(employeeId.toString())
+      }
     }
   }, [selectedEmployee?.user_id || selectedEmployee?.id, user?.id, selectedYear, selectedMonth])
 
@@ -601,18 +634,18 @@ export function AgentActivityData({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold">Most Active Time</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {detailLoading || chartLoading ? (
-                        <Skeleton className="h-4 w-32" />
-                      ) : peakTimes.mostActive ? (
-                        formatDateForDisplay(peakTimes.mostActive.date, 'long')
-                      ) : (
-                        "No data available"
-                      )}
-                    </p>
-                  </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold">Most Active Time</h3>
+                      <div className="text-sm text-muted-foreground">
+                        {detailLoading || chartLoading ? (
+                          <Skeleton className="h-4 w-32" />
+                        ) : peakTimes.mostActive ? (
+                          formatDateForDisplay(peakTimes.mostActive.date, 'long')
+                        ) : (
+                          "No data available"
+                        )}
+                      </div>
+                    </div>
                   <div className="text-right">
                     <div className="text-lg font-bold text-green-600">
                       {detailLoading || chartLoading ? (
@@ -637,18 +670,18 @@ export function AgentActivityData({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold">Most Inactive Time</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {detailLoading || chartLoading ? (
-                        <Skeleton className="h-4 w-32" />
-                      ) : peakTimes.mostInactive ? (
-                        formatDateForDisplay(peakTimes.mostInactive.date, 'long')
-                      ) : (
-                        "No data available"
-                      )}
-                    </p>
-                  </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold">Most Inactive Time</h3>
+                      <div className="text-sm text-muted-foreground">
+                        {detailLoading || chartLoading ? (
+                          <Skeleton className="h-4 w-32" />
+                        ) : peakTimes.mostInactive ? (
+                          formatDateForDisplay(peakTimes.mostInactive.date, 'long')
+                        ) : (
+                          "No data available"
+                        )}
+                      </div>
+                    </div>
                   <div className="text-right">
                     <div className="text-lg font-bold text-red-600">
                       {detailLoading || chartLoading ? (
