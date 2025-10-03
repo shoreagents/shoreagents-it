@@ -325,6 +325,7 @@ export default function PastTicketsPage() {
 
   const [tickets, setTickets] = useState<PastTicketTable[]>([])
   const [loading, setLoading] = useState(true)
+  const [reloading, setReloading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
@@ -481,6 +482,69 @@ export default function PastTicketsPage() {
     }
   }
 
+  // Reload function
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+      
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        sortField: sortField,
+        sortDirection: sortDirection,
+        userId: user?.id || ''
+      })
+      
+      // If there's a search term, fetch all tickets, otherwise fetch only closed tickets
+      if (searchTerm) {
+        // Search across all tickets
+        params.append('search', searchTerm)
+      } else {
+        // Default to closed tickets only
+        params.append('status', 'Closed')
+        params.append('past', 'true')
+      }
+      
+      if (selectedCategory !== 'all') {
+        params.append('categoryId', selectedCategory)
+      }
+      
+      console.log('Reloading tickets with params:', params.toString())
+      const response = await fetch(`/api/tickets?admin=false&${params.toString()}`)
+      console.log('Reload response status:', response.status)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Reload response data:', data)
+        
+        // Handle paginated response
+        if (data.tickets && data.pagination) {
+          setTickets(data.tickets)
+          setTotalCount(data.pagination.totalCount)
+          setTotalPages(data.pagination.totalPages)
+          setResolvedByUserCount(data.resolvedByUserCount || 0)
+        } else {
+          // Fallback for non-paginated response
+          setTickets(data)
+          setTotalCount(data.length)
+          setTotalPages(Math.ceil(data.length / itemsPerPage))
+        }
+        setError(null) // Clear any previous errors
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Reload API Error:', response.status, errorData)
+        setError(errorData.error || 'Failed to fetch tickets')
+      }
+    } catch (error) {
+      console.error('Reload network error:', error)
+      setError('Network error - please check your connection')
+    } finally {
+      setReloading(false)
+    }
+  }
+
   // Reset to first page when search term changes
   useEffect(() => {
     setCurrentPage(1)
@@ -535,8 +599,8 @@ export default function PastTicketsPage() {
                   </div>
                   <div className="flex gap-2">
                     <ReloadButton 
-                      onReload={fetchTickets}
-                      loading={loading}
+                      onReload={handleReload}
+                      loading={reloading}
                       className="flex-1"
                     />
                   </div>

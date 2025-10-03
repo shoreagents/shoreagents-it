@@ -270,6 +270,7 @@ export default function PastTicketsPage() {
 
   const [tickets, setTickets] = useState<PastTicketTable[]>([])
   const [loading, setLoading] = useState(true)
+  const [reloading, setReloading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
@@ -413,6 +414,57 @@ export default function PastTicketsPage() {
     }
   }
 
+  // Reload function
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        sortField: sortField,
+        sortDirection: sortDirection,
+        userId: user?.id || ''
+      })
+
+      if (searchTerm) {
+        params.append('search', searchTerm)
+      } else {
+        params.append('status', 'Closed')
+        params.append('past', 'true')
+      }
+
+      if (selectedCategory !== 'all') {
+        params.append('categoryId', selectedCategory)
+      }
+
+      const response = await fetch(`/api/tickets?admin=true&${params.toString()}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.tickets && data.pagination) {
+          setTickets(data.tickets)
+          setTotalCount(data.pagination.totalCount)
+          setTotalPages(data.pagination.totalPages)
+          setResolvedByUserCount(data.resolvedByUserCount || 0)
+        } else {
+          setTickets(data)
+          setTotalCount(data.length)
+          setTotalPages(Math.ceil(data.length / itemsPerPage))
+        }
+        setError(null) // Clear any previous errors
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        setError(errorData.error || 'Failed to fetch tickets')
+      }
+    } catch (error) {
+      setError('Network error - please check your connection')
+    } finally {
+      setReloading(false)
+    }
+  }
+
   useEffect(() => { setCurrentPage(1) }, [searchTerm])
 
   useEffect(() => {
@@ -457,7 +509,7 @@ export default function PastTicketsPage() {
                     <p className="text-sm text-muted-foreground">View all completed tickets and resolution history.</p>
                   </div>
                   <div className="flex gap-2">
-                    <ReloadButton onReload={fetchTickets} loading={loading} className="flex-1" />
+                    <ReloadButton onReload={handleReload} loading={reloading} className="flex-1" />
                   </div>
                 </div>
                 <div className="flex items-center gap-4">

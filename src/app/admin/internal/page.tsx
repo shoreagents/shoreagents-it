@@ -76,6 +76,7 @@ export default function InternalPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [selectedUser, setSelectedUser] = useState<InternalRecord | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [reloading, setReloading] = useState(false)
 
   // 🔄 Real-time updates for internal users - automatically syncs with database changes
   const { isConnected: isRealtimeConnected } = useRealtimeMembers({
@@ -185,6 +186,39 @@ export default function InternalPage() {
     }
   }
 
+  // Reload function
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+      
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(PAGE_SIZE),
+        sortField,
+        sortDirection,
+      })
+      if (search.trim()) params.append('search', search.trim())
+      const res = await fetch(`/api/internal?${params.toString()}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || "Failed to fetch internal users")
+      }
+      const data = await res.json()
+      setUsers(data.internal || [])
+      setTotalCount(data.pagination?.totalCount || 0)
+      setTotalPages(data.pagination?.totalPages || 1)
+      setError(null) // Clear any previous errors
+      
+    } catch (err) {
+      console.error('❌ Reload error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to reload internal users')
+    } finally {
+      setReloading(false)
+    }
+  }
+
   useEffect(() => { fetchUsers() }, [])
   useEffect(() => { setCurrentPage(1) }, [search])
   useEffect(() => {
@@ -229,7 +263,7 @@ export default function InternalPage() {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <ReloadButton onReload={fetchUsers} loading={loading} className="flex-1" />
+                    <ReloadButton onReload={handleReload} loading={reloading} className="flex-1" />
                   </div>
                 </div>
               </div>

@@ -2508,16 +2508,6 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                      <div className="flex items-center justify-between min-h-[40px]">
                        <div className="flex items-center gap-2">
                          <h3 className="text-lg font-medium text-muted-foreground">Leaderboard</h3>
-                         {(() => {
-                           const cacheKey = agentData ? `${agentData.user_id}-${selectedYear}` : ''
-                           const isCached = leaderboardDataCache[cacheKey]
-                           return isCached ? (
-                             <Badge variant="secondary" className="text-xs">
-                               <IconRefresh className="h-3 w-3 mr-1" />
-                               Cached
-                             </Badge>
-                           ) : null
-                         })()}
                        </div>
                      </div>
                      <div className="rounded-lg border border-[#cecece99] dark:border-border overflow-hidden">

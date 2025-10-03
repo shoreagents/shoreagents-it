@@ -244,6 +244,7 @@ export default function CompaniesPage() {
   const [memberUsersCache, setMemberUsersCache] = useState<Record<string, { type: 'agents' | 'clients', users: { user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, employee_id: string | null }[] }>>({})
   const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false)
   const [companyToEdit, setCompanyToEdit] = useState<CompanyModalData | null>(null)
+  const [reloading, setReloading] = useState(false)
 
   const openEditModal = (company: MemberRecord) => {
     // Convert MemberRecord to CompanyModalData format for the modal
@@ -322,6 +323,39 @@ export default function CompaniesPage() {
     }
   }
 
+  // Reload function
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+      
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(PAGE_SIZE),
+        sortField,
+        sortDirection,
+      })
+      if (search.trim()) params.append('search', search.trim())
+      const res = await fetch(`/api/members?${params.toString()}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || "Failed to fetch members")
+      }
+      const data = await res.json()
+      setMembers(data.members || [])
+      setTotalCount(data.pagination?.totalCount || 0)
+      setTotalPages(data.pagination?.totalPages || 1)
+      setError(null) // Clear any previous errors
+      
+    } catch (err) {
+      console.error('❌ Reload error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to reload members')
+    } finally {
+      setReloading(false)
+    }
+  }
+
   useEffect(() => { fetchMembers() }, [])
   useEffect(() => { setCurrentPage(1) }, [search])
   useEffect(() => {
@@ -354,7 +388,7 @@ export default function CompaniesPage() {
                     <p className="text-sm text-muted-foreground">Directory of member companies</p>
                   </div>
                   <div className="flex gap-2">
-                    <ReloadButton onReload={fetchMembers} loading={loading} className="flex-1" />
+                    <ReloadButton onReload={handleReload} loading={reloading} className="flex-1" />
                   </div>
                 </div>
               </div>

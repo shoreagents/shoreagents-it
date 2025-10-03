@@ -196,6 +196,7 @@ export default function AnnouncementsPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>('scheduled')
   const [loadingUsersKey, setLoadingUsersKey] = useState<string | null>(null)
   const [announcementUsersCache, setAnnouncementUsersCache] = useState<Record<string, { users: { user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, employee_id: string | null }[] }>>({})
+  const [reloading, setReloading] = useState(false)
 
   // Fetch active announcements count
   const fetchActiveCount = async () => {
@@ -292,6 +293,91 @@ export default function AnnouncementsPage() {
       setError(e?.message || "Failed to fetch announcements")
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Reload function
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+      
+      // First, update announcement statuses in database based on current date
+      try {
+        console.log('Updating announcement statuses based on current date...')
+        
+        // Get browser's current date to send to API
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = String(now.getMonth() + 1).padStart(2, '0')
+        const day = String(now.getDate()).padStart(2, '0')
+        const browserDate = `${year}-${month}-${day}` // YYYY-MM-DD format
+        
+        const updateResponse = await fetch('/api/announcements/update-statuses', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ date: browserDate })
+        })
+        
+        if (updateResponse.ok) {
+          const updateData = await updateResponse.json()
+          console.log('Announcement statuses updated successfully:', updateData)
+          
+          // Log detailed update information
+          if (updateData.updates) {
+            console.log('Update summary:', {
+              activated: updateData.updates.activated,
+              expired: updateData.updates.expired,
+              quickExpired: updateData.updates.quickExpired,
+              rescheduled: updateData.updates.rescheduled,
+              date: updateData.date
+            })
+          }
+        } else {
+          const errorData = await updateResponse.json().catch(() => ({}))
+          console.warn('Failed to update announcement statuses:', errorData)
+        }
+      } catch (updateError) {
+        console.warn('Error updating announcement statuses:', updateError)
+        // Continue with fetching announcements even if status update fails
+      }
+      
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: '20',
+        sortField: 'created_at',
+        sortDirection: 'desc',
+        status: selectedStatus
+      })
+      if (searchTerm.trim()) params.append('search', searchTerm.trim())
+      
+      console.log('Fetching announcements with params:', params.toString())
+      const res = await fetch(`/api/announcements?${params.toString()}`)
+      console.log('Announcements API response status:', res.status)
+      
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        console.error('Announcements API error:', err)
+        throw new Error(err.error || "Failed to fetch announcements")
+      }
+      const data = await res.json()
+      console.log('Announcements data received:', data)
+      setAnnouncements(data.announcements || data || [])
+      setTotalCount(data.pagination?.totalCount || data.length || 0)
+      setTotalPages(data.pagination?.totalPages || 1)
+      
+      // Fetch active count after loading announcements
+      fetchActiveCount()
+      setError(null) // Clear any previous errors
+      
+    } catch (err) {
+      console.error('❌ Reload error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to reload announcements')
+    } finally {
+      setReloading(false)
     }
   }
 
@@ -459,7 +545,7 @@ export default function AnnouncementsPage() {
                     <p className="text-sm text-muted-foreground">Manage system-wide announcements and notifications.</p>
                   </div>
                   <div className="flex gap-2">
-                    <ReloadButton onReload={fetchAnnouncements} loading={loading} className="flex-1" />
+                    <ReloadButton onReload={handleReload} loading={reloading} className="flex-1" />
                   </div>
                 </div>
               </div>

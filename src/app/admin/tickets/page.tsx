@@ -645,6 +645,7 @@ export default function TicketsPage() {
   const [expandedTickets, setExpandedTickets] = useState<Set<string>>(new Set())
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
+  const [reloading, setReloading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
@@ -876,6 +877,31 @@ export default function TicketsPage() {
       console.error('Error fetching tickets:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Reload function
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+      
+      const response = await fetch('/api/tickets?admin=true')
+      if (response.ok) {
+        const data = await response.json()
+        setTickets(data)
+        setError(null) // Clear any previous errors
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        setError(errorData.error || 'Failed to fetch tickets')
+        console.error('Failed to fetch tickets:', response.status, errorData)
+      }
+    } catch (error) {
+      setError('Network error - please check your connection')
+      console.error('Error fetching tickets:', error)
+    } finally {
+      setReloading(false)
     }
   }
 
@@ -1621,7 +1647,7 @@ export default function TicketsPage() {
                     <p className="text-sm text-muted-foreground">Drag and drop tickets to manage their status.</p>
                   </div>
                   <div className="flex gap-2">
-                    <ReloadButton onReload={fetchTickets} loading={loading} className="flex-1" />
+                    <ReloadButton onReload={handleReload} loading={reloading} className="flex-1" />
                   </div>
                 </div>
                 

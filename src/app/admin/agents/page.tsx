@@ -88,6 +88,7 @@ export default function AgentsPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [selectedAgent, setSelectedAgent] = useState<AgentRecord | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [reloading, setReloading] = useState(false)
 
   // Real-time updates for all agent changes
   const { isConnected: isRealtimeConnected } = useRealtimeMembers({
@@ -303,6 +304,47 @@ export default function AgentsPage() {
     }
   }
 
+  // Reload function
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+      
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(PAGE_SIZE),
+        sortField,
+        sortDirection,
+      })
+      if (search.trim()) params.append('search', search.trim())
+      if (memberId !== 'all') params.append('memberId', memberId)
+      const res = await fetch(`/api/agents?${params.toString()}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || "Failed to fetch agents")
+      }
+      const data = await res.json()
+      if (data?.agents && data?.pagination) {
+        setAgents(data.agents)
+        setTotalCount(data.pagination.totalCount || 0)
+        setTotalPages(data.pagination.totalPages || 1)
+      } else {
+        setAgents(Array.isArray(data) ? data : [])
+        const fallbackCount = Array.isArray(data) ? data.length : 0
+        setTotalCount(fallbackCount)
+        setTotalPages(Math.max(1, Math.ceil(fallbackCount / PAGE_SIZE)))
+      }
+      setError(null) // Clear any previous errors
+      
+    } catch (err) {
+      console.error('❌ Reload error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to reload agents')
+    } finally {
+      setReloading(false)
+    }
+  }
+
   useEffect(() => { fetchAgents() }, [])
 
   useEffect(() => {
@@ -354,7 +396,7 @@ export default function AgentsPage() {
                     <p className="text-sm text-muted-foreground">Directory of employees with member assignments and contact details</p>
                   </div>
                   <div className="flex gap-2">
-                    <ReloadButton onReload={fetchAgents} loading={loading} className="flex-1" />
+                    <ReloadButton onReload={handleReload} loading={reloading} className="flex-1" />
                   </div>
                 </div>
               </div>

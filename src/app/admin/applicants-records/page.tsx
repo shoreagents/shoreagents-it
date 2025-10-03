@@ -303,6 +303,7 @@ export default function ApplicantsRecordsPage() {
 
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [reloading, setReloading] = useState(false)
 
   // Helper function to map raw database records to Applicant objects
   const mapApplicantData = useCallback((rawData: any, index: number = 0): Applicant => ({
@@ -506,6 +507,41 @@ export default function ApplicantsRecordsPage() {
     }
   }, [mapApplicantData])
 
+  // Reload function
+  const handleReload = useCallback(async () => {
+    setReloading(true)
+    try {
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+      
+      const res = await fetch('/api/bpoc')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `Failed to fetch applicants (${res.status})`)
+      }
+      const data: any[] = await res.json()
+      
+      // Filter applicants by allowed statuses only
+      const filteredData = data.filter((item: any) => {
+        const status = item.status?.toLowerCase()
+        return ALLOWED_STATUSES.includes(status as ApplicantStatus)
+      })
+      
+      // Map BPOC applications from main database into table items
+      const mapped: Applicant[] = filteredData.map((a, index) => mapApplicantData(a))
+      setApplicants(mapped)
+      setTotalCount(mapped.length)
+      setTotalPages(Math.ceil(mapped.length / itemsPerPage))
+      setError(null) // Clear any previous errors
+      
+    } catch (err) {
+      console.error('❌ Reload error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to reload applicants')
+    } finally {
+      setReloading(false)
+    }
+  }, [mapApplicantData])
+
   useEffect(() => {
     fetchApplicants()
   }, [fetchApplicants])
@@ -612,7 +648,7 @@ export default function ApplicantsRecordsPage() {
                     <p className="text-sm text-muted-foreground">View and manage applicant records.</p>
                   </div>
                   <div className="flex gap-2">
-                    <ReloadButton onReload={fetchApplicants} loading={loading} className="flex-1" />
+                    <ReloadButton onReload={handleReload} loading={reloading} className="flex-1" />
                   </div>
                 </div>
                 <div className="flex items-center gap-4">

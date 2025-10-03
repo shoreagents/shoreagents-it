@@ -79,6 +79,7 @@ export default function ClientsPage() {
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedClient, setSelectedClient] = useState<ClientRecord | null>(null)
+  const [reloading, setReloading] = useState(false)
 
   // Realtime functionality
   const { isConnected: isRealtimeConnected } = useRealtimeClients({
@@ -202,6 +203,47 @@ export default function ClientsPage() {
     }
   }
 
+  // Reload function
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+      
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(PAGE_SIZE),
+        sortField,
+        sortDirection,
+      })
+      if (search.trim()) params.append('search', search.trim())
+      if (memberId !== 'all') params.append('memberId', memberId)
+      const res = await fetch(`/api/clients?${params.toString()}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || "Failed to fetch clients")
+      }
+      const data = await res.json()
+      if (data?.agents && data?.pagination) {
+        setClients(data.agents)
+        setTotalCount(data.pagination.totalCount || 0)
+        setTotalPages(data.pagination.totalPages || 1)
+      } else {
+        setClients(Array.isArray(data) ? data : [])
+        const fallbackCount = Array.isArray(data) ? data.length : 0
+        setTotalCount(fallbackCount)
+        setTotalPages(Math.max(1, Math.ceil(fallbackCount / PAGE_SIZE)))
+      }
+      setError(null) // Clear any previous errors
+      
+    } catch (err) {
+      console.error('❌ Reload error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to reload clients')
+    } finally {
+      setReloading(false)
+    }
+  }
+
   useEffect(() => { fetchClients() }, [])
   useEffect(() => {
     const fetchMembers = async () => {
@@ -272,7 +314,7 @@ export default function ClientsPage() {
                     <p className="text-sm text-muted-foreground">Directory of client users with member assignments and contact details</p>
                   </div>
                   <div className="flex gap-2">
-                    <ReloadButton onReload={fetchClients} loading={loading} className="flex-1" />
+                    <ReloadButton onReload={handleReload} loading={reloading} className="flex-1" />
                   </div>
                 </div>
               </div>

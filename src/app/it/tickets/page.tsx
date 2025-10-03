@@ -46,7 +46,7 @@ import { CSS } from "@dnd-kit/utilities"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/contexts/auth-context"
 
-type TicketStatus = 'On Hold' | 'In Progress' | 'Approved' | 'Stuck' | 'Actioned' | 'Closed'
+type TicketStatus = 'For Approval' | 'On Hold' | 'In Progress' | 'Stuck' | 'Actioned' | 'Closed'
 interface TicketCategory {
   id: number
   name: string
@@ -345,12 +345,12 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
 
   const getStatusColor = (status: TicketStatus) => {
     switch (status) {
+      case "For Approval":
+        return "text-yellow-700 dark:text-white border-yellow-600/20 bg-yellow-50 dark:bg-yellow-600/20"
       case "On Hold":
         return "text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20"
       case "In Progress":
         return "text-orange-700 dark:text-white border-orange-600/20 bg-orange-50 dark:bg-orange-600/20"
-      case "Approved":
-        return "text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20"
       case "Stuck":
         return "text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20"
       case "Actioned":
@@ -364,12 +364,12 @@ const SortableTicket = React.memo(function SortableTicket({ ticket, isLast = fal
 
   const getCircleColor = (status: TicketStatus) => {
     switch (status) {
+      case "For Approval":
+        return "bg-yellow-600/20 dark:bg-yellow-600/40 text-yellow-700 dark:text-white"
       case "On Hold":
         return "bg-gray-600/20 dark:bg-gray-600/40 text-gray-700 dark:text-white"
       case "In Progress":
         return "bg-orange-600/20 dark:bg-orange-600/40 text-orange-700 dark:text-white"
-      case "Approved":
-        return "bg-blue-600/20 dark:bg-blue-600/40 text-blue-700 dark:text-white"
       case "Stuck":
         return "bg-red-600/20 dark:bg-red-600/40 text-red-700 dark:text-white"
       case "Actioned":
@@ -527,14 +527,14 @@ function TicketsSkeleton() {
           msOverflowStyle: 'none'
         }}
       >
-        {["Approved", "In Progress", "Stuck", "Actioned", "Closed", "On Hold"].map((status) => (
+        {["For Approval", "In Progress", "Stuck", "Actioned", "Closed", "On Hold"].map((status) => (
           <div key={status} className="flex-shrink-0 min-w-[400px]">
             <div className="bg-card border border-border rounded-xl transition-all duration-200 flex flex-col shadow-sm min-h-[200px] max-h-[calc(94vh-200px)] status-cell">
               <div className="flex-shrink-0 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <Badge variant="outline" className={`px-3 py-1 font-medium rounded-xl ${
-                      status === 'Approved' ? 'text-blue-700 dark:text-white border-blue-600/20 bg-blue-50 dark:bg-blue-600/20' :
+                      status === 'For Approval' ? 'text-yellow-700 dark:text-white border-yellow-600/20 bg-yellow-50 dark:bg-yellow-600/20' :
                       status === 'In Progress' ? 'text-orange-700 dark:text-white border-orange-600/20 bg-orange-50 dark:bg-orange-600/20' :
                       status === 'Stuck' ? 'text-red-700 dark:text-white border-red-600/20 bg-red-50 dark:bg-red-600/20' :
                       status === 'Actioned' ? 'text-purple-700 dark:text-white border-purple-600/20 bg-purple-50 dark:bg-purple-600/20' :
@@ -542,8 +542,8 @@ function TicketsSkeleton() {
                       status === 'On Hold' ? 'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20' :
                       'text-gray-700 dark:text-white border-gray-600/20 bg-gray-50 dark:bg-gray-600/20'
                     }`}>
-                      {status === 'Approved' ? 'New' : status} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${
-                        status === 'Approved' ? 'bg-blue-600/20 dark:bg-blue-600/40 text-blue-700 dark:text-white' :
+                      {status} <span className={`inline-flex items-center justify-center w-5 h-5 rounded-xl text-xs ml-1 ${
+                        status === 'For Approval' ? 'bg-yellow-600/20 dark:bg-yellow-600/40 text-yellow-700 dark:text-white' :
                         status === 'In Progress' ? 'bg-orange-600/20 dark:bg-orange-600/40 text-orange-700 dark:text-white' :
                         status === 'Stuck' ? 'bg-red-600/20 dark:bg-red-600/40 text-red-700 dark:text-white' :
                         status === 'Actioned' ? 'bg-purple-600/20 dark:bg-purple-600/40 text-purple-700 dark:text-white' :
@@ -597,6 +597,7 @@ export default function TicketsPage() {
   const [expandedTickets, setExpandedTickets] = useState<Set<string>>(new Set())
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
+  const [reloading, setReloading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
@@ -733,6 +734,31 @@ export default function TicketsPage() {
       console.error('Error fetching tickets:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Reload function
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+      
+      const response = await fetch('/api/tickets')
+      if (response.ok) {
+        const data = await response.json()
+        setTickets(data)
+        setError(null) // Clear any previous errors
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        setError(errorData.error || 'Failed to fetch tickets')
+        console.error('Failed to fetch tickets:', response.status, errorData)
+      }
+    } catch (error) {
+      setError('Network error - please check your connection')
+      console.error('Error fetching tickets:', error)
+    } finally {
+      setReloading(false)
     }
   }
 
@@ -985,7 +1011,7 @@ export default function TicketsPage() {
     setSelectedTicket(null)
   }, [])
 
-  const statuses = ["Approved", "In Progress", "Stuck", "Actioned", "Closed", "On Hold"]
+  const statuses = ["For Approval", "In Progress", "Stuck", "Actioned", "Closed", "On Hold"]
 
   return (
     <>
@@ -1002,7 +1028,7 @@ export default function TicketsPage() {
                     <p className="text-sm text-muted-foreground">Drag and drop tickets to manage their status.</p>
                   </div>
                   <div className="flex gap-2">
-                    <ReloadButton onReload={fetchTickets} loading={loading} className="flex-1" />
+                    <ReloadButton onReload={handleReload} loading={reloading} className="flex-1" />
                   </div>
                 </div>
 

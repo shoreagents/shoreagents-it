@@ -130,7 +130,7 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
       
       // Get user role for status-based notifications
       const isAdmin = (user as any)?.roleName?.toLowerCase() === 'admin'
-      const relevantStatus = isAdmin ? 'For Approval' : 'Approved'
+      const relevantStatus = 'For Approval' // Both admin and IT users get notifications for For Approval
       
       switch (action) {
         case 'INSERT':
@@ -151,9 +151,9 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
               if (enableNotifications && isSupported) {
                 console.log('🔔 Attempting to show notification for new ticket:', completeTicket.id)
                 
-                // Only show notifications for admin users (new tickets)
-                if (isAdmin && completeTicket.status === relevantStatus) {
-                  console.log(`🔔 Ticket status "${completeTicket.status}" is relevant for admin user`)
+                // Show notifications for all users when tickets are created with For Approval status
+                if (completeTicket.status === relevantStatus) {
+                  console.log(`🔔 Ticket status "${completeTicket.status}" is relevant for all users`)
                   
                   // Format name from available fields - prioritize personal names over company names
                   const getName = () => {
@@ -233,9 +233,9 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
                   
                   console.log(`🔔 Status change: "${oldStatus}" → "${newStatus}"`)
                   
-                  // Only show status change notifications for IT users
-                  if (!isAdmin && newStatus === relevantStatus && oldStatus !== relevantStatus) {
-                    console.log(`🔔 Status changed to "${newStatus}" - showing notification for IT user`)
+                  // Show status change notifications for all users when status changes to For Approval
+                  if (newStatus === relevantStatus && oldStatus !== relevantStatus) {
+                    console.log(`🔔 Status changed to "${newStatus}" - showing notification for all users`)
                     
                     // Format name from available fields - prioritize personal names over company names
                     const getName = () => {

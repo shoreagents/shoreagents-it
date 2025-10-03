@@ -638,6 +638,7 @@ export default function BPOCApplicantsPage() {
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(1)
+  const [reloading, setReloading] = useState(false)
 
     // Helper function to map raw database records to Applicant objects
   const mapApplicantData = useCallback((rawData: any, index: number = 0): Applicant => ({
@@ -834,6 +835,33 @@ export default function BPOCApplicantsPage() {
       setError(e?.message || 'Failed to load applicants')
     } finally {
       setLoading(false)
+    }
+  }, [mapApplicantData])
+
+  // Reload function
+  const handleReload = useCallback(async () => {
+    setReloading(true)
+    try {
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+      
+      const res = await fetch('/api/bpoc')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `Failed to fetch applicants (${res.status})`)
+      }
+      const data: any[] = await res.json()
+      
+      // Map BPOC applications from main database into board items with proper status mapping
+      const mapped: Applicant[] = data.map((a, index) => mapApplicantData(a))
+      setApplicants(mapped)
+      setError(null) // Clear any previous errors
+      
+    } catch (err) {
+      console.error('❌ Reload error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to reload applicants')
+    } finally {
+      setReloading(false)
     }
   }, [mapApplicantData])
 
@@ -1143,7 +1171,7 @@ export default function BPOCApplicantsPage() {
         <p className="text-sm text-muted-foreground">Manage and track applicant applications through the recruitment pipeline.</p>
                   </div>
                   <div className="flex gap-2">
-                    <ReloadButton onReload={fetchApplicants} loading={loading} className="flex-1" />
+                    <ReloadButton onReload={handleReload} loading={reloading} className="flex-1" />
                   </div>
                 </div>
 

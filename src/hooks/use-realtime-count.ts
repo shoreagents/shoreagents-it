@@ -190,8 +190,7 @@ export function useRealtimeCount(countType: CountType) {
   const { isConnected: ticketsConnected } = useRealtimeTickets({
     onTicketCreated: (ticket) => {
       if (countType === 'tickets') {
-        const isAdmin = (user as any)?.roleName?.toLowerCase() === 'admin'
-        const relevantStatus = isAdmin ? 'For Approval' : 'Approved'
+        const relevantStatus = 'For Approval' // Both admin and IT users count For Approval tickets
         
         if (ticket.status === relevantStatus) {
           updateCount(prev => prev + 1)
@@ -200,8 +199,7 @@ export function useRealtimeCount(countType: CountType) {
     },
     onTicketUpdated: (ticket, oldTicket) => {
       if (countType === 'tickets') {
-        const isAdmin = (user as any)?.roleName?.toLowerCase() === 'admin'
-        const relevantStatus = isAdmin ? 'For Approval' : 'Approved'
+        const relevantStatus = 'For Approval' // Both admin and IT users count For Approval tickets
         
         const oldStatusRelevant = oldTicket?.status === relevantStatus
         const newStatusRelevant = ticket.status === relevantStatus
@@ -217,8 +215,7 @@ export function useRealtimeCount(countType: CountType) {
     },
     onTicketDeleted: (ticket) => {
       if (countType === 'tickets') {
-        const isAdmin = (user as any)?.roleName?.toLowerCase() === 'admin'
-        const relevantStatus = isAdmin ? 'For Approval' : 'Approved'
+        const relevantStatus = 'For Approval' // Both admin and IT users count For Approval tickets
         
         if (ticket.status === relevantStatus) {
           updateCount(prev => Math.max(0, prev - 1))
@@ -227,7 +224,7 @@ export function useRealtimeCount(countType: CountType) {
     },
     autoConnect: countType === 'tickets',
     enableNotifications: true, // Enable global notifications
-    roleFilter: null
+    roleFilter: countType === 'tickets' ? (user as any)?.roleName?.toLowerCase() === 'admin' ? null : 1 : null
   })
 
   // Real-time updates for events
