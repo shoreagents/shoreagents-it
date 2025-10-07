@@ -3108,7 +3108,9 @@ export async function getInternalUserByEmail(email: string, role: string = '') {
     ? `AND ir.role_id = (SELECT id FROM roles WHERE name = 'Admin')`
     : role === 'it'
       ? `AND (ir.role_id = 1 OR ir.role_id = (SELECT id FROM roles WHERE name = 'IT'))`
-      : ''
+      : role === 'nurse'
+        ? `AND ir.role_id = (SELECT id FROM roles WHERE name = 'Nurse')`
+        : ''
   const { rows } = await pool.query(`
     SELECT u.id, u.email, u.user_type, pi.first_name, pi.last_name, pi.profile_picture, ir.role_id, r.name as role_name
     FROM public.users u

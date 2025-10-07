@@ -3,12 +3,14 @@ import pool from '@/lib/database'
 
 export async function GET(request: NextRequest) {
   try {
-    // Get count for active (today) announcements only
+    // Simple count query for active announcements (no role filtering since announcements doesn't have role_id)
     const countQuery = `
       SELECT COUNT(*) as count
       FROM announcements 
       WHERE status = 'active'
     `
+    
+    console.log('Announcements count query:', countQuery)
     
     const result = await pool.query(countQuery)
     const activeCount = parseInt(result.rows[0]?.count || '0')

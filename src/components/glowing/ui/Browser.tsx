@@ -177,7 +177,8 @@ export default function Browser(props: Props) {
           <Tabs ref={TabsRef}>
             <Item ref={el => { if (el) refs.current.push(el) }} active={activeTab === 1} onClick={() => setActiveTab(1)}>Admin</Item>
             <Item ref={el => { if (el) refs.current.push(el) }} active={activeTab === 2} onClick={() => setActiveTab(2)}>IT</Item>
-            <Item ref={el => { if (el) refs.current.push(el) }} active={activeTab === 3} onClick={() => setActiveTab(3)}>Finance</Item>
+            <Item ref={el => { if (el) refs.current.push(el) }} active={activeTab === 3} onClick={() => setActiveTab(3)}>Nurse</Item>
+            <Item ref={el => { if (el) refs.current.push(el) }} active={activeTab === 4} onClick={() => setActiveTab(4)}>Finance</Item>
           </Tabs>
           <NavigatorRightBG width={right} />
         </Navigation>

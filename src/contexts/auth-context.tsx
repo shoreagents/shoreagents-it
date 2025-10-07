@@ -17,7 +17,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   loading: boolean
-  login: (email: string, password: string, role?: 'it' | 'admin') => Promise<{ success: boolean; error?: string }>
+  login: (email: string, password: string, role?: 'it' | 'admin' | 'nurse') => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
   checkAuth: () => Promise<void>
 }
@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const login = async (email: string, password: string, role: 'it' | 'admin' = 'it') => {
+  const login = async (email: string, password: string, role: 'it' | 'admin' | 'nurse' = 'it') => {
     try {
       console.log('🔐 Starting login process for:', email, 'role:', role)
       

@@ -27,7 +27,7 @@ import { ClockIcon, BarChart3Icon, MegaphoneIcon, TrophyIcon } from "lucide-reac
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useNewTicketsCount, useNewApplicantsCount, useTodayEventsCount, useActiveAnnouncementsCount } from "@/hooks/use-realtime-count"
+import { useRoleBasedTicketsCount, useRoleBasedApplicantsCount, useRoleBasedEventsCount, useRoleBasedAnnouncementsCount } from "@/hooks/use-realtime-count"
 
 import { NavMain } from "@/components/nav/nav-main"
 import { NavMainWithSubgroups } from "@/components/nav/nav-main-with-subgroups"
@@ -47,13 +47,15 @@ import {
 export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { user, loading } = useAuth()
-  const { newTicketsCount, error: ticketsError, isConnected } = useNewTicketsCount()
-  const { newApplicantsCount, error: applicantsError, isConnected: applicantsIsConnected } = useNewApplicantsCount()
-  const { todayEventsCount, error: eventsError, isConnected: eventsIsConnected } = useTodayEventsCount()
-  const { activeAnnouncementsCount, error: announcementsError, isConnected: announcementsIsConnected } = useActiveAnnouncementsCount()
+  const { newTicketsCount, error: ticketsError, isConnected } = useRoleBasedTicketsCount()
+  const { newApplicantsCount, error: applicantsError, isConnected: applicantsIsConnected } = useRoleBasedApplicantsCount()
+  const { todayEventsCount, error: eventsError, isConnected: eventsIsConnected } = useRoleBasedEventsCount()
+  const { activeAnnouncementsCount, error: announcementsError, isConnected: announcementsIsConnected } = useRoleBasedAnnouncementsCount()
 
   const role = (user as any)?.roleName?.toLowerCase() || "it"
   const isAdmin = role === "admin"
+  // const isNurse = role === "nurse" // Temporarily disabled
+  const isNurse = false // Temporarily disabled
   
 
 
@@ -65,13 +67,21 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
           icon: GripDashboardIcon,
         },
       ]
+    : isNurse
+    ? [
+        {
+          title: "Dashboard",
+          url: "/nurse/dashboard",
+          icon: GripDashboardIcon,
+        },
+      ]
     : [
         {
           title: "Dashboard",
           url: "/it/dashboard",
           icon: GripDashboardIcon,
         },
-      ], [isAdmin])
+      ], [isAdmin, isNurse])
 
   const navSupport = useMemo(() => isAdmin
     ? [
@@ -87,6 +97,19 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
           icon: HistoryIcon,
         },
       ]
+    : isNurse
+    ? [
+        {
+          title: "Patient Records",
+          url: "/nurse/patients",
+          icon: IdCardIcon,
+        },
+        {
+          title: "Medical History",
+          url: "/nurse/history",
+          icon: HistoryIcon,
+        },
+      ]
     : [
         {
           title: "Tickets",
@@ -99,7 +122,7 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
           url: "/it/past-tickets",
           icon: HistoryIcon,
         },
-      ], [isAdmin, newTicketsCount])
+      ], [isAdmin, isNurse, newTicketsCount])
 
   const navSecondary = useMemo(() => [
     {
@@ -200,12 +223,12 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
               <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
                 <span className="text-base font-semibold">ShoreAgents</span>
                 <Badge className="text-xs px-1.5 py-0.5 bg-teal-100 text-teal-800 border-teal-200 shadow-none">
-                  {isAdmin ? "Admin" : "IT"}
+                  {isAdmin ? "Admin" : isNurse ? "Nurse" : "IT"}
                 </Badge>
               </div>
               <div className="hidden group-data-[collapsible=icon]:block">
                 <Badge className="text-xs px-1.5 py-0.5 bg-teal-100 text-teal-800 border-teal-200 shadow-none">
-                  {isAdmin ? "Admin" : "IT"}
+                  {isAdmin ? "Admin" : isNurse ? "Nurse" : "IT"}
                 </Badge>
               </div>
             </div>
@@ -217,7 +240,7 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
           <SidebarGroupLabel>MAIN</SidebarGroupLabel>
           <NavMain items={navMain} />
         </SidebarGroup>
-        {navSupport.length > 0 && (
+        {navSupport.length > 0 && !isNurse && (
           <SidebarGroup className="p-0">
             <SidebarGroupLabel>SUPPORT</SidebarGroupLabel>
             <NavMain items={navSupport} />
@@ -230,6 +253,7 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
               items={[
                 { title: "Internal", url: "/admin/internal", icon: UserIcon },
                 { title: "Agents", url: "/admin/agents", icon: UsersIcon },
+                { title: "Onboarding", url: "/admin/onboarding", icon: UserPlusIcon },
               ]}
             />
           </SidebarGroup>
@@ -284,6 +308,16 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
                 { title: "Leaderboard", url: "/admin/leaderboard", icon: TrophyIcon },
                 { title: "Announcements", url: "/admin/announcements", icon: MegaphoneIcon, badge: activeAnnouncementsCount > 0 ? activeAnnouncementsCount : undefined },
                 { title: "Events & Activities", url: "/admin/events", icon: CalendarIcon, badge: todayEventsCount > 0 ? todayEventsCount : undefined },
+              ]}
+            />
+          </SidebarGroup>
+        )}
+        {isAdmin && (
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel>LOGS</SidebarGroupLabel>
+            <NavMain
+              items={[
+                { title: "Visits", url: "/admin/visits", icon: HistoryIcon },
               ]}
             />
           </SidebarGroup>

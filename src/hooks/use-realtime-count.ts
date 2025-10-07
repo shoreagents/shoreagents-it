@@ -24,15 +24,15 @@ const COUNT_CONFIGS: Record<CountType, CountConfig> = {
     type: 'applicants',
     localStorageKey: 'newApplicantsCount',
     localStorageTimestampKey: 'newApplicantsCountTimestamp',
-    apiEndpoint: '/api/bpoc',
+    apiEndpoint: '/api/bpoc/count',
     statusFilter: 'submitted',
   },
   tickets: {
     type: 'tickets',
     localStorageKey: 'newTicketsCount',
     localStorageTimestampKey: 'newTicketsCountTimestamp',
-    apiEndpoint: '/api/tickets',
-    statusFilter: 'Approved', // Default for IT users
+    apiEndpoint: '/api/tickets/count',
+    statusFilter: 'For Approval', // Both admin and IT users count For Approval tickets
     adminParam: '&admin=true',
     roleFilter: true,
   },
@@ -112,19 +112,54 @@ export function useRealtimeCount(countType: CountType) {
       return
     }
 
+    // Role-based filtering - don't fetch if not needed
+    const role = (user as any)?.roleName?.toLowerCase() || 'it'
+    
+    if (countType === 'applicants' && role !== 'admin') {
+      // Only admin needs applicants count
+      updateCount(0)
+      return
+    }
+    
+    if (countType === 'events' && role !== 'admin') {
+      // Only admin needs events count
+      updateCount(0)
+      return
+    }
+    
+    if (countType === 'announcements' && role !== 'admin') {
+      // Only admin needs announcements count
+      updateCount(0)
+      return
+    }
+    
+    if (countType === 'tickets' && role !== 'admin' && role !== 'it') {
+      // Only admin and IT need tickets count
+      updateCount(0)
+      setLoading(false)
+      return
+    }
+
     try {
       if (countType === 'tickets') {
         setLoading(true)
       }
       setError(null)
       
+      const isAdmin = (user as any)?.roleName?.toLowerCase() === 'admin'
+      
       let apiUrl = `${config.apiEndpoint}?status=${config.statusFilter}`
       
-      // Add admin parameter for tickets if user is admin
-      if (countType === 'tickets' && config.roleFilter) {
-        const isAdmin = (user as any)?.roleName?.toLowerCase() === 'admin'
+      // Add admin parameter for all APIs if user is admin
+      if (isAdmin) {
+        apiUrl += '&admin=true'
+      }
+      
+      // Special handling for tickets status
+      if (countType === 'tickets') {
+        apiUrl = `${config.apiEndpoint}?status=For Approval`
         if (isAdmin) {
-          apiUrl = `${config.apiEndpoint}?status=For Approval${config.adminParam}`
+          apiUrl += '&admin=true'
         }
       }
       
@@ -140,8 +175,11 @@ export function useRealtimeCount(countType: CountType) {
         } else if (countType === 'announcements') {
           // Announcements API returns { active: number }
           count = data.active || 0
+        } else if (countType === 'tickets' || countType === 'applicants') {
+          // New count APIs return { count: number }
+          count = data.count || 0
         } else {
-          // Other APIs return arrays
+          // Fallback for other APIs that return arrays
           count = data.length
         }
         
@@ -366,6 +404,104 @@ export function useTodayEventsCount() {
 
 export function useActiveAnnouncementsCount() {
   const result = useRealtimeCount('announcements')
+  return {
+    activeAnnouncementsCount: result.count,
+    error: result.error,
+    isConnected: result.isConnected,
+    refetch: result.refetch
+  }
+}
+
+// Role-aware hooks that only fetch data when needed
+export function useRoleBasedApplicantsCount() {
+  const { user } = useAuth()
+  const isAdmin = (user as any)?.roleName?.toLowerCase() === 'admin'
+  
+  const result = useRealtimeCount('applicants')
+  
+  // Only return data for admin users, return empty for others
+  if (!isAdmin) {
+    return {
+      newApplicantsCount: 0,
+      error: null,
+      isConnected: false,
+      refetch: () => {}
+    }
+  }
+  
+  return {
+    newApplicantsCount: result.count,
+    error: result.error,
+    isConnected: result.isConnected,
+    refetch: result.refetch
+  }
+}
+
+export function useRoleBasedTicketsCount() {
+  const { user } = useAuth()
+  const role = (user as any)?.roleName?.toLowerCase() || 'it'
+  const shouldFetch = role === 'admin' || role === 'it'
+  
+  const result = useRealtimeCount('tickets')
+  
+  // Only return data for admin and IT users
+  if (!shouldFetch) {
+    return {
+      newTicketsCount: 0,
+      loading: false,
+      error: null,
+      isConnected: false
+    }
+  }
+  
+  return {
+    newTicketsCount: result.count,
+    loading: result.loading,
+    error: result.error,
+    isConnected: result.isConnected
+  }
+}
+
+export function useRoleBasedEventsCount() {
+  const { user } = useAuth()
+  const isAdmin = (user as any)?.roleName?.toLowerCase() === 'admin'
+  
+  const result = useRealtimeCount('events')
+  
+  // Only return data for admin users
+  if (!isAdmin) {
+    return {
+      todayEventsCount: 0,
+      error: null,
+      isConnected: false,
+      refetch: () => {}
+    }
+  }
+  
+  return {
+    todayEventsCount: result.count,
+    error: result.error,
+    isConnected: result.isConnected,
+    refetch: result.refetch
+  }
+}
+
+export function useRoleBasedAnnouncementsCount() {
+  const { user } = useAuth()
+  const isAdmin = (user as any)?.roleName?.toLowerCase() === 'admin'
+  
+  const result = useRealtimeCount('announcements')
+  
+  // Only return data for admin users
+  if (!isAdmin) {
+    return {
+      activeAnnouncementsCount: 0,
+      error: null,
+      isConnected: false,
+      refetch: () => {}
+    }
+  }
+  
   return {
     activeAnnouncementsCount: result.count,
     error: result.error,
