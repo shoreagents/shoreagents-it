@@ -89,9 +89,7 @@ const variants = {
 
 enum ActiveTab {
   'Login' = 1,
-  'Admin' = 2,
-  'Nurse' = 3,
-  'Finance' = 4
+  'Admin' = 2
 }
 
 export default function LoginPage() {
@@ -105,9 +103,6 @@ export default function LoginPage() {
   const [adminEmail, setAdminEmail] = React.useState("")
   const [adminPassword, setAdminPassword] = React.useState("")
   const [adminShowPassword, setAdminShowPassword] = React.useState(false)
-  const [nurseEmail, setNurseEmail] = React.useState("")
-  const [nursePassword, setNursePassword] = React.useState("")
-  const [nurseShowPassword, setNurseShowPassword] = React.useState(false)
 
   const router = useRouter()
   const { login, user } = useAuth()
@@ -119,8 +114,6 @@ export default function LoginPage() {
       const roleName = (user as any).roleName as string | undefined
       if (roleName && roleName.toLowerCase() === 'admin') {
         router.push('/admin/dashboard')
-      } else if (roleName && roleName.toLowerCase() === 'nurse') {
-        router.push('/nurse/dashboard')
       } else {
         router.push('/it/dashboard')
       }
@@ -171,20 +164,6 @@ export default function LoginPage() {
     setIsLoading(false)
   }
 
-  const handleNurseSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    const result = await login(nurseEmail, nursePassword, 'nurse')
-    console.log('Nurse login result:', result)
-    if (result.success) {
-      toast.success("Successfully Signed In")
-      router.push('/nurse/dashboard')
-    } else {
-      const errorMessage = result.error || 'Login Failed'
-      toast.error(errorMessage)
-    }
-    setIsLoading(false)
-  }
 
   return (
     <Container bg={BACKGROUNDS[bg]}>
@@ -339,99 +318,6 @@ export default function LoginPage() {
               </div>
             </Content>
           }
-
-          {activeTab === 3 && 
-            <Content 
-              as={motion.div}
-              key="nurse"
-              variants={variants}
-              initial="hidden"
-              animate="open"
-              exit="out"
-            >
-              <div className="w-80 text-center">
-                <form onSubmit={handleNurseSubmit} className="space-y-4" name="nurse-login-form">
-                  <div className="space-y-2">
-                    <Label htmlFor="nurse-email" className="text-white text-left block font-sans">Email</Label>
-                    <div className="relative">
-                      <IconMail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
-                      <CustomInput
-                        id="nurse-email"
-                        type="email"
-                        placeholder="Enter nurse email"
-                        value={nurseEmail}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNurseEmail(e.target.value)}
-                        autoComplete="username"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="nurse-password" className="text-white text-left block font-sans">Password</Label>
-                    <div className="relative">
-                      <IconLock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
-                      <CustomInput
-                        id="nurse-password"
-                        type={nurseShowPassword ? "text" : "password"}
-                        placeholder="Enter nurse password"
-                        value={nursePassword}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNursePassword(e.target.value)}
-                        autoComplete="current-password"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setNurseShowPassword(!nurseShowPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white transition-colors"
-                      >
-                        {nurseShowPassword ? (
-                          <IconEyeOff className="h-4 w-4" />
-                        ) : (
-                          <IconEye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-end">
-                    <span
-                      className="text-sm text-white/70 hover:text-white transition-colors cursor-pointer"
-                    >
-                      Forgot Password?
-                    </span>
-                  </div>
-
-                  <div className="w-full flex justify-center mt-6">
-                    <NormalButton type="submit">
-                      Sign In
-                    </NormalButton>
-                  </div>
-                </form>
-              </div>
-            </Content>
-          }
-
-          {activeTab === 4 && 
-            <Content 
-              as={motion.div}
-              key="finance"
-              variants={variants}
-              initial="hidden"
-              animate="open"
-              exit="out"
-            >
-              <div className="w-80 text-center">
-                <div className="text-white text-2xl font-semibold mb-4">
-                  Finance Portal
-                </div>
-                <div className="text-white/70 text-lg">
-                  Coming Soon...
-                </div>
-              </div>
-            </Content>
-          }
-
 
         </AnimatePresence>
       </Browser>}

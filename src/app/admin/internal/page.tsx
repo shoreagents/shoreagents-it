@@ -257,9 +257,9 @@ export default function InternalPage() {
               <div className="px-4 lg:px-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h1 className="text-2xl font-bold">Internal</h1>
+                    <h1 className="text-2xl font-bold">Admin</h1>
                     <p className="text-sm text-muted-foreground">
-                      Directory of internal employees and contact details
+                      Directory of admin employees and contact details
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -273,7 +273,7 @@ export default function InternalPage() {
                   <div className="relative flex-1">
                     <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search internal users..."
+                      placeholder="Search admin users..."
                       className="pl-8"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
@@ -374,8 +374,8 @@ export default function InternalPage() {
                       <div className="flex items-center justify-between mt-6">
                         <div className="text-sm text-muted-foreground">
                           {totalCount > 0
-                            ? <>Showing {((currentPage - 1) * PAGE_SIZE) + 1} to {Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount} Internal</>
-                            : <>Showing 0 to 0 of 0 Internal</>
+                            ? <>Showing {((currentPage - 1) * PAGE_SIZE) + 1} to {Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount} Admin</>
+                            : <>Showing 0 to 0 of 0 Admin</>
                           }
                         </div>
                         <Pagination>

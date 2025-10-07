@@ -3672,4 +3672,3 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     </Dialog>
   )
 }
-

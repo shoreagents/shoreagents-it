@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
@@ -543,7 +543,7 @@ export function ActivityDataCard({
       let mostActive = chartData[0]
       let mostInactive = chartData[0]
 
-      chartData.forEach(dataPoint => {
+      chartData.forEach((dataPoint: ChartDataPoint) => {
         if (dataPoint.active > mostActive.active) {
           mostActive = dataPoint
         }
@@ -628,7 +628,7 @@ export function ActivityDataCard({
                     axisLine={false} 
                     tickMargin={8}
                     minTickGap={32}
-                    tickFormatter={(value) => formatDateForDisplay(value, 'short')}
+                    tickFormatter={(value: string) => formatDateForDisplay(value, 'short')}
                   />
                   <ChartTooltip
                     cursor={false}
@@ -636,7 +636,7 @@ export function ActivityDataCard({
                       <ChartTooltipContent
                         className="min-w-[16rem]"
                         labelClassName="text-center w-full"
-                        labelFormatter={(value) => {
+                        labelFormatter={(value: string) => {
                           const dateText = formatDateForDisplay(value, 'long')
                           // Check if formatting failed by looking for our error messages
                           if (dateText === 'No date available' || dateText === 'Invalid date') {
@@ -656,7 +656,7 @@ export function ActivityDataCard({
                           )
                         }}
                         indicator="dot"
-                        formatter={(val, name, item, _idx, point: any) => {
+                        formatter={(val: any, name: string, item: any, _idx: number, point: any) => {
                           // Only render once for the first series (active) to avoid duplication
                           if (name !== 'active') return null
                           
@@ -734,7 +734,7 @@ export function ActivityDataCard({
     let mostActive = chartData[0]
     let mostInactive = chartData[0]
 
-    chartData.forEach(dataPoint => {
+    chartData.forEach((dataPoint: ChartDataPoint) => {
       if (dataPoint.active > mostActive.active) {
         mostActive = dataPoint
       }

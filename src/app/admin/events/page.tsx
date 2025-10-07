@@ -43,6 +43,7 @@ export default function EventsPage() {
   const [loadingParticipantsKey, setLoadingParticipantsKey] = useState<string | null>(null)
   const [eventParticipantsCache, setEventParticipantsCache] = useState<Record<string, { users: { user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, employee_id: string | null }[] }>>({})
   const [todayCount, setTodayCount] = useState<number>(0)
+  const [reloading, setReloading] = useState(false)
 
   // Realtime events hook
   const { isConnected: isRealtimeConnected } = useRealtimeEvents({
@@ -103,47 +104,6 @@ export default function EventsPage() {
     try {
       setLoading(true)
       setError(null)
-      
-      // First, update event statuses in database based on current date
-      try {
-        console.log('Updating event statuses based on current date...')
-        
-        // Get browser's current date to send to API
-        const now = new Date()
-        const year = now.getFullYear()
-        const month = String(now.getMonth() + 1).padStart(2, '0')
-        const day = String(now.getDate()).padStart(2, '0')
-        const browserDate = `${year}-${month}-${day}` // YYYY-MM-DD format
-        
-        const updateResponse = await fetch('/api/events/update-statuses', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ date: browserDate })
-        })
-        
-        if (updateResponse.ok) {
-          const updateData = await updateResponse.json()
-          console.log('Event statuses updated successfully:', updateData)
-          
-          // Log detailed update information
-          if (updateData.updates) {
-            console.log('Update summary:', {
-              ended: updateData.updates.ended,
-              today: updateData.updates.today,
-              upcoming: updateData.updates.upcoming,
-              date: updateData.date
-            })
-          }
-        } else {
-          const errorData = await updateResponse.json().catch(() => ({}))
-          console.warn('Failed to update event statuses:', errorData)
-        }
-      } catch (updateError) {
-        console.warn('Error updating event statuses:', updateError)
-        // Continue with fetching events even if status update fails
-      }
       
       const params = new URLSearchParams({
         page: String(currentPage),
@@ -271,6 +231,96 @@ export default function EventsPage() {
       setError(e?.message || "Failed to fetch events")
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Reload function
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      // Don't set loading to true during reload to keep the UI visible
+      setError(null)
+      
+      // First, update event statuses in database based on current date
+      try {
+        console.log('Updating event statuses based on current date...')
+        
+        // Get browser's current date to send to API
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = String(now.getMonth() + 1).padStart(2, '0')
+        const day = String(now.getDate()).padStart(2, '0')
+        const browserDate = `${year}-${month}-${day}` // YYYY-MM-DD format
+        
+        const updateResponse = await fetch('/api/events/update-statuses', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ date: browserDate })
+        })
+        
+        if (updateResponse.ok) {
+          const updateData = await updateResponse.json()
+          console.log('Event statuses updated successfully:', updateData)
+          
+          // Log detailed update information
+          if (updateData.updates) {
+            console.log('Update summary:', {
+              ended: updateData.updates.ended,
+              today: updateData.updates.today,
+              upcoming: updateData.updates.upcoming,
+              date: updateData.date
+            })
+          }
+        } else {
+          const errorData = await updateResponse.json().catch(() => ({}))
+          console.warn('Failed to update event statuses:', errorData)
+        }
+      } catch (updateError) {
+        console.warn('Error updating event statuses:', updateError)
+        // Continue with fetching events even if status update fails
+      }
+      
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: '20',
+        sortField: 'event_date',
+        sortDirection: 'asc'
+      })
+      
+      // Add status filter for better performance
+      const statusToFetch = selectedStatus
+      if (statusToFetch) {
+        params.append('status', statusToFetch)
+      }
+      
+      if (search.trim()) params.append('search', search.trim())
+      
+      console.log('Fetching events with params:', params.toString())
+      const res = await fetch(`/api/events?${params.toString()}`)
+      console.log('Events API response status:', res.status)
+      
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        console.error('Events API error:', err)
+        throw new Error(err.error || "Failed to fetch events")
+      }
+      const data = await res.json()
+      console.log('Events data received:', data)
+      setEvents(data.events || [])
+      setTotalCount(data.pagination?.totalCount || 0)
+      setTotalPages(data.pagination?.totalPages || 1)
+      
+      // Fetch today count after loading events
+      fetchTodayCount()
+      setError(null) // Clear any previous errors
+      
+    } catch (err) {
+      console.error('❌ Reload error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to reload events')
+    } finally {
+      setReloading(false)
     }
   }
 
@@ -413,7 +463,7 @@ export default function EventsPage() {
   const handleTabChange = (tab: any) => {
     setSelectedStatus(tab.value)
     setCurrentPage(1) // Reset to first page when changing tabs
-    fetchEvents(tab.value) // Fetch events for the selected status
+    // fetchEvents will be called automatically by useEffect when selectedStatus changes
   }
 
   return (
@@ -430,7 +480,7 @@ export default function EventsPage() {
                     <h1 className="text-2xl font-bold">Events & Activities</h1>
                     <p className="text-sm text-muted-foreground">Discover and track all company events and activities in one place.</p>
                   </div>
-                  <ReloadButton onReload={() => fetchEvents(selectedStatus)} loading={loading} />
+                  <ReloadButton onReload={handleReload} loading={reloading} />
                 </div>
               </div>
 
