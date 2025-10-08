@@ -423,7 +423,7 @@ export default function LeaderboardPage() {
                                     Rank
                                   </TableHead>
                                   <TableHead>
-                                    Team Member
+                                    Agents
                                   </TableHead>
                                   <TableHead className="text-center">
                                     Points
@@ -493,13 +493,13 @@ export default function LeaderboardPage() {
                           <Select value={memberId} onValueChange={(v: string) => setMemberId(v)}>
                             <SelectTrigger className="w-full">
                               <SelectValue placeholder="Filter by member">
-                                {memberId === 'all' ? 'All Employees' : 
+                                {memberId === 'all' ? 'All Agents' : 
                                  memberId === 'none' ? 'No Assigned Members' :
                                  memberOptions.find(m => String(m.id) === memberId)?.company || 'Filter by member'}
                               </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="all">All Employees</SelectItem>
+                              <SelectItem value="all">All Agents</SelectItem>
                               <SelectItem value="none">No Assigned Members</SelectItem>
                               <SelectSeparator className="bg-border mx-2" />
                               <SelectGroup>
@@ -720,7 +720,7 @@ export default function LeaderboardPage() {
                                   onClick={() => handleSort('name')}
                                 >
                                   <div className="flex items-center gap-1">
-                                    Team Member
+                                    Agents
                                     {sortField === 'name' && getSortIcon('name')}
                                   </div>
                                 </TableHead>
@@ -810,13 +810,13 @@ export default function LeaderboardPage() {
                         <Select value={memberId} onValueChange={(v: string) => setMemberId(v)}>
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Filter by member">
-                              {memberId === 'all' ? 'All Employees' : 
+                              {memberId === 'all' ? 'All Agents' : 
                                memberId === 'none' ? 'No Assigned Members' :
                                memberOptions.find(m => String(m.id) === memberId)?.company || 'Filter by member'}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all">All Employees</SelectItem>
+                            <SelectItem value="all">All Agents</SelectItem>
                             <SelectItem value="none">No Assigned Members</SelectItem>
                             <SelectSeparator className="bg-border mx-2" />
                             <SelectGroup>

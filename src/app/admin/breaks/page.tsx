@@ -774,13 +774,13 @@ export default function BreaksPage() {
                       <Select value={memberId} onValueChange={(v: string) => setMemberId(v)}>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Filter by member">
-                            {memberId === 'all' ? 'All Employees' : 
+                            {memberId === 'all' ? 'All Agents' : 
                              memberId === 'none' ? 'No Assigned Members' :
                              memberOptions.find(m => String(m.id) === memberId)?.company || 'Filter by member'}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">All Employees</SelectItem>
+                          <SelectItem value="all">All Agents</SelectItem>
                           <SelectItem value="none">No Assigned Members</SelectItem>
                           <SelectSeparator className="bg-border mx-2" />
                           <SelectGroup>
@@ -906,7 +906,7 @@ export default function BreaksPage() {
                                   onClick={() => handleSort('name')}
                                 >
                                   <div className="flex items-center gap-1">
-                                    Name
+                                    Agents
                                     {sortField === 'name' && getSortIcon('name')}
                                   </div>
                                 </TableHead>

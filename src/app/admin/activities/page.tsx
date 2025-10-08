@@ -1155,13 +1155,13 @@ const getActivityStatus = (isActive: boolean, lastSessionStart: string | null, h
                         <Select value={memberId} onValueChange={(v: string) => setMemberId(v)}>
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Filter by member">
-                              {memberId === 'all' ? 'All Employees' : 
+                              {memberId === 'all' ? 'All Agents' : 
                                memberId === 'none' ? 'No Assigned Members' :
                                memberOptions.find(m => String(m.id) === memberId)?.company || 'Filter by member'}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all">All Employees</SelectItem>
+                            <SelectItem value="all">All Agents</SelectItem>
                             <SelectItem value="none">No Assigned Members</SelectItem>
                             <SelectSeparator className="bg-border mx-2" />
                             <SelectGroup>
@@ -1341,7 +1341,7 @@ const getActivityStatus = (isActive: boolean, lastSessionStart: string | null, h
                           <SelectValue placeholder="Filter by member" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">All Employees</SelectItem>
+                          <SelectItem value="all">All Agents</SelectItem>
                           <SelectItem value="none">No Assigned Members</SelectItem>
                           <SelectSeparator className="bg-border mx-2" />
                           <SelectGroup>
@@ -1377,7 +1377,7 @@ const getActivityStatus = (isActive: boolean, lastSessionStart: string | null, h
                                   onClick={() => handleSort('name')}
                                 >
                                   <div className="flex items-center gap-1">
-                                    Name
+                                    Agents
                                     {sortField === 'name' && getSortIcon('name')}
                                   </div>
                                 </TableHead>
@@ -1414,7 +1414,9 @@ const getActivityStatus = (isActive: boolean, lastSessionStart: string | null, h
                                {sortedActivities.length === 0 ? (
                                 <TableRow>
                                   <TableCell colSpan={4} className="p-0">
-                                    <NoData message={employees.length === 0 ? 'No employees found' : 'No Activity Data'} />
+                                    <div className="p-6">
+                                      <NoData message="No Activity Data" />
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               ) : (

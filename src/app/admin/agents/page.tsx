@@ -417,7 +417,7 @@ export default function AgentsPage() {
                         <SelectValue placeholder="Filter by member" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Employees</SelectItem>
+                        <SelectItem value="all">All Agents</SelectItem>
                         <SelectItem value="none">No Assigned Members</SelectItem>
                         <SelectSeparator className="bg-border mx-2" />
                         <SelectGroup>
@@ -457,7 +457,7 @@ export default function AgentsPage() {
                             <TableRow variant="no-hover">
                             <TableHead onClick={() => handleSort('first_name')} className="cursor-pointer">
                               <div className="flex items-center gap-1">
-                                Employee <span className="w-4 h-4">{sortField === 'first_name' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
+                                Name <span className="w-4 h-4">{sortField === 'first_name' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
                               </div>
                             </TableHead>
                             <TableHead onClick={() => handleSort('job_title')} className="cursor-pointer">
