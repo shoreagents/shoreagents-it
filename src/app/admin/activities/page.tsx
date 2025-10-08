@@ -185,6 +185,7 @@ export default function ActivitiesPage() {
     return () => clearInterval(timer)
   }, [])
 
+
   // Fetch member options
   useEffect(() => {
     const fetchMembers = async () => {
@@ -200,73 +201,67 @@ export default function ActivitiesPage() {
     fetchMembers()
   }, [])
 
-  // Fetch employees data
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      if (!user?.id && user?.userType !== 'Internal') {
-        return
-      }
-
-      try {
-        const params = new URLSearchParams({
-          limit: '1000'
-        })
-        
-        if (memberId !== 'all') {
-          params.append('memberId', memberId)
-        }
-
-        const response = await fetch(`/api/agents?${params.toString()}`)
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch employees: ${response.status}`)
-        }
-
-        const data = await response.json()
-        console.log('🔍 fetchEmployees - API response:', data)
-        setEmployees(data.agents)
-      } catch (err) {
-        console.error('❌ Employees fetch error:', err)
-        // Don't set error state for employees fetch failure, just log it
-      }
+  // Fetch both employees and activities data in parallel
+  const fetchData = async () => {
+    if (!user) {
+      // Don't change loading state if user is not available yet
+      // This prevents the skeleton from disappearing and reappearing
+      return
     }
 
-    if (user) {
-      fetchEmployees()
-    }
-  }, [user, memberId])
-
-  // Fetch activities data
-  const fetchActivities = async () => {
-    if (!user) return
-    
     setLoading(true)
     setError(null)
-    
+
     try {
-      const memberId = 'all'
+      // Prepare parameters for employees fetch
+      const employeesParams = new URLSearchParams({
+        limit: '1000'
+      })
       
-       const response = await fetch(`/api/activities?memberId=${memberId}`)
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch activities: ${response.status}`)
+      if (memberId !== 'all') {
+        employeesParams.append('memberId', memberId)
+      }
+
+      // Fetch both datasets in parallel
+      const [employeesResponse, activitiesResponse] = await Promise.all([
+        fetch(`/api/agents?${employeesParams.toString()}`),
+        fetch(`/api/activities?memberId=all`)
+      ])
+
+      // Check if both requests were successful
+      if (!employeesResponse.ok) {
+        throw new Error(`Failed to fetch employees: ${employeesResponse.status}`)
       }
       
-      const data = await response.json()
-      console.log('🔍 fetchActivities - API response:', data)
-      setActivities(data.activities)
-      setStats(data.stats)
+      if (!activitiesResponse.ok) {
+        throw new Error(`Failed to fetch activities: ${activitiesResponse.status}`)
+      }
+
+      // Parse both responses
+      const [employeesData, activitiesData] = await Promise.all([
+        employeesResponse.json(),
+        activitiesResponse.json()
+      ])
+
+      console.log('🔍 fetchData - Employees API response:', employeesData)
+      console.log('🔍 fetchData - Activities API response:', activitiesData)
+
+      // Update state with both datasets
+      setEmployees(employeesData.agents || [])
+      setActivities(activitiesData.activities || [])
+      setStats(activitiesData.stats || null)
+
     } catch (err) {
       console.error('❌ Fetch error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to fetch activities')
+      setError(err instanceof Error ? err.message : 'Failed to fetch data')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchActivities()
-  }, [user])
+    fetchData()
+  }, [user, memberId])
 
   // Reload function
   const handleReload = async () => {
@@ -275,31 +270,38 @@ export default function ActivitiesPage() {
       // Don't set loading to true during reload to keep the UI visible
       setError(null)
       
-      const params = new URLSearchParams({
+      // Prepare parameters for employees fetch
+      const employeesParams = new URLSearchParams({
         limit: '1000'
       })
       
       if (memberId !== 'all') {
-        params.append('memberId', memberId)
+        employeesParams.append('memberId', memberId)
       }
 
-      const response = await fetch(`/api/agents?${params.toString()}`)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+      // Fetch both datasets in parallel
+      const [employeesResponse, activitiesResponse] = await Promise.all([
+        fetch(`/api/agents?${employeesParams.toString()}`),
+        fetch(`/api/activities?memberId=${memberId}`)
+      ])
+
+      // Check if both requests were successful
+      if (!employeesResponse.ok) {
+        throw new Error(`Failed to fetch employees: ${employeesResponse.status}`)
       }
-      
-      const data = await response.json()
-      setEmployees(data.agents || [])
-      
-      // Fetch activities data
-      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
-      const activitiesResponse = await fetch(`/api/activities?memberId=${memberId}&date=${today}`)
       
       if (!activitiesResponse.ok) {
-        throw new Error(`HTTP error! status: ${activitiesResponse.status}`)
+        throw new Error(`Failed to fetch activities: ${activitiesResponse.status}`)
       }
-      
-      const activitiesData = await activitiesResponse.json()
+
+      // Parse both responses
+      const [employeesData, activitiesData] = await Promise.all([
+        employeesResponse.json(),
+        activitiesResponse.json()
+      ])
+
+      // Update state with both datasets
+      setEmployees(employeesData.agents || [])
       setActivities(activitiesData.activities || [])
       setStats(activitiesData.stats || null)
       
@@ -1411,7 +1413,7 @@ const getActivityStatus = (isActive: boolean, lastSessionStart: string | null, h
                               </TableRow>
                             </TableHeader>
                              <TableBody>
-                               {sortedActivities.length === 0 ? (
+                               {!loading && sortedActivities.length === 0 ? (
                                 <TableRow>
                                   <TableCell colSpan={4} className="p-0">
                                     <div className="p-6">
