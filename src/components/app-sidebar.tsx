@@ -232,12 +232,12 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
               <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
                 <span className="text-base font-semibold">ShoreAgents</span>
                 <Badge className="text-xs px-1.5 py-0.5 bg-teal-100 text-teal-800 border-teal-200 shadow-none">
-                  {isAdmin ? "Admin" : isNurse ? "Nurse" : "IT"}
+                  {isAdmin ? "Admins" : isNurse ? "Nurse" : "IT"}
                 </Badge>
               </div>
               <div className="hidden group-data-[collapsible=icon]:block">
                 <Badge className="text-xs px-1.5 py-0.5 bg-teal-100 text-teal-800 border-teal-200 shadow-none">
-                  {isAdmin ? "Admin" : isNurse ? "Nurse" : "IT"}
+                  {isAdmin ? "Admins" : isNurse ? "Nurse" : "IT"}
                 </Badge>
               </div>
             </div>
@@ -265,7 +265,7 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
             <SidebarGroupLabel>USERS</SidebarGroupLabel>
             <NavMain
               items={[
-                { title: "Admin", url: "/admin/internal", icon: UserIcon },
+                { title: "Admins", url: "/admin/internal", icon: UserIcon },
                 { title: "Agents", url: "/admin/agents", icon: UsersIcon },
               ]}
             />
