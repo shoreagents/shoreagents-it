@@ -13,7 +13,7 @@ export async function GET(
     }
 
     // For now, return empty activities since we don't have an events_activity_log table yet
-    // This would be implemented similar to members_activity_log
+    // This would be implemented similar to companies_activity_log
     const activities = []
 
     return NextResponse.json({ activities })

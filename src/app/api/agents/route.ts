@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAgentMembers, getAgentsPaginated } from '@/lib/db-utils'
+import { getAgentCompanies, getAgentsPaginated } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,12 +7,12 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '40', 10)
     const search = searchParams.get('search') || ''
-    const memberIdParam = searchParams.get('memberId')
-    const memberId = memberIdParam === 'none' ? 'none' : (memberIdParam ? parseInt(memberIdParam, 10) : undefined)
+    const companyIdParam = searchParams.get('companyId')
+    const companyId = companyIdParam === 'none' ? 'none' : (companyIdParam ? parseInt(companyIdParam, 10) : undefined)
     const sortField = searchParams.get('sortField') || 'first_name'
     const sortDirection = (searchParams.get('sortDirection') as 'asc' | 'desc') || 'asc'
 
-    const { agents, totalCount } = await getAgentsPaginated({ search, page, limit, memberId, sortField, sortDirection })
+    const { agents, totalCount } = await getAgentsPaginated({ search, page, limit, companyId, sortField, sortDirection })
     const totalPages = Math.max(1, Math.ceil(totalCount / Math.max(1, limit)))
 
     return NextResponse.json({
@@ -32,10 +32,10 @@ export async function GET(request: NextRequest) {
 
 export async function OPTIONS() {
   try {
-    const members = await getAgentMembers()
-    return NextResponse.json({ members })
+    const companies = await getAgentCompanies()
+    return NextResponse.json({ companies })
   } catch (error) {
-    return NextResponse.json({ members: [] })
+    return NextResponse.json({ companies: [] })
   }
 }
 

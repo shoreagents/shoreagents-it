@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
 import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconGenderMale, IconGenderFemale, IconGenderNeutrois, IconHelp, IconSun, IconMoon, IconClockHour4, IconUsers, IconHome, IconDeviceLaptop } from "@tabler/icons-react"
-import { useRealtimeMembers } from '@/hooks/use-realtime-members'
+import { useRealtimeCompanies } from '@/hooks/use-realtime-companies'
 import { SendHorizontal, Target } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
@@ -27,7 +27,7 @@ import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/auth-context"
 import { ColorPicker } from "@/components/ui/color-picker"
 import { LinkPreview } from "@/components/ui/link-preview"
-import { MembersActivityLog } from "@/components/members-activity-log"
+import { CompaniesActivityLog } from "@/components/companies-activity-log"
 import { Comment } from "@/components/ui/comment"
 
 interface InternalDetailModalProps {
@@ -68,9 +68,9 @@ interface InternalRecord {
   // Internal specific fields
   station_id: string | null
   // Additional fields that might be available from API
-  member_id?: number | null
-  member_company?: string | null
-  member_badge_color?: string | null
+  company_id?: number | null
+  company_name?: string | null
+  company_badge_color?: string | null
   department_name?: string | null
 }
 
@@ -94,6 +94,57 @@ const getCompanyBadgeClass = (badgeColor: string | null): string => {
   const borderColor = `rgba(${r}, ${g}, ${b}, 0.4)`
   
   return `border-[${borderColor}]`
+}
+
+// Convert 24-hour time to 12-hour format
+const convertTo12Hour = (time24: string): string => {
+  if (!time24) return ''
+  
+  const [hours, minutes] = time24.split(':').map(Number)
+  const period = hours >= 12 ? 'PM' : 'AM'
+  const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
+  
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
+}
+
+// Convert 12-hour time to 24-hour format
+const convertTo24Hour = (time12: string): string => {
+  if (!time12) return ''
+  
+  const [time, period] = time12.split(' ')
+  const [hours, minutes] = time.split(':').map(Number)
+  
+  let hours24 = hours
+  if (period === 'AM' && hours === 12) {
+    hours24 = 0
+  } else if (period === 'PM' && hours !== 12) {
+    hours24 = hours + 12
+  }
+  
+  return `${hours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+}
+
+// Parse shift time string to extract start and end times
+const parseShiftTime = (shiftTime: string | null): { startTime: string; endTime: string } => {
+  if (!shiftTime) return { startTime: '', endTime: '' }
+  
+  const parts = shiftTime.split(' - ')
+  if (parts.length !== 2) return { startTime: '', endTime: '' }
+  
+  return {
+    startTime: convertTo24Hour(parts[0].trim()),
+    endTime: convertTo24Hour(parts[1].trim())
+  }
+}
+
+// Combine start and end times into shift time format
+const combineShiftTime = (startTime: string, endTime: string): string => {
+  if (!startTime || !endTime) return ''
+  
+  const start12 = convertTo12Hour(startTime)
+  const end12 = convertTo12Hour(endTime)
+  
+  return `${start12} - ${end12}`
 }
 
 
@@ -122,6 +173,8 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
     const [localExitDate, setLocalExitDate] = React.useState<Date | undefined>(undefined)
     const [localShiftPeriod, setLocalShiftPeriod] = React.useState<string | null>(null)
     const [localEmploymentStatus, setLocalEmploymentStatus] = React.useState<string | null>(null)
+    const [localStartTime, setLocalStartTime] = React.useState<string>('')
+    const [localEndTime, setLocalEndTime] = React.useState<string>('')
     
     const [isHovered, setIsHovered] = React.useState(false)
     const [isWorkEmailHovered, setIsWorkEmailHovered] = React.useState(false)
@@ -140,7 +193,6 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
       job_title: '',
       work_email: '',
       shift_schedule: '',
-      shift_time: '',
       work_setup: '',
       hire_type: '',
       staff_source: ''
@@ -159,7 +211,6 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
       job_title: '',
       work_email: '',
       shift_schedule: '',
-      shift_time: '',
       work_setup: '',
       hire_type: '',
       staff_source: ''
@@ -207,6 +258,11 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
         setLocalShiftPeriod(internalUserData.shift_period)
         // Initialize employment status
         setLocalEmploymentStatus(internalUserData.employment_status)
+        
+        // Initialize shift times by parsing the shift_time string
+        const { startTime, endTime } = parseShiftTime(internalUserData.shift_time)
+        setLocalStartTime(startTime)
+        setLocalEndTime(endTime)
 
         // Initialize input values for editable fields
         const initialValues = {
@@ -221,7 +277,6 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
           job_title: internalUserData.job_title || '',
           work_email: internalUserData.work_email || '',
           shift_schedule: internalUserData.shift_schedule || '',
-          shift_time: internalUserData.shift_time || '',
           work_setup: internalUserData.work_setup || '',
           hire_type: internalUserData.hire_type || '',
           staff_source: internalUserData.staff_source || ''
@@ -241,7 +296,7 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
   console.log('🔄 Current internal data:', {
     user_id: currentInternalData?.user_id,
     station_id: currentInternalData?.station_id,
-    member_company: currentInternalData?.member_company
+    company_name: currentInternalData?.company_name
   })
   
   const displayData = currentInternalData ? {
@@ -253,9 +308,8 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
     profile_picture: currentInternalData.profile_picture || null,
     employee_id: inputValues.employee_id || currentInternalData.employee_id || "N/A",
     station_id: currentInternalData.station_id || null,
-    member_company: currentInternalData.member_company || null,
-    member_badge_color: currentInternalData.member_badge_color || null,
-    member_name: (inputValues.first_name || currentInternalData.first_name) && (inputValues.last_name || currentInternalData.last_name) ? `${inputValues.first_name || currentInternalData.first_name} ${inputValues.last_name || currentInternalData.last_name}` : null,
+    company_name: currentInternalData.company_name || null,
+    company_badge_color: currentInternalData.company_badge_color || null,
     job_title: inputValues.job_title || currentInternalData.job_title || "Not Specified",
     department: currentInternalData.department_name || "Not Specified",
     email: currentInternalData.email || "No email",
@@ -269,7 +323,7 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
     work_email: inputValues.work_email || currentInternalData.work_email || null,
     shift_period: localShiftPeriod !== null ? localShiftPeriod : (currentInternalData.shift_period || null),
     shift_schedule: inputValues.shift_schedule || currentInternalData.shift_schedule || null,
-    shift_time: inputValues.shift_time || currentInternalData.shift_time || null,
+    shift_time: (localStartTime && localEndTime) ? combineShiftTime(localStartTime, localEndTime) : (currentInternalData.shift_time || null),
     work_setup: inputValues.work_setup || currentInternalData.work_setup || null,
     employment_status: localEmploymentStatus !== null ? localEmploymentStatus : (currentInternalData.employment_status || null),
     hire_type: inputValues.hire_type || currentInternalData.hire_type || null,
@@ -284,9 +338,8 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
     profile_picture: null,
     employee_id: "N/A",
     station_id: null,
-    member_company: null,
-    member_badge_color: null,
-    member_name: null,
+    company_name: null,
+    company_badge_color: null,
     job_title: "Not Specified",
     department: "Not Specified",
     email: "No email",
@@ -330,7 +383,9 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
       (localStartDate?.toISOString().split('T')[0] || null) !== (internalUserData?.start_date || null) ||
       (localExitDate?.toISOString().split('T')[0] || null) !== (internalUserData?.exit_date || null) ||
       localShiftPeriod !== (internalUserData?.shift_period || null) ||
-      localEmploymentStatus !== (internalUserData?.employment_status || null)
+      localEmploymentStatus !== (internalUserData?.employment_status || null) ||
+      localStartTime !== (parseShiftTime(internalUserData?.shift_time || null).startTime) ||
+      localEndTime !== (parseShiftTime(internalUserData?.shift_time || null).endTime)
     
     const hasChanges = hasFieldChanges || hasOtherChanges
     
@@ -350,13 +405,15 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
           startDate: { current: localStartDate && !isNaN(localStartDate.getTime()) ? localStartDate.toISOString().split('T')[0] : null, original: internalUserData?.start_date },
           exitDate: { current: localExitDate && !isNaN(localExitDate.getTime()) ? localExitDate.toISOString().split('T')[0] : null, original: internalUserData?.exit_date },
           shiftPeriod: { current: localShiftPeriod, original: internalUserData?.shift_period },
-          employmentStatus: { current: localEmploymentStatus, original: internalUserData?.employment_status }
+          employmentStatus: { current: localEmploymentStatus, original: internalUserData?.employment_status },
+          startTime: { current: localStartTime, original: parseShiftTime(internalUserData?.shift_time || null).startTime },
+          endTime: { current: localEndTime, original: parseShiftTime(internalUserData?.shift_time || null).endTime }
         }
       })
     }
     
     return hasChanges
-  }, [inputValues, originalValues, localInternalData, internalUserData, localGender, localBirthday, localStartDate, localExitDate, localShiftPeriod, localEmploymentStatus])
+  }, [inputValues, originalValues, localInternalData, internalUserData, localGender, localBirthday, localStartDate, localExitDate, localShiftPeriod, localEmploymentStatus, localStartTime, localEndTime])
 
   // Auto-save function that can be called before closing
   const autoSaveBeforeClose = async (): Promise<boolean> => {
@@ -428,6 +485,16 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
       if (localEmploymentStatus !== internalUserData?.employment_status) {
         allUpdates.employment_status = localEmploymentStatus
         console.log(`🔄 Employment status change detected:`, { current: localEmploymentStatus, original: internalUserData?.employment_status })
+      }
+      
+      // Check for shift time changes
+      const originalShiftTimes = parseShiftTime(internalUserData?.shift_time || null)
+      if (localStartTime !== originalShiftTimes.startTime || localEndTime !== originalShiftTimes.endTime) {
+        allUpdates.shift_time = combineShiftTime(localStartTime, localEndTime)
+        console.log(`🔄 Shift time change detected:`, { 
+          current: { startTime: localStartTime, endTime: localEndTime, combined: combineShiftTime(localStartTime, localEndTime) }, 
+          original: { startTime: originalShiftTimes.startTime, endTime: originalShiftTimes.endTime, combined: internalUserData?.shift_time }
+        })
       }
       
       console.log('🔄 All updates to send:', allUpdates)
@@ -529,7 +596,7 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
 
   // Real-time updates for all internal user changes
   console.log('🔄 Initializing real-time hook for internal users modal (all changes)')
-  const { isConnected: isRealtimeConnected } = useRealtimeMembers({
+  const { isConnected: isRealtimeConnected } = useRealtimeCompanies({
     onPersonalInfoChanged: async (personalInfo, oldPersonalInfo, notificationData) => {
       console.log('🔄 Real-time: Personal info change received in modal:', { 
         personalInfo, 
@@ -631,7 +698,6 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
           employee_id: jobInfo.employee_id || '',
           job_title: jobInfo.job_title || '',
           shift_schedule: jobInfo.shift_schedule || '',
-          shift_time: jobInfo.shift_time || '',
           work_setup: jobInfo.work_setup || '',
           hire_type: jobInfo.hire_type || '',
           staff_source: jobInfo.staff_source || ''
@@ -644,6 +710,14 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
         if (jobInfo.employment_status !== oldJobInfo?.employment_status) {
           setLocalEmploymentStatus(jobInfo.employment_status)
         }
+        
+        // Update shift times if they changed
+        if (jobInfo.shift_time !== oldJobInfo?.shift_time) {
+          const { startTime, endTime } = parseShiftTime(jobInfo.shift_time)
+          setLocalStartTime(startTime)
+          setLocalEndTime(endTime)
+        }
+        
         if (jobInfo.start_date !== oldJobInfo?.start_date) {
           if (jobInfo.start_date) {
             const [year, month, day] = jobInfo.start_date.split('-').map(Number)
@@ -1177,14 +1251,86 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
                          placeholder="-"
                        />
 
-                       {/* Shift Time */}
+                       {/* Start Time */}
                        <DataFieldRow
                          icon={<IconClock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                         label="Shift Time"
-                         fieldName="shift_time"
-                         value={inputValues.shift_time}
-                         onSave={handleInputChange}
+                         label="Start Time"
+                         fieldName="start_time"
+                         value={localStartTime ? convertTo12Hour(localStartTime) : ''}
+                         onSave={() => {}}
                          placeholder="-"
+                         customInput={
+                           <Popover>
+                             <PopoverTrigger asChild>
+                               <Button
+                                 variant="outline"
+                                 tabIndex={-1}
+                                 className={`h-[33px] w-full justify-start font-normal border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none hover:bg-muted/50 ${
+                                   localStartTime ? 'text-foreground' : 'text-muted-foreground'
+                                 }`}
+                                 onClick={() => {
+                                   console.log('🔄 Start time popover opened, current value:', localStartTime)
+                                 }}
+                               >
+                                 {localStartTime ? convertTo12Hour(localStartTime) : "-"}
+                               </Button>
+                             </PopoverTrigger>
+                             <PopoverContent className="w-auto p-0" align="start">
+                               <Input
+                                 type="time"
+                                 value={localStartTime || ''}
+                                 onChange={(e) => {
+                                   console.log('🔄 Start time changed:', e.target.value)
+                                   setLocalStartTime(e.target.value)
+                                 }}
+                                 className="w-full"
+                                 autoFocus
+                                 placeholder=""
+                               />
+                             </PopoverContent>
+                           </Popover>
+                         }
+                       />
+
+                       {/* End Time */}
+                       <DataFieldRow
+                         icon={<IconClock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                         label="End Time"
+                         fieldName="end_time"
+                         value={localEndTime ? convertTo12Hour(localEndTime) : ''}
+                         onSave={() => {}}
+                         placeholder="-"
+                         customInput={
+                           <Popover>
+                             <PopoverTrigger asChild>
+                               <Button
+                                 variant="outline"
+                                 tabIndex={-1}
+                                 className={`h-[33px] w-full justify-start font-normal border-0 bg-transparent dark:bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none hover:bg-muted/50 ${
+                                   localEndTime ? 'text-foreground' : 'text-muted-foreground'
+                                 }`}
+                                 onClick={() => {
+                                   console.log('🔄 End time popover opened, current value:', localEndTime)
+                                 }}
+                               >
+                                 {localEndTime ? convertTo12Hour(localEndTime) : "-"}
+                               </Button>
+                             </PopoverTrigger>
+                             <PopoverContent className="w-auto p-0" align="start">
+                               <Input
+                                 type="time"
+                                 value={localEndTime || ''}
+                                 onChange={(e) => {
+                                   console.log('🔄 End time changed:', e.target.value)
+                                   setLocalEndTime(e.target.value)
+                                 }}
+                                 className="w-full"
+                                 autoFocus
+                                 placeholder=""
+                               />
+                             </PopoverContent>
+                           </Popover>
+                         }
                        />
 
                        {/* Work Setup */}
@@ -1399,8 +1545,8 @@ export function InternalDetailModal({ isOpen, onClose, internalUserId, internalU
               {/* Activity Content - Shows internal user activity and recent changes */}
               <div className="space-y-4">
                 {internalUserData?.user_id ? (
-                  <MembersActivityLog 
-                    memberId={internalUserData.user_id} 
+                  <CompaniesActivityLog 
+                    companyId={internalUserData.user_id} 
                     companyName={internalUserData.first_name && internalUserData.last_name ? `${internalUserData.first_name} ${internalUserData.last_name}` : 'Unknown Internal'} 
                     onRefresh={() => {
                       // Real-time updates handle refresh automatically

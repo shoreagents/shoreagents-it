@@ -7,13 +7,13 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const search = searchParams.get('search') || ''
-    const memberId = searchParams.get('memberId') || ''
+    const companyId = searchParams.get('companyId') || ''
     const sortField = searchParams.get('sortField') || 'first_name'
     const sortDirection = (searchParams.get('sortDirection') || 'asc') as 'asc' | 'desc'
 
-    console.log('🔍 Agents modal API called with:', { page, limit, search, memberId, sortField, sortDirection })
+    console.log('🔍 Agents modal API called with:', { page, limit, search, companyId, sortField, sortDirection })
 
-    const result = await getAgentsForModal(page, limit, search, memberId, sortField, sortDirection)
+    const result = await getAgentsForModal(page, limit, search, companyId, sortField, sortDirection)
     
     console.log('✅ Agents modal API result:', { 
       agentsCount: result.agents?.length || 0, 

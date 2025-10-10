@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
 import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconGenderMale, IconGenderFemale, IconGenderNeutrois, IconHelp, IconSun, IconMoon, IconClockHour4, IconUsers, IconHome, IconDeviceLaptop, IconTrophy, IconMedal, IconCrown, IconStar, IconChartBar, IconRefresh } from "@tabler/icons-react"
-import { useRealtimeMembers } from '@/hooks/use-realtime-members'
+import { useRealtimeCompanies } from '@/hooks/use-realtime-companies'
 import { SendHorizontal, Target } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
@@ -28,7 +28,7 @@ import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/auth-context"
 import { ColorPicker } from "@/components/ui/color-picker"
 import { LinkPreview } from "@/components/ui/link-preview"
-import { MembersActivityLog } from "@/components/members-activity-log"
+import { CompaniesActivityLog } from "@/components/companies-activity-log"
 import { Comment } from "@/components/ui/comment"
 import { AgentActivityData } from "@/components/agent-activity-data"
 
@@ -84,9 +84,9 @@ interface AgentRecord {
   start_date: string | null
   exit_date: string | null
   // Agent specific fields
-  member_id: number | null
-  member_company: string | null
-  member_badge_color: string | null
+  company_id: number | null
+  company_name: string | null
+  company_badge_color: string | null
   department_id: number | null
   department_name: string | null
   station_id: string | null
@@ -177,7 +177,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     setActivityLoading(true)
     
     try {
-      const memberId = user.userType === 'Internal' ? 'all' : user.id
+      const companyId = user.userType === 'Internal' ? 'all' : user.id
       
       // Get date ranges
       const today = new Date()
@@ -208,10 +208,10 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       
       // Fetch activity data in parallel
       const [todayResponse, yesterdayResponse, weekResponse, monthResponse] = await Promise.all([
-        fetch(`/api/activities?memberId=${memberId}&date=${todayStr}`),
-        fetch(`/api/activities?memberId=${memberId}&date=${yesterdayStr}`),
-        fetch(`/api/activities?memberId=${memberId}&startDate=${startDate}&endDate=${endDate}`),
-        fetch(`/api/activities?memberId=${memberId}&startDate=${monthStartDate}&endDate=${monthEndDate}`)
+        fetch(`/api/activities?companyId=${companyId}&date=${todayStr}`),
+        fetch(`/api/activities?companyId=${companyId}&date=${yesterdayStr}`),
+        fetch(`/api/activities?companyId=${companyId}&startDate=${startDate}&endDate=${endDate}`),
+        fetch(`/api/activities?companyId=${companyId}&startDate=${monthStartDate}&endDate=${monthEndDate}`)
       ])
       
       // Process responses
@@ -519,10 +519,10 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       setProductivityError(null)
       
       try {
-        const memberId = user.userType === 'Internal' ? 'all' : user.id
+        const companyId = user.userType === 'Internal' ? 'all' : user.id
         const allMonthsData: ProductivityScore[] = []
         
-        console.log('📊 Fetching productivity scores for user:', agentData.user_id, 'memberId:', memberId, 'year:', selectedYear)
+        console.log('📊 Fetching productivity scores for user:', agentData.user_id, 'companyId:', companyId, 'year:', selectedYear)
         
         const currentYear = new Date().getFullYear()
         
@@ -532,7 +532,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
           const currentMonthYear = `${currentYear}-${String(currentMonth).padStart(2, '0')}`
           
           const params = new URLSearchParams({
-            memberId: String(memberId),
+            companyId: String(companyId),
             timeframe: 'monthly',
             monthYear: currentMonthYear
           })
@@ -560,7 +560,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
           const monthYear = `${selectedYear}-${String(month).padStart(2, '0')}`
           
           const params = new URLSearchParams({
-            memberId: String(memberId),
+            companyId: String(companyId),
             timeframe: 'monthly',
             monthYear: monthYear
           })
@@ -674,7 +674,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
         agentData.staff_source,
         agentData.start_date,
         agentData.exit_date,
-        agentData.member_badge_color,
+        agentData.company_badge_color,
         agentData.station_id,
         agentData.department_name
       ]
@@ -708,9 +708,9 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
   
   // Debug: Log the current agent data and display data
   console.log('🔄 Current agent data:', {
-    member_id: currentAgentData?.member_id,
-    member_company: currentAgentData?.member_company,
-    member_badge_color: currentAgentData?.member_badge_color
+    company_id: currentAgentData?.company_id,
+    company_name: currentAgentData?.company_name,
+    company_badge_color: currentAgentData?.company_badge_color
   })
   
   const displayData = currentAgentData ? {
@@ -721,10 +721,10 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     nickname: inputValues.nickname || currentAgentData.nickname || null,
     profile_picture: currentAgentData.profile_picture || null,
     employee_id: inputValues.employee_id || currentAgentData.employee_id || "N/A",
-    member_id: currentAgentData.member_id || null,
-    member_company: currentAgentData.member_company || null,
-    member_badge_color: currentAgentData.member_badge_color || null,
-    member_name: (inputValues.first_name || currentAgentData.first_name) && (inputValues.last_name || currentAgentData.last_name) ? `${inputValues.first_name || currentAgentData.first_name} ${inputValues.last_name || currentAgentData.last_name}` : null,
+    company_id: currentAgentData.company_id || null,
+    company_name: currentAgentData.company_name || null,
+    company_badge_color: currentAgentData.company_badge_color || null,
+    company_name: (inputValues.first_name || currentAgentData.first_name) && (inputValues.last_name || currentAgentData.last_name) ? `${inputValues.first_name || currentAgentData.first_name} ${inputValues.last_name || currentAgentData.last_name}` : null,
     job_title: inputValues.job_title || currentAgentData.job_title || "Not Specified",
     department: currentAgentData.department_name || "Not Specified",
     email: currentAgentData.work_email || currentAgentData.email || "No email",
@@ -752,10 +752,9 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     nickname: null,
     profile_picture: null,
     employee_id: "N/A",
-    member_id: null,
-    member_company: null,
-    member_badge_color: null,
-    member_name: null,
+    company_id: null,
+    company_name: null,
+    company_badge_color: null,
     job_title: "Not Specified",
     department: "Not Specified",
     email: "No email",
@@ -1013,7 +1012,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
     console.log('📝 Company selection closed')
   }
 
-  // Fetch companies from members table
+  // Fetch companies from companies table
   const fetchCompanies = async (searchTerm: string = "", page: number = 1) => {
     try {
       setIsLoadingCompanies(true)
@@ -1027,7 +1026,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
         sortDirection: 'asc'
       })
       
-      const url = `/api/members?${params.toString()}`
+      const url = `/api/companies?${params.toString()}`
       console.log('🔍 API URL:', url)
       
       const response = await fetch(url)
@@ -1037,9 +1036,9 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       
       const data = await response.json()
       console.log('🔍 API response:', data)
-      console.log('🔍 Companies found:', data.members?.length || 0)
+      console.log('🔍 Companies found:', data.companies?.length || 0)
       
-      setCompanies(data.members || [])
+      setCompanies(data.companies || [])
     } catch (error) {
       console.error('Failed to fetch companies:', error)
     } finally {
@@ -1057,14 +1056,14 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
 
       console.log('🔄 Assigning agent to company:', { companyId, companyName, badgeColor })
       
-      // API call to update agent's member_id in database
+      // API call to update agent's company_id in database
       const response = await fetch(`/api/agents/${agentData.user_id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          member_id: companyId
+          company_id: companyId
         }),
       })
 
@@ -1080,9 +1079,9 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
         // Update the local agent data with new company info
         const updatedAgentData = {
           ...localAgentData,
-          member_id: companyId,
-          member_company: companyName,
-          member_badge_color: badgeColor
+          company_id: companyId,
+          company_name: companyName,
+          company_badge_color: badgeColor
         }
         
         // Update local state so UI reflects the change immediately
@@ -1105,9 +1104,9 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
 
   // Real-time updates for all agent changes
   console.log('🔄 Initializing real-time hook for agents modal (all changes)')
-  const { isConnected: isRealtimeConnected } = useRealtimeMembers({
-    onAgentMemberChanged: async (updatedAgent, oldAgent, notificationData) => {
-      console.log('🔄 Real-time: Agent member assignment change received in modal:', { 
+  const { isConnected: isRealtimeConnected } = useRealtimeCompanies({
+    onAgentCompanyChanged: async (updatedAgent, oldAgent, notificationData) => {
+      console.log('🔄 Real-time: Agent company assignment change received in modal:', { 
         updatedAgent, 
         oldAgent, 
         currentAgentId: localAgentData?.user_id,
@@ -1117,31 +1116,31 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
       
       // Only process updates for the current agent
       if (localAgentData && updatedAgent.user_id === localAgentData.user_id) {
-        console.log('🔄 Real-time: Processing member assignment change for current agent:', updatedAgent)
+        console.log('🔄 Real-time: Processing company assignment change for current agent:', updatedAgent)
         
-        // Update the member_id immediately
+        // Update the company_id immediately
         setLocalAgentData(prevAgent => {
           if (!prevAgent) return prevAgent
           
           return {
             ...prevAgent,
-            member_id: updatedAgent.member_id
+            company_id: updatedAgent.company_id
           }
         })
         
-        // If member_id changed, fetch the updated company information
-        if (updatedAgent.member_id !== oldAgent?.member_id) {
+        // If company_id changed, fetch the updated company information
+        if (updatedAgent.company_id !== oldAgent?.company_id) {
           try {
-            console.log('🔄 Fetching updated company information for member_id:', updatedAgent.member_id)
+            console.log('🔄 Fetching updated company information for company_id:', updatedAgent.company_id)
             const response = await fetch(`/api/agents/${updatedAgent.user_id}`)
             if (response.ok) {
               const responseData = await response.json()
               const freshAgentData = responseData.agent // Extract agent from response
               console.log('🔄 Fetched fresh agent data with company info:', freshAgentData)
               console.log('🔄 Company info from API:', {
-                member_id: freshAgentData.member_id,
-                member_company: freshAgentData.member_company,
-                member_badge_color: freshAgentData.member_badge_color
+                company_id: freshAgentData.company_id,
+                company_name: freshAgentData.company_name,
+                company_badge_color: freshAgentData.company_badge_color
               })
               
               // Update local agent data with fresh company information
@@ -1150,15 +1149,15 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                 
                 const updatedAgent = {
                   ...prevAgent,
-                  member_id: freshAgentData.member_id,
-                  member_company: freshAgentData.member_company,
-                  member_badge_color: freshAgentData.member_badge_color
+                  company_id: freshAgentData.company_id,
+                  company_name: freshAgentData.company_name,
+                  company_badge_color: freshAgentData.company_badge_color
                 }
                 
                 console.log('🔄 Updated localAgentData with company info:', {
-                  member_id: updatedAgent.member_id,
-                  member_company: updatedAgent.member_company,
-                  member_badge_color: updatedAgent.member_badge_color
+                  company_id: updatedAgent.company_id,
+                  company_name: updatedAgent.company_name,
+                  company_badge_color: updatedAgent.company_badge_color
                 })
                 
                 return updatedAgent
@@ -1169,7 +1168,7 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
           }
         }
         
-        console.log('🔄 Updated agent member assignment in real-time')
+        console.log('🔄 Updated agent company assignment in real-time')
 
       } else {
         console.log('🔄 Real-time: Update not for current agent, skipping')
@@ -1417,22 +1416,22 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
               
               {/* Agent Metadata Grid */}
               <div className="grid grid-cols-2 gap-4 text-sm">
-                {/* Member */}
+                {/* Company */}
                 <div className="flex items-center gap-2">
                   <IconBuilding className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Member:</span>
-                  {displayData.member_company ? (
+                  <span className="text-muted-foreground">Company:</span>
+                  {displayData.company_name ? (
                     <Badge
                       variant="outline"
                       className="border cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={openCompanySelection}
                       style={{
-                        backgroundColor: withAlpha(displayData.member_badge_color || '#999999', 0.2),
-                        borderColor: withAlpha(displayData.member_badge_color || '#999999', 0.4),
-                        color: theme === 'dark' ? '#ffffff' : (displayData.member_badge_color || '#6B7280'),
+                        backgroundColor: withAlpha(displayData.company_badge_color || '#999999', 0.2),
+                        borderColor: withAlpha(displayData.company_badge_color || '#999999', 0.4),
+                        color: theme === 'dark' ? '#ffffff' : (displayData.company_badge_color || '#6B7280'),
                       }}
                     >
-                      <span className="truncate inline-block max-w-[16rem] align-bottom">{displayData.member_company}</span>
+                      <span className="truncate inline-block max-w-[16rem] align-bottom">{displayData.company_name}</span>
                     </Badge>
                   ) : (
                     <Badge
@@ -2477,8 +2476,8 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                            user_id: agentData.user_id,
                            first_name: agentData.first_name || undefined,
                            last_name: agentData.last_name || undefined,
-                           member_id: agentData.member_id || undefined,
-                           member_company: agentData.member_company || undefined,
+                           company_id: agentData.company_id || undefined,
+                           company_name: agentData.company_name || undefined,
                            activity: getTodayActivityData({
                              user_id: agentData.user_id,
                              id: agentData.user_id.toString()
@@ -3104,8 +3103,8 @@ export function AgentsDetailModal({ isOpen, onClose, agentId, agentData }: Agent
                 /* Activity Content - Shows agent activity and recent changes */
                 <div className="space-y-4">
                   {agentData?.user_id ? (
-                    <MembersActivityLog 
-                      memberId={agentData.user_id} 
+                    <CompaniesActivityLog 
+                      companyId={agentData.user_id} 
                       companyName={agentData.first_name && agentData.last_name ? `${agentData.first_name} ${agentData.last_name}` : 'Unknown Agent'} 
                       onRefresh={() => {
                         // Real-time updates handle refresh automatically

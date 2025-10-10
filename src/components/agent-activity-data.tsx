@@ -32,8 +32,8 @@ interface Employee {
   user_id?: number
   first_name?: string
   last_name?: string
-  member_id?: number
-  member_company?: string
+  company_id?: number
+  company_name?: string
   activity?: {
     today_active_seconds: number
     today_inactive_seconds: number
@@ -162,13 +162,13 @@ export function AgentActivityData({
       
       // For IT users, fetch data for the specific employee
       // For Internal users, they can see all data but we need to filter by specific employee
-      const memberId = user.userType === 'Internal' ? 'all' : user.id
+      const companyId = user.userType === 'Internal' ? 'all' : user.id
       
-      console.log('📊 Fetching chart data for date range:', startDate, 'to', endDate, 'memberId:', memberId, 'employeeId:', employeeId)
+      console.log('📊 Fetching chart data for date range:', startDate, 'to', endDate, 'companyId:', companyId, 'employeeId:', employeeId)
 
-      // Fetch activities - the API will return all activities for the memberId
+      // Fetch activities - the API will return all activities for the companyId
       // We'll filter by employeeId on the frontend since the API doesn't support userId parameter
-      const response = await fetch(`/api/activities?memberId=${memberId}&startDate=${startDate}&endDate=${endDate}`)
+      const response = await fetch(`/api/activities?companyId=${companyId}&startDate=${startDate}&endDate=${endDate}`)
 
       if (!response.ok) {
         throw new Error(`Failed to fetch chart data: ${response.statusText}`)
@@ -190,8 +190,8 @@ export function AgentActivityData({
       // Filter activities by the specific employee ID
       const activities = allActivities.filter((activity: any) => {
         // Check if the activity belongs to the selected employee
-        // The activity should have a user_id or member_id field that matches our employeeId
-        const activityUserId = activity.user_id || activity.member_id || activity.id
+        // The activity should have a user_id or company_id field that matches our employeeId
+        const activityUserId = activity.user_id || activity.company_id || activity.id
         return activityUserId === parseInt(employeeId) || activityUserId === employeeId
       })
       

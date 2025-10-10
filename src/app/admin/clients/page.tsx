@@ -41,9 +41,9 @@ interface ClientRecord {
   address: string | null
   gender: string | null
   // Client specific fields
-  member_id: number | null
-  member_company: string | null
-  member_badge_color: string | null
+  company_id: number | null
+  company_name: string | null
+  company_badge_color: string | null
   station_id: string | null
   department_id: number | null
   department_name: string | null
@@ -71,8 +71,8 @@ export default function ClientsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const PAGE_SIZE = 40
-  const [memberId, setMemberId] = useState<string>('all')
-  const [memberOptions, setMemberOptions] = useState<{ id: number; company: string }[]>([])
+  const [companyId, setCompanyId] = useState<string>('all')
+  const [companyOptions, setCompanyOptions] = useState<{ id: number; company: string }[]>([])
   const [sortField, setSortField] = useState<string>('first_name')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   
@@ -100,9 +100,9 @@ export default function ClientsPage() {
     onClientUpdated: (updatedClient, oldClient) => {
       console.log('📝 Client updated via realtime:', updatedClient, 'Old:', oldClient)
       
-      // If this update is missing member company information, we need to refetch the full client data
-      // because some updates don't include complete member information
-      if (updatedClient && (!updatedClient.member_company || !updatedClient.member_badge_color)) {
+      // If this update is missing company information, we need to refetch the full client data
+      // because some updates don't include complete company information
+      if (updatedClient && (!updatedClient.company_name || !updatedClient.company_badge_color)) {
         console.log('🔄 Incomplete client data detected, refetching full client data...')
         
         // First, update with the partial data to avoid showing empty data
@@ -179,7 +179,7 @@ export default function ClientsPage() {
         sortDirection,
       })
       if (search.trim()) params.append('search', search.trim())
-      if (memberId !== 'all') params.append('memberId', memberId)
+      if (companyId !== 'all') params.append('companyId', companyId)
       const res = await fetch(`/api/clients?${params.toString()}`)
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -217,7 +217,7 @@ export default function ClientsPage() {
         sortDirection,
       })
       if (search.trim()) params.append('search', search.trim())
-      if (memberId !== 'all') params.append('memberId', memberId)
+      if (companyId !== 'all') params.append('companyId', companyId)
       const res = await fetch(`/api/clients?${params.toString()}`)
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -246,23 +246,23 @@ export default function ClientsPage() {
 
   useEffect(() => { fetchClients() }, [])
   useEffect(() => {
-    const fetchMembers = async () => {
+    const fetchCompanies = async () => {
       try {
         const res = await fetch('/api/clients', { method: 'OPTIONS' })
         const data = await res.json()
-        setMemberOptions(data.members || [])
+        setCompanyOptions(data.companies || [])
       } catch (e) {
-        setMemberOptions([])
+        setCompanyOptions([])
       }
     }
-    fetchMembers()
+    fetchCompanies()
   }, [])
 
   useEffect(() => { setCurrentPage(1) }, [search])
   useEffect(() => {
     const timer = setTimeout(() => { fetchClients() }, 300)
     return () => clearTimeout(timer)
-  }, [currentPage, search, memberId, sortField, sortDirection])
+  }, [currentPage, search, companyId, sortField, sortDirection])
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -311,7 +311,7 @@ export default function ClientsPage() {
                     <div className="flex items-center gap-2">
                       <h1 className="text-2xl font-bold">Clients</h1>
                     </div>
-                    <p className="text-sm text-muted-foreground">Directory of client users with member assignments and contact details</p>
+                    <p className="text-sm text-muted-foreground">Directory of client users with company assignments and contact details</p>
                   </div>
                   <div className="flex gap-2">
                     <ReloadButton onReload={handleReload} loading={reloading} className="flex-1" />
@@ -324,24 +324,24 @@ export default function ClientsPage() {
                   <div className="relative flex-1">
                     <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search by name, member, email, or phone..."
+                      placeholder="Search by name, company, email, or phone..."
                       className="pl-8"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                     />
                   </div>
                   <div className="w-56">
-                    <Select value={memberId} onValueChange={(v: string) => { setMemberId(v); setCurrentPage(1) }}>
+                    <Select value={companyId} onValueChange={(v: string) => { setCompanyId(v); setCurrentPage(1) }}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Filter by member" />
+                        <SelectValue placeholder="Filter by company" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Clients</SelectItem>
-                        <SelectItem value="none">No Assigned Members</SelectItem>
+                        <SelectItem value="none">No Assigned Companies</SelectItem>
                         <SelectSeparator className="bg-border mx-2" />
                         <SelectGroup>
-                          <SelectLabel className="text-muted-foreground">Members</SelectLabel>
-                          {memberOptions.map((m) => (
+                          <SelectLabel className="text-muted-foreground">Companies</SelectLabel>
+                          {companyOptions.map((m) => (
                             <SelectItem key={m.id} value={String(m.id)}>{m.company}</SelectItem>
                           ))}
                         </SelectGroup>
@@ -379,9 +379,9 @@ export default function ClientsPage() {
                                   </div>
                                 </TableHead>
 
-                                <TableHead onClick={() => handleSort('member_company')} className={`cursor-pointer ${sortField === 'member_company' ? 'text-primary font-medium bg-accent/50' : ''}`}>
+                                <TableHead onClick={() => handleSort('company_name')} className={`cursor-pointer ${sortField === 'company_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
                                   <div className="flex items-center gap-1">
-                                    Member <span className="w-4 h-4">{sortField === 'member_company' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
+                                    Company <span className="w-4 h-4">{sortField === 'company_name' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
                                   </div>
                                 </TableHead>
                                 <TableHead onClick={() => handleSort('work_email')} className={`cursor-pointer ${sortField === 'work_email' ? 'text-primary font-medium bg-accent/50' : ''}`}>
@@ -411,17 +411,17 @@ export default function ClientsPage() {
                                   </TableCell>
 
                                   <TableCell className="whitespace-nowrap">
-                                    {c.member_company ? (
+                                    {c.company_name ? (
                                       <Badge
                                         variant="outline"
                                         className="border"
                                         style={{
-                                          backgroundColor: withAlpha(c.member_badge_color || '#999999', 0.2),
-                                          borderColor: withAlpha(c.member_badge_color || '#999999', 0.4),
-                                          color: theme === 'dark' ? '#ffffff' : (c.member_badge_color || '#6B7280'),
+                                          backgroundColor: withAlpha(c.company_badge_color || '#999999', 0.2),
+                                          borderColor: withAlpha(c.company_badge_color || '#999999', 0.4),
+                                          color: theme === 'dark' ? '#ffffff' : (c.company_badge_color || '#6B7280'),
                                         }}
                                       >
-                                        <span className="truncate inline-block max-w-[16rem] align-bottom">{c.member_company}</span>
+                                        <span className="truncate inline-block max-w-[16rem] align-bottom">{c.company_name}</span>
                                       </Badge>
                                     ) : (
                                       "-"

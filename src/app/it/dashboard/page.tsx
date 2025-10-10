@@ -52,8 +52,8 @@ interface Ticket {
   resolver_first_name?: string | null
   resolver_last_name?: string | null
   user_type?: string | null
-  member_name?: string | null
-  member_color?: string | null
+  company_name?: string | null
+  company_color?: string | null
 }
 
 interface TicketStats {

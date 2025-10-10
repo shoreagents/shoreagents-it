@@ -23,11 +23,11 @@ export async function GET(
     }
 
     // Fetch job details from processed_job_requests table in BPOC database
-    // JOIN with members table to get company name
+    // JOIN with companies table to get company name
     const { rows: jobData } = await bpocPool.query(
       `SELECT pjr.*, m.company as company_name 
        FROM public.processed_job_requests pjr
-       LEFT JOIN public.members m ON pjr.company_id = m.company_id
+       LEFT JOIN public.companies m ON pjr.company_id = m.company_id
        WHERE pjr.id = $1`,
       [jobId]
     )

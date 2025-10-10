@@ -16,8 +16,8 @@ export interface Agent {
   employee_id: string | null
   job_title: string | null
   profile_picture: string | null
-  member_company: string | null
-  member_badge_color: string | null
+  company_name: string | null
+  company_badge_color: string | null
 }
 
 export interface AgentSelectionProps {
@@ -243,7 +243,7 @@ export function AgentSelection({
                 <div 
                   key={agent.user_id}
                    className={`px-4 py-2 border border-gray-300 dark:border-border rounded-lg transition-all duration-200 ${
-                    showDisabledStyling && agent.member_company && agent.member_company !== currentCompany
+                    showDisabledStyling && agent.company_name && agent.company_name !== currentCompany
                       ? 'opacity-50 cursor-not-allowed bg-muted/30' 
                       : `cursor-pointer ${
                           selectedAgentIds.has(agent.user_id)
@@ -253,7 +253,7 @@ export function AgentSelection({
                   }`}
                   onClick={() => {
                     // Disable selection for agents assigned to other companies (only if showDisabledStyling is true)
-                    if (showDisabledStyling && agent.member_company && agent.member_company !== currentCompany) return
+                    if (showDisabledStyling && agent.company_name && agent.company_name !== currentCompany) return
                     
                     const wasSelected = selectedAgentIds.has(agent.user_id)
                     onSelectionChange(agent.user_id, !wasSelected)
@@ -270,7 +270,7 @@ export function AgentSelection({
                           }
                         </AvatarFallback>
                       </Avatar>
-                      {selectedAgentIds.has(agent.user_id) && (!currentCompany || !agent.member_company || agent.member_company === currentCompany) && (
+                      {selectedAgentIds.has(agent.user_id) && (!currentCompany || !agent.company_name || agent.company_name === currentCompany) && (
                         <div className="absolute inset-0 rounded-full" style={{ backgroundColor: '#73a2bb80' }}></div>
                       )}
                     </div>
@@ -281,18 +281,18 @@ export function AgentSelection({
                           : agent.first_name || agent.last_name || 'Unknown Name'
                         }
                       </h4>
-                      {agent.member_company && agent.member_company !== currentCompany && (
+                      {agent.company_name && agent.company_name !== currentCompany && (
                         <Badge 
                           variant="outline"
                           className="text-xs px-2 py-0.5 font-medium inline-block mt-1 truncate max-w-[120px]"
                           style={{ 
-                            color: agent.member_badge_color || '#6B7280',
-                            borderColor: agent.member_badge_color ? `${agent.member_badge_color}30` : '#6B7280',
-                            backgroundColor: agent.member_badge_color ? `${agent.member_badge_color}20` : 'transparent'
+                            color: agent.company_badge_color || '#6B7280',
+                            borderColor: agent.company_badge_color ? `${agent.company_badge_color}30` : '#6B7280',
+                            backgroundColor: agent.company_badge_color ? `${agent.company_badge_color}20` : 'transparent'
                           }}
-                          title={agent.member_company || undefined}
+                          title={agent.company_name || undefined}
                         >
-                          {agent.member_company}
+                          {agent.company_name}
                         </Badge>
                       )}
                     </div>

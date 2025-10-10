@@ -77,8 +77,8 @@ interface Ticket {
   resolver_last_name?: string | null
   resolver_profile_picture?: string | null
   user_type?: string | null
-  member_name?: string | null
-  member_color?: string | null
+  company_name?: string | null
+  company_color?: string | null
 }
 
 interface SortableTicketProps {
@@ -670,7 +670,7 @@ export default function TicketsPage() {
         return
       }
       
-      // For other updates, merge to preserve joined fields like member_name and user_type
+      // For other updates, merge to preserve joined fields like company_name and user_type
       setTickets(prev => prev.map(ticket => 
         ticket.id === updatedTicket.id ? { ...ticket, ...updatedTicket } : ticket
       ))

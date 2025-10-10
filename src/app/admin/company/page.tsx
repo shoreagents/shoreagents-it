@@ -3,7 +3,7 @@
 /**
  * Companies Page with Real-time Updates
  * 
- * This page displays all member companies and automatically updates in real-time when:
+ * This page displays all companies and automatically updates in real-time when:
  * - New companies are created
  * - Existing companies are updated
  * - Companies are deleted
@@ -38,11 +38,11 @@ import {
   PaginationNext,
 } from "@/components/ui/pagination"
 import { useTheme } from "next-themes"
-import { AddCompanyModal } from "@/components/modals/members-detail-modal"
-import { useRealtimeMembers } from "@/hooks/use-realtime-members"
+import { AddCompanyModal } from "@/components/modals/companies-detail-modal"
+import { useRealtimeCompanies } from "@/hooks/use-realtime-companies"
 import { UserTooltip } from "@/components/ui/user-tooltip"
 
-interface MemberRecord {
+interface CompanyRecord {
   id: number
   company: string
   address: string | null
@@ -87,22 +87,22 @@ export default function CompaniesPage() {
   const { theme } = useTheme()
   
   // Realtime updates hook
-  const { isConnected } = useRealtimeMembers({
-    onMemberCreated: (newCompany) => {
+  const { isConnected } = useRealtimeCompanies({
+    onCompanyCreated: (newCompany) => {
       console.log('🆕 New company created:', newCompany)
       // Add new company to the list if it matches current search/filters
       if (!search.trim() || 
           newCompany.company?.toLowerCase().includes(search.toLowerCase()) ||
           newCompany.service?.toLowerCase().includes(search.toLowerCase()) ||
           newCompany.country?.toLowerCase().includes(search.toLowerCase())) {
-        setMembers(prev => [newCompany, ...prev])
+        setCompanies(prev => [newCompany, ...prev])
         setTotalCount(prev => prev + 1)
       }
     },
-    onMemberUpdated: (updatedCompany) => {
+    onCompanyUpdated: (updatedCompany) => {
       console.log('📝 Company updated:', updatedCompany)
       // Update company in the list, preserving existing counts if not provided
-      setMembers(prev => prev.map(c => {
+      setCompanies(prev => prev.map(c => {
         if (c.id === updatedCompany.id) {
           return {
             ...updatedCompany,
@@ -114,48 +114,48 @@ export default function CompaniesPage() {
         return c
       }))
       // Clear cache for this company's users since assignments might have changed
-      setMemberUsersCache(prev => {
+      setCompanyUsersCache(prev => {
         const newCache = { ...prev }
         delete newCache[`agents:${updatedCompany.id}`]
         delete newCache[`clients:${updatedCompany.id}`]
         return newCache
       })
     },
-    onMemberDeleted: (deletedCompany) => {
+    onCompanyDeleted: (deletedCompany) => {
       console.log('🗑️ Company deleted:', deletedCompany)
       
       // Handle null or undefined deletedCompany
       if (!deletedCompany || !deletedCompany.id) {
-        console.warn('⚠️ Received null/undefined deletedCompany in onMemberDeleted')
+        console.warn('⚠️ Received null/undefined deletedCompany in onCompanyDeleted')
         return
       }
       
       // Remove company from the list
-      setMembers(prev => prev.filter(c => c.id !== deletedCompany.id))
+      setCompanies(prev => prev.filter(c => c.id !== deletedCompany.id))
       setTotalCount(prev => Math.max(0, prev - 1))
       // Clear cache for this company's users
-      setMemberUsersCache(prev => {
+      setCompanyUsersCache(prev => {
         const newCache = { ...prev }
         delete newCache[`agents:${deletedCompany.id}`]
         delete newCache[`clients:${deletedCompany.id}`]
         return newCache
       })
     },
-    onAgentMemberChanged: (agent, oldAgent, notificationData) => {
-      console.log('👤 Agent moved from company', oldAgent?.member_id, 'to', agent?.member_id)
+    onAgentCompanyChanged: (agent, oldAgent, notificationData) => {
+      console.log('👤 Agent moved from company', oldAgent?.company_id, 'to', agent?.company_id)
       console.log('📊 Real-time count updates:', notificationData?.count_updates)
       
       // Handle null or undefined parameters
       if (!agent || !oldAgent) {
-        console.warn('⚠️ Received null/undefined agent or oldAgent in onAgentMemberChanged')
+        console.warn('⚠️ Received null/undefined agent or oldAgent in onAgentCompanyChanged')
         return
       }
       
       // Clear cache for both old and new companies since agent assignments changed
-      setMemberUsersCache(prev => {
+      setCompanyUsersCache(prev => {
         const newCache = { ...prev }
-        if (oldAgent.member_id) delete newCache[`agents:${oldAgent.member_id}`]
-        if (agent.member_id) delete newCache[`agents:${agent.member_id}`]
+        if (oldAgent.company_id) delete newCache[`agents:${oldAgent.company_id}`]
+        if (agent.company_id) delete newCache[`agents:${agent.company_id}`]
         return newCache
       })
       
@@ -166,7 +166,7 @@ export default function CompaniesPage() {
         console.log('✅ Using real-time count updates:', notificationData.count_updates)
         const { old_company_id, old_employee_count, new_company_id, new_employee_count } = notificationData.count_updates
         
-        setMembers(prev => prev.map(m => {
+        setCompanies(prev => prev.map(m => {
           if (m.id === old_company_id) {
             return { ...m, employee_count: old_employee_count || 0 }
           }
@@ -178,21 +178,21 @@ export default function CompaniesPage() {
       }
       // No fallback - only real-time counts from database triggers
     },
-    onClientMemberChanged: (client, oldClient, notificationData) => {
-      console.log('🏢 Client moved from company', oldClient?.member_id, 'to', client?.member_id)
+    onClientCompanyChanged: (client, oldClient, notificationData) => {
+      console.log('🏢 Client moved from company', oldClient?.company_id, 'to', client?.company_id)
       console.log('📊 Real-time count updates:', notificationData?.count_updates)
       
       // Handle null or undefined parameters
       if (!client || !oldClient) {
-        console.warn('⚠️ Received null/undefined client or oldClient in onClientMemberChanged')
+        console.warn('⚠️ Received null/undefined client or oldClient in onClientCompanyChanged')
         return
       }
       
       // Clear cache for both old and new companies since client assignments changed
-      setMemberUsersCache(prev => {
+      setCompanyUsersCache(prev => {
         const newCache = { ...prev }
-        if (oldClient.member_id) delete newCache[`clients:${oldClient.member_id}`]
-        if (client.member_id) delete newCache[`clients:${client.member_id}`]
+        if (oldClient.company_id) delete newCache[`clients:${oldClient.company_id}`]
+        if (client.company_id) delete newCache[`clients:${client.company_id}`]
         return newCache
       })
       
@@ -203,7 +203,7 @@ export default function CompaniesPage() {
         console.log('✅ Using real-time client count updates:', notificationData.count_updates)
         const { old_company_id, old_client_count, new_company_id, new_client_count } = notificationData.count_updates
         
-        setMembers(prev => prev.map(m => {
+        setCompanies(prev => prev.map(m => {
           if (m.id === old_company_id) {
             return { ...m, client_count: old_client_count || 0 }
           }
@@ -232,7 +232,7 @@ export default function CompaniesPage() {
   }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [members, setMembers] = useState<MemberRecord[]>([])
+  const [companies, setCompanies] = useState<CompanyRecord[]>([])
   const [search, setSearch] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
@@ -241,13 +241,13 @@ export default function CompaniesPage() {
   const [sortField, setSortField] = useState<string>('company')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [loadingUsersKey, setLoadingUsersKey] = useState<string | null>(null)
-  const [memberUsersCache, setMemberUsersCache] = useState<Record<string, { type: 'agents' | 'clients', users: { user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, employee_id: string | null }[] }>>({})
+  const [companyUsersCache, setCompanyUsersCache] = useState<Record<string, { type: 'agents' | 'clients', users: { user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, employee_id: string | null }[] }>>({})
   const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false)
   const [companyToEdit, setCompanyToEdit] = useState<CompanyModalData | null>(null)
   const [reloading, setReloading] = useState(false)
 
-  const openEditModal = (company: MemberRecord) => {
-    // Convert MemberRecord to CompanyModalData format for the modal
+  const openEditModal = (company: CompanyRecord) => {
+    // Convert CompanyRecord to CompanyModalData format for the modal
     const companyData: CompanyModalData = {
       id: company.id,
       company: company.company,
@@ -277,17 +277,17 @@ export default function CompaniesPage() {
     setCompanyToEdit(null)
   }
 
-  const fetchUsersForMember = async (memberId: number, type: 'agents' | 'clients') => {
-    const key = `${type}:${memberId}`
-    if (memberUsersCache[key]) return memberUsersCache[key].users
+  const fetchUsersForCompany = async (companyId: number, type: 'agents' | 'clients') => {
+    const key = `${type}:${companyId}`
+    if (companyUsersCache[key]) return companyUsersCache[key].users
     try {
       setLoadingUsersKey(key)
-      const params = new URLSearchParams({ usersOfMember: String(memberId), type })
-      const res = await fetch(`/api/members?${params.toString()}`)
+      const params = new URLSearchParams({ usersOfCompany: String(companyId), type })
+      const res = await fetch(`/api/companies?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to load users')
       const data = await res.json()
       const users = Array.isArray(data.users) ? data.users : []
-      setMemberUsersCache(prev => ({ ...prev, [key]: { type, users } }))
+      setCompanyUsersCache(prev => ({ ...prev, [key]: { type, users } }))
       return users
     } catch (e) {
       return []
@@ -296,7 +296,7 @@ export default function CompaniesPage() {
     }
   }
 
-  const fetchMembers = async () => {
+  const fetchCompanies = async () => {
     try {
       setLoading(true)
       setError(null)
@@ -307,17 +307,17 @@ export default function CompaniesPage() {
         sortDirection,
       })
       if (search.trim()) params.append('search', search.trim())
-      const res = await fetch(`/api/members?${params.toString()}`)
+      const res = await fetch(`/api/companies?${params.toString()}`)
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || "Failed to fetch members")
+        throw new Error(err.error || "Failed to fetch companies")
       }
       const data = await res.json()
-      setMembers(data.members || [])
+      setCompanies(data.companies || [])
       setTotalCount(data.pagination?.totalCount || 0)
       setTotalPages(data.pagination?.totalPages || 1)
     } catch (e: any) {
-      setError(e?.message || "Failed to fetch members")
+      setError(e?.message || "Failed to fetch companies")
     } finally {
       setLoading(false)
     }
@@ -337,29 +337,29 @@ export default function CompaniesPage() {
         sortDirection,
       })
       if (search.trim()) params.append('search', search.trim())
-      const res = await fetch(`/api/members?${params.toString()}`)
+      const res = await fetch(`/api/companies?${params.toString()}`)
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || "Failed to fetch members")
+        throw new Error(err.error || "Failed to fetch companies")
       }
       const data = await res.json()
-      setMembers(data.members || [])
+      setCompanies(data.companies || [])
       setTotalCount(data.pagination?.totalCount || 0)
       setTotalPages(data.pagination?.totalPages || 1)
       setError(null) // Clear any previous errors
       
     } catch (err) {
       console.error('❌ Reload error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to reload members')
+      setError(err instanceof Error ? err.message : 'Failed to reload companies')
     } finally {
       setReloading(false)
     }
   }
 
-  useEffect(() => { fetchMembers() }, [])
+  useEffect(() => { fetchCompanies() }, [])
   useEffect(() => { setCurrentPage(1) }, [search])
   useEffect(() => {
-    const t = setTimeout(() => fetchMembers(), 300)
+    const t = setTimeout(() => fetchCompanies(), 300)
     return () => clearTimeout(t)
   }, [currentPage, search, sortField, sortDirection])
 
@@ -385,7 +385,7 @@ export default function CompaniesPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h1 className="text-2xl font-bold">Companies</h1>
-                    <p className="text-sm text-muted-foreground">Directory of member companies</p>
+                    <p className="text-sm text-muted-foreground">Directory of companies</p>
                   </div>
                   <div className="flex gap-2">
                     <ReloadButton onReload={handleReload} loading={reloading} className="flex-1" />
@@ -426,7 +426,7 @@ export default function CompaniesPage() {
                 ) : (
                   <div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {members.map((m) => (
+                      {companies.map((m) => (
                         <Card key={m.id} className="h-full cursor-pointer hover:border-primary/50 hover:text-primary transition-all duration-200" onClick={() => openEditModal(m)}>
                           <CardContent className="p-4 h-full flex flex-col">
                               <div className="flex items-start justify-between gap-3">
@@ -471,23 +471,23 @@ export default function CompaniesPage() {
                                   <span className="font-medium text-foreground">Employees</span>
                                   <Popover>
                                     <PopoverTrigger asChild>
-                                      <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer" onClick={async (e) => { e.stopPropagation(); await fetchUsersForMember(m.id, 'agents') }}>
+                                      <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer" onClick={async (e) => { e.stopPropagation(); await fetchUsersForCompany(m.id, 'agents') }}>
                                         {typeof m.employee_count === 'number' ? m.employee_count : 0}
                                       </button>
                                     </PopoverTrigger>
                                     <PopoverContent align="end" sideOffset={6} className="w-80 p-2">
                                       <div className="flex flex-wrap gap-2 items-center justify-center min-h-10">
-                                        {loadingUsersKey === `agents:${m.id}` && !memberUsersCache[`agents:${m.id}`] && (
+                                        {loadingUsersKey === `agents:${m.id}` && !companyUsersCache[`agents:${m.id}`] && (
                                           <div className="w-full flex items-center justify-center py-2 gap-1">
                                             <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0s' }} />
                                             <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.2s' }} />
                                             <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.4s' }} />
                                           </div>
                                         )}
-                                        {(memberUsersCache[`agents:${m.id}`]?.users || []).map(u => (
+                                        {(companyUsersCache[`agents:${m.id}`]?.users || []).map(u => (
                                           <UserTooltip key={u.user_id} user={u} showEmployeeId={true} />
                                         ))}
-                                        {loadingUsersKey !== `agents:${m.id}` && (!memberUsersCache[`agents:${m.id}`]?.users || memberUsersCache[`agents:${m.id}`]?.users.length === 0) && (
+                                        {loadingUsersKey !== `agents:${m.id}` && (!companyUsersCache[`agents:${m.id}`]?.users || companyUsersCache[`agents:${m.id}`]?.users.length === 0) && (
                                           <div className="text-xs text-muted-foreground w-full text-center">No Agents</div>
                                         )}
                                       </div>
@@ -498,23 +498,23 @@ export default function CompaniesPage() {
                                   <span className="font-medium text-foreground">Clients</span>
                                   <Popover>
                                     <PopoverTrigger asChild>
-                                      <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer" onClick={async (e) => { e.stopPropagation(); await fetchUsersForMember(m.id, 'clients') }}>
+                                      <button className="rounded-md border px-1.5 py-0.5 text-base font-semibold leading-none text-foreground/80 hover:bg-accent hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer" onClick={async (e) => { e.stopPropagation(); await fetchUsersForCompany(m.id, 'clients') }}>
                                         {typeof m.client_count === 'number' ? m.client_count : 0}
                                       </button>
                                     </PopoverTrigger>
                                     <PopoverContent align="end" sideOffset={6} className="w-80 p-2">
                                       <div className="flex flex-wrap gap-2 items-center justify-center min-h-10">
-                                        {loadingUsersKey === `clients:${m.id}` && !memberUsersCache[`clients:${m.id}`] && (
+                                        {loadingUsersKey === `clients:${m.id}` && !companyUsersCache[`clients:${m.id}`] && (
                                           <div className="w-full flex items-center justify-center py-2 gap-1">
                                             <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0s' }} />
                                             <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.2s' }} />
                                             <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-pulse" style={{ animationDelay: '0.4s' }} />
                                           </div>
                                         )}
-                                        {(memberUsersCache[`clients:${m.id}`]?.users || []).map(u => (
+                                        {(companyUsersCache[`clients:${m.id}`]?.users || []).map(u => (
                                           <UserTooltip key={u.user_id} user={u} showEmployeeId={false} />
                                         ))}
-                                        {loadingUsersKey !== `clients:${m.id}` && (!memberUsersCache[`clients:${m.id}`]?.users || memberUsersCache[`clients:${m.id}`]?.users.length === 0) && (
+                                        {loadingUsersKey !== `clients:${m.id}` && (!companyUsersCache[`clients:${m.id}`]?.users || companyUsersCache[`clients:${m.id}`]?.users.length === 0) && (
                                           <div className="text-xs text-muted-foreground w-full text-center">No Clients</div>
                                         )}
                                       </div>
@@ -583,7 +583,7 @@ export default function CompaniesPage() {
           // Just clear cache to ensure fresh data when real-time updates arrive
           if (company && company.id) {
             console.log('🔄 Clearing cache for real-time updates...')
-            setMemberUsersCache(prev => {
+            setCompanyUsersCache(prev => {
               const newCache = { ...prev }
               delete newCache[`agents:${company.id}`]
               delete newCache[`clients:${company.id}`]

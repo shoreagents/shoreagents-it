@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getMemberById, updateMember, deleteMember, uploadMemberLogo } from '@/lib/db-utils'
-import { MembersActivityLogger } from '@/lib/logs-utils'
+import { getCompanyById, updateCompany, deleteCompany, uploadCompanyLogo } from '@/lib/db-utils'
+import { CompaniesActivityLogger } from '@/lib/logs-utils'
 
 export async function PATCH(
   request: NextRequest,
@@ -8,12 +8,12 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const memberId = parseInt(id, 10)
-    if (isNaN(memberId)) {
-      return NextResponse.json({ error: 'Invalid member ID' }, { status: 400 })
+    const companyId = parseInt(id, 10)
+    if (isNaN(companyId)) {
+      return NextResponse.json({ error: 'Invalid company ID' }, { status: 400 })
     }
 
-    console.log('API: Starting member update for ID:', memberId)
+    console.log('API: Starting company update for ID:', companyId)
     
     const formData = await request.formData()
     
@@ -74,7 +74,7 @@ export async function PATCH(
     let logoUrl = null
     if (logo && logo.size > 0) {
       try {
-        logoUrl = await uploadMemberLogo(logo, company)
+        logoUrl = await uploadCompanyLogo(logo, company)
         console.log('Logo uploaded successfully for update:', logoUrl)
       } catch (uploadError) {
         console.error('Logo upload error for update:', uploadError)
@@ -124,153 +124,153 @@ export async function PATCH(
     }
     // If neither remove_logo nor new logo, logo field won't be included in update
 
-    // Get the current member data for comparison
-    const currentMember = await getMemberById(memberId)
-    if (!currentMember) {
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    // Get the current company data for comparison
+    const currentCompany = await getCompanyById(companyId)
+    if (!currentCompany) {
+      return NextResponse.json({ error: 'Company not found' }, { status: 404 })
     }
     
     console.log('🔍 Logo update processing:')
     console.log('  remove_logo:', remove_logo)
     console.log('  logoUrl:', logoUrl)
-    console.log('  currentMember.logo:', currentMember.logo)
+    console.log('  currentCompany.logo:', currentCompany.logo)
 
     // Clean up the update data - remove undefined values
     const cleanUpdateData = Object.fromEntries(
       Object.entries(updateData).filter(([_, value]) => value !== undefined)
     )
     
-    console.log('API: Updating member in database:', memberId, cleanUpdateData)
+    console.log('API: Updating company in database:', companyId, cleanUpdateData)
     
-    // Use db-utils function to update member
-    const updatedMember = await updateMember(memberId, cleanUpdateData)
+    // Use db-utils function to update company
+    const updatedCompany = await updateCompany(companyId, cleanUpdateData)
     
     // Log field changes for activity tracking
     try {
-      const userId = updatedMember.updated_by || currentMember.created_by || null
+      const userId = updatedCompany.updated_by || currentCompany.created_by || null
       
       // Log company name changes
-      if (currentMember.company !== company) {
-        if (!currentMember.company || currentMember.company.trim() === '') {
-          await MembersActivityLogger.logFieldSet(memberId, 'Company Name', company, userId)
+      if (currentCompany.company !== company) {
+        if (!currentCompany.company || currentCompany.company.trim() === '') {
+          await CompaniesActivityLogger.logFieldSet(companyId, 'Company Name', company, userId)
         } else {
-          await MembersActivityLogger.logFieldUpdated(memberId, 'Company Name', currentMember.company, company, userId)
+          await CompaniesActivityLogger.logFieldUpdated(companyId, 'Company Name', currentCompany.company, company, userId)
         }
       }
       
       // Log address changes
-      if (currentMember.address !== address) {
-        if (!currentMember.address || currentMember.address.trim() === '') {
+      if (currentCompany.address !== address) {
+        if (!currentCompany.address || currentCompany.address.trim() === '') {
           if (address && address.trim()) {
-            await MembersActivityLogger.logFieldSet(memberId, 'Address', address, userId)
+            await CompaniesActivityLogger.logFieldSet(companyId, 'Address', address, userId)
           }
         } else if (!address || address.trim() === '') {
-          await MembersActivityLogger.logFieldRemoved(memberId, 'Address', currentMember.address, userId)
+          await CompaniesActivityLogger.logFieldRemoved(companyId, 'Address', currentCompany.address, userId)
         } else {
-          await MembersActivityLogger.logFieldUpdated(memberId, 'Address', currentMember.address, address, userId)
+          await CompaniesActivityLogger.logFieldUpdated(companyId, 'Address', currentCompany.address, address, userId)
         }
       }
       
       // Log phone changes
-      if (currentMember.phone !== phone) {
-        if (!currentMember.phone || currentMember.phone.trim() === '') {
+      if (currentCompany.phone !== phone) {
+        if (!currentCompany.phone || currentCompany.phone.trim() === '') {
           if (phone && phone.trim()) {
-            await MembersActivityLogger.logFieldSet(memberId, 'Phone', phone, userId)
+            await CompaniesActivityLogger.logFieldSet(companyId, 'Phone', phone, userId)
           }
         } else if (!phone || phone.trim() === '') {
-          await MembersActivityLogger.logFieldRemoved(memberId, 'Phone', currentMember.phone, userId)
+          await CompaniesActivityLogger.logFieldRemoved(companyId, 'Phone', currentCompany.phone, userId)
         } else {
-          await MembersActivityLogger.logFieldUpdated(memberId, 'Phone', currentMember.phone, phone, userId)
+          await CompaniesActivityLogger.logFieldUpdated(companyId, 'Phone', currentCompany.phone, phone, userId)
         }
       }
       
       // Log country changes
-      if (currentMember.country !== country) {
-        if (!currentMember.country || currentMember.country.trim() === '') {
+      if (currentCompany.country !== country) {
+        if (!currentCompany.country || currentCompany.country.trim() === '') {
           if (country && country.trim()) {
-            await MembersActivityLogger.logFieldSet(memberId, 'Country', country, userId)
+            await CompaniesActivityLogger.logFieldSet(companyId, 'Country', country, userId)
           }
         } else if (!country || country.trim() === '') {
-          await MembersActivityLogger.logFieldRemoved(memberId, 'Country', currentMember.country, userId)
+          await CompaniesActivityLogger.logFieldRemoved(companyId, 'Country', currentCompany.country, userId)
         } else {
-          await MembersActivityLogger.logFieldUpdated(memberId, 'Country', currentMember.country, country, userId)
+          await CompaniesActivityLogger.logFieldUpdated(companyId, 'Country', currentCompany.country, country, userId)
         }
       }
       
       // Log service changes
-      if (currentMember.service !== formattedService) {
-        if (!currentMember.service || currentMember.service.trim() === '') {
+      if (currentCompany.service !== formattedService) {
+        if (!currentCompany.service || currentCompany.service.trim() === '') {
           if (formattedService && formattedService.trim()) {
-            await MembersActivityLogger.logFieldSet(memberId, 'Service', formattedService, userId)
+            await CompaniesActivityLogger.logFieldSet(companyId, 'Service', formattedService, userId)
           }
         } else if (!formattedService || formattedService.trim() === '') {
-          await MembersActivityLogger.logFieldRemoved(memberId, 'Service', currentMember.service, userId)
+          await CompaniesActivityLogger.logFieldRemoved(companyId, 'Service', currentCompany.service, userId)
         } else {
-          await MembersActivityLogger.logFieldUpdated(memberId, 'Service', currentMember.service, formattedService, userId)
+          await CompaniesActivityLogger.logFieldUpdated(companyId, 'Service', currentCompany.service, formattedService, userId)
         }
       }
       
       // Log website changes using special handler
       console.log('🔍 Website comparison for logging:')
-      console.log('  currentMember.website:', currentMember.website)
+      console.log('  currentCompany.website:', currentCompany.website)
       console.log('  websiteArray:', websiteArray)
-      console.log('  currentMember.website JSON:', JSON.stringify(currentMember.website))
+      console.log('  currentCompany.website JSON:', JSON.stringify(currentCompany.website))
       console.log('  websiteArray JSON:', JSON.stringify(websiteArray))
-      console.log('  Are they different?', JSON.stringify(currentMember.website) !== JSON.stringify(websiteArray))
+      console.log('  Are they different?', JSON.stringify(currentCompany.website) !== JSON.stringify(websiteArray))
       
-      if (JSON.stringify(currentMember.website) !== JSON.stringify(websiteArray)) {
+      if (JSON.stringify(currentCompany.website) !== JSON.stringify(websiteArray)) {
         console.log('✅ Website change detected, logging...')
-        await MembersActivityLogger.logWebsiteChange(memberId, currentMember.website, websiteArray, userId)
+        await CompaniesActivityLogger.logWebsiteChange(companyId, currentCompany.website, websiteArray, userId)
       } else {
         console.log('ℹ️ No website change detected')
       }
       
       // Log badge color changes
-      if (currentMember.badge_color !== badge_color) {
-        if (!currentMember.badge_color || currentMember.badge_color.trim() === '') {
+      if (currentCompany.badge_color !== badge_color) {
+        if (!currentCompany.badge_color || currentCompany.badge_color.trim() === '') {
           if (badge_color && badge_color.trim()) {
-            await MembersActivityLogger.logFieldSet(memberId, 'Badge Color', badge_color, userId)
+            await CompaniesActivityLogger.logFieldSet(companyId, 'Badge Color', badge_color, userId)
           }
         } else if (!badge_color || badge_color.trim() === '') {
-          await MembersActivityLogger.logFieldRemoved(memberId, 'Badge Color', currentMember.badge_color, userId)
+          await CompaniesActivityLogger.logFieldRemoved(companyId, 'Badge Color', currentCompany.badge_color, userId)
         } else {
-          await MembersActivityLogger.logFieldUpdated(memberId, 'Badge Color', currentMember.badge_color, badge_color, userId)
+          await CompaniesActivityLogger.logFieldUpdated(companyId, 'Badge Color', currentCompany.badge_color, badge_color, userId)
         }
       }
       
       // Log status changes
-      if (currentMember.status !== status) {
-        if (!currentMember.status || currentMember.status.trim() === '') {
+      if (currentCompany.status !== status) {
+        if (!currentCompany.status || currentCompany.status.trim() === '') {
           if (status && status.trim()) {
-            await MembersActivityLogger.logFieldSet(memberId, 'Status', status, userId)
+            await CompaniesActivityLogger.logFieldSet(companyId, 'Status', status, userId)
           }
         } else if (!status || status.trim() === '') {
-          await MembersActivityLogger.logFieldRemoved(memberId, 'Status', currentMember.status, userId)
+          await CompaniesActivityLogger.logFieldRemoved(companyId, 'Status', currentCompany.status, userId)
         } else {
-          await MembersActivityLogger.logFieldUpdated(memberId, 'Status', currentMember.status, status, userId)
+          await CompaniesActivityLogger.logFieldUpdated(companyId, 'Status', currentCompany.status, status, userId)
         }
       }
       
       // Log logo changes
       if (remove_logo === 'true') {
         // Logo was removed
-        if (currentMember.logo) {
+        if (currentCompany.logo) {
           // Extract filename from the previous logo URL for display
-          const urlParts = currentMember.logo.split('/')
+          const urlParts = currentCompany.logo.split('/')
           const fileName = urlParts[urlParts.length - 1] || 'logo'
-          await MembersActivityLogger.logFieldRemoved(memberId, 'Logo', fileName, userId)
+          await CompaniesActivityLogger.logFieldRemoved(companyId, 'Logo', fileName, userId)
         }
-      } else if (logoUrl && currentMember.logo !== logoUrl) {
+      } else if (logoUrl && currentCompany.logo !== logoUrl) {
         // New logo was uploaded
-        if (!currentMember.logo || currentMember.logo.trim() === '') {
+        if (!currentCompany.logo || currentCompany.logo.trim() === '') {
           // Create a shortened, user-friendly version of the URL
           const urlParts = logoUrl.split('/')
           const fileName = urlParts[urlParts.length - 1] || 'logo'
           const shortenedUrl = fileName
-          await MembersActivityLogger.logFieldSet(memberId, 'Logo', shortenedUrl, userId)
+          await CompaniesActivityLogger.logFieldSet(companyId, 'Logo', shortenedUrl, userId)
         } else {
           // Create shortened versions for both old and new URLs
-          const oldUrlParts = currentMember.logo.split('/')
+          const oldUrlParts = currentCompany.logo.split('/')
           const oldFileName = oldUrlParts[oldUrlParts.length - 1] || 'logo'
           const oldShortenedUrl = oldFileName
           
@@ -278,7 +278,7 @@ export async function PATCH(
           const newFileName = newUrlParts[newUrlParts.length - 1] || 'logo'
           const newShortenedUrl = newFileName
           
-          await MembersActivityLogger.logFieldUpdated(memberId, 'Logo', oldShortenedUrl, newShortenedUrl, userId)
+          await CompaniesActivityLogger.logFieldUpdated(companyId, 'Logo', oldShortenedUrl, newShortenedUrl, userId)
         }
       }
       
@@ -287,20 +287,20 @@ export async function PATCH(
       // Don't fail the request if logging fails
     }
     
-    console.log('API: Member updated successfully:', updatedMember)
+    console.log('API: Company updated successfully:', updatedCompany)
     
     return NextResponse.json({ 
       success: true, 
-      company: updatedMember // Keep 'company' key for frontend compatibility
+      company: updatedCompany // Keep 'company' key for frontend compatibility
     })
 
   } catch (error) {
-    console.error('API: Unexpected error during member update:', error)
+    console.error('API: Unexpected error during company update:', error)
     
     // Handle specific errors
     if (error instanceof Error && error.message.includes('not found')) {
       return NextResponse.json({ 
-        error: 'Member not found',
+        error: 'Company not found',
         details: error.message
       }, { status: 404 })
     }
@@ -318,21 +318,21 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const memberId = parseInt(id, 10)
-    if (isNaN(memberId)) {
-      return NextResponse.json({ error: 'Invalid member ID' }, { status: 400 })
+    const companyId = parseInt(id, 10)
+    if (isNaN(companyId)) {
+      return NextResponse.json({ error: 'Invalid company ID' }, { status: 400 })
     }
 
-    // Use db-utils function to get member
-    const member = await getMemberById(memberId)
+    // Use db-utils function to get company
+    const company = await getCompanyById(companyId)
 
-    if (!member) {
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    if (!company) {
+      return NextResponse.json({ error: 'Company not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ company: member }) // Keep 'company' key for frontend compatibility
+    return NextResponse.json({ company: company }) // Keep 'company' key for frontend compatibility
   } catch (error) {
-    console.error('Error fetching member:', error)
+    console.error('Error fetching company:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -343,41 +343,41 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const memberId = parseInt(id, 10)
-    if (isNaN(memberId)) {
-      return NextResponse.json({ error: 'Invalid member ID' }, { status: 400 })
+    const companyId = parseInt(id, 10)
+    if (isNaN(companyId)) {
+      return NextResponse.json({ error: 'Invalid company ID' }, { status: 400 })
     }
 
-    console.log('API: Starting member deletion for ID:', memberId)
+    console.log('API: Starting company deletion for ID:', companyId)
     console.log('API: Raw params id:', id)
-    console.log('API: Parsed memberId:', memberId)
+    console.log('API: Parsed companyId:', companyId)
     
-    // First, check if the member exists using the same method as other functions
-    console.log('API: Checking if member exists in database...')
-    const existingMember = await getMemberById(memberId)
+    // First, check if the company exists using the same method as other functions
+    console.log('API: Checking if company exists in database...')
+    const existingCompany = await getCompanyById(companyId)
     
-    console.log('API: Database query result:', { existingMember })
+    console.log('API: Database query result:', { existingCompany })
     
-    if (!existingMember) {
-      console.log('API: Member not found, returning 404')
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    if (!existingCompany) {
+      console.log('API: Company not found, returning 404')
+      return NextResponse.json({ error: 'Company not found' }, { status: 404 })
     }
     
-    // Delete the member from the database using db-utils function
+    // Delete the company from the database using db-utils function
     // This will also clean up associated storage files
-    console.log('API: Deleting member from database and cleaning up storage...')
-    await deleteMember(memberId)
+    console.log('API: Deleting company from database and cleaning up storage...')
+    await deleteCompany(companyId)
     
-    console.log('API: Member deleted successfully from database and storage:', memberId)
+    console.log('API: Company deleted successfully from database and storage:', companyId)
     
     return NextResponse.json({ 
       success: true, 
-      message: 'Member deleted successfully along with all associated files',
-      deletedId: memberId
+      message: 'Company deleted successfully along with all associated files',
+      deletedId: companyId
     })
 
   } catch (error) {
-    console.error('API: Unexpected error during member deletion:', error)
+    console.error('API: Unexpected error during company deletion:', error)
     
     return NextResponse.json({ 
       error: 'Internal server error', 

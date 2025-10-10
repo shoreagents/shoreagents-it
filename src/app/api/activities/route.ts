@@ -4,15 +4,15 @@ import { getActivitiesByDate, getActivityStats } from '@/lib/db-utils'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const memberId = searchParams.get('memberId')
+    const companyId = searchParams.get('companyId')
     const date = searchParams.get('date') // Format: YYYY-MM-DD
     const startDate = searchParams.get('startDate') // Format: YYYY-MM-DD
     const endDate = searchParams.get('endDate') // Format: YYYY-MM-DD
 
-    console.log('📊 API: Fetching activities for memberId:', memberId, 'date:', date, 'startDate:', startDate, 'endDate:', endDate)
+    console.log('📊 API: Fetching activities for companyId:', companyId, 'date:', date, 'startDate:', startDate, 'endDate:', endDate)
 
-    if (!memberId) {
-      return NextResponse.json({ error: 'Member ID is required' }, { status: 400 })
+    if (!companyId) {
+      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
     // Determine date range
@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
       targetEndDate = today
     }
 
-    const activities = await getActivitiesByDate(memberId, targetStartDate, targetEndDate)
-    const stats = await getActivityStats(memberId, targetStartDate, targetEndDate)
+    const activities = await getActivitiesByDate(companyId, targetStartDate, targetEndDate)
+    const stats = await getActivityStats(companyId, targetStartDate, targetEndDate)
 
     return NextResponse.json({ 
       activities, 

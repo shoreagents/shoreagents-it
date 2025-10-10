@@ -97,9 +97,9 @@ interface Employee {
   employment_status: string | null
   hire_type: string | null
   staff_source: string | null
-  member_id: number | null
-  member_company: string | null
-  member_badge_color: string | null
+  company_id: number | null
+  company_name: string | null
+  company_badge_color: string | null
   department_id: number | null
   department_name: string | null
   station_id: string | null
@@ -119,26 +119,26 @@ export default function BreaksPage() {
     totalAgents: 0
   })
 
-  // Calculate filtered stats based on member selection
+  // Calculate filtered stats based on company selection
   const getFilteredStats = () => {
     let filteredEmployees = employees
     let filteredBreakSessions = breakSessions
     
-    if (memberId !== 'all') {
-      if (memberId === 'none') {
-        // Show only employees with no member assignment
-        filteredEmployees = employees.filter(emp => !emp.member_id)
+    if (companyId !== 'all') {
+      if (companyId === 'none') {
+        // Show only employees with no company assignment
+        filteredEmployees = employees.filter(emp => !emp.company_id)
         filteredBreakSessions = breakSessions.filter(session => {
           const employee = employees.find(emp => emp.user_id === session.agent_user_id)
-          return employee && !employee.member_id
+          return employee && !employee.company_id
         })
       } else {
-        // Show only employees from the selected member company
-        const selectedMemberId = parseInt(memberId)
-        filteredEmployees = employees.filter(emp => emp.member_id === selectedMemberId)
+        // Show only employees from the selected company
+        const selectedcompanyId = parseInt(companyId)
+        filteredEmployees = employees.filter(emp => emp.company_id === selectedcompanyId)
         filteredBreakSessions = breakSessions.filter(session => {
           const employee = employees.find(emp => emp.user_id === session.agent_user_id)
-          return employee && employee.member_id === selectedMemberId
+          return employee && employee.company_id === selectedcompanyId
         })
       }
     }
@@ -164,9 +164,9 @@ export default function BreaksPage() {
   const [sortField, setSortField] = useState<'name' | 'department' | 'position'>('name')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
-  // Member filter state
-  const [memberId, setMemberId] = useState<string>('all')
-  const [memberOptions, setMemberOptions] = useState<{ id: number; company: string }[]>([])
+  // Company filter state
+  const [companyId, setcompanyId] = useState<string>('all')
+  const [companyOptions, setCompanyOptions] = useState<{ id: number; company: string }[]>([])
 
   // Real-time updates for break sessions
   const { isConnected: isRealtimeConnected } = useRealtimeBreaks({
@@ -242,19 +242,19 @@ export default function BreaksPage() {
     return () => clearInterval(timer)
   }, [])
 
-  // Fetch member options
+  // Fetch company options
   useEffect(() => {
-    const fetchMembers = async () => {
+    const fetchCompanies = async () => {
       try {
         const res = await fetch('/api/agents', { method: 'OPTIONS' })
         const data = await res.json()
-        setMemberOptions(data.members || [])
+        setCompanyOptions(data.companies || [])
       } catch (e) {
-        console.error('❌ Failed to fetch members:', e)
-        setMemberOptions([])
+        console.error('❌ Failed to fetch companies:', e)
+        setCompanyOptions([])
       }
     }
-    fetchMembers()
+    fetchCompanies()
   }, [])
 
   // Fetch employees data
@@ -270,8 +270,8 @@ export default function BreaksPage() {
           limit: '1000'
         })
         
-        if (memberId !== 'all') {
-          params.append('memberId', memberId)
+        if (companyId !== 'all') {
+          params.append('companyId', companyId)
         }
 
         const response = await fetch(`/api/agents?${params.toString()}`)
@@ -291,7 +291,7 @@ export default function BreaksPage() {
     if (user) {
       fetchEmployees()
     }
-  }, [user, memberId])
+  }, [user, companyId])
 
   // Fetch break sessions data
   const fetchBreakSessions = async () => {
@@ -312,10 +312,10 @@ export default function BreaksPage() {
     try {
       console.log('📡 Making API request to /api/breaks')
       // For internal users, fetch all break sessions. For others, this would need to be adjusted based on your business logic
-      const memberId = 'all'
+      const companyId = 'all'
       // Get today's date in Asia/Manila timezone to match database calculations
       const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) // YYYY-MM-DD format
-      const response = await fetch(`/api/breaks?memberId=${memberId}&date=${today}`)
+      const response = await fetch(`/api/breaks?companyId=${companyId}&date=${today}`)
       
       console.log('📊 Response status:', response.status)
       
@@ -361,10 +361,10 @@ export default function BreaksPage() {
       
       console.log('📡 Making API request to /api/breaks')
       // For internal users, fetch all break sessions. For others, this would need to be adjusted based on your business logic
-      const memberId = 'all'
+      const companyId = 'all'
       // Get today's date in Asia/Manila timezone to match database calculations
       const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) // YYYY-MM-DD format
-      const response = await fetch(`/api/breaks?memberId=${memberId}&date=${today}`)
+      const response = await fetch(`/api/breaks?companyId=${companyId}&date=${today}`)
       
       console.log('📊 Response status:', response.status)
       
@@ -526,16 +526,16 @@ export default function BreaksPage() {
     
     // If no agents data available, fallback to simple count
     if (totalAgents === 0) {
-      if (activeCount === 1) return "1 team member is currently on break."
-      return `${activeCount} team members are currently on break.`
+      if (activeCount === 1) return "1 team company is currently on break."
+      return `${activeCount} team companies are currently on break.`
     }
     
     // Calculate percentage based on actual team size
     const percentage = (activeCount / totalAgents) * 100
     
     if (percentage === 0) return "No one is currently on break."
-    if (percentage > 0 && percentage < 20) return "A few team members are currently on break."
-    if (percentage >= 20 && percentage < 40) return "Several team members are currently on break."
+    if (percentage > 0 && percentage < 20) return "A few team companies are currently on break."
+    if (percentage >= 20 && percentage < 40) return "Several team companies are currently on break."
     if (percentage >= 40 && percentage < 70) return "Half the team is currently taking this break."
     if (percentage >= 70 && percentage < 100) return "Most of the team is currently on break."
     if (percentage === 100) return "Everyone is currently on break."
@@ -582,22 +582,22 @@ export default function BreaksPage() {
 
   // Helper function to get break type card data
   const getBreakTypeCardData = (breakType: string) => {
-    // Filter break sessions by member selection
+    // Filter break sessions by company selection
     let filteredSessions = breakSessions
     
-    if (memberId !== 'all') {
-      if (memberId === 'none') {
-        // Show only sessions for employees with no member assignment
+    if (companyId !== 'all') {
+      if (companyId === 'none') {
+        // Show only sessions for employees with no company assignment
         filteredSessions = breakSessions.filter(session => {
           const employee = employees.find(emp => emp.user_id === session.agent_user_id)
-          return employee && !employee.member_id
+          return employee && !employee.company_id
         })
       } else {
-        // Show only sessions for employees from the selected member company
-        const selectedMemberId = parseInt(memberId)
+        // Show only sessions for employees from the selected company
+        const selectedcompanyId = parseInt(companyId)
         filteredSessions = breakSessions.filter(session => {
           const employee = employees.find(emp => emp.user_id === session.agent_user_id)
-          return employee && employee.member_id === selectedMemberId
+          return employee && employee.company_id === selectedcompanyId
         })
       }
     }
@@ -771,21 +771,21 @@ export default function BreaksPage() {
                   </div>
                   <div className="flex gap-2">
                     <div className="w-56">
-                      <Select value={memberId} onValueChange={(v: string) => setMemberId(v)}>
+                      <Select value={companyId} onValueChange={(v: string) => setcompanyId(v)}>
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Filter by member">
-                            {memberId === 'all' ? 'All Agents' : 
-                             memberId === 'none' ? 'No Assigned Members' :
-                             memberOptions.find(m => String(m.id) === memberId)?.company || 'Filter by member'}
+                          <SelectValue placeholder="Filter by company">
+                            {companyId === 'all' ? 'All Agents' : 
+                             companyId === 'none' ? 'No Assigned Companies' :
+                             companyOptions.find(m => String(m.id) === companyId)?.company || 'Filter by company'}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Agents</SelectItem>
-                          <SelectItem value="none">No Assigned Members</SelectItem>
+                          <SelectItem value="none">No Assigned Companies</SelectItem>
                           <SelectSeparator className="bg-border mx-2" />
                           <SelectGroup>
-                            <SelectLabel className="text-muted-foreground">Members</SelectLabel>
-                            {memberOptions.map((m) => (
+                            <SelectLabel className="text-muted-foreground">Companies</SelectLabel>
+                            {companyOptions.map((m) => (
                               <SelectItem key={m.id} value={String(m.id)}>{m.company}</SelectItem>
                             ))}
                           </SelectGroup>

@@ -15,7 +15,7 @@ export interface BaseRecord {
 
 export interface CommentRecord extends BaseRecord {
   comment: string
-  [key: string]: any // Allow additional fields like member_id, ticket_id, etc.
+  [key: string]: any // Allow additional fields like company_id, ticket_id, etc.
 }
 
 export interface ActivityLogRecord extends BaseRecord {
@@ -23,7 +23,7 @@ export interface ActivityLogRecord extends BaseRecord {
   fieldName: string
   oldValue: string | null
   newValue: string | null
-  [key: string]: any // Allow additional fields like member_id, ticket_id, etc.
+  [key: string]: any // Allow additional fields like company_id, ticket_id, etc.
 }
 
 export interface NotificationData {
@@ -37,11 +37,11 @@ export interface NotificationData {
 export interface RealtimeTableConfig {
   tableName: string
   recordId: number
-  recordIdField: string // e.g., 'member_id', 'ticket_id', 'applicant_id'
-  messageType: string // e.g., 'member_comment_update', 'ticket_activity_update'
+  recordIdField: string // e.g., 'company_id', 'ticket_id', 'applicant_id'
+  messageType: string // e.g., 'company_comment_update', 'ticket_activity_update'
   apiEndpoints: {
-    comments: string // e.g., '/api/members/{id}/comments'
-    activityLogs: string // e.g., '/api/members/{id}/activity'
+    comments: string // e.g., '/api/companies/{id}/comments'
+    activityLogs: string // e.g., '/api/companies/{id}/activity'
   }
   crudFunctions?: {
     getComments?: (id: number) => Promise<CommentRecord[]>
@@ -162,7 +162,7 @@ export function useRealtimeActivityLogs(config: RealtimeTableConfig) {
           // Return a basic enriched version if not found
           return {
             id: activityLogId,
-            member_id: configRef.current.recordId,
+            company_id: configRef.current.recordId,
             field_name: 'Unknown',
             action: 'updated',
             old_value: null,
@@ -188,13 +188,15 @@ export function useRealtimeActivityLogs(config: RealtimeTableConfig) {
       
       // Handle both comment and activity log updates
       if (message.type === configRef.current.messageType || 
-          message.type === 'member_activity_update' || 
-          message.type === 'member_update') {
+          message.type === 'company_activity_update' || 
+          message.type === 'company_update' ||
+          message.type === 'company_activity_update' || 
+          message.type === 'company_update') {
         console.log('✅ Processing message type:', message.type)
         const { action, record, old_record } = message.data
         
         if (record && record[configRef.current.recordIdField] === configRef.current.recordId) {
-          console.log('✅ Record matches current member, processing...')
+          console.log('✅ Record matches current company, processing...')
           // Handle comments
           if (record.comment !== undefined) {
             // For new comments, fetch user information to get avatar and name
@@ -518,15 +520,15 @@ export function useRealtimeActivityLogs(config: RealtimeTableConfig) {
 // EXAMPLE USAGE CONFIGURATIONS FOR DIFFERENT TABLES
 // ============================================================================
 
-// Example 1: For Members Table
-export const createMembersConfig = (memberId: number): RealtimeTableConfig => ({
-  tableName: 'members',
-  recordId: memberId,
-  recordIdField: 'member_id',
-  messageType: 'member_comment_update', // Listen for comment updates (will also handle activity logs via additional check)
+// Example 1: For Companies Table
+export const createCompaniesConfig = (companyId: number): RealtimeTableConfig => ({
+  tableName: 'companies',
+  recordId: companyId,
+  recordIdField: 'company_id',
+  messageType: 'company_comment_update', // Listen for comment updates (will also handle activity logs via additional check)
   apiEndpoints: {
-    comments: '/api/members/{id}/comments',
-    activityLogs: '/api/members/{id}/activity'
+    comments: '/api/companies/{id}/comments',
+    activityLogs: '/api/companies/{id}/activity'
   }
   // Optional: Add crudFunctions if you have them
 })
@@ -562,9 +564,9 @@ export const createApplicantsConfig = (applicantId: number): RealtimeTableConfig
 // ============================================================================
 
 /*
-// In a Members component:
+// In a Companies component:
 const { comments, activityLogs, allEntries, loading, addComment } = useRealtimeActivityLogs(
-  createMembersConfig(memberId)
+  createCompaniesConfig(companyId)
 )
 
 // In a Tickets component:

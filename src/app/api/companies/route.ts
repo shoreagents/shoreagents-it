@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getMembersPaginated, getAgentsByMember, getClientsByMember, createMemberCompany, uploadMemberLogo } from '@/lib/db-utils'
-import { MembersActivityLogger } from '@/lib/logs-utils'
+import { getCompaniesPaginated, getAgentsByCompany, getClientsByCompany, createCompany, uploadCompanyLogo } from '@/lib/db-utils'
+import { CompaniesActivityLogger } from '@/lib/logs-utils'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl
-    const memberIdForUsers = searchParams.get('usersOfMember')
+    const companyIdForUsers = searchParams.get('usersOfCompany')
     const usersType = (searchParams.get('type') || '').toLowerCase()
 
-    if (memberIdForUsers && (usersType === 'agents' || usersType === 'clients')) {
-      const memberId = parseInt(memberIdForUsers, 10)
-      if (Number.isNaN(memberId)) {
-        return NextResponse.json({ error: 'Invalid member id' }, { status: 400 })
+    if (companyIdForUsers && (usersType === 'agents' || usersType === 'clients')) {
+      const companyId = parseInt(companyIdForUsers, 10)
+      if (Number.isNaN(companyId)) {
+        return NextResponse.json({ error: 'Invalid company id' }, { status: 400 })
       }
       if (usersType === 'agents') {
-        const users = await getAgentsByMember(memberId)
+        const users = await getAgentsByCompany(companyId)
         return NextResponse.json({ users })
       }
-      const users = await getClientsByMember(memberId)
+      const users = await getClientsByCompany(companyId)
       return NextResponse.json({ users })
     }
     const page = parseInt(searchParams.get('page') || '1', 10)
@@ -26,11 +26,11 @@ export async function GET(request: NextRequest) {
     const sortField = searchParams.get('sortField') || 'company'
     const sortDirection = (searchParams.get('sortDirection') as 'asc' | 'desc') || 'asc'
 
-    const { members, totalCount } = await getMembersPaginated({ search, page, limit, sortField, sortDirection })
+    const { companies, totalCount } = await getCompaniesPaginated({ search, page, limit, sortField, sortDirection })
     const totalPages = Math.ceil(totalCount / Math.max(1, limit))
 
     return NextResponse.json({
-      members,
+      companies,
       pagination: {
         page,
         limit,
@@ -39,15 +39,15 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Failed to fetch members:', error)
-    return NextResponse.json({ error: 'Failed to fetch members' }, { status: 500 })
+    console.error('Failed to fetch companies:', error)
+    return NextResponse.json({ error: 'Failed to fetch companies' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🚀🚀🚀 API ROUTE EXECUTED - POST /api/members 🚀🚀🚀')
-    console.log('API: Starting member creation...')
+    console.log('🚀🚀🚀 API ROUTE EXECUTED - POST /api/companies 🚀🚀🚀')
+    console.log('API: Starting company creation...')
     console.log('API: Request URL:', request.url)
     console.log('API: Request method:', request.method)
     console.log('API: Request headers:', Object.fromEntries(request.headers.entries()))
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     
     if (logo && logo.size > 0) {
       try {
-        logoUrl = await uploadMemberLogo(logo, company)
+        logoUrl = await uploadCompanyLogo(logo, company)
         console.log('Logo uploaded successfully for creation:', logoUrl)
       } catch (uploadError) {
         console.error('Logo upload error details:', {
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
     const userId = request.headers.get('x-user-id')
     const currentUserId = userId ? parseInt(userId, 10) : undefined
     
-    const memberData = await createMemberCompany({
+    const companyData = await createCompany({
       company,
       address,
       phone,
@@ -191,25 +191,25 @@ export async function POST(request: NextRequest) {
 
     // Log company creation activity
     try {
-      await MembersActivityLogger.logCompanyCreated(memberData.id, company, memberData.created_by || null)
+      await CompaniesActivityLogger.logCompanyCreated(companyData.id, company, companyData.created_by || null)
       
       // Log initial field values if they exist
       if (address && address.trim()) {
-        await MembersActivityLogger.logFieldSet(memberData.id, 'Address', address, memberData.created_by || null)
+        await CompaniesActivityLogger.logFieldSet(companyData.id, 'Address', address, companyData.created_by || null)
       }
       if (phone && phone.trim()) {
-        await MembersActivityLogger.logFieldSet(memberData.id, 'Phone', phone, memberData.created_by || null)
+        await CompaniesActivityLogger.logFieldSet(companyData.id, 'Phone', phone, companyData.created_by || null)
       }
       if (country && country.trim()) {
-        await MembersActivityLogger.logFieldSet(memberData.id, 'Country', country, memberData.created_by || null)
+        await CompaniesActivityLogger.logFieldSet(companyData.id, 'Country', country, companyData.created_by || null)
       }
       if (formattedService && formattedService.trim()) {
-        await MembersActivityLogger.logFieldSet(memberData.id, 'Service', formattedService, memberData.created_by || null)
+        await CompaniesActivityLogger.logFieldSet(companyData.id, 'Service', formattedService, companyData.created_by || null)
       }
       if (websiteArray.length > 0) {
         console.log('✅ Logging website to activity log:', websiteArray.join(', '))
         try {
-          const logResult = await MembersActivityLogger.logFieldSet(memberData.id, 'Website', websiteArray.join(', '), memberData.created_by || null)
+          const logResult = await CompaniesActivityLogger.logFieldSet(companyData.id, 'Website', websiteArray.join(', '), companyData.created_by || null)
           console.log('✅ Website logged successfully:', logResult)
         } catch (logError) {
           console.error('❌ Error logging website:', logError)
@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
         
         console.log('✅ Logging logo to activity log:', shortenedUrl)
         try {
-          const logResult = await MembersActivityLogger.logFieldSet(memberData.id, 'Logo', shortenedUrl, memberData.created_by || null)
+          const logResult = await CompaniesActivityLogger.logFieldSet(companyData.id, 'Logo', shortenedUrl, companyData.created_by || null)
           console.log('✅ Logo logged successfully:', logResult)
         } catch (logError) {
           console.error('❌ Error logging logo:', logError)
@@ -245,10 +245,10 @@ export async function POST(request: NextRequest) {
       
       // Log badge_color and status if they were set
       if (finalBadgeColor) {
-        await MembersActivityLogger.logFieldSet(memberData.id, 'Badge Color', finalBadgeColor, memberData.created_by || null)
+        await CompaniesActivityLogger.logFieldSet(companyData.id, 'Badge Color', finalBadgeColor, companyData.created_by || null)
       }
       if (finalStatus) {
-        await MembersActivityLogger.logFieldSet(memberData.id, 'Status', finalStatus, memberData.created_by || null)
+        await CompaniesActivityLogger.logFieldSet(companyData.id, 'Status', finalStatus, companyData.created_by || null)
       }
 
     } catch (loggingError) {
@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
     console.log('API: Returning success response')
     return NextResponse.json({ 
       success: true, 
-      company: memberData // Keep 'company' key for frontend compatibility
+      company: companyData // Keep 'company' key for frontend compatibility
     })
 
   } catch (error) {

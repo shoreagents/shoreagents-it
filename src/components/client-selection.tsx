@@ -12,8 +12,8 @@ export interface Client {
   first_name: string | null
   last_name: string | null
   profile_picture: string | null
-  member_company: string | null
-  member_badge_color: string | null
+  company_name: string | null
+  company_badge_color: string | null
 }
 
 export interface ClientSelectionProps {
@@ -113,7 +113,7 @@ export function ClientSelection({
                 <div 
                   key={client.user_id}
                    className={`px-4 py-2 border border-gray-300 dark:border-border rounded-lg transition-all duration-200 ${
-                    client.member_company && client.member_company !== currentCompany
+                    client.company_name && client.company_name !== currentCompany
                       ? 'opacity-50 cursor-not-allowed bg-muted/30' 
                       : `cursor-pointer ${
                           selectedClientIds.has(client.user_id)
@@ -123,7 +123,7 @@ export function ClientSelection({
                   }`}
                   onClick={() => {
                     // Disable selection for clients assigned to other companies
-                    if (client.member_company && client.member_company !== currentCompany) return
+                    if (client.company_name && client.company_name !== currentCompany) return
                     
                     const wasSelected = selectedClientIds.has(client.user_id)
                     onSelectionChange(client.user_id, !wasSelected)
@@ -140,7 +140,7 @@ export function ClientSelection({
                           }
                         </AvatarFallback>
                       </Avatar>
-                      {selectedClientIds.has(client.user_id) && (!client.member_company || client.member_company === currentCompany) && (
+                      {selectedClientIds.has(client.user_id) && (!client.company_name || client.company_name === currentCompany) && (
                         <div className="absolute inset-0 rounded-full" style={{ backgroundColor: '#73a2bb80' }}></div>
                       )}
                     </div>
@@ -151,18 +151,18 @@ export function ClientSelection({
                           : client.first_name || client.last_name || 'Unknown Name'
                         }
                       </h4>
-                      {!selectedClientIds.has(client.user_id) && client.member_company && client.member_company !== currentCompany && (
+                      {!selectedClientIds.has(client.user_id) && client.company_name && client.company_name !== currentCompany && (
                         <Badge 
                           variant="outline"
                           className="text-xs px-2 py-0.5 font-medium inline-block mt-1 truncate max-w-[120px]"
                           style={{ 
-                            color: client.member_badge_color || '#6B7280',
-                            borderColor: client.member_badge_color ? `${client.member_badge_color}30` : '#6B7280',
-                            backgroundColor: client.member_badge_color ? `${client.member_badge_color}20` : 'transparent'
+                            color: client.company_badge_color || '#6B7280',
+                            borderColor: client.company_badge_color ? `${client.company_badge_color}30` : '#6B7280',
+                            backgroundColor: client.company_badge_color ? `${client.company_badge_color}20` : 'transparent'
                           }}
-                          title={client.member_company || undefined}
+                          title={client.company_name || undefined}
                         >
-                          {client.member_company}
+                          {client.company_name}
                         </Badge>
                       )}
                     </div>

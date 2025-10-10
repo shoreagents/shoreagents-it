@@ -63,11 +63,11 @@ interface Ticket extends PastTicketTable {
   file_count?: number
   user_email?: string
   user_type?: string
-  member_company?: string
-  member_name?: string
-  member_color?: string
-  member_address?: string
-  member_phone?: string
+  company_name?: string
+  company_name?: string
+  company_color?: string
+  company_address?: string
+  company_phone?: string
   department_name?: string
 
   job_title?: string

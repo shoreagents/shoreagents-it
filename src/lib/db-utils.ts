@@ -39,9 +39,9 @@ export interface AgentRecord {
   employment_status: string | null
   hire_type: string | null
   staff_source: string | null
-  member_id: number | null
-  member_company: string | null
-  member_badge_color: string | null
+  company_id: number | null
+  company_name: string | null
+  company_badge_color: string | null
   department_id: number | null
   department_name: string | null
   station_id: string | null
@@ -71,8 +71,8 @@ export interface Ticket {
   resolver_last_name?: string | null
   resolver_profile_picture?: string | null
   user_type?: string | null
-  member_name?: string | null
-  member_color?: string | null
+  company_name?: string | null
+  company_color?: string | null
   supporting_files?: string[]
   file_count?: number
   clear?: boolean
@@ -172,16 +172,16 @@ export async function getTicketsByStatus(status: string, past: boolean = false):
            t.supporting_files, t.file_count,
            CASE 
              WHEN u.user_type = 'Internal' THEN 'Internal'
-             WHEN a.member_id IS NOT NULL THEN m.company
-             WHEN c.member_id IS NOT NULL THEN m.company
+             WHEN a.company_id IS NOT NULL THEN c.company
+             WHEN c.company_id IS NOT NULL THEN c.company
              ELSE NULL
-           END as member_name,
+           END as company_name,
            CASE 
              WHEN u.user_type = 'Internal' THEN NULL
-             WHEN a.member_id IS NOT NULL THEN m.badge_color
-             WHEN c.member_id IS NOT NULL THEN m.badge_color
+             WHEN a.company_id IS NOT NULL THEN c.badge_color
+             WHEN c.company_id IS NOT NULL THEN c.badge_color
              ELSE NULL
-           END as member_color
+           END as company_color
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
@@ -191,7 +191,7 @@ export async function getTicketsByStatus(status: string, past: boolean = false):
     LEFT JOIN public.users u ON t.user_id = u.id
     LEFT JOIN public.agents a ON t.user_id = a.user_id
     LEFT JOIN public.clients c ON t.user_id = c.user_id
-    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+    LEFT JOIN public.companies c ON (a.company_id = c.id) OR (cl.company_id = c.id)
     WHERE ${whereClause}
     ORDER BY t.position ASC, t.created_at DESC
   `, queryParams)
@@ -221,16 +221,16 @@ export async function getTicketsByStatusAdmin(status: string): Promise<Ticket[]>
            t.supporting_files, t.file_count,
            CASE 
              WHEN u.user_type = 'Internal' THEN 'Internal'
-             WHEN a.member_id IS NOT NULL THEN m.company
-             WHEN c.member_id IS NOT NULL THEN m.company
+             WHEN a.company_id IS NOT NULL THEN c.company
+             WHEN c.company_id IS NOT NULL THEN c.company
              ELSE NULL
-           END as member_name,
+           END as company_name,
            CASE 
              WHEN u.user_type = 'Internal' THEN NULL
-             WHEN a.member_id IS NOT NULL THEN m.badge_color
-             WHEN c.member_id IS NOT NULL THEN m.badge_color
+             WHEN a.company_id IS NOT NULL THEN c.badge_color
+             WHEN c.company_id IS NOT NULL THEN c.badge_color
              ELSE NULL
-           END as member_color
+           END as company_color
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
@@ -240,7 +240,7 @@ export async function getTicketsByStatusAdmin(status: string): Promise<Ticket[]>
     LEFT JOIN public.users u ON t.user_id = u.id
     LEFT JOIN public.agents a ON t.user_id = a.user_id
     LEFT JOIN public.clients c ON t.user_id = c.user_id
-    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+    LEFT JOIN public.companies c ON (a.company_id = c.id) OR (cl.company_id = c.id)
     WHERE ${whereClause}
     ORDER BY t.position ASC, t.created_at DESC
   `, queryParams)
@@ -324,16 +324,16 @@ export async function updateTicketStatus(id: number, status: string, resolvedBy?
              t.supporting_files, t.file_count,
              CASE 
                WHEN u.user_type = 'Internal' THEN 'Internal'
-               WHEN a.member_id IS NOT NULL THEN m.company
-               WHEN c.member_id IS NOT NULL THEN m.company
+               WHEN a.company_id IS NOT NULL THEN c.company
+               WHEN c.company_id IS NOT NULL THEN c.company
                ELSE NULL
-             END as member_name,
+             END as company_name,
              CASE 
                WHEN u.user_type = 'Internal' THEN NULL
-               WHEN a.member_id IS NOT NULL THEN m.badge_color
-               WHEN c.member_id IS NOT NULL THEN m.badge_color
+               WHEN a.company_id IS NOT NULL THEN c.badge_color
+               WHEN c.company_id IS NOT NULL THEN c.badge_color
                ELSE NULL
-             END as member_color
+             END as company_color
       FROM public.tickets t
       LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
       LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
@@ -343,7 +343,7 @@ export async function updateTicketStatus(id: number, status: string, resolvedBy?
       LEFT JOIN public.users u ON t.user_id = u.id
       LEFT JOIN public.agents a ON t.user_id = a.user_id
       LEFT JOIN public.clients c ON t.user_id = c.user_id
-      LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+      LEFT JOIN public.companies c ON (a.company_id = c.id) OR (cl.company_id = c.id)
       WHERE t.id = $1
     `, [id])
     
@@ -403,16 +403,16 @@ export async function updateTicket(id: number, updates: Partial<Ticket>): Promis
            t.supporting_files, t.file_count,
            CASE 
              WHEN u.user_type = 'Internal' THEN 'Internal'
-             WHEN a.member_id IS NOT NULL THEN m.company
-             WHEN c.member_id IS NOT NULL THEN m.company
+             WHEN a.company_id IS NOT NULL THEN c.company
+             WHEN c.company_id IS NOT NULL THEN c.company
              ELSE NULL
-           END as member_name,
+           END as company_name,
            CASE 
              WHEN u.user_type = 'Internal' THEN NULL
-             WHEN a.member_id IS NOT NULL THEN m.badge_color
-             WHEN c.member_id IS NOT NULL THEN m.badge_color
+             WHEN a.company_id IS NOT NULL THEN c.badge_color
+             WHEN c.company_id IS NOT NULL THEN c.badge_color
              ELSE NULL
-           END as member_color
+           END as company_color
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
@@ -422,7 +422,7 @@ export async function updateTicket(id: number, updates: Partial<Ticket>): Promis
     LEFT JOIN public.users u ON t.user_id = u.id
     LEFT JOIN public.agents a ON t.user_id = a.user_id
     LEFT JOIN public.clients c ON t.user_id = c.user_id
-    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+    LEFT JOIN public.companies c ON (a.company_id = c.id) OR (cl.company_id = c.id)
     WHERE t.id = $1
   `, [id])
   
@@ -446,16 +446,16 @@ export async function getTicketById(id: number): Promise<Ticket | null> {
            u.user_type,
            CASE 
              WHEN u.user_type = 'Internal' THEN 'Internal'
-             WHEN a.member_id IS NOT NULL THEN m.company
-             WHEN c.member_id IS NOT NULL THEN m.company
+             WHEN a.company_id IS NOT NULL THEN c.company
+             WHEN c.company_id IS NOT NULL THEN c.company
              ELSE NULL
-           END as member_name,
+           END as company_name,
            CASE 
              WHEN u.user_type = 'Internal' THEN NULL
-             WHEN a.member_id IS NOT NULL THEN m.badge_color
-             WHEN c.member_id IS NOT NULL THEN m.badge_color
+             WHEN a.company_id IS NOT NULL THEN c.badge_color
+             WHEN c.company_id IS NOT NULL THEN c.badge_color
              ELSE NULL
-           END as member_color
+           END as company_color
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
@@ -465,7 +465,7 @@ export async function getTicketById(id: number): Promise<Ticket | null> {
     LEFT JOIN public.users u ON t.user_id = u.id
     LEFT JOIN public.agents a ON t.user_id = a.user_id
     LEFT JOIN public.clients c ON t.user_id = c.user_id
-    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+    LEFT JOIN public.companies c ON (a.company_id = c.id) OR (cl.company_id = c.id)
     WHERE t.id = $1 AND t.role_id = 1
   `, [id])
   return result.rows[0] || null
@@ -482,16 +482,16 @@ export async function getTicketByIdAdmin(id: number): Promise<Ticket | null> {
            u.user_type,
            CASE 
              WHEN u.user_type = 'Internal' THEN 'Internal'
-             WHEN a.member_id IS NOT NULL THEN m.company
-             WHEN c.member_id IS NOT NULL THEN m.company
+             WHEN a.company_id IS NOT NULL THEN c.company
+             WHEN c.company_id IS NOT NULL THEN c.company
              ELSE NULL
-           END as member_name,
+           END as company_name,
            CASE 
              WHEN u.user_type = 'Internal' THEN NULL
-             WHEN a.member_id IS NOT NULL THEN m.badge_color
-             WHEN c.member_id IS NOT NULL THEN m.badge_color
+             WHEN a.company_id IS NOT NULL THEN c.badge_color
+             WHEN c.company_id IS NOT NULL THEN c.badge_color
              ELSE NULL
-           END as member_color
+           END as company_color
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
     LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
@@ -501,7 +501,7 @@ export async function getTicketByIdAdmin(id: number): Promise<Ticket | null> {
     LEFT JOIN public.users u ON t.user_id = u.id
     LEFT JOIN public.agents a ON t.user_id = a.user_id
     LEFT JOIN public.clients c ON t.user_id = c.user_id
-    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+    LEFT JOIN public.companies c ON (a.company_id = c.id) OR (cl.company_id = c.id)
     WHERE t.id = $1
   `, [id])
   return result.rows[0] || null
@@ -599,16 +599,16 @@ export async function updateTicketPosition(id: number, position: number): Promis
              t.supporting_files, t.file_count,
              CASE 
                WHEN u.user_type = 'Internal' THEN 'Internal'
-               WHEN a.member_id IS NOT NULL THEN m.company
-               WHEN c.member_id IS NOT NULL THEN m.company
+               WHEN a.company_id IS NOT NULL THEN c.company
+               WHEN c.company_id IS NOT NULL THEN c.company
                ELSE NULL
-             END as member_name,
+             END as company_name,
              CASE 
                WHEN u.user_type = 'Internal' THEN NULL
-               WHEN a.member_id IS NOT NULL THEN m.badge_color
-               WHEN c.member_id IS NOT NULL THEN m.badge_color
+               WHEN a.company_id IS NOT NULL THEN c.badge_color
+               WHEN c.company_id IS NOT NULL THEN c.badge_color
                ELSE NULL
-             END as member_color
+             END as company_color
       FROM public.tickets t
       LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
       LEFT JOIN public.stations s ON t.user_id = s.assigned_user_id
@@ -618,7 +618,7 @@ export async function updateTicketPosition(id: number, position: number): Promis
       LEFT JOIN public.users u ON t.user_id = u.id
       LEFT JOIN public.agents a ON t.user_id = a.user_id
       LEFT JOIN public.clients c ON t.user_id = c.user_id
-      LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+      LEFT JOIN public.companies c ON (a.company_id = c.id) OR (cl.company_id = c.id)
       WHERE t.id = $1
     `, [id])
     
@@ -877,16 +877,16 @@ export async function getTicketsByStatusWithPagination(
            t.supporting_files, t.file_count,
            CASE
              WHEN u.user_type = 'Internal' THEN 'Internal'
-             WHEN a.member_id IS NOT NULL THEN m.company
-             WHEN c.member_id IS NOT NULL THEN m.company
+             WHEN a.company_id IS NOT NULL THEN c.company
+             WHEN c.company_id IS NOT NULL THEN c.company
              ELSE NULL
-           END as member_name,
+           END as company_name,
            CASE
              WHEN u.user_type = 'Internal' THEN NULL
-             WHEN a.member_id IS NOT NULL THEN m.badge_color
-             WHEN c.member_id IS NOT NULL THEN m.badge_color
+             WHEN a.company_id IS NOT NULL THEN c.badge_color
+             WHEN c.company_id IS NOT NULL THEN c.badge_color
              ELSE NULL
-           END as member_color,
+           END as company_color,
            u.user_type
     FROM public.tickets t
     LEFT JOIN public.personal_info pi ON t.user_id = pi.user_id
@@ -897,7 +897,7 @@ export async function getTicketsByStatusWithPagination(
     LEFT JOIN public.users u ON t.user_id = u.id
     LEFT JOIN public.agents a ON t.user_id = a.user_id
     LEFT JOIN public.clients c ON t.user_id = c.user_id
-    LEFT JOIN public.members m ON (a.member_id = m.id) OR (c.member_id = m.id)
+    LEFT JOIN public.companies c ON (a.company_id = c.id) OR (cl.company_id = c.id)
     WHERE ${whereClause}
     ORDER BY ${getSortField(sortField)} ${sortDirection.toUpperCase()}
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -1014,7 +1014,7 @@ export async function getPastTicketsTableData(
   }
 }
 
-// Get all agents with joined profile/job/member/department/station info
+// Get all agents with joined profile/job/company/department/station info
 export async function getAllAgents(): Promise<AgentRecord[]> {
   const result = await pool.query(
     `SELECT 
@@ -1030,9 +1030,9 @@ export async function getAllAgents(): Promise<AgentRecord[]> {
         ji.work_email,
         ji.start_date,
         ji.exit_date,
-        m.id AS member_id,
-        m.company AS member_company,
-        m.badge_color AS member_badge_color,
+        m.id AS company_id,
+        c.company AS company_name,
+        c.badge_color AS company_badge_color,
         d.id AS department_id,
         d.name AS department_name,
         s.station_id
@@ -1040,7 +1040,7 @@ export async function getAllAgents(): Promise<AgentRecord[]> {
       INNER JOIN public.agents a ON u.id = a.user_id
       LEFT JOIN public.personal_info pi ON u.id = pi.user_id
       LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
-      LEFT JOIN public.members m ON a.member_id = m.id
+      LEFT JOIN public.companies m ON a.company_id = m.id
       LEFT JOIN public.departments d ON a.department_id = d.id
       LEFT JOIN public.stations s ON u.id = s.assigned_user_id
       WHERE u.user_type = 'Agent'
@@ -1054,16 +1054,16 @@ export async function getAgentsPaginated({
   search = "",
   page = 1,
   limit = 40,
-  member,
-  memberId,
+  company,
+  companyId,
   sortField = 'first_name',
   sortDirection = 'asc',
 }: {
   search?: string
   page?: number
   limit?: number
-  member?: 'with' | 'without'
-  memberId?: number | 'none'
+  company?: 'with' | 'without'
+  companyId?: number | 'none'
   sortField?: string
   sortDirection?: 'asc' | 'desc'
 }): Promise<{ agents: AgentRecord[]; totalCount: number }> {
@@ -1083,24 +1083,24 @@ export async function getAgentsPaginated({
         COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
         OR COALESCE(ji.employee_id,'') ILIKE ${t}
         OR COALESCE(ji.job_title,'') ILIKE ${t}
-        OR COALESCE(m.company,'') ILIKE ${t}
+        OR COALESCE(c.company,'') ILIKE ${t}
         OR COALESCE(pi.phone,'') ILIKE ${t}
         OR u.email ILIKE ${t}
       )`
     )
   }
 
-  if (memberId === 'none') {
-    whereParts.push('a.member_id IS NULL')
-  } else if (typeof memberId === 'number' && !Number.isNaN(memberId)) {
-    params.push(memberId)
+  if (companyId === 'none') {
+    whereParts.push('a.company_id IS NULL')
+  } else if (typeof companyId === 'number' && !Number.isNaN(companyId)) {
+    params.push(companyId)
     const t = `$${paramIndex++}`
-    whereParts.push(`a.member_id = ${t}`)
+    whereParts.push(`a.company_id = ${t}`)
   } else {
-    if (member === 'with') {
-      whereParts.push('a.member_id IS NOT NULL')
-    } else if (member === 'without') {
-      whereParts.push('a.member_id IS NULL')
+    if (company === 'with') {
+      whereParts.push('a.company_id IS NOT NULL')
+    } else if (company === 'without') {
+      whereParts.push('a.company_id IS NULL')
     }
   }
 
@@ -1112,8 +1112,8 @@ export async function getAgentsPaginated({
         return 'COALESCE(pi.first_name, \'\') ASC, COALESCE(pi.last_name, \'\')'
       case 'job_title':
         return 'COALESCE(ji.job_title, \'\')'
-      case 'member_company':
-        return 'COALESCE(m.company, \'\')'
+      case 'company_name':
+        return 'COALESCE(c.company, \'\')'
       case 'work_email':
         return 'COALESCE(ji.work_email, u.email, \'\')'
       default:
@@ -1128,7 +1128,7 @@ export async function getAgentsPaginated({
     INNER JOIN public.agents a ON u.id = a.user_id
     LEFT JOIN public.personal_info pi ON u.id = pi.user_id
     LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
-    LEFT JOIN public.members m ON a.member_id = m.id
+    LEFT JOIN public.companies c ON a.company_id = c.id
     WHERE ${whereClause}
   `
   const countResult = await pool.query(countQuery, params)
@@ -1146,14 +1146,14 @@ export async function getAgentsPaginated({
         ji.employee_id,
         ji.job_title,
         ji.work_email,
-        m.id AS member_id,
-        m.company AS member_company,
-        m.badge_color AS member_badge_color
+        c.id AS company_id,
+        c.company AS company_name,
+        c.badge_color AS company_badge_color
      FROM public.users u
      INNER JOIN public.agents a ON u.id = a.user_id
      LEFT JOIN public.personal_info pi ON u.id = pi.user_id
      LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
-     LEFT JOIN public.members m ON a.member_id = m.id
+     LEFT JOIN public.companies c ON a.company_id = c.id
      WHERE ${whereClause}
      ORDER BY ${getSortField(sortField)} ${sortDirection.toUpperCase()}
      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -1164,28 +1164,28 @@ export async function getAgentsPaginated({
   return { agents: dataResult.rows, totalCount }
 }
 
-export async function getAgentMembers(): Promise<{ id: number; company: string }[]> {
+export async function getAgentCompanies(): Promise<{ id: number; company: string; badge_color: string | null }[]> {
   const query = `
-    SELECT DISTINCT m.id, m.company
-    FROM public.members m
-    INNER JOIN public.agents a ON a.member_id = m.id
-    WHERE m.company IS NOT NULL AND m.company <> ''
-    ORDER BY m.company ASC
+    SELECT DISTINCT c.id, c.company, c.badge_color
+    FROM public.companies c
+    INNER JOIN public.agents a ON a.company_id = c.id
+    WHERE c.company IS NOT NULL AND c.company <> ''
+    ORDER BY c.company ASC
   `
   const result = await pool.query(query)
   return result.rows
 }
 
-// Update agent member_id assignment
-export async function updateAgentMember(userId: number, memberId: number | null): Promise<any> {
+// Update agent company_id assignment
+export async function updateAgentCompany(userId: number, companyId: number | null): Promise<any> {
   try {
     const query = `
       UPDATE public.agents 
-      SET member_id = $1, updated_at = CURRENT_TIMESTAMP
+      SET company_id = $1, updated_at = CURRENT_TIMESTAMP
       WHERE user_id = $2
       RETURNING *
     `
-    const result = await pool.query(query, [memberId, userId])
+    const result = await pool.query(query, [companyId, userId])
     
     if (result.rows.length === 0) {
       throw new Error(`Agent with user_id ${userId} not found`)
@@ -1193,7 +1193,7 @@ export async function updateAgentMember(userId: number, memberId: number | null)
     
     return result.rows[0]
   } catch (error) {
-    console.error('Error updating agent member:', error)
+    console.error('Error updating agent company:', error)
     throw error
   }
 }
@@ -1379,7 +1379,7 @@ export async function getAgentById(userId: number): Promise<any> {
     const query = `
       SELECT 
         a.user_id,
-        a.member_id,
+        a.company_id,
         a.department_id,
         a.created_at,
         a.updated_at,
@@ -1407,14 +1407,14 @@ export async function getAgentById(userId: number): Promise<any> {
         ji.employment_status,
         ji.hire_type,
         ji.staff_source,
-        m.company AS member_company,
-        m.badge_color AS member_badge_color,
+        c.company AS company_name,
+        c.badge_color AS company_badge_color,
         d.name AS department_name
       FROM public.agents a
       INNER JOIN public.users u ON a.user_id = u.id
       LEFT JOIN public.personal_info pi ON a.user_id = pi.user_id
       LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
-      LEFT JOIN public.members m ON a.member_id = m.id
+      LEFT JOIN public.companies m ON a.company_id = m.id
       LEFT JOIN public.departments d ON a.department_id = d.id
       WHERE a.user_id = $1
     `
@@ -1438,7 +1438,7 @@ export async function getAgentDetailsById(userId: number): Promise<any> {
     const query = `
       SELECT 
         a.user_id,
-        a.member_id,
+        a.company_id,
         a.department_id,
         a.created_at,
         a.updated_at,
@@ -1485,16 +1485,16 @@ export async function getClientsPaginated({
   search = "",
   page = 1,
   limit = 40,
-  member,
-  memberId,
+  company,
+  companyId,
   sortField = 'first_name',
   sortDirection = 'asc',
 }: {
   search?: string
   page?: number
   limit?: number
-  member?: 'with' | 'without'
-  memberId?: number | 'none'
+  company?: 'with' | 'without'
+  companyId?: number | 'none'
   sortField?: string
   sortDirection?: 'asc' | 'desc'
 }): Promise<{ agents: AgentRecord[]; totalCount: number }> {
@@ -1512,24 +1512,24 @@ export async function getClientsPaginated({
     whereParts.push(
       `(
         COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
-        OR COALESCE(m.company,'') ILIKE ${t}
+        OR COALESCE(c.company,'') ILIKE ${t}
         OR u.email ILIKE ${t}
         OR COALESCE(pi.phone,'') ILIKE ${t}
       )`
     )
   }
 
-  if (memberId === 'none') {
-    whereParts.push('c.member_id IS NULL')
-  } else if (typeof memberId === 'number' && !Number.isNaN(memberId)) {
-    params.push(memberId)
+  if (companyId === 'none') {
+    whereParts.push('c.company_id IS NULL')
+  } else if (typeof companyId === 'number' && !Number.isNaN(companyId)) {
+    params.push(companyId)
     const t = `$${paramIndex++}`
-    whereParts.push(`c.member_id = ${t}`)
+    whereParts.push(`c.company_id = ${t}`)
   } else {
-    if (member === 'with') {
-      whereParts.push('c.member_id IS NOT NULL')
-    } else if (member === 'without') {
-      whereParts.push('c.member_id IS NULL')
+    if (company === 'with') {
+      whereParts.push('c.company_id IS NOT NULL')
+    } else if (company === 'without') {
+      whereParts.push('c.company_id IS NULL')
     }
   }
 
@@ -1541,8 +1541,8 @@ export async function getClientsPaginated({
         return "COALESCE(pi.first_name, '') ASC, COALESCE(pi.last_name, '')"
       case 'job_title':
         return "COALESCE(ji.job_title, '')"
-      case 'member_company':
-        return "COALESCE(m.company, '')"
+      case 'company_name':
+        return "COALESCE(c.company, '')"
       case 'work_email':
         return "COALESCE(ji.work_email, u.email, '')"
       default:
@@ -1555,7 +1555,7 @@ export async function getClientsPaginated({
     FROM public.users u
     INNER JOIN public.clients c ON u.id = c.user_id
     LEFT JOIN public.personal_info pi ON u.id = pi.user_id
-    LEFT JOIN public.members m ON c.member_id = m.id
+    LEFT JOIN public.companies m ON c.company_id = m.id
     LEFT JOIN public.stations s ON u.id = s.assigned_user_id
     LEFT JOIN public.job_info ji ON c.user_id = ji.agent_user_id -- may be null for clients
     WHERE ${whereClause}
@@ -1577,16 +1577,16 @@ export async function getClientsPaginated({
         ji.work_email,
         NULL::date AS start_date,
         NULL::date AS exit_date,
-        m.id AS member_id,
-        m.company AS member_company,
-        m.badge_color AS member_badge_color,
+        m.id AS company_id,
+        c.company AS company_name,
+        c.badge_color AS company_badge_color,
         NULL::int AS department_id,
         NULL::text AS department_name,
         s.station_id
      FROM public.users u
      INNER JOIN public.clients c ON u.id = c.user_id
      LEFT JOIN public.personal_info pi ON u.id = pi.user_id
-     LEFT JOIN public.members m ON c.member_id = m.id
+     LEFT JOIN public.companies m ON c.company_id = m.id
      LEFT JOIN public.stations s ON u.id = s.assigned_user_id
      LEFT JOIN public.job_info ji ON c.user_id = ji.agent_user_id
      WHERE ${whereClause}
@@ -1599,28 +1599,28 @@ export async function getClientsPaginated({
   return { agents: dataResult.rows, totalCount }
 }
 
-export async function getClientMembers(): Promise<{ id: number; company: string }[]> {
+export async function getClientCompanies(): Promise<{ id: number; company: string }[]> {
   const query = `
-    SELECT DISTINCT m.id, m.company
-    FROM public.members m
-    INNER JOIN public.clients c ON c.member_id = m.id
-    WHERE m.company IS NOT NULL AND m.company <> ''
-    ORDER BY m.company ASC
+    SELECT DISTINCT c.id, c.company
+    FROM public.companies c
+    INNER JOIN public.clients cl ON cl.company_id = c.id
+    WHERE c.company IS NOT NULL AND c.company <> ''
+    ORDER BY c.company ASC
   `
   const result = await pool.query(query)
   return result.rows
 }
 
-// Update client member_id assignment
-export async function updateClientMember(userId: number, memberId: number | null): Promise<any> {
+// Update client company_id assignment
+export async function updateClientCompany(userId: number, companyId: number | null): Promise<any> {
   try {
     const query = `
       UPDATE public.clients 
-      SET member_id = $1, updated_at = CURRENT_TIMESTAMP
+      SET company_id = $1, updated_at = CURRENT_TIMESTAMP
       WHERE user_id = $2
       RETURNING *
     `
-    const result = await pool.query(query, [memberId, userId])
+    const result = await pool.query(query, [companyId, userId])
     
     if (result.rows.length === 0) {
       throw new Error(`Client with user_id ${userId} not found`)
@@ -1628,7 +1628,7 @@ export async function updateClientMember(userId: number, memberId: number | null
     
     return result.rows[0]
   } catch (error) {
-    console.error('Error updating client member:', error)
+    console.error('Error updating client company:', error)
     throw error
   }
 }
@@ -1639,7 +1639,7 @@ export async function getClientById(userId: number): Promise<any> {
     const query = `
       SELECT 
         c.user_id,
-        c.member_id,
+        c.company_id,
         c.department_id,
         c.created_at,
         c.updated_at,
@@ -1655,14 +1655,14 @@ export async function getClientById(userId: number): Promise<any> {
         pi.city,
         pi.address,
         pi.gender,
-        m.company AS member_company,
-        m.badge_color AS member_badge_color,
+        c.company AS company_name,
+        c.badge_color AS company_badge_color,
         d.name AS department_name
       FROM public.clients c
       INNER JOIN public.users u ON c.user_id = u.id
       LEFT JOIN public.personal_info pi ON c.user_id = pi.user_id
       LEFT JOIN public.stations s ON u.id = s.assigned_user_id
-      LEFT JOIN public.members m ON c.member_id = m.id
+      LEFT JOIN public.companies m ON c.company_id = m.id
       LEFT JOIN public.departments d ON c.department_id = d.id
       WHERE c.user_id = $1
     `
@@ -1783,8 +1783,8 @@ export async function updateClientData(userId: number, updates: Record<string, a
   }
 }
 
-// Members (Companies) pagination
-export async function getMembersPaginated({
+// Companies pagination
+export async function getCompaniesPaginated({
   search = "",
   page = 1,
   limit = 40,
@@ -1796,7 +1796,7 @@ export async function getMembersPaginated({
   limit?: number
   sortField?: string
   sortDirection?: 'asc' | 'desc'
-}): Promise<{ members: any[]; totalCount: number }> {
+}): Promise<{ companies: any[]; totalCount: number }> {
   const offset = (Math.max(1, page) - 1) * Math.max(1, limit)
 
   const params: any[] = []
@@ -1809,7 +1809,7 @@ export async function getMembersPaginated({
     const t = `$${paramIndex++}`
     whereParts.push(
       `(
-        m.company ILIKE ${t}
+        c.company ILIKE ${t}
       )`
     )
   }
@@ -1818,23 +1818,23 @@ export async function getMembersPaginated({
   const mapSort = (field: string): string => {
     switch (field) {
       case 'company':
-        return 'm.company'
+        return 'c.company'
       case 'service':
-        return 'm.service'
+        return 'c.service'
       case 'status':
-        return 'm.status'
+        return 'c.status'
       case 'country':
-        return 'm.country'
+        return 'c.country'
       case 'created_at':
-        return 'm.created_at'
+        return 'c.created_at'
       default:
-        return 'm.company'
+        return 'c.company'
     }
   }
 
   const countQuery = `
     SELECT COUNT(*) AS count
-    FROM public.members m
+    FROM public.companies c
     ${whereClause}
   `
   const countResult = await pool.query(countQuery, params)
@@ -1842,35 +1842,35 @@ export async function getMembersPaginated({
 
   const dataQuery = `
     SELECT 
-      m.id,
-      m.company,
-      m.address,
-      m.phone,
-      m.logo,
-      m.service,
-      m.status,
-      m.badge_color,
-      m.country,
-      m.website,
-      m.shift,
-      m.company_id,
-      m.created_at,
-      m.updated_at,
+      c.id,
+      c.company,
+      c.address,
+      c.phone,
+      c.logo,
+      c.service,
+      c.status,
+      c.badge_color,
+      c.country,
+      c.website,
+      c.shift,
+      c.company_id,
+      c.created_at,
+      c.updated_at,
       COALESCE(ag.agent_count, 0)::int AS employee_count,
       COALESCE(cl.client_count, 0)::int AS client_count
-    FROM public.members m
+    FROM public.companies c
     LEFT JOIN (
-      SELECT a.member_id, COUNT(*) AS agent_count
+      SELECT a.company_id, COUNT(*) AS agent_count
       FROM public.agents a
-      WHERE a.member_id IS NOT NULL
-      GROUP BY a.member_id
-    ) ag ON ag.member_id = m.id
+      WHERE a.company_id IS NOT NULL
+      GROUP BY a.company_id
+    ) ag ON ag.company_id = c.id
     LEFT JOIN (
-      SELECT c.member_id, COUNT(*) AS client_count
-      FROM public.clients c
-      WHERE c.member_id IS NOT NULL
-      GROUP BY c.member_id
-    ) cl ON cl.member_id = m.id
+      SELECT cl.company_id, COUNT(*) AS client_count
+      FROM public.clients cl
+      WHERE cl.company_id IS NOT NULL
+      GROUP BY cl.company_id
+    ) cl ON cl.company_id = c.id
     ${whereClause}
     ORDER BY ${mapSort(sortField)} ${sortDirection.toUpperCase()}
     LIMIT $${params.length + 1} OFFSET $${params.length + 2}
@@ -1878,7 +1878,7 @@ export async function getMembersPaginated({
   const dataParams = [...params, Math.max(1, limit), offset]
   const dataResult = await pool.query(dataQuery, dataParams)
 
-  return { members: dataResult.rows, totalCount }
+  return { companies: dataResult.rows, totalCount }
 }
 // Get internal users with pagination and optional search (mirrors agents but for user_type = 'Internal')
 export async function getInternalPaginated({
@@ -1937,7 +1937,6 @@ export async function getInternalPaginated({
     INNER JOIN public.internal i ON u.id = i.user_id
     LEFT JOIN public.personal_info pi ON u.id = pi.user_id
     LEFT JOIN public.job_info ji ON i.user_id = ji.internal_user_id
-    LEFT JOIN public.stations s ON u.id = s.assigned_user_id
     WHERE ${whereClause}
   `
   const countResult = await pool.query(countQuery, params)
@@ -1970,13 +1969,11 @@ export async function getInternalPaginated({
         ji.hire_type,
         ji.staff_source,
         to_char(ji.start_date, 'YYYY-MM-DD') AS start_date,
-        to_char(ji.exit_date, 'YYYY-MM-DD') AS exit_date,
-        s.station_id
+        to_char(ji.exit_date, 'YYYY-MM-DD') AS exit_date
      FROM public.users u
      INNER JOIN public.internal i ON u.id = i.user_id
      LEFT JOIN public.personal_info pi ON u.id = pi.user_id
      LEFT JOIN public.job_info ji ON i.user_id = ji.internal_user_id
-     LEFT JOIN public.stations s ON u.id = s.assigned_user_id
      WHERE ${whereClause}
      ORDER BY ${getSortField(sortField)} ${sortDirection.toUpperCase()}
      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -1987,8 +1984,8 @@ export async function getInternalPaginated({
   return { internal: dataResult.rows, totalCount }
 }
 
-// Fetch agents assigned to a specific member (for avatar popovers)
-export async function getAgentsByMember(memberId: number): Promise<{ user_id: number; first_name: string | null; last_name: string | null; profile_picture: string | null; employee_id: string | null }[]> {
+// Fetch agents assigned to a specific company (for avatar popovers)
+export async function getAgentsByCompany(companyId: number): Promise<{ user_id: number; first_name: string | null; last_name: string | null; profile_picture: string | null; employee_id: string | null }[]> {
   const query = `
     SELECT 
       a.user_id,
@@ -1999,15 +1996,15 @@ export async function getAgentsByMember(memberId: number): Promise<{ user_id: nu
     FROM public.agents a
     LEFT JOIN public.personal_info pi ON pi.user_id = a.user_id
     LEFT JOIN public.job_info ji ON ji.agent_user_id = a.user_id
-    WHERE a.member_id = $1
+    WHERE a.company_id = $1
     ORDER BY COALESCE(pi.first_name, ''), COALESCE(pi.last_name, '')
   `
-  const result = await pool.query(query, [memberId])
+  const result = await pool.query(query, [companyId])
   return result.rows
 }
 
 // Fetch agents by their user IDs (for event assignments)
-export async function getAgentsByIds(userIds: number[]): Promise<{ user_id: number; first_name: string | null; last_name: string | null; employee_id: string | null; job_title: string | null; profile_picture: string | null; member_company: string | null; member_badge_color: string | null }[]> {
+export async function getAgentsByIds(userIds: number[]): Promise<{ user_id: number; first_name: string | null; last_name: string | null; employee_id: string | null; job_title: string | null; profile_picture: string | null; company_name: string | null; company_badge_color: string | null }[]> {
   console.log('🔄 getAgentsByIds called with:', userIds)
   if (userIds.length === 0) {
     console.log('🔄 No user IDs provided, returning empty array')
@@ -2022,13 +2019,13 @@ export async function getAgentsByIds(userIds: number[]): Promise<{ user_id: numb
       ji.employee_id,
       ji.job_title,
       pi.profile_picture,
-      m.company as member_company,
-      m.badge_color as member_badge_color
+      c.company as company_name,
+      c.badge_color as company_badge_color
     FROM users u
     LEFT JOIN personal_info pi ON u.id = pi.user_id
     LEFT JOIN agents a ON u.id = a.user_id
     LEFT JOIN job_info ji ON a.user_id = ji.agent_user_id
-    LEFT JOIN members m ON a.member_id = m.id
+    LEFT JOIN companies c ON a.company_id = c.id
     WHERE u.id = ANY($1)
     ORDER BY pi.first_name, pi.last_name
   `
@@ -2038,12 +2035,12 @@ export async function getAgentsByIds(userIds: number[]): Promise<{ user_id: numb
   return result.rows
 }
 
-// Get agents for modal with pagination, search, and member filtering
+// Get agents for modal with pagination, search, and company filtering
 export async function getAgentsForModal(
   page: number = 1,
   limit: number = 20,
   search: string = '',
-  memberId: string = '',
+  companyId: string = '',
   sortField: string = 'first_name',
   sortDirection: 'asc' | 'desc' = 'asc'
 ): Promise<{ agents: any[]; totalCount: number; hasMore: boolean }> {
@@ -2063,22 +2060,22 @@ export async function getAgentsForModal(
           COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
           OR COALESCE(ji.employee_id,'') ILIKE ${t}
           OR COALESCE(ji.job_title,'') ILIKE ${t}
-          OR COALESCE(m.company,'') ILIKE ${t}
+          OR COALESCE(c.company,'') ILIKE ${t}
           OR COALESCE(pi.phone,'') ILIKE ${t}
           OR u.email ILIKE ${t}
         )`
       )
     }
 
-    if (memberId && memberId !== 'none') {
-      const memberIdNum = parseInt(memberId, 10)
-      if (!Number.isNaN(memberIdNum)) {
-        params.push(memberIdNum)
+    if (companyId && companyId !== 'none') {
+      const companyIdNum = parseInt(companyId, 10)
+      if (!Number.isNaN(companyIdNum)) {
+        params.push(companyIdNum)
         const t = `$${paramIndex++}`
-        whereParts.push(`a.member_id = ${t}`)
+        whereParts.push(`a.company_id = ${t}`)
       }
-    } else if (memberId === 'none') {
-      whereParts.push('a.member_id IS NULL')
+    } else if (companyId === 'none') {
+      whereParts.push('a.company_id IS NULL')
     }
 
     const whereClause = whereParts.join(' AND ')
@@ -2089,8 +2086,8 @@ export async function getAgentsForModal(
           return 'COALESCE(pi.first_name, \'\') ASC, COALESCE(pi.last_name, \'\')'
         case 'job_title':
           return 'COALESCE(ji.job_title, \'\')'
-        case 'member_company':
-          return 'COALESCE(m.company, \'\')'
+        case 'company_name':
+          return 'COALESCE(c.company, \'\')'
         case 'work_email':
           return 'COALESCE(ji.work_email, u.email, \'\')'
         default:
@@ -2105,7 +2102,7 @@ export async function getAgentsForModal(
       INNER JOIN public.agents a ON u.id = a.user_id
       LEFT JOIN public.personal_info pi ON u.id = pi.user_id
       LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
-      LEFT JOIN public.members m ON a.member_id = m.id
+      LEFT JOIN public.companies m ON a.company_id = m.id
       LEFT JOIN public.departments d ON a.department_id = d.id
       LEFT JOIN public.stations s ON u.id = s.assigned_user_id
       WHERE ${whereClause}
@@ -2128,9 +2125,9 @@ export async function getAgentsForModal(
           ji.work_email,
           ji.start_date,
           ji.exit_date,
-          m.id AS member_id,
-          m.company AS member_company,
-          m.badge_color AS member_badge_color,
+          m.id AS company_id,
+          c.company AS company_name,
+          c.badge_color AS company_badge_color,
           d.id AS department_id,
           d.name AS department_name,
           s.station_id
@@ -2138,7 +2135,7 @@ export async function getAgentsForModal(
        INNER JOIN public.agents a ON u.id = a.user_id
        LEFT JOIN public.personal_info pi ON u.id = pi.user_id
        LEFT JOIN public.job_info ji ON a.user_id = ji.agent_user_id
-       LEFT JOIN public.members m ON a.member_id = m.id
+       LEFT JOIN public.companies m ON a.company_id = m.id
        LEFT JOIN public.departments d ON a.department_id = d.id
        LEFT JOIN public.stations s ON u.id = s.assigned_user_id
        WHERE ${whereClause}
@@ -2157,8 +2154,8 @@ export async function getAgentsForModal(
   }
 }
 
-// Fetch clients for a specific member (for avatar popovers)
-export async function getClientsByMember(memberId: number): Promise<{ user_id: number; first_name: string | null; last_name: string | null; profile_picture: string | null; employee_id: string | null }[]> {
+// Fetch clients for a specific company (for avatar popovers)
+export async function getClientsByCompany(companyId: number): Promise<{ user_id: number; first_name: string | null; last_name: string | null; profile_picture: string | null; employee_id: string | null }[]> {
   const query = `
     SELECT 
       c.user_id,
@@ -2168,10 +2165,10 @@ export async function getClientsByMember(memberId: number): Promise<{ user_id: n
       NULL::text AS employee_id
     FROM public.clients c
     LEFT JOIN public.personal_info pi ON pi.user_id = c.user_id
-    WHERE c.member_id = $1
+    WHERE c.company_id = $1
     ORDER BY COALESCE(pi.first_name, ''), COALESCE(pi.last_name, '')
   `
-  const result = await pool.query(query, [memberId])
+  const result = await pool.query(query, [companyId])
   return result.rows
 }
 
@@ -2195,12 +2192,12 @@ export async function getClientsByUserIds(userIds: number[]): Promise<{ user_id:
   return result.rows
 }
 
-// Get clients for modal with pagination, search, and member filtering
+// Get clients for modal with pagination, search, and company filtering
 export async function getClientsForModal(
   page: number = 1,
   limit: number = 20,
   search: string = '',
-  memberId: string = '',
+  companyId: string = '',
   sortField: string = 'first_name',
   sortDirection: 'asc' | 'desc' = 'asc'
 ): Promise<{ clients: any[]; totalCount: number }> {
@@ -2218,22 +2215,22 @@ export async function getClientsForModal(
       whereParts.push(
         `(
           COALESCE(pi.first_name,'') || ' ' || COALESCE(pi.last_name,'') ILIKE ${t}
-          OR COALESCE(m.company,'') ILIKE ${t}
+          OR COALESCE(c.company,'') ILIKE ${t}
           OR u.email ILIKE ${t}
           OR COALESCE(pi.phone,'') ILIKE ${t}
         )`
       )
     }
 
-    if (memberId && memberId !== 'none') {
-      const memberIdNum = parseInt(memberId, 10)
-      if (!Number.isNaN(memberIdNum)) {
-        params.push(memberIdNum)
+    if (companyId && companyId !== 'none') {
+      const companyIdNum = parseInt(companyId, 10)
+      if (!Number.isNaN(companyIdNum)) {
+        params.push(companyIdNum)
         const t = `$${paramIndex++}`
-        whereParts.push(`c.member_id = ${t}`)
+        whereParts.push(`c.company_id = ${t}`)
       }
-    } else if (memberId === 'none') {
-      whereParts.push('c.member_id IS NULL')
+    } else if (companyId === 'none') {
+      whereParts.push('c.company_id IS NULL')
     }
 
     const whereClause = whereParts.join(' AND ')
@@ -2244,8 +2241,8 @@ export async function getClientsForModal(
           return "COALESCE(pi.first_name, '') ASC, COALESCE(pi.last_name, '')"
         case 'job_title':
           return "COALESCE(ji.job_title, '')"
-        case 'member_company':
-          return "COALESCE(m.company, '')"
+        case 'company_name':
+          return "COALESCE(c.company, '')"
         case 'work_email':
           return "COALESCE(ji.work_email, u.email, '')"
         default:
@@ -2258,7 +2255,7 @@ export async function getClientsForModal(
       FROM public.users u
       INNER JOIN public.clients c ON u.id = c.user_id
       LEFT JOIN public.personal_info pi ON u.id = pi.user_id
-      LEFT JOIN public.members m ON c.member_id = m.id
+      LEFT JOIN public.companies m ON c.company_id = m.id
       LEFT JOIN public.stations s ON u.id = s.assigned_user_id
       LEFT JOIN public.job_info ji ON c.user_id = ji.agent_user_id -- may be null for clients
       WHERE ${whereClause}
@@ -2280,16 +2277,16 @@ export async function getClientsForModal(
           ji.work_email,
           NULL::date AS start_date,
           NULL::date AS exit_date,
-          m.id AS member_id,
-          m.company AS member_company,
-          m.badge_color AS member_badge_color,
+          m.id AS company_id,
+          c.company AS company_name,
+          c.badge_color AS company_badge_color,
           NULL::int AS department_id,
           NULL::text AS department_name,
           s.station_id
        FROM public.users u
        INNER JOIN public.clients c ON u.id = c.user_id
        LEFT JOIN public.personal_info pi ON u.id = pi.user_id
-       LEFT JOIN public.members m ON c.member_id = m.id
+       LEFT JOIN public.companies m ON c.company_id = m.id
        LEFT JOIN public.stations s ON u.id = s.assigned_user_id
        LEFT JOIN public.job_info ji ON c.user_id = ji.agent_user_id
        WHERE ${whereClause}
@@ -2620,7 +2617,7 @@ export interface NewCompanyInput {
   created_by?: number
 }
 
-export async function createMemberCompany(input: NewCompanyInput) {
+export async function createCompany(input: NewCompanyInput) {
   const insertColumns = ['company', 'address', 'phone', 'country', 'service', 'website', 'shift', 'logo', 'company_id', 'badge_color', 'status']
   const companyId = (globalThis.crypto?.randomUUID?.() || undefined) as unknown as string || Math.random().toString(36).slice(2)
   const insertValues: any[] = [
@@ -2645,7 +2642,7 @@ export async function createMemberCompany(input: NewCompanyInput) {
   
   const placeholders = insertValues.map((_, i) => `$${i + 1}`).join(', ')
   const result = await pool.query(
-    `INSERT INTO public.members (${insertColumns.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+    `INSERT INTO public.companies (${insertColumns.join(', ')}) VALUES (${placeholders}) RETURNING *`,
     insertValues
   )
   const created = result.rows[0]
@@ -2653,7 +2650,7 @@ export async function createMemberCompany(input: NewCompanyInput) {
   if (bpocPool) {
     try {
       await bpocPool.query(
-        `INSERT INTO public.members (company, company_id) VALUES ($1, $2)
+        `INSERT INTO public.companies (company, company_id) VALUES ($1, $2)
          ON CONFLICT (company_id) DO UPDATE SET company = EXCLUDED.company, updated_at = CURRENT_TIMESTAMP`,
         [input.company, companyId]
       )
@@ -2662,17 +2659,17 @@ export async function createMemberCompany(input: NewCompanyInput) {
   return created
 }
 
-// Get a single member by ID
-export async function getMemberById(id: number) {
+// Get a single company by ID
+export async function getCompanyById(id: number) {
   const result = await pool.query(
-    'SELECT * FROM public.members WHERE id = $1',
+    'SELECT * FROM public.companies WHERE id = $1',
     [id]
   )
   return result.rows[0] || null
 }
 
-// Update a member by ID
-export async function updateMember(id: number, updates: Partial<NewCompanyInput>) {
+// Update a company by ID
+export async function updateCompany(id: number, updates: Partial<NewCompanyInput>) {
   const updateColumns = Object.keys(updates).filter(key => updates[key as keyof NewCompanyInput] !== undefined)
   const updateValues = Object.values(updates).filter(value => value !== undefined)
   
@@ -2683,7 +2680,7 @@ export async function updateMember(id: number, updates: Partial<NewCompanyInput>
   const placeholders = updateColumns.map((_, i) => `${updateColumns[i]} = $${i + 2}`).join(', ')
   
   const query = `
-    UPDATE public.members 
+    UPDATE public.companies 
     SET ${placeholders}, updated_at = CURRENT_TIMESTAMP 
     WHERE id = $1 
     RETURNING *
@@ -2692,36 +2689,36 @@ export async function updateMember(id: number, updates: Partial<NewCompanyInput>
   const result = await pool.query(query, [id, ...updateValues])
   
   if (result.rows.length === 0) {
-    throw new Error(`Member with ID ${id} not found`)
+    throw new Error(`Company with ID ${id} not found`)
   }
   
   // BPOC sync for company name updates
   if (bpocPool && updates.company) {
     try {
-      const companyIdResult = await pool.query('SELECT company_id FROM public.members WHERE id = $1', [id])
+      const companyIdResult = await pool.query('SELECT company_id FROM public.companies WHERE id = $1', [id])
       if (companyIdResult.rows.length > 0) {
         const companyId = companyIdResult.rows[0].company_id
         await bpocPool.query(
-          `UPDATE public.members SET company = $1, updated_at = CURRENT_TIMESTAMP WHERE company_id = $2`,
+          `UPDATE public.companies SET company = $1, updated_at = CURRENT_TIMESTAMP WHERE company_id = $2`,
           [updates.company, companyId]
         )
       }
     } catch (error) {
-      console.warn('BPOC sync failed for member update:', error)
+      console.warn('BPOC sync failed for company update:', error)
     }
   }
   
   return result.rows[0]
 }
 
-// Delete a member by ID
-export async function deleteMember(id: number): Promise<void> {
+// Delete a company by ID
+export async function deleteCompany(id: number): Promise<void> {
   // Get company_id and company name before deletion for BPOC sync and storage cleanup
   let companyId: string | null = null
   let companyName: string | null = null
   
   try {
-    const companyResult = await pool.query('SELECT company_id, company FROM public.members WHERE id = $1', [id])
+    const companyResult = await pool.query('SELECT company_id, company FROM public.companies WHERE id = $1', [id])
     if (companyResult.rows.length > 0) {
       companyId = companyResult.rows[0].company_id
       companyName = companyResult.rows[0].company
@@ -2740,7 +2737,7 @@ export async function deleteMember(id: number): Promise<void> {
       
       // First, list the company folder to see what's inside
       const { data: companyItems, error: listError } = await supabase.storage
-        .from('members')
+        .from('companies')
         .list(companyName)
       
       if (listError) {
@@ -2762,7 +2759,7 @@ export async function deleteMember(id: number): Promise<void> {
           try {
             // Try to list files inside this "folder" (even though it appears as a file)
             const { data: subFiles, error: subListError } = await supabase.storage
-              .from('members')
+              .from('companies')
               .list(`${companyName}/${item.name}`)
             
             if (subListError) {
@@ -2793,7 +2790,7 @@ export async function deleteMember(id: number): Promise<void> {
           console.log('Files to delete:', allFilePaths)
           
           const { error: deleteError } = await supabase.storage
-            .from('members')
+            .from('companies')
             .remove(allFilePaths)
           
           if (deleteError) {
@@ -2807,7 +2804,7 @@ export async function deleteMember(id: number): Promise<void> {
             for (const filePath of allFilePaths) {
               try {
                 const { error: singleDeleteError } = await supabase.storage
-                  .from('members')
+                  .from('companies')
                   .remove([filePath])
                 
                 if (singleDeleteError) {
@@ -2841,7 +2838,7 @@ export async function deleteMember(id: number): Promise<void> {
           console.log(`📁 Deleting ${subfoldersToDelete.length} subfolders:`, subfoldersToDelete)
           
           const { error: subfolderDeleteError } = await supabase.storage
-            .from('members')
+            .from('companies')
             .remove(subfoldersToDelete)
           
           if (subfolderDeleteError) {
@@ -2851,7 +2848,7 @@ export async function deleteMember(id: number): Promise<void> {
             for (const subfolder of subfoldersToDelete) {
               try {
                 const { error: singleSubfolderError } = await supabase.storage
-                  .from('members')
+                  .from('companies')
                   .remove([subfolder])
                 
                 if (singleSubfolderError) {
@@ -2871,7 +2868,7 @@ export async function deleteMember(id: number): Promise<void> {
         // Finally, delete the company folder itself
         console.log(`📁 Deleting company folder: ${companyName}`)
         const { error: companyFolderDeleteError } = await supabase.storage
-          .from('members')
+          .from('companies')
           .remove([companyName])
         
         if (companyFolderDeleteError) {
@@ -2886,7 +2883,7 @@ export async function deleteMember(id: number): Promise<void> {
         // Even if no items, try to delete the company folder itself
         console.log(`📁 Attempting to delete empty company folder: ${companyName}`)
         const { error: emptyFolderDeleteError } = await supabase.storage
-          .from('members')
+          .from('companies')
           .remove([companyName])
         
         if (emptyFolderDeleteError) {
@@ -2902,23 +2899,23 @@ export async function deleteMember(id: number): Promise<void> {
   }
   
   const result = await pool.query(
-    'DELETE FROM public.members WHERE id = $1 RETURNING id',
+    'DELETE FROM public.companies WHERE id = $1 RETURNING id',
     [id]
   )
   
   if (result.rowCount === 0) {
-    throw new Error(`Member with ID ${id} not found`)
+    throw new Error(`Company with ID ${id} not found`)
   }
   
-  // BPOC sync for member deletion
+  // BPOC sync for company deletion
   if (bpocPool && companyId) {
     try {
       await bpocPool.query(
-        'DELETE FROM public.members WHERE company_id = $1',
+        'DELETE FROM public.companies WHERE company_id = $1',
         [companyId]
       )
     } catch (error) {
-      console.warn('BPOC sync failed for member deletion:', error)
+      console.warn('BPOC sync failed for company deletion:', error)
     }
   }
 }
@@ -3020,12 +3017,12 @@ export async function autoSaveSubmittedApplications() {
   if (!bpocPool) throw new Error('BPOC database is not configured')
   const applicationsQuery = `
     SELECT a.id::text, a.user_id::text, a.job_id, a.resume_slug, a.status::text, a.created_at,
-           u.first_name, u.last_name, u.full_name, u.avatar_url, p.job_title, m.company AS company_name,
+           u.first_name, u.last_name, u.full_name, u.avatar_url, p.job_title, c.company AS company_name,
            COALESCE(a.position, 0) as position
     FROM public.applications a
     JOIN public.users u ON u.id = a.user_id
     LEFT JOIN public.processed_job_requests p ON p.id = a.job_id
-    LEFT JOIN public.members m ON m.company_id = p.company_id
+    LEFT JOIN public.companies m ON c.company_id = p.company_id
     WHERE a.status = 'submitted'
     ORDER BY a.created_at DESC
   `
@@ -3186,12 +3183,12 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
       // Fetch applications from bpoc_application_ids (original approach)
       const enrichmentQuery = `
         SELECT a.id::text, a.user_id::text, u.first_name, u.last_name, u.full_name, u.avatar_url,
-               p.job_title, m.company AS company_name, a.job_id, a.status::text as application_status,
+               p.job_title, c.company AS company_name, a.job_id, a.status::text as application_status,
                a.created_at as application_created_at
         FROM public.applications a
         JOIN public.users u ON u.id = a.user_id
         LEFT JOIN public.processed_job_requests p ON p.id = a.job_id
-        LEFT JOIN public.members m ON m.company_id = p.company_id
+        LEFT JOIN public.companies m ON c.company_id = p.company_id
         WHERE a.id IN (${applicationIds.map((_, i) => `$${i + 1}`).join(',')})
       `
       console.log('🔍 getApplicants: Enrichment query:', enrichmentQuery)
@@ -3201,9 +3198,9 @@ export async function getApplicants({ status, diagnose = false }: { status?: str
     }
     if (jobIds.length > 0) {
       const jobQuery = `
-        SELECT p.id as job_id, p.job_title, m.company AS company_name
+        SELECT p.id as job_id, p.job_title, c.company AS company_name
         FROM public.processed_job_requests p
-        LEFT JOIN public.members m ON m.company_id = p.company_id
+        LEFT JOIN public.companies m ON c.company_id = p.company_id
         WHERE p.id IN (${jobIds.map((_, i) => `$${i + 1}`).join(',')})
       `
       const { rows } = await bpocPool.query(jobQuery, jobIds)
@@ -3697,12 +3694,12 @@ export async function getRecruitById(id: number) {
             if (applicationIds.length > 0) {
           const enrichmentQuery = `
             SELECT a.id::text, a.user_id::text, u.first_name, u.last_name, u.full_name, u.avatar_url,
-                   p.job_title, m.company AS company_name, a.job_id, a.status::text as application_status,
+                   p.job_title, c.company AS company_name, a.job_id, a.status::text as application_status,
                    a.created_at as application_created_at
             FROM public.applications a
             JOIN public.users u ON u.id = a.user_id
             LEFT JOIN public.processed_job_requests p ON p.id = a.job_id
-            LEFT JOIN public.members m ON m.company_id = p.company_id
+            LEFT JOIN public.companies m ON c.company_id = p.company_id
             WHERE a.id IN (${applicationIds.map((_: any, i: number) => `$${i + 1}`).join(',')})
           `
       const { rows } = await bpocPool.query(enrichmentQuery, applicationIds)
@@ -3711,9 +3708,9 @@ export async function getRecruitById(id: number) {
     
     if (jobIds.length > 0) {
       const jobQuery = `
-        SELECT p.id as job_id, p.job_title, m.company AS company_name
+        SELECT p.id as job_id, p.job_title, c.company AS company_name
         FROM public.processed_job_requests p
-        LEFT JOIN public.members m ON m.company_id = p.company_id
+        LEFT JOIN public.companies m ON c.company_id = p.company_id
         WHERE p.id IN (${jobIds.map((_: any, i: number) => `$${i + 1}`).join(',')})
       `
       const { rows } = await bpocPool.query(jobQuery, jobIds)
@@ -3936,8 +3933,8 @@ export async function getBpocDebugInfo() {
   const { rows: jobsTbl } = await bpocPool.query(`
     SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'processed_job_requests') as table_exists
   `)
-  const { rows: membersTbl } = await bpocPool.query(`
-    SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'members') as table_exists
+  const { rows: companiesTbl } = await bpocPool.query(`
+    SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'companies') as table_exists
   `)
   return {
     message: 'Debug successful',
@@ -3946,42 +3943,42 @@ export async function getBpocDebugInfo() {
       applications: appTbl[0].table_exists,
       users: usersTbl[0].table_exists,
       processed_job_requests: jobsTbl[0].table_exists,
-      members: membersTbl[0].table_exists,
+      companies: companiesTbl[0].table_exists,
     },
     test: testRows[0],
   }
 }
 
-// Get all clients for a specific member with full details
-export async function getClientsForMember(memberId: number): Promise<any[]> {
+// Get all clients for a specific company with full details
+export async function getClientsForCompany(companyId: number): Promise<any[]> {
   try {
     const { agents } = await getClientsPaginated({ 
-      memberId, 
+      companyId, 
       limit: 1000 
     })
     return agents
   } catch (error) {
-    console.error('Error fetching clients for member:', error)
+    console.error('Error fetching clients for company:', error)
     throw error
   }
 }
 
-// Member Comments Functions
-export async function getMemberCommentsPaginated(memberId: number, page: number = 1, limit: number = 20) {
+// Company Comments Functions
+export async function getCompanyCommentsPaginated(companyId: number, page: number = 1, limit: number = 20) {
   try {
     const offset = (page - 1) * limit
 
     // Get total count first
     const countResult = await pool.query(`
       SELECT COUNT(*) as total_count
-      FROM public.member_comments mc
-      WHERE mc.member_id = $1
-    `, [memberId])
+      FROM public.company_comments mc
+      WHERE mc.company_id = $1
+    `, [companyId])
     
     const totalCount = parseInt(countResult.rows[0]?.total_count || '0', 10)
     const totalPages = Math.ceil(totalCount / limit)
 
-    // Get comments for the member with user names and pagination
+    // Get comments for the company with user names and pagination
     const result = await pool.query(`
       SELECT 
         mc.id,
@@ -3991,12 +3988,12 @@ export async function getMemberCommentsPaginated(memberId: number, page: number 
         mc.user_id,
         pi.first_name,
         pi.last_name
-      FROM public.member_comments mc
+      FROM public.company_comments mc
       LEFT JOIN public.personal_info pi ON mc.user_id = pi.user_id
-      WHERE mc.member_id = $1
+      WHERE mc.company_id = $1
       ORDER BY mc.created_at DESC
       LIMIT $2 OFFSET $3
-    `, [memberId, limit, offset])
+    `, [companyId, limit, offset])
 
     // Transform the data to match the expected format
     const transformedComments = result.rows.map(comment => ({
@@ -4019,18 +4016,18 @@ export async function getMemberCommentsPaginated(memberId: number, page: number 
       }
     }
   } catch (error) {
-    console.error('Error fetching member comments:', error)
+    console.error('Error fetching company comments:', error)
     throw error
   }
 }
 
-export async function createMemberComment(memberId: number, userId: number, comment: string) {
+export async function createCompanyComment(companyId: number, userId: number, comment: string) {
   try {
     const result = await pool.query(`
-      INSERT INTO public.member_comments (member_id, user_id, comment)
+      INSERT INTO public.company_comments (company_id, user_id, comment)
       VALUES ($1, $2, $3)
-      RETURNING id, member_id, user_id, comment, created_at, updated_at
-    `, [memberId, userId, comment.trim()])
+      RETURNING id, company_id, user_id, comment, created_at, updated_at
+    `, [companyId, userId, comment.trim()])
 
     if (result.rows.length === 0) {
       throw new Error('Failed to insert comment')
@@ -4038,14 +4035,14 @@ export async function createMemberComment(memberId: number, userId: number, comm
 
     return result.rows[0]
   } catch (error) {
-    console.error('Error creating member comment:', error)
+    console.error('Error creating company comment:', error)
     throw error
   }
 }
 
-// Member Activity Functions
-export async function getMemberActivityPaginated(
-  memberId: number, 
+// Company Activity Functions
+export async function getCompanyActivityPaginated(
+  companyId: number, 
   page: number = 1, 
   limit: number = 20, 
   action: string | null = null
@@ -4057,7 +4054,7 @@ export async function getMemberActivityPaginated(
     let activityQuery = `
       SELECT 
         mal.id,
-        mal.member_id,
+        mal.company_id,
         mal.field_name,
         mal.old_value,
         mal.new_value,
@@ -4065,10 +4062,10 @@ export async function getMemberActivityPaginated(
         mal.created_at,
         mal.user_id,
         COALESCE(pi.first_name || ' ' || pi.last_name, u.email) as user_name
-      FROM public.members_activity_log mal
+      FROM public.companies_activity_log mal
       LEFT JOIN public.users u ON mal.user_id = u.id
       LEFT JOIN public.personal_info pi ON u.id = pi.user_id
-      WHERE mal.member_id = $1
+      WHERE mal.company_id = $1
     `
 
     if (action) {
@@ -4084,27 +4081,27 @@ export async function getMemberActivityPaginated(
         mc.user_id,
         COALESCE(pi.first_name || ' ' || pi.last_name, u.email) as user_name,
         pi.profile_picture
-      FROM public.member_comments mc
+      FROM public.company_comments mc
       LEFT JOIN public.users u ON mc.user_id = u.id
       LEFT JOIN public.personal_info pi ON u.id = pi.user_id
-      WHERE mc.member_id = $1
+      WHERE mc.company_id = $1
     `
 
     // Get total count for both activities and comments
     const countQuery = `
       SELECT 
-        (SELECT COUNT(*) FROM public.members_activity_log WHERE member_id = $1 ${action ? 'AND action = $2' : ''}) as activity_count,
-        (SELECT COUNT(*) FROM public.member_comments WHERE member_id = $1) as comment_count
+        (SELECT COUNT(*) FROM public.companies_activity_log WHERE company_id = $1 ${action ? 'AND action = $2' : ''}) as activity_count,
+        (SELECT COUNT(*) FROM public.company_comments WHERE company_id = $1) as comment_count
     `
     
-    const countResult = await pool.query(countQuery, action ? [memberId, action] : [memberId])
+    const countResult = await pool.query(countQuery, action ? [companyId, action] : [companyId])
     const totalActivityCount = parseInt(countResult.rows[0]?.activity_count || '0', 10)
     const totalCommentCount = parseInt(countResult.rows[0]?.comment_count || '0', 10)
     const totalCount = totalActivityCount + totalCommentCount
 
-    // Get ALL activities and comments for this member (we'll paginate after combining)
-    const activityResult = await pool.query(activityQuery, action ? [memberId, action] : [memberId])
-    const commentsResult = await pool.query(commentsQuery, [memberId])
+    // Get ALL activities and comments for this company (we'll paginate after combining)
+    const activityResult = await pool.query(activityQuery, action ? [companyId, action] : [companyId])
+    const commentsResult = await pool.query(commentsQuery, [companyId])
     
     // Format activities
     const activities = activityResult.rows.map(row => ({
@@ -4152,13 +4149,13 @@ export async function getMemberActivityPaginated(
       }
     }
   } catch (error) {
-    console.error('Error fetching member activity:', error)
+    console.error('Error fetching company activity:', error)
     throw error
   }
 }
 
-export async function createMemberActivityLog(
-  memberId: number, 
+export async function createCompanyActivityLog(
+  companyId: number, 
   fieldName: string, 
   action: string, 
   oldValue: string | null, 
@@ -4167,21 +4164,21 @@ export async function createMemberActivityLog(
 ) {
   try {
     const result = await pool.query(`
-      INSERT INTO public.members_activity_log (
-        member_id, field_name, action, old_value, new_value, user_id
+      INSERT INTO public.companies_activity_log (
+        company_id, field_name, action, old_value, new_value, user_id
       ) VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id
-    `, [memberId, fieldName || '', action, oldValue || null, newValue || null, userId || null])
+    `, [companyId, fieldName || '', action, oldValue || null, newValue || null, userId || null])
 
     return result.rows[0].id
   } catch (error) {
-    console.error('Error creating member activity log:', error)
+    console.error('Error creating company activity log:', error)
     throw error
   }
 }
 
-// Member Logo Upload Functions
-export async function uploadMemberLogo(logo: File, companyName: string) {
+// Company Logo Upload Functions
+export async function uploadCompanyLogo(logo: File, companyName: string) {
   try {
     const { createServiceClient } = await import('@/lib/supabase/server')
     const supabase = createServiceClient()
@@ -4194,7 +4191,7 @@ export async function uploadMemberLogo(logo: File, companyName: string) {
     
     // Upload logo to Supabase storage
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('members')
+      .from('companies')
       .upload(fullPath, logo, {
         cacheControl: '3600',
         upsert: false
@@ -4206,24 +4203,24 @@ export async function uploadMemberLogo(logo: File, companyName: string) {
     
     // Get public URL for the uploaded logo
     const { data: urlData } = supabase.storage
-      .from('members')
+      .from('companies')
       .getPublicUrl(fullPath)
     
     return urlData.publicUrl
   } catch (error) {
-    console.error('Error uploading member logo:', error)
+    console.error('Error uploading company logo:', error)
     throw error
   }
 }
 
-export async function removeMemberLogo(logoUrl: string) {
+export async function removeCompanyLogo(logoUrl: string) {
   try {
     const { createServiceClient } = await import('@/lib/supabase/server')
     const supabase = createServiceClient()
     
     // Extract the path from the public URL
     const urlParts = logoUrl.split('/')
-    const bucketIndex = urlParts.findIndex(part => part === 'members')
+    const bucketIndex = urlParts.findIndex(part => part === 'companies')
     if (bucketIndex === -1) {
       throw new Error('Invalid logo URL format')
     }
@@ -4232,7 +4229,7 @@ export async function removeMemberLogo(logoUrl: string) {
     
     // Remove the file from storage
     const { error: deleteError } = await supabase.storage
-      .from('members')
+      .from('companies')
       .remove([path])
     
     if (deleteError) {
@@ -4242,7 +4239,7 @@ export async function removeMemberLogo(logoUrl: string) {
     
     return true
   } catch (error) {
-    console.error('Error removing member logo:', error)
+    console.error('Error removing company logo:', error)
     // Don't throw error as this is not critical
     return false
   }
@@ -4465,13 +4462,11 @@ export async function getInternalById(userId: number): Promise<any> {
         ji.work_setup,
         ji.employment_status,
         ji.hire_type,
-        ji.staff_source,
-        s.station_id
+        ji.staff_source
       FROM public.internal i
       INNER JOIN public.users u ON i.user_id = u.id
       LEFT JOIN public.personal_info pi ON i.user_id = pi.user_id
       LEFT JOIN public.job_info ji ON i.user_id = ji.internal_user_id
-      LEFT JOIN public.stations s ON i.user_id = s.assigned_user_id
       WHERE i.user_id = $1
     `
     
@@ -4600,7 +4595,7 @@ async function enrichJobRequestsWithCompanyNames(jobRequests: JobRequest[]): Pro
     // Fetch company names and badge colors from main database
     const companyQuery = `
       SELECT company_id, company, badge_color 
-      FROM public.members 
+      FROM public.companies 
       WHERE company_id = ANY($1)
     `
     const { rows: companyRows } = await pool.query(companyQuery, [companyIds])
@@ -4775,15 +4770,15 @@ export async function resolveCompanyId(companyId: string | number | null): Promi
       return companyId
     }
     
-    // If it's a number, look up the company_id from members table
+    // If it's a number, look up the company_id from companies table
     if (typeof companyId === 'number' || /^\d+$/.test(companyId.toString())) {
-      const query = 'SELECT company_id FROM public.members WHERE id = $1'
+      const query = 'SELECT company_id FROM public.companies WHERE id = $1'
       const { rows } = await pool.query(query, [companyId])
       return rows[0]?.company_id || null
     }
     
     // If it's a string but not a UUID, treat it as company name and look up
-    const query = 'SELECT company_id FROM public.members WHERE company = $1'
+    const query = 'SELECT company_id FROM public.companies WHERE company = $1'
     const { rows } = await pool.query(query, [companyId])
     return rows[0]?.company_id || null
   } catch (error) {
@@ -5214,8 +5209,8 @@ export async function deleteEvent(eventId: number): Promise<void> {
 // Breaks
 // =============================
 
-export async function getBreakSessions(memberId: string, date: string) {
-  const query = memberId === 'all' ? `
+export async function getBreakSessions(companyId: string, date: string) {
+  const query = companyId === 'all' ? `
     SELECT 
       bs.id,
       bs.agent_user_id,
@@ -5265,17 +5260,17 @@ export async function getBreakSessions(memberId: string, date: string) {
     LEFT JOIN users u ON bs.agent_user_id = u.id
     LEFT JOIN agents a ON bs.agent_user_id = a.user_id
     LEFT JOIN departments d ON a.department_id = d.id
-    WHERE a.member_id = $1 AND bs.break_date = $2
+    WHERE a.company_id = $1 AND bs.break_date = $2
     ORDER BY bs.created_at DESC
   `
-  const params = memberId === 'all' ? [date] : [memberId, date]
+  const params = companyId === 'all' ? [date] : [companyId, date]
   const result = await pool.query(query, params)
   return result.rows
 }
 
-export async function getBreakStats(memberId: string, date: string) {
+export async function getBreakStats(companyId: string, date: string) {
   // Get break session stats
-  const breakQuery = memberId === 'all' ? `
+  const breakQuery = companyId === 'all' ? `
     SELECT 
       COUNT(*) as total_sessions,
       COUNT(CASE WHEN end_time IS NULL THEN 1 END) as active_sessions,
@@ -5292,11 +5287,11 @@ export async function getBreakStats(memberId: string, date: string) {
       AVG(duration_minutes) as average_duration
     FROM break_sessions bs
     LEFT JOIN agents a ON bs.agent_user_id = a.user_id
-    WHERE a.member_id = $1 AND bs.break_date = $2
+    WHERE a.company_id = $1 AND bs.break_date = $2
   `
   
-  // Get total agent count for the member
-  const agentQuery = memberId === 'all' ? `
+  // Get total agent count for the company
+  const agentQuery = companyId === 'all' ? `
     SELECT COUNT(*) as total_agents
     FROM agents a
     INNER JOIN users u ON a.user_id = u.id
@@ -5305,11 +5300,11 @@ export async function getBreakStats(memberId: string, date: string) {
     SELECT COUNT(*) as total_agents
     FROM agents a
     INNER JOIN users u ON a.user_id = u.id
-    WHERE a.member_id = $1 AND u.user_type = 'Agent'
+    WHERE a.company_id = $1 AND u.user_type = 'Agent'
   `
   
-  const breakParams = memberId === 'all' ? [date] : [memberId, date]
-  const agentParams = memberId === 'all' ? [] : [memberId]
+  const breakParams = companyId === 'all' ? [date] : [companyId, date]
+  const agentParams = companyId === 'all' ? [] : [companyId]
   
   const [breakResult, agentResult] = await Promise.all([
     pool.query(breakQuery, breakParams),
@@ -5328,7 +5323,7 @@ export async function getBreakStats(memberId: string, date: string) {
   }
 }
 
-export async function getActivitiesByDate(memberId: string, startDate: string, endDate: string) {
+export async function getActivitiesByDate(companyId: string, startDate: string, endDate: string) {
   const query = `
     SELECT 
       ad.id,
@@ -5410,16 +5405,16 @@ export async function getActivitiesByDate(memberId: string, startDate: string, e
       AND hcr.in_clinic = true
     WHERE ad.today_date BETWEEN $1 AND $2
       AND ($3 = 'all' OR u.id IN (
-        SELECT user_id FROM agents WHERE member_id = $3::int
+        SELECT user_id FROM agents WHERE company_id = $3::int
       ))
     ORDER BY ad.today_date DESC, ad.today_active_seconds DESC
   `
   
-  const result = await pool.query(query, [startDate, endDate, memberId])
+  const result = await pool.query(query, [startDate, endDate, companyId])
   return result.rows
 }
 
-export async function getActivityStats(memberId: string, startDate: string, endDate: string) {
+export async function getActivityStats(companyId: string, startDate: string, endDate: string) {
   const query = `
     SELECT 
       COUNT(DISTINCT ad.user_id) as total_users,
@@ -5434,15 +5429,15 @@ export async function getActivityStats(memberId: string, startDate: string, endD
     JOIN users u ON ad.user_id = u.id
     WHERE ad.today_date BETWEEN $1 AND $2
       AND ($3 = 'all' OR u.id IN (
-        SELECT user_id FROM agents WHERE member_id = $3::int
+        SELECT user_id FROM agents WHERE company_id = $3::int
       ))
   `
   
-  const result = await pool.query(query, [startDate, endDate, memberId])
+  const result = await pool.query(query, [startDate, endDate, companyId])
   return result.rows[0] || {}
 }
 
-export async function getDailyProductivityTrend(memberId: string, monthYear: string) {
+export async function getDailyProductivityTrend(companyId: string, monthYear: string) {
   const dailyProductivityQueryAll = `
     WITH base AS (
       SELECT ps.user_id,
@@ -5526,7 +5521,7 @@ export async function getDailyProductivityTrend(memberId: string, monthYear: str
     ORDER BY t.month_year
   `
 
-  const dailyProductivityQueryByMember = `
+  const dailyProductivityQueryByCompany = `
     WITH base AS (
       SELECT ps.user_id,
              ps.month_year,
@@ -5537,7 +5532,7 @@ export async function getDailyProductivityTrend(memberId: string, monthYear: str
       JOIN users u ON ps.user_id = u.id
       JOIN agents ag ON ag.user_id = u.id
       WHERE u.user_type = 'Agent'
-        AND ag.member_id = $2
+        AND ag.company_id = $2
         AND ps.month_year = $1
     ),
     totals_by_month AS (
@@ -5610,14 +5605,103 @@ export async function getDailyProductivityTrend(memberId: string, monthYear: str
     ORDER BY t.month_year
   `
 
-  const result = memberId === 'all'
-    ? await pool.query(dailyProductivityQueryAll, [monthYear])
-    : await pool.query(dailyProductivityQueryByMember, [monthYear, memberId])
+  let result
+  if (companyId === 'all') {
+    result = await pool.query(dailyProductivityQueryAll, [monthYear])
+  } else if (companyId === 'none') {
+    // For "none", we need to modify the query to filter for agents with no company
+    const dailyProductivityQueryNone = `
+      WITH base AS (
+        SELECT ps.user_id,
+               ps.month_year,
+               ps.productivity_score,
+               ps.total_active_seconds,
+               ps.total_inactive_seconds
+        FROM productivity_scores ps
+        JOIN users u ON ps.user_id = u.id
+        JOIN agents ag ON ag.user_id = u.id
+        WHERE u.user_type = 'Agent'
+          AND ag.company_id IS NULL
+          AND ps.month_year = $1
+      ),
+      totals_by_month AS (
+        SELECT month_year,
+               SUM(productivity_score)::numeric(10,2) AS total_productivity_score,
+               SUM(total_active_seconds)::int AS total_active_seconds,
+               SUM(total_inactive_seconds)::int AS total_inactive_seconds
+        FROM base
+        GROUP BY month_year
+      ),
+      ranked AS (
+        SELECT b.user_id,
+               b.productivity_score,
+               ROW_NUMBER() OVER (ORDER BY b.productivity_score DESC) AS rn
+        FROM base b
+      )
+      SELECT t.month_year AS date,
+             t.total_productivity_score,
+             t.total_active_seconds,
+             t.total_inactive_seconds,
+             (MAX(CASE WHEN r.rn = 1 THEN (
+                 json_build_object(
+                   'user_id', r.user_id,
+                   'first_name', pi.first_name,
+                   'last_name', pi.last_name,
+                   'profile_picture', pi.profile_picture,
+                   'points', r.productivity_score
+                 )::text
+             ) END))::json AS top1,
+             (MAX(CASE WHEN r.rn = 2 THEN (
+                 json_build_object(
+                   'user_id', r.user_id,
+                   'first_name', pi.first_name,
+                   'last_name', pi.last_name,
+                   'profile_picture', pi.profile_picture,
+                   'points', r.productivity_score
+                 )::text
+             ) END))::json AS top2,
+             (MAX(CASE WHEN r.rn = 3 THEN (
+                 json_build_object(
+                   'user_id', r.user_id,
+                   'first_name', pi.first_name,
+                   'last_name', pi.last_name,
+                   'profile_picture', pi.profile_picture,
+                   'points', r.productivity_score
+                 )::text
+             ) END))::json AS top3,
+             (MAX(CASE WHEN r.rn = 4 THEN (
+                 json_build_object(
+                   'user_id', r.user_id,
+                   'first_name', pi.first_name,
+                   'last_name', pi.last_name,
+                   'profile_picture', pi.profile_picture,
+                   'points', r.productivity_score
+                 )::text
+             ) END))::json AS top4,
+             (MAX(CASE WHEN r.rn = 5 THEN (
+                 json_build_object(
+                   'user_id', r.user_id,
+                   'first_name', pi.first_name,
+                   'last_name', pi.last_name,
+                   'profile_picture', pi.profile_picture,
+                   'points', r.productivity_score
+                 )::text
+             ) END))::json AS top5
+      FROM ranked r
+      JOIN personal_info pi ON pi.user_id = r.user_id
+      JOIN totals_by_month t ON t.month_year = $1
+      GROUP BY t.month_year, t.total_productivity_score, t.total_active_seconds, t.total_inactive_seconds
+      ORDER BY t.month_year
+    `
+    result = await pool.query(dailyProductivityQueryNone, [monthYear])
+  } else {
+    result = await pool.query(dailyProductivityQueryByCompany, [monthYear, parseInt(companyId)])
+  }
 
   return result.rows
 }
 
-export async function getWeeklyTrend(memberId: string, startISO: string, endISO: string) {
+export async function getWeeklyTrend(companyId: string, startISO: string, endISO: string) {
   const weeklyTrendQueryAll = `
     WITH base AS (
       SELECT was.user_id,
@@ -5655,37 +5739,46 @@ export async function getWeeklyTrend(memberId: string, startISO: string, endISO:
            r.week_end_date,
            a.avg_active_seconds,
            a.avg_inactive_seconds,
-           MAX(CASE WHEN r.rn = 1 THEN json_build_object(
-             'user_id', r.user_id,
+           (SELECT json_build_object(
+             'user_id', r1.user_id,
              'first_name', pi1.first_name,
              'last_name', pi1.last_name,
              'profile_picture', pi1.profile_picture,
-             'points', r.total_active_seconds
-           ) END) AS top1,
-           MAX(CASE WHEN r.rn = 2 THEN json_build_object(
-             'user_id', r.user_id,
+             'points', r1.total_active_seconds
+           ) FROM ranked r1 
+           LEFT JOIN personal_info pi1 ON pi1.user_id = r1.user_id
+           WHERE r1.week_start_date = r.week_start_date 
+           AND r1.week_end_date = r.week_end_date 
+           AND r1.rn = 1 LIMIT 1) AS top1,
+           (SELECT json_build_object(
+             'user_id', r2.user_id,
              'first_name', pi2.first_name,
              'last_name', pi2.last_name,
              'profile_picture', pi2.profile_picture,
-             'points', r.total_active_seconds
-           ) END) AS top2,
-           MAX(CASE WHEN r.rn = 3 THEN json_build_object(
-             'user_id', r.user_id,
+             'points', r2.total_active_seconds
+           ) FROM ranked r2 
+           LEFT JOIN personal_info pi2 ON pi2.user_id = r2.user_id
+           WHERE r2.week_start_date = r.week_start_date 
+           AND r2.week_end_date = r.week_end_date 
+           AND r2.rn = 2 LIMIT 1) AS top2,
+           (SELECT json_build_object(
+             'user_id', r3.user_id,
              'first_name', pi3.first_name,
              'last_name', pi3.last_name,
              'profile_picture', pi3.profile_picture,
-             'points', r.total_active_seconds
-           ) END) AS top3
+             'points', r3.total_active_seconds
+           ) FROM ranked r3 
+           LEFT JOIN personal_info pi3 ON pi3.user_id = r3.user_id
+           WHERE r3.week_start_date = r.week_start_date 
+           AND r3.week_end_date = r.week_end_date 
+           AND r3.rn = 3 LIMIT 1) AS top3
     FROM ranked r
-    LEFT JOIN personal_info pi1 ON (r.rn = 1 AND pi1.user_id = r.user_id)
-    LEFT JOIN personal_info pi2 ON (r.rn = 2 AND pi2.user_id = r.user_id)
-    LEFT JOIN personal_info pi3 ON (r.rn = 3 AND pi3.user_id = r.user_id)
     JOIN avg_by_week a ON a.week_start_date = r.week_start_date AND a.week_end_date = r.week_end_date
     GROUP BY r.week_start_date, r.week_end_date, a.avg_active_seconds, a.avg_inactive_seconds
     ORDER BY r.week_start_date
   `
 
-  const weeklyTrendQueryByMember = `
+  const weeklyTrendQueryByCompany = `
     WITH base AS (
       SELECT was.user_id,
              was.week_start_date,
@@ -5696,7 +5789,7 @@ export async function getWeeklyTrend(memberId: string, startISO: string, endISO:
       JOIN users u ON was.user_id = u.id
       JOIN agents ag ON ag.user_id = u.id
       WHERE u.user_type = 'Agent'
-        AND ag.member_id = $3
+        AND ag.company_id = $3
         AND was.week_start_date <= $2
         AND was.week_end_date >= $1
     ),
@@ -5723,130 +5816,522 @@ export async function getWeeklyTrend(memberId: string, startISO: string, endISO:
            r.week_end_date,
            a.avg_active_seconds,
            a.avg_inactive_seconds,
-           MAX(CASE WHEN r.rn = 1 THEN json_build_object(
-             'user_id', r.user_id,
+           (SELECT json_build_object(
+             'user_id', r1.user_id,
              'first_name', pi1.first_name,
              'last_name', pi1.last_name,
              'profile_picture', pi1.profile_picture,
-             'points', r.total_active_seconds
-           ) END) AS top1,
-           MAX(CASE WHEN r.rn = 2 THEN json_build_object(
-             'user_id', r.user_id,
+             'points', r1.total_active_seconds
+           ) FROM ranked r1 
+           LEFT JOIN personal_info pi1 ON pi1.user_id = r1.user_id
+           WHERE r1.week_start_date = r.week_start_date 
+           AND r1.week_end_date = r.week_end_date 
+           AND r1.rn = 1 LIMIT 1) AS top1,
+           (SELECT json_build_object(
+             'user_id', r2.user_id,
              'first_name', pi2.first_name,
              'last_name', pi2.last_name,
              'profile_picture', pi2.profile_picture,
-             'points', r.total_active_seconds
-           ) END) AS top2,
-           MAX(CASE WHEN r.rn = 3 THEN json_build_object(
-             'user_id', r.user_id,
+             'points', r2.total_active_seconds
+           ) FROM ranked r2 
+           LEFT JOIN personal_info pi2 ON pi2.user_id = r2.user_id
+           WHERE r2.week_start_date = r.week_start_date 
+           AND r2.week_end_date = r.week_end_date 
+           AND r2.rn = 2 LIMIT 1) AS top2,
+           (SELECT json_build_object(
+             'user_id', r3.user_id,
              'first_name', pi3.first_name,
              'last_name', pi3.last_name,
              'profile_picture', pi3.profile_picture,
-             'points', r.total_active_seconds
-           ) END) AS top3
+             'points', r3.total_active_seconds
+           ) FROM ranked r3 
+           LEFT JOIN personal_info pi3 ON pi3.user_id = r3.user_id
+           WHERE r3.week_start_date = r.week_start_date 
+           AND r3.week_end_date = r.week_end_date 
+           AND r3.rn = 3 LIMIT 1) AS top3
     FROM ranked r
-    LEFT JOIN personal_info pi1 ON (r.rn = 1 AND pi1.user_id = r.user_id)
-    LEFT JOIN personal_info pi2 ON (r.rn = 2 AND pi2.user_id = r.user_id)
-    LEFT JOIN personal_info pi3 ON (r.rn = 3 AND pi3.user_id = r.user_id)
     JOIN avg_by_week a ON a.week_start_date = r.week_start_date AND a.week_end_date = r.week_end_date
     GROUP BY r.week_start_date, r.week_end_date, a.avg_active_seconds, a.avg_inactive_seconds
     ORDER BY r.week_start_date
   `
 
-  const result = memberId === 'all'
-    ? await pool.query(weeklyTrendQueryAll, [startISO, endISO])
-    : await pool.query(weeklyTrendQueryByMember, [startISO, endISO, memberId])
+  let result
+  if (companyId === 'all') {
+    result = await pool.query(weeklyTrendQueryAll, [startISO, endISO])
+  } else if (companyId === 'none') {
+    // For "none", we need to modify the query to filter for agents with no company
+    const weeklyTrendQueryNone = `
+      WITH base AS (
+        SELECT was.user_id,
+               was.week_start_date,
+               was.week_end_date,
+               COALESCE(was.total_active_seconds, 0)   AS total_active_seconds,
+               COALESCE(was.total_inactive_seconds, 0) AS total_inactive_seconds
+        FROM weekly_activity_summary was
+        JOIN users u ON was.user_id = u.id
+        JOIN agents ag ON ag.user_id = u.id
+        WHERE u.user_type = 'Agent'
+          AND ag.company_id IS NULL
+          AND was.week_start_date <= $2
+          AND was.week_end_date >= $1
+      ),
+      avg_by_week AS (
+        SELECT week_start_date,
+               week_end_date,
+               AVG(total_active_seconds)::int   AS avg_active_seconds,
+               AVG(total_inactive_seconds)::int AS avg_inactive_seconds
+        FROM base
+        GROUP BY week_start_date, week_end_date
+      ),
+      ranked AS (
+        SELECT b.week_start_date,
+               b.week_end_date,
+               b.user_id,
+               b.total_active_seconds,
+               ROW_NUMBER() OVER (PARTITION BY b.week_start_date, b.week_end_date ORDER BY b.total_active_seconds DESC) AS rn
+        FROM base b
+      )
+      SELECT              r.week_start_date,
+             r.week_end_date,
+             a.avg_active_seconds,
+             a.avg_inactive_seconds,
+             (SELECT json_build_object(
+               'user_id', r1.user_id,
+               'first_name', pi1.first_name,
+               'last_name', pi1.last_name,
+               'profile_picture', pi1.profile_picture,
+               'points', r1.total_active_seconds
+             ) FROM ranked r1 
+             LEFT JOIN personal_info pi1 ON pi1.user_id = r1.user_id
+             WHERE r1.week_start_date = r.week_start_date 
+             AND r1.week_end_date = r.week_end_date 
+             AND r1.rn = 1 LIMIT 1) AS top1,
+             (SELECT json_build_object(
+               'user_id', r2.user_id,
+               'first_name', pi2.first_name,
+               'last_name', pi2.last_name,
+               'profile_picture', pi2.profile_picture,
+               'points', r2.total_active_seconds
+             ) FROM ranked r2 
+             LEFT JOIN personal_info pi2 ON pi2.user_id = r2.user_id
+             WHERE r2.week_start_date = r.week_start_date 
+             AND r2.week_end_date = r.week_end_date 
+             AND r2.rn = 2 LIMIT 1) AS top2,
+             (SELECT json_build_object(
+               'user_id', r3.user_id,
+               'first_name', pi3.first_name,
+               'last_name', pi3.last_name,
+               'profile_picture', pi3.profile_picture,
+               'points', r3.total_active_seconds
+             ) FROM ranked r3 
+             LEFT JOIN personal_info pi3 ON pi3.user_id = r3.user_id
+             WHERE r3.week_start_date = r.week_start_date 
+             AND r3.week_end_date = r.week_end_date 
+             AND r3.rn = 3 LIMIT 1) AS top3
+      FROM ranked r
+      JOIN avg_by_week a ON a.week_start_date = r.week_start_date AND a.week_end_date = r.week_end_date
+      GROUP BY r.week_start_date, r.week_end_date, a.avg_active_seconds, a.avg_inactive_seconds
+      ORDER BY r.week_start_date
+    `
+    result = await pool.query(weeklyTrendQueryNone, [startISO, endISO])
+  } else {
+    result = await pool.query(weeklyTrendQueryByCompany, [startISO, endISO, parseInt(companyId)])
+  }
   return result.rows
 }
 
-export async function getProductivityScoresRows(memberId: string, monthYear: string, limit?: number) {
+export async function getProductivityScoresRows(companyId: string, monthYear: string, limit?: number) {
   const limitClause = limit ? `LIMIT ${parseInt(String(limit))}` : ''
-  const query = memberId === 'all' ? `
+  
+  if (companyId === 'all') {
+    const query = `
+      SELECT 
+        COALESCE(ps.id, 0) as id,
+        u.id as user_id,
+        $1 as month_year,
+        COALESCE(ps.productivity_score, 0) as productivity_score,
+        COALESCE(ps.total_active_seconds, 0) as total_active_seconds,
+        COALESCE(ps.total_inactive_seconds, 0) as total_inactive_seconds,
+        COALESCE(ps.total_seconds, 0) as total_seconds,
+        COALESCE(ps.active_percentage, 0) as active_percentage,
+        COALESCE(ps.created_at, NOW()) as created_at,
+        COALESCE(ps.updated_at, NOW()) as updated_at,
+        pi.first_name,
+        pi.last_name,
+        pi.profile_picture,
+        u.email,
+        d.name as department_name,
+        a.company_id
+      FROM users u
+      LEFT JOIN personal_info pi ON u.id = pi.user_id
+      LEFT JOIN agents a ON u.id = a.user_id
+      LEFT JOIN departments d ON a.department_id = d.id
+      LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
+      WHERE u.user_type = 'Agent'
+      ORDER BY COALESCE(ps.productivity_score, 0) DESC, COALESCE(ps.active_percentage, 0) DESC
+      ${limitClause}
+    `
+    const result = await pool.query(query, [monthYear])
+    return result.rows
+  } else if (companyId === 'none') {
+    const query = `
+      SELECT 
+        COALESCE(ps.id, 0) as id,
+        u.id as user_id,
+        $1 as month_year,
+        COALESCE(ps.productivity_score, 0) as productivity_score,
+        COALESCE(ps.total_active_seconds, 0) as total_active_seconds,
+        COALESCE(ps.total_inactive_seconds, 0) as total_inactive_seconds,
+        COALESCE(ps.total_seconds, 0) as total_seconds,
+        COALESCE(ps.active_percentage, 0) as active_percentage,
+        COALESCE(ps.created_at, NOW()) as created_at,
+        COALESCE(ps.updated_at, NOW()) as updated_at,
+        pi.first_name,
+        pi.last_name,
+        pi.profile_picture,
+        u.email,
+        d.name as department_name
+      FROM users u
+      LEFT JOIN personal_info pi ON u.id = pi.user_id
+      LEFT JOIN agents a ON u.id = a.user_id
+      LEFT JOIN departments d ON a.department_id = d.id
+      LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
+      WHERE u.user_type = 'Agent'
+        AND a.company_id IS NULL
+      ORDER BY COALESCE(ps.productivity_score, 0) DESC, COALESCE(ps.active_percentage, 0) DESC
+      ${limitClause}
+    `
+    const result = await pool.query(query, [monthYear])
+    return result.rows
+  } else {
+    // Specific company ID
+    const query = `
+      SELECT 
+        COALESCE(ps.id, 0) as id,
+        u.id as user_id,
+        $1 as month_year,
+        COALESCE(ps.productivity_score, 0) as productivity_score,
+        COALESCE(ps.total_active_seconds, 0) as total_active_seconds,
+        COALESCE(ps.total_inactive_seconds, 0) as total_inactive_seconds,
+        COALESCE(ps.total_seconds, 0) as total_seconds,
+        COALESCE(ps.active_percentage, 0) as active_percentage,
+        COALESCE(ps.created_at, NOW()) as created_at,
+        COALESCE(ps.updated_at, NOW()) as updated_at,
+        pi.first_name,
+        pi.last_name,
+        pi.profile_picture,
+        u.email,
+        d.name as department_name
+      FROM users u
+      LEFT JOIN personal_info pi ON u.id = pi.user_id
+      LEFT JOIN agents a ON u.id = a.user_id
+      LEFT JOIN departments d ON a.department_id = d.id
+      LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
+      WHERE u.user_type = 'Agent'
+        AND a.company_id = $2
+      ORDER BY COALESCE(ps.productivity_score, 0) DESC, COALESCE(ps.active_percentage, 0) DESC
+      ${limitClause}
+    `
+    const result = await pool.query(query, [monthYear, parseInt(companyId)])
+    return result.rows
+  }
+}
+
+export async function getProductivityStatsRow(companyId: string, monthYear: string) {
+  if (companyId === 'all') {
+    const query = `
+      SELECT 
+        COUNT(u.id) as total_agents,
+        AVG(COALESCE(ps.productivity_score, 0)) as average_productivity,
+        AVG(COALESCE(ps.active_percentage, 0)) as average_active_percentage,
+        MAX(COALESCE(ps.productivity_score, 0)) as highest_productivity,
+        MIN(COALESCE(ps.productivity_score, 0)) as lowest_productivity
+      FROM users u
+      LEFT JOIN agents a ON u.id = a.user_id
+      LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
+      WHERE u.user_type = 'Agent'
+    `
+    const result = await pool.query(query, [monthYear])
+    return result.rows[0] || null
+  } else if (companyId === 'none') {
+    const query = `
+      SELECT 
+        COUNT(u.id) as total_agents,
+        AVG(COALESCE(ps.productivity_score, 0)) as average_productivity,
+        AVG(COALESCE(ps.active_percentage, 0)) as average_active_percentage,
+        MAX(COALESCE(ps.productivity_score, 0)) as highest_productivity,
+        MIN(COALESCE(ps.productivity_score, 0)) as lowest_productivity
+      FROM users u
+      LEFT JOIN agents a ON u.id = a.user_id
+      LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
+      WHERE u.user_type = 'Agent'
+        AND a.company_id IS NULL
+    `
+    const result = await pool.query(query, [monthYear])
+    return result.rows[0] || null
+  } else {
+    // Specific company ID
+    const query = `
+      SELECT 
+        COUNT(u.id) as total_agents,
+        AVG(COALESCE(ps.productivity_score, 0)) as average_productivity,
+        AVG(COALESCE(ps.active_percentage, 0)) as average_active_percentage,
+        MAX(COALESCE(ps.productivity_score, 0)) as highest_productivity,
+        MIN(COALESCE(ps.productivity_score, 0)) as lowest_productivity
+      FROM users u
+      LEFT JOIN agents a ON u.id = a.user_id
+      LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
+      WHERE u.user_type = 'Agent'
+        AND a.company_id = $2
+    `
+    const result = await pool.query(query, [monthYear, parseInt(companyId)])
+    return result.rows[0] || null
+  }
+}
+
+// Get monthly activity summary data
+export async function getMonthlyActivitySummaryRows(companyId: string, monthYear: string, limit?: number) {
+  let companyFilter = ''
+  let queryParams: any[] = [monthYear]
+  
+  if (companyId !== 'all') {
+    if (companyId === 'none') {
+      companyFilter = 'AND a.company_id IS NULL'
+    } else {
+      companyFilter = 'AND a.company_id = $2'
+      queryParams.push(parseInt(companyId))
+    }
+  }
+
+  const limitClause = limit ? `LIMIT ${limit}` : ''
+  
+  const query = `
     SELECT 
-      COALESCE(ps.id, 0) as id,
-      u.id as user_id,
-      $1 as month_year,
-      COALESCE(ps.productivity_score, 0) as productivity_score,
-      COALESCE(ps.total_active_seconds, 0) as total_active_seconds,
-      COALESCE(ps.total_inactive_seconds, 0) as total_inactive_seconds,
-      COALESCE(ps.total_seconds, 0) as total_seconds,
-      COALESCE(ps.active_percentage, 0) as active_percentage,
-      COALESCE(ps.created_at, NOW()) as created_at,
-      COALESCE(ps.updated_at, NOW()) as updated_at,
+      mas.id,
+      mas.user_id,
+      mas.month_start_date,
+      mas.month_end_date,
+      mas.total_active_seconds,
+      mas.total_inactive_seconds,
+      mas.total_days_active,
       pi.first_name,
       pi.last_name,
-      pi.profile_picture,
       u.email,
-      d.name as department_name
-    FROM users u
+      pi.profile_picture,
+      d.name as department_name,
+      a.company_id,
+      -- Calculate productivity score from monthly summary
+      CASE 
+        WHEN (mas.total_active_seconds + mas.total_inactive_seconds) > 0 THEN
+          GREATEST(0, ROUND(
+            (mas.total_active_seconds::DECIMAL / 3600.0) - 
+            (mas.total_inactive_seconds::DECIMAL / 3600.0), 2
+          ))
+        ELSE 0
+      END as productivity_score,
+      -- Calculate active percentage
+      CASE 
+        WHEN (mas.total_active_seconds + mas.total_inactive_seconds) > 0 THEN
+          ROUND((mas.total_active_seconds::DECIMAL / (mas.total_active_seconds + mas.total_inactive_seconds)) * 100, 2)
+        ELSE 0
+      END as active_percentage,
+      (mas.total_active_seconds + mas.total_inactive_seconds) as total_seconds
+    FROM monthly_activity_summary mas
+    JOIN users u ON mas.user_id = u.id
     LEFT JOIN personal_info pi ON u.id = pi.user_id
     LEFT JOIN agents a ON u.id = a.user_id
     LEFT JOIN departments d ON a.department_id = d.id
-    LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
     WHERE u.user_type = 'Agent'
-    ORDER BY COALESCE(ps.productivity_score, 0) DESC, COALESCE(ps.active_percentage, 0) DESC
-    ${limitClause}
-  ` : `
-    SELECT 
-      COALESCE(ps.id, 0) as id,
-      u.id as user_id,
-      $1 as month_year,
-      COALESCE(ps.productivity_score, 0) as productivity_score,
-      COALESCE(ps.total_active_seconds, 0) as total_active_seconds,
-      COALESCE(ps.total_inactive_seconds, 0) as total_inactive_seconds,
-      COALESCE(ps.total_seconds, 0) as total_seconds,
-      COALESCE(ps.active_percentage, 0) as active_percentage,
-      COALESCE(ps.created_at, NOW()) as created_at,
-      COALESCE(ps.updated_at, NOW()) as updated_at,
-      pi.first_name,
-      pi.last_name,
-      pi.profile_picture,
-      u.email,
-      d.name as department_name
-    FROM users u
-    LEFT JOIN personal_info pi ON u.id = pi.user_id
-    LEFT JOIN agents a ON u.id = a.user_id
-    LEFT JOIN departments d ON a.department_id = d.id
-    LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
-    WHERE u.user_type = 'Agent'
-      AND a.member_id = $2
-    ORDER BY COALESCE(ps.productivity_score, 0) DESC, COALESCE(ps.active_percentage, 0) DESC
+      AND TO_CHAR(mas.month_start_date, 'YYYY-MM') = $1
+      ${companyFilter}
+    ORDER BY productivity_score DESC, mas.total_active_seconds DESC
     ${limitClause}
   `
-  const result = memberId === 'all'
-    ? await pool.query(query, [monthYear])
-    : await pool.query(query, [monthYear, memberId])
+  
+  const result = await pool.query(query, queryParams)
   return result.rows
 }
 
-export async function getProductivityStatsRow(memberId: string, monthYear: string) {
-  const query = memberId === 'all' ? `
+// Get monthly activity summary statistics
+export async function getMonthlyActivitySummaryStats(companyId: string, monthYear: string) {
+  let companyFilter = ''
+  let queryParams: any[] = [monthYear]
+  
+  if (companyId !== 'all') {
+    if (companyId === 'none') {
+      companyFilter = 'AND a.company_id IS NULL'
+    } else {
+      companyFilter = 'AND a.company_id = $2'
+      queryParams.push(parseInt(companyId))
+    }
+  }
+
+  const query = `
     SELECT 
-      COUNT(u.id) as total_agents,
-      AVG(COALESCE(ps.productivity_score, 0)) as average_productivity,
-      AVG(COALESCE(ps.active_percentage, 0)) as average_active_percentage,
-      MAX(COALESCE(ps.productivity_score, 0)) as highest_productivity,
-      MIN(COALESCE(ps.productivity_score, 0)) as lowest_productivity
-    FROM users u
+      COUNT(DISTINCT mas.user_id) as total_agents,
+      AVG(
+        CASE 
+          WHEN (mas.total_active_seconds + mas.total_inactive_seconds) > 0 THEN
+            GREATEST(0, (mas.total_active_seconds::DECIMAL / 3600.0) - 
+                       (mas.total_inactive_seconds::DECIMAL / 3600.0))
+          ELSE 0
+        END
+      ) as average_productivity,
+      AVG(
+        CASE 
+          WHEN (mas.total_active_seconds + mas.total_inactive_seconds) > 0 THEN
+            (mas.total_active_seconds::DECIMAL / (mas.total_active_seconds + mas.total_inactive_seconds)) * 100
+          ELSE 0
+        END
+      ) as average_active_percentage,
+      MAX(
+        CASE 
+          WHEN (mas.total_active_seconds + mas.total_inactive_seconds) > 0 THEN
+            GREATEST(0, (mas.total_active_seconds::DECIMAL / 3600.0) - 
+                       (mas.total_inactive_seconds::DECIMAL / 3600.0))
+          ELSE 0
+        END
+      ) as highest_productivity,
+      MIN(
+        CASE 
+          WHEN (mas.total_active_seconds + mas.total_inactive_seconds) > 0 THEN
+            GREATEST(0, (mas.total_active_seconds::DECIMAL / 3600.0) - 
+                       (mas.total_inactive_seconds::DECIMAL / 3600.0))
+          ELSE 0
+        END
+      ) as lowest_productivity
+    FROM monthly_activity_summary mas
+    JOIN users u ON mas.user_id = u.id
     LEFT JOIN agents a ON u.id = a.user_id
-    LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
     WHERE u.user_type = 'Agent'
-  ` : `
-    SELECT 
-      COUNT(u.id) as total_agents,
-      AVG(COALESCE(ps.productivity_score, 0)) as average_productivity,
-      AVG(COALESCE(ps.active_percentage, 0)) as average_active_percentage,
-      MAX(COALESCE(ps.productivity_score, 0)) as highest_productivity,
-      MIN(COALESCE(ps.productivity_score, 0)) as lowest_productivity
-    FROM users u
-    LEFT JOIN agents a ON u.id = a.user_id
-    LEFT JOIN productivity_scores ps ON u.id = ps.user_id AND ps.month_year = $1
-    WHERE u.user_type = 'Agent'
-      AND a.member_id = $2
+      AND TO_CHAR(mas.month_start_date, 'YYYY-MM') = $1
+      ${companyFilter}
   `
-  const result = memberId === 'all'
-    ? await pool.query(query, [monthYear])
-    : await pool.query(query, [monthYear, memberId])
+  
+  const result = await pool.query(query, queryParams)
+  return result.rows[0] || null
+}
+
+// Get weekly activity summary data
+export async function getWeeklyActivitySummaryRows(companyId: string, monthYear: string, limit?: number) {
+  let companyFilter = ''
+  let queryParams: any[] = [monthYear]
+  
+  if (companyId !== 'all') {
+    if (companyId === 'none') {
+      companyFilter = 'AND a.company_id IS NULL'
+    } else {
+      companyFilter = 'AND a.company_id = $2'
+      queryParams.push(parseInt(companyId))
+    }
+  }
+
+  const limitClause = limit ? `LIMIT ${limit}` : ''
+  
+  const query = `
+    SELECT 
+      was.id,
+      was.user_id,
+      was.week_start_date,
+      was.week_end_date,
+      was.total_active_seconds,
+      was.total_inactive_seconds,
+      was.total_days_active,
+      pi.first_name,
+      pi.last_name,
+      u.email,
+      pi.profile_picture,
+      d.name as department_name,
+      a.company_id,
+      -- Calculate productivity score from weekly summary
+      CASE 
+        WHEN (was.total_active_seconds + was.total_inactive_seconds) > 0 THEN
+          GREATEST(0, ROUND(
+            (was.total_active_seconds::DECIMAL / 3600.0) - 
+            (was.total_inactive_seconds::DECIMAL / 3600.0), 2
+          ))
+        ELSE 0
+      END as productivity_score,
+      -- Calculate active percentage
+      CASE 
+        WHEN (was.total_active_seconds + was.total_inactive_seconds) > 0 THEN
+          ROUND((was.total_active_seconds::DECIMAL / (was.total_active_seconds + was.total_inactive_seconds)) * 100, 2)
+        ELSE 0
+      END as active_percentage,
+      (was.total_active_seconds + was.total_inactive_seconds) as total_seconds
+    FROM weekly_activity_summary was
+    JOIN users u ON was.user_id = u.id
+    LEFT JOIN personal_info pi ON u.id = pi.user_id
+    LEFT JOIN agents a ON u.id = a.user_id
+    LEFT JOIN departments d ON a.department_id = d.id
+    WHERE u.user_type = 'Agent'
+      AND TO_CHAR(was.week_start_date, 'YYYY-MM') = $1
+      ${companyFilter}
+    ORDER BY productivity_score DESC, was.total_active_seconds DESC
+    ${limitClause}
+  `
+  
+  const result = await pool.query(query, queryParams)
+  return result.rows
+}
+
+// Get weekly activity summary statistics
+export async function getWeeklyActivitySummaryStats(companyId: string, monthYear: string) {
+  let companyFilter = ''
+  let queryParams: any[] = [monthYear]
+  
+  if (companyId !== 'all') {
+    if (companyId === 'none') {
+      companyFilter = 'AND a.company_id IS NULL'
+    } else {
+      companyFilter = 'AND a.company_id = $2'
+      queryParams.push(parseInt(companyId))
+    }
+  }
+
+  const query = `
+    SELECT 
+      COUNT(DISTINCT was.user_id) as total_agents,
+      AVG(
+        CASE 
+          WHEN (was.total_active_seconds + was.total_inactive_seconds) > 0 THEN
+            GREATEST(0, (was.total_active_seconds::DECIMAL / 3600.0) - 
+                       (was.total_inactive_seconds::DECIMAL / 3600.0))
+          ELSE 0
+        END
+      ) as average_productivity,
+      AVG(
+        CASE 
+          WHEN (was.total_active_seconds + was.total_inactive_seconds) > 0 THEN
+            (was.total_active_seconds::DECIMAL / (was.total_active_seconds + was.total_inactive_seconds)) * 100
+          ELSE 0
+        END
+      ) as average_active_percentage,
+      MAX(
+        CASE 
+          WHEN (was.total_active_seconds + was.total_inactive_seconds) > 0 THEN
+            GREATEST(0, (was.total_active_seconds::DECIMAL / 3600.0) - 
+                       (was.total_inactive_seconds::DECIMAL / 3600.0))
+          ELSE 0
+        END
+      ) as highest_productivity,
+      MIN(
+        CASE 
+          WHEN (was.total_active_seconds + was.total_inactive_seconds) > 0 THEN
+            GREATEST(0, (was.total_active_seconds::DECIMAL / 3600.0) - 
+                       (was.total_inactive_seconds::DECIMAL / 3600.0))
+          ELSE 0
+        END
+      ) as lowest_productivity
+    FROM weekly_activity_summary was
+    JOIN users u ON was.user_id = u.id
+    LEFT JOIN agents a ON u.id = a.user_id
+    WHERE u.user_type = 'Agent'
+      AND TO_CHAR(was.week_start_date, 'YYYY-MM') = $1
+      ${companyFilter}
+  `
+  
+  const result = await pool.query(query, queryParams)
   return result.rows[0] || null
 }
 

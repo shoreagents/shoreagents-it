@@ -75,8 +75,8 @@ interface Visit {
   completer_last_name?: string | null
   completer_profile_picture?: string | null
   user_type?: string | null
-  member_name?: string | null
-  member_color?: string | null
+  company_name?: string | null
+  company_color?: string | null
   clear?: boolean
 }
 

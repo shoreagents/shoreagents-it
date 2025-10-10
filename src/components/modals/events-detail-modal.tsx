@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
 import { IconCalendar, IconClock, IconUser, IconUsers, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconWorld, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconSun, IconMoon, IconCalendarEvent, IconX as IconCancel, IconCheck as IconDone, IconCalendarPlus, IconX as IconClose } from "@tabler/icons-react"
-// import { useRealtimeMembers } from '@/hooks/use-realtime-members'
+// import { useRealtimeCompanies } from '@/hooks/use-realtime-companies'
 import { SendHorizontal, Target } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
@@ -251,8 +251,8 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
 
   // Agent selection state
   const [showAgentSelection, setShowAgentSelection] = React.useState(false)
-  const [agents, setAgents] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
-  const [selectedAgentsData, setSelectedAgentsData] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
+  const [agents, setAgents] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, company_name: string | null, company_badge_color: string | null}>>([])
+  const [selectedAgentsData, setSelectedAgentsData] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, company_name: string | null, company_badge_color: string | null}>>([])
   const [isLoadingAgents, setIsLoadingAgents] = React.useState(false)
   const [isLoadingMore, setIsLoadingMore] = React.useState(false)
   const [currentPage, setCurrentPage] = React.useState(1)
@@ -383,7 +383,7 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
         try {
           const res = await fetch('/api/agents', { method: 'OPTIONS' })
           const data = await res.json()
-          setCompanyOptions(data.members || [])
+          setCompanyOptions(data.companies || [])
         } catch (e) {
           setCompanyOptions([])
         }
@@ -1070,7 +1070,7 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
         search: searchQuery
       })
       if (companyId !== 'all') {
-        params.append('memberId', companyId)
+        params.append('companyId', companyId)
       }
       
       const response = await fetch(`/api/agents/modal?${params.toString()}`)
@@ -1128,7 +1128,7 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
         search: agentSearch
       })
       if (companyFilter !== 'all') {
-        params.append('memberId', companyFilter)
+        params.append('companyId', companyFilter)
       }
       
       const response = await fetch(`/api/agents/modal?${params.toString()}`)
@@ -1226,7 +1226,7 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
   const handleRemoveCompanyAgents = (companyName: string) => {
     // Get all agents from the specified company
     const companyAgentIds = selectedAgentsData
-      .filter(agent => agent.member_company === companyName)
+      .filter(agent => agent.company_name === companyName)
       .map(agent => agent.user_id)
     
     // Remove these agents from the assigned user IDs
@@ -1236,7 +1236,7 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
     handleInputChange('assigned_user_ids', newAssignedIds)
     
     // Update local state immediately for responsive UI
-    setSelectedAgentsData(prev => prev.filter(agent => agent.member_company !== companyName))
+    setSelectedAgentsData(prev => prev.filter(agent => agent.company_name !== companyName))
   }
 
   return (
@@ -1802,8 +1802,8 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, eventToEdit }: Ad
                           {(() => {
                             // Count agents per company
                             const companyCounts = selectedAgentsData.reduce((acc, agent) => {
-                              if (agent.member_company && agent.member_company.trim() !== '') {
-                                acc[agent.member_company] = (acc[agent.member_company] || 0) + 1
+                              if (agent.company_name && agent.company_name.trim() !== '') {
+                                acc[agent.company_name] = (acc[agent.company_name] || 0) + 1
                               }
                               return acc
                             }, {} as Record<string, number>)

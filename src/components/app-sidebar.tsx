@@ -191,7 +191,7 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
             </div>
           </SidebarGroup>
           <SidebarGroup className="p-0">
-            <SidebarGroupLabel>MEMBERS</SidebarGroupLabel>
+            <SidebarGroupLabel>COMPANIES</SidebarGroupLabel>
             <div className="flex flex-col gap-2 px-2 py-2">
               <Skeleton className="h-8 w-4/5 rounded-lg" />
               <Skeleton className="h-8 w-3/5 rounded-lg" />
@@ -289,7 +289,7 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: React.Com
         )}
         {isAdmin && (
           <SidebarGroup className="p-0">
-            <SidebarGroupLabel>MEMBERS</SidebarGroupLabel>
+            <SidebarGroupLabel>COMPANIES</SidebarGroupLabel>
             <NavMain
               items={[
                 { title: "Companies", url: "/admin/company", icon: HomeIcon },

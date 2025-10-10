@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useId } from "react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +28,7 @@ export const AnimatedTabs = ({
 }) => {
   const [active, setActive] = useState<Tab>(propTabs[0]);
   const [tabs, setTabs] = useState<Tab[]>(propTabs);
+  const uniqueId = useId();
 
   const moveSelectedTabToTop = (idx: number) => {
     const newTabs = [...propTabs];
@@ -63,7 +64,7 @@ export const AnimatedTabs = ({
           >
             {active.value === tab.value && (
               <motion.div
-                layoutId="clickedbutton"
+                layoutId={`clickedbutton-${uniqueId}`}
                 transition={{ type: "spring", bounce: 0.3, duration: 0.6 }}
                 className={cn(
                   "absolute inset-0 bg-primary/10 rounded-lg",

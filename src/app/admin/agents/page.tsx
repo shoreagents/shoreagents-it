@@ -22,7 +22,7 @@ import {
   PaginationNext,
 } from "@/components/ui/pagination"
 import { useTheme } from "next-themes"
-import { useRealtimeMembers } from "@/hooks/use-realtime-members"
+import { useRealtimeCompanies } from "@/hooks/use-realtime-companies"
 import { ReloadButton } from "@/components/ui/reload-button"
 
 interface AgentRecord {
@@ -54,9 +54,9 @@ interface AgentRecord {
   start_date: string | null
   exit_date: string | null
   // Agent specific fields
-  member_id: number | null
-  member_company: string | null
-  member_badge_color: string | null
+  company_id: number | null
+  company_name: string | null
+  company_badge_color: string | null
   department_id: number | null
   department_name: string | null
   station_id: string | null
@@ -82,8 +82,8 @@ export default function AgentsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const PAGE_SIZE = 40
-  const [memberId, setMemberId] = useState<string>('all')
-  const [memberOptions, setMemberOptions] = useState<{ id: number; company: string }[]>([])
+  const [companyId, setCompanyId] = useState<string>('all')
+  const [companyOptions, setCompanyOptions] = useState<{ id: number; company: string }[]>([])
   const [sortField, setSortField] = useState<string>('first_name')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [selectedAgent, setSelectedAgent] = useState<AgentRecord | null>(null)
@@ -91,9 +91,9 @@ export default function AgentsPage() {
   const [reloading, setReloading] = useState(false)
 
   // Real-time updates for all agent changes
-  const { isConnected: isRealtimeConnected } = useRealtimeMembers({
-    onAgentMemberChanged: (updatedAgent, oldAgent, notificationData) => {
-      console.log('🔄 Real-time: Agent member update received in agents page:', { 
+  const { isConnected: isRealtimeConnected } = useRealtimeCompanies({
+    onAgentCompanyChanged: (updatedAgent, oldAgent, notificationData) => {
+      console.log('🔄 Real-time: Agent company update received in agents page:', { 
         updatedAgent, 
         oldAgent, 
         currentAgentsCount: agents.length
@@ -104,16 +104,16 @@ export default function AgentsPage() {
         const agentIndex = prevAgents.findIndex(agent => agent.user_id === updatedAgent.user_id)
         
         if (agentIndex !== -1) {
-          console.log('🔄 Updating agent member in list:', updatedAgent.user_id)
+          console.log('🔄 Updating agent company in list:', updatedAgent.user_id)
           
-          // Create updated agent with new member information
+          // Create updated agent with new company information
           const updatedAgentInList = {
             ...prevAgents[agentIndex],
-            member_id: updatedAgent.member_id
+            company_id: updatedAgent.company_id
           }
           
-          // If member_id changed, fetch the updated company information
-          if (updatedAgent.member_id !== oldAgent?.member_id) {
+          // If company_id changed, fetch the updated company information
+          if (updatedAgent.company_id !== oldAgent?.company_id) {
             // Use setTimeout to avoid async issues in the callback
             setTimeout(async () => {
               try {
@@ -130,8 +130,8 @@ export default function AgentsPage() {
                       const newAgents = [...prevAgents]
                       newAgents[agentIndex] = {
                         ...newAgents[agentIndex],
-                        member_company: freshAgentData.member_company,
-                        member_badge_color: freshAgentData.member_badge_color
+                        company_name: freshAgentData.company_name,
+                        company_badge_color: freshAgentData.company_badge_color
                       }
                       return newAgents
                     }
@@ -139,9 +139,9 @@ export default function AgentsPage() {
                   })
                   
                   console.log('🔄 Updated agent with company info:', {
-                    member_id: updatedAgent.member_id,
-                    member_company: freshAgentData.member_company,
-                    member_badge_color: freshAgentData.member_badge_color
+                    company_id: updatedAgent.company_id,
+                    company_name: freshAgentData.company_name,
+                    company_badge_color: freshAgentData.company_badge_color
                   })
                 }
               } catch (error) {
@@ -280,7 +280,7 @@ export default function AgentsPage() {
           sortDirection,
         })
       if (search.trim()) params.append('search', search.trim())
-      if (memberId !== 'all') params.append('memberId', memberId)
+      if (companyId !== 'all') params.append('companyId', companyId)
       const res = await fetch(`/api/agents?${params.toString()}`)
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -318,7 +318,7 @@ export default function AgentsPage() {
         sortDirection,
       })
       if (search.trim()) params.append('search', search.trim())
-      if (memberId !== 'all') params.append('memberId', memberId)
+      if (companyId !== 'all') params.append('companyId', companyId)
       const res = await fetch(`/api/agents?${params.toString()}`)
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -348,16 +348,16 @@ export default function AgentsPage() {
   useEffect(() => { fetchAgents() }, [])
 
   useEffect(() => {
-    const fetchMembers = async () => {
+    const fetchCompanies = async () => {
       try {
         const res = await fetch('/api/agents', { method: 'OPTIONS' })
         const data = await res.json()
-        setMemberOptions(data.members || [])
+        setCompanyOptions(data.companies || [])
       } catch (e) {
-        setMemberOptions([])
+        setCompanyOptions([])
       }
     }
-    fetchMembers()
+    fetchCompanies()
   }, [])
 
   // Reset to page 1 when search changes
@@ -367,7 +367,7 @@ export default function AgentsPage() {
   useEffect(() => {
     const timer = setTimeout(() => { fetchAgents() }, 300)
     return () => clearTimeout(timer)
-  }, [currentPage, search, memberId, sortField, sortDirection])
+  }, [currentPage, search, companyId, sortField, sortDirection])
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -393,7 +393,7 @@ export default function AgentsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h1 className="text-2xl font-bold">Agents</h1>
-                    <p className="text-sm text-muted-foreground">Directory of employees with member assignments and contact details</p>
+                    <p className="text-sm text-muted-foreground">Directory of employees with company assignments and contact details</p>
                   </div>
                   <div className="flex gap-2">
                     <ReloadButton onReload={handleReload} loading={reloading} className="flex-1" />
@@ -405,24 +405,24 @@ export default function AgentsPage() {
                   <div className="relative flex-1">
                     <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search by name, employee ID, job title, member, phone, or email..."
+                      placeholder="Search by name, employee ID, job title, company, phone, or email..."
                       className="pl-8"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                     />
                   </div>
                                     <div className="w-56">
-                    <Select value={memberId} onValueChange={(v: string) => { setMemberId(v); setCurrentPage(1) }}>
+                    <Select value={companyId} onValueChange={(v: string) => { setCompanyId(v); setCurrentPage(1) }}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Filter by member" />
+                        <SelectValue placeholder="Filter by company" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Agents</SelectItem>
-                        <SelectItem value="none">No Assigned Members</SelectItem>
+                        <SelectItem value="none">No Assigned Companies</SelectItem>
                         <SelectSeparator className="bg-border mx-2" />
                         <SelectGroup>
-                          <SelectLabel className="text-muted-foreground">Members</SelectLabel>
-                          {memberOptions.map((m) => (
+                          <SelectLabel className="text-muted-foreground">Companies</SelectLabel>
+                          {companyOptions.map((m) => (
                             <SelectItem key={m.id} value={String(m.id)}>{m.company}</SelectItem>
                           ))}
                         </SelectGroup>
@@ -455,22 +455,22 @@ export default function AgentsPage() {
                           </colgroup>
                           <TableHeader>
                             <TableRow variant="no-hover">
-                            <TableHead onClick={() => handleSort('first_name')} className="cursor-pointer">
+                            <TableHead onClick={() => handleSort('first_name')} className={`cursor-pointer ${sortField === 'first_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
                               <div className="flex items-center gap-1">
                                 Name <span className="w-4 h-4">{sortField === 'first_name' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
                               </div>
                             </TableHead>
-                            <TableHead onClick={() => handleSort('job_title')} className="cursor-pointer">
+                            <TableHead onClick={() => handleSort('job_title')} className={`cursor-pointer ${sortField === 'job_title' ? 'text-primary font-medium bg-accent/50' : ''}`}>
                               <div className="flex items-center gap-1">
                                 Job Title <span className="w-4 h-4">{sortField === 'job_title' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
                               </div>
                             </TableHead>
-                            <TableHead onClick={() => handleSort('member_company')} className="cursor-pointer">
+                            <TableHead onClick={() => handleSort('company_name')} className={`cursor-pointer ${sortField === 'company_name' ? 'text-primary font-medium bg-accent/50' : ''}`}>
                               <div className="flex items-center gap-1">
-                                Member <span className="w-4 h-4">{sortField === 'member_company' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
+                                Company <span className="w-4 h-4">{sortField === 'company_name' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
                               </div>
                             </TableHead>
-                            <TableHead onClick={() => handleSort('work_email')} className="cursor-pointer">
+                            <TableHead onClick={() => handleSort('work_email')} className={`cursor-pointer ${sortField === 'work_email' ? 'text-primary font-medium bg-accent/50' : ''}`}>
                               <div className="flex items-center gap-1">
                                 Contact <span className="w-4 h-4">{sortField === 'work_email' && (sortDirection === 'asc' ? <IconArrowUp className="h-4 w-4 text-primary" /> : <IconArrowDown className="h-4 w-4 text-primary" />)}</span>
                               </div>
@@ -518,17 +518,17 @@ export default function AgentsPage() {
                             </TableCell>
                             <TableCell className="whitespace-nowrap group-hover:bg-muted/30 transition-colors"><span className="truncate block max-w-[18rem]">{a.job_title || "-"}</span></TableCell>
                             <TableCell className="whitespace-nowrap group-hover:bg-muted/30 transition-colors">
-                              {a.member_company ? (
+                              {a.company_name ? (
                                 <Badge
                                   variant="outline"
                                   className="border"
                                   style={{
-                                    backgroundColor: withAlpha(a.member_badge_color || '#999999', 0.2),
-                                    borderColor: withAlpha(a.member_badge_color || '#999999', 0.4),
-                                    color: theme === 'dark' ? '#ffffff' : (a.member_badge_color || '#6B7280'),
+                                    backgroundColor: withAlpha(a.company_badge_color || '#999999', 0.2),
+                                    borderColor: withAlpha(a.company_badge_color || '#999999', 0.4),
+                                    color: theme === 'dark' ? '#ffffff' : (a.company_badge_color || '#6B7280'),
                                   }}
                                 >
-                                  <span className="truncate inline-block max-w-[16rem] align-bottom">{a.member_company}</span>
+                                  <span className="truncate inline-block max-w-[16rem] align-bottom">{a.company_name}</span>
                                 </Badge>
                               ) : (
                                 "-"

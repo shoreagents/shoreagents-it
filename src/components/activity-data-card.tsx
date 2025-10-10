@@ -33,8 +33,8 @@ interface Employee {
   user_id?: number
   first_name?: string
   last_name?: string
-  member_id?: number
-  member_company?: string
+  company_id?: number
+  company_name?: string
   activity?: {
     today_active_seconds: number
     today_inactive_seconds: number
@@ -117,12 +117,12 @@ export function ActivityDataCard({
       const startDate = startOfMonth.toLocaleDateString('en-CA')
       const endDate = endOfMonth.toLocaleDateString('en-CA')
       
-      // Use the same memberId as the parent component
-      const memberId = user.userType === 'Internal' ? 'all' : user.id
+      // Use the same companyId as the parent component
+      const companyId = user.userType === 'Internal' ? 'all' : user.id
       
-      console.log('📊 Fetching chart data for date range:', startDate, 'to', endDate, 'memberId:', memberId)
+      console.log('📊 Fetching chart data for date range:', startDate, 'to', endDate, 'companyId:', companyId)
 
-      const response = await fetch(`/api/activities?memberId=${memberId}&startDate=${startDate}&endDate=${endDate}`)
+      const response = await fetch(`/api/activities?companyId=${companyId}&startDate=${startDate}&endDate=${endDate}`)
 
       if (!response.ok) {
         throw new Error(`Failed to fetch chart data: ${response.statusText}`)

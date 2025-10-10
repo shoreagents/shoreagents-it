@@ -165,9 +165,9 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
                     if (completeTicket.first_name) {
                       return completeTicket.first_name
                     }
-                    // Last resort: Use member_name (company name) only if no personal name available
-                    if (completeTicket.member_name) {
-                      return completeTicket.member_name
+                    // Last resort: Use company_name (company name) only if no personal name available
+                    if (completeTicket.company_name) {
+                      return completeTicket.company_name
                     }
                     return 'Unknown User'
                   }
@@ -247,9 +247,9 @@ export function useRealtimeTickets(options: UseRealtimeTicketsOptions = {}) {
                       if (completeTicket.first_name) {
                         return completeTicket.first_name
                       }
-                      // Last resort: Use member_name (company name) only if no personal name available
-                      if (completeTicket.member_name) {
-                        return completeTicket.member_name
+                      // Last resort: Use company_name (company name) only if no personal name available
+                      if (completeTicket.company_name) {
+                        return completeTicket.company_name
                       }
                       return 'Unknown User'
                     }

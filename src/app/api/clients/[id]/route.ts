@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { updateClientMember, getClientById } from '@/lib/db-utils'
+import { updateClientCompany, getClientById } from '@/lib/db-utils'
 
 export async function PATCH(
   request: NextRequest,
@@ -13,15 +13,15 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { member_id } = body
+    const { company_id } = body
 
     // Validate required fields
-    if (member_id === undefined) {
-      return NextResponse.json({ error: 'member_id is required' }, { status: 400 })
+    if (company_id === undefined) {
+      return NextResponse.json({ error: 'company_id is required' }, { status: 400 })
     }
 
-    // Update client member_id using utility function
-    const updatedClient = await updateClientMember(clientId, member_id)
+    // Update client company_id using utility function
+    const updatedClient = await updateClientCompany(clientId, company_id)
 
     return NextResponse.json({ 
       message: 'Client updated successfully',

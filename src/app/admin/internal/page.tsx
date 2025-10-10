@@ -22,7 +22,7 @@ import {
 import { useTheme } from "next-themes"
 import { ReloadButton } from "@/components/ui/reload-button"
 import { InternalDetailModal } from "@/components/modals/internal-detail-modal"
-import { useRealtimeMembers } from '@/hooks/use-realtime-members'
+import { useRealtimeCompanies } from '@/hooks/use-realtime-companies'
 
 interface InternalRecord {
   user_id: number
@@ -55,9 +55,9 @@ interface InternalRecord {
   // Internal specific fields
   station_id: string | null
   // Additional fields that might be available from API
-  member_id?: number | null
-  member_company?: string | null
-  member_badge_color?: string | null
+  company_id?: number | null
+  company_name?: string | null
+  company_badge_color?: string | null
   department_name?: string | null
 }
 
@@ -79,7 +79,7 @@ export default function InternalPage() {
   const [reloading, setReloading] = useState(false)
 
   // 🔄 Real-time updates for internal users - automatically syncs with database changes
-  const { isConnected: isRealtimeConnected } = useRealtimeMembers({
+  const { isConnected: isRealtimeConnected } = useRealtimeCompanies({
     onPersonalInfoChanged: async (personalInfo, oldPersonalInfo, notificationData) => {
       console.log('🔄 Real-time: Personal info change received in internal page:', { 
         personalInfo, 

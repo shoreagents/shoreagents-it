@@ -13,7 +13,7 @@ export async function GET(
     }
 
     // For now, return empty comments since we don't have an events_comments table yet
-    // This would be implemented similar to members_comments
+    // This would be implemented similar to companies_comments
     const comments = []
 
     return NextResponse.json({ comments })
@@ -41,7 +41,7 @@ export async function POST(
     }
 
     // For now, return success since we don't have an events_comments table yet
-    // This would be implemented similar to members_comments
+    // This would be implemented similar to companies_comments
     const newComment = {
       id: Date.now().toString(),
       comment,

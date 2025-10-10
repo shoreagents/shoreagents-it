@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { IconCalendar, IconUser, IconBuilding, IconMapPin, IconPhone, IconMail, IconId, IconBriefcase, IconCircle, IconSearch, IconX, IconGenderMale, IconGenderFemale, IconMinus, IconClock } from "@tabler/icons-react"
-import { useRealtimeMembers } from '@/hooks/use-realtime-members'
+import { useRealtimeCompanies } from '@/hooks/use-realtime-companies'
 import { SendHorizontal, Target } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { DataFieldRow } from "@/components/ui/fields"
@@ -17,7 +17,7 @@ import { AnimatedTabs } from "@/components/ui/animated-tabs"
 import { Popover, PopoverContent, PopoverTrigger, PopoverItem } from "@/components/ui/popover"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/auth-context"
-import { MembersActivityLog } from "@/components/members-activity-log"
+import { CompaniesActivityLog } from "@/components/companies-activity-log"
 
 interface ClientsDetailModalProps {
   isOpen: boolean
@@ -42,9 +42,9 @@ interface ClientRecord {
   address: string | null
   gender: string | null
   // Client specific fields
-  member_id: number | null
-  member_company: string | null
-  member_badge_color: string | null
+  company_id: number | null
+  company_name: string | null
+  company_badge_color: string | null
   station_id: string | null
   department_id: number | null
   department_name: string | null
@@ -105,10 +105,10 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
   const [hasChanges, setHasChanges] = React.useState(false)
   const [isSaving, setIsSaving] = React.useState(false)
 
-  // Realtime functionality - using useRealtimeMembers for specific callbacks
-  const { isConnected: isRealtimeConnected } = useRealtimeMembers({
-    onClientMemberChanged: async (updatedClient, oldClient, notificationData) => {
-      console.log('🔄 Real-time: Client member assignment change received in modal:', { 
+  // Realtime functionality - using useRealtimeCompanies for specific callbacks
+  const { isConnected: isRealtimeConnected } = useRealtimeCompanies({
+    onClientCompanyChanged: async (updatedClient, oldClient, notificationData) => {
+      console.log('🔄 Real-time: Client company assignment change received in modal:', { 
         updatedClient, 
         oldClient, 
         currentClientId: localClientData?.user_id,
@@ -118,31 +118,31 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
       
       // Only process updates for the current client
       if (localClientData && updatedClient.user_id === localClientData.user_id) {
-        console.log('🔄 Real-time: Processing member assignment change for current client:', updatedClient)
+        console.log('🔄 Real-time: Processing company assignment change for current client:', updatedClient)
         
-        // Update the member_id immediately
+        // Update the company_id immediately
         setLocalClientData(prevClient => {
           if (!prevClient) return prevClient
           
           return {
             ...prevClient,
-            member_id: updatedClient.member_id
+            company_id: updatedClient.company_id
           }
         })
         
-        // If member_id changed, fetch the updated company information
-        if (updatedClient.member_id !== oldClient?.member_id) {
+        // If company_id changed, fetch the updated company information
+        if (updatedClient.company_id !== oldClient?.company_id) {
           try {
-            console.log('🔄 Fetching updated company information for member_id:', updatedClient.member_id)
+            console.log('🔄 Fetching updated company information for company_id:', updatedClient.company_id)
             const response = await fetch(`/api/clients/${updatedClient.user_id}`)
             if (response.ok) {
               const responseData = await response.json()
               const freshClientData = responseData.client // Extract client from response
               console.log('🔄 Fetched fresh client data with company info:', freshClientData)
               console.log('🔄 Company info from API:', {
-                member_id: freshClientData.member_id,
-                member_company: freshClientData.member_company,
-                member_badge_color: freshClientData.member_badge_color
+                company_id: freshClientData.company_id,
+                company_name: freshClientData.company_name,
+                company_badge_color: freshClientData.company_badge_color
               })
               
               // Update local client data with fresh company information
@@ -151,15 +151,15 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
                 
                 const updatedClient = {
                   ...prevClient,
-                  member_id: freshClientData.member_id,
-                  member_company: freshClientData.member_company,
-                  member_badge_color: freshClientData.member_badge_color
+                  company_id: freshClientData.company_id,
+                  company_name: freshClientData.company_name,
+                  company_badge_color: freshClientData.company_badge_color
                 }
                 
                 console.log('🔄 Updated localClientData with company info:', {
-                  member_id: updatedClient.member_id,
-                  member_company: updatedClient.member_company,
-                  member_badge_color: updatedClient.member_badge_color
+                  company_id: updatedClient.company_id,
+                  company_name: updatedClient.company_name,
+                  company_badge_color: updatedClient.company_badge_color
                 })
                 
                 return updatedClient
@@ -170,7 +170,7 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
           }
         }
         
-        console.log('🔄 Updated client member assignment in real-time')
+        console.log('🔄 Updated client company assignment in real-time')
       } else {
         console.log('🔄 Real-time: Update not for current client, skipping')
       }
@@ -289,10 +289,10 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
     last_name: inputValues.last_name || currentClientData.last_name || "Client",
     nickname: inputValues.nickname || currentClientData.nickname || null,
     profile_picture: currentClientData.profile_picture || null,
-    member_id: currentClientData.member_id || null,
-    member_company: currentClientData.member_company || null,
-    member_badge_color: currentClientData.member_badge_color || null,
-    member_name: (inputValues.first_name || currentClientData.first_name) && (inputValues.last_name || currentClientData.last_name) ? `${inputValues.first_name || currentClientData.first_name} ${inputValues.last_name || currentClientData.last_name}` : null,
+    company_id: currentClientData.company_id || null,
+    company_name: currentClientData.company_name || null,
+    company_badge_color: currentClientData.company_badge_color || null,
+    company_name: (inputValues.first_name || currentClientData.first_name) && (inputValues.last_name || currentClientData.last_name) ? `${inputValues.first_name || currentClientData.first_name} ${inputValues.last_name || currentClientData.last_name}` : null,
     department: currentClientData.department_name || "Not Specified",
     email: currentClientData.email || "No email",
     phone: inputValues.phone || currentClientData.phone || "No phone",
@@ -308,10 +308,10 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
     last_name: "Client",
     nickname: null,
     profile_picture: null,
-    member_id: null,
-    member_company: null,
-    member_badge_color: null,
-    member_name: null,
+    company_id: null,
+    company_name: null,
+    company_badge_color: null,
+    company_name: null,
     department: "Not Specified",
     email: "No email",
     phone: "No phone",
@@ -433,7 +433,7 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
     setShowCompanySelection(false)
   }
 
-  // Fetch companies from members table
+  // Fetch companies from companies table
   const fetchCompanies = async (searchTerm: string = "", page: number = 1) => {
     try {
       setIsLoadingCompanies(true)
@@ -445,13 +445,13 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
         sortDirection: 'asc'
       })
       
-      const response = await fetch(`/api/members?${params.toString()}`)
+      const response = await fetch(`/api/companies?${params.toString()}`)
       if (!response.ok) {
         throw new Error('Failed to fetch companies')
       }
       
       const data = await response.json()
-      setCompanies(data.members || [])
+      setCompanies(data.companies || [])
     } catch (error) {
       console.error('Failed to fetch companies:', error)
     } finally {
@@ -473,7 +473,7 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          member_id: companyId
+          company_id: companyId
         }),
       })
 
@@ -488,9 +488,9 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
       if (localClientData) {
         const updatedClientData = {
           ...localClientData,
-          member_id: companyId,
-          member_company: companyName,
-          member_badge_color: badgeColor
+          company_id: companyId,
+          company_name: companyName,
+          company_badge_color: badgeColor
         }
         setLocalClientData(updatedClientData)
       }
@@ -590,22 +590,22 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
               
               {/* Client Metadata Grid */}
               <div className="grid grid-cols-2 gap-4 text-sm">
-                {/* Member */}
+                {/* Company */}
                 <div className="flex items-center gap-2">
                   <IconBuilding className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Member:</span>
-                  {displayData.member_company ? (
+                  <span className="text-muted-foreground">Company:</span>
+                  {displayData.company_name ? (
                     <Badge
                       variant="outline"
                       className="border cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={openCompanySelection}
                       style={{
-                        backgroundColor: withAlpha(displayData.member_badge_color || '#999999', 0.2),
-                        borderColor: withAlpha(displayData.member_badge_color || '#999999', 0.4),
-                        color: theme === 'dark' ? '#ffffff' : (displayData.member_badge_color || '#6B7280'),
+                        backgroundColor: withAlpha(displayData.company_badge_color || '#999999', 0.2),
+                        borderColor: withAlpha(displayData.company_badge_color || '#999999', 0.4),
+                        color: theme === 'dark' ? '#ffffff' : (displayData.company_badge_color || '#6B7280'),
                       }}
                     >
-                      <span className="truncate inline-block max-w-[16rem] align-bottom">{displayData.member_company}</span>
+                      <span className="truncate inline-block max-w-[16rem] align-bottom">{displayData.company_name}</span>
                     </Badge>
                   ) : (
                     <Badge
@@ -873,12 +873,12 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
                         readOnly={true}
                       />
 
-                      {/* Member ID */}
+                      {/* Company ID */}
                       <DataFieldRow
                         icon={<IconBuilding className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                        label="Member ID"
-                        fieldName="member_id"
-                        value={displayData.member_id ? displayData.member_id.toString() : "-"}
+                        label="Company ID"
+                        fieldName="company_id"
+                        value={displayData.company_id ? displayData.company_id.toString() : "-"}
                         onSave={() => {}}
                         placeholder="-"
                         readOnly={true}
@@ -1045,8 +1045,8 @@ export function ClientsDetailModal({ isOpen, onClose, clientId, clientData }: Cl
                 /* Activity Content - Shows client activity and recent changes */
                 <div className="space-y-4">
                   {clientData?.user_id ? (
-                    <MembersActivityLog 
-                      memberId={clientData.user_id} 
+                    <CompaniesActivityLog 
+                      companyId={clientData.user_id} 
                       companyName={clientData.first_name && clientData.last_name ? `${clientData.first_name} ${clientData.last_name}` : 'Unknown Client'} 
                       onRefresh={() => {
                         // Real-time updates handle refresh automatically

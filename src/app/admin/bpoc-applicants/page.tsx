@@ -74,8 +74,8 @@ interface Applicant {
   resolver_first_name?: string | null
   resolver_last_name?: string | null
   user_type?: string | null
-  member_name?: string | null
-  member_color?: string | null
+  company_name?: string | null
+  company_color?: string | null
   job_title?: string | null
   company_name?: string | null
   user_position?: string | null
@@ -233,12 +233,12 @@ const SortableApplicant = React.memo(function SortableApplicant({ applicant, isL
                 <span className="text-xs font-medium text-blue-600 dark:text-blue-400 truncate">
                   Internal
                 </span>
-              ) : applicant.member_name && (
+              ) : applicant.company_name && (
                 <span 
                   className="text-xs font-medium truncate"
-                  style={{ color: applicant.member_color || undefined }}
+                  style={{ color: applicant.company_color || undefined }}
                 >
-                  {applicant.member_name}
+                  {applicant.company_name}
                 </span>
               )}
             </div>
@@ -450,12 +450,12 @@ function DraggingApplicant({ applicant, isExpanded, onStatusUpdate }: { applican
                 <span className="text-xs font-medium text-blue-600 dark:text-blue-400 truncate">
                   Internal
                 </span>
-              ) : applicant.member_name && (
+              ) : applicant.company_name && (
                 <span 
                   className="text-xs font-medium truncate"
-                  style={{ color: applicant.member_color || undefined }}
+                  style={{ color: applicant.company_color || undefined }}
                 >
-                  {applicant.member_name}
+                  {applicant.company_name}
                 </span>
               )}
             </div>
@@ -667,8 +667,8 @@ export default function BPOCApplicantsPage() {
     resolver_first_name: null,
     resolver_last_name: null,
     user_type: 'External',
-    member_name: null,
-    member_color: null,
+    company_name: null,
+    company_color: null,
     job_title: rawData.job_title || null,
     company_name: rawData.company_name || null,
     user_position: rawData.user_position || null,

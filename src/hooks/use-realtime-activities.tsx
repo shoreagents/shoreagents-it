@@ -268,7 +268,7 @@ export function useRealtimeActivities(options: UseRealtimeActivitiesOptions = {}
         })
         
         // For meeting updates, we need to refetch activities to get the updated meeting status
-        fetch('/api/activities?memberId=all')
+        fetch('/api/activities?companyId=all')
           .then(res => {
             if (!res.ok) {
               throw new Error(`HTTP error! status: ${res.status}`)
@@ -311,7 +311,7 @@ export function useRealtimeActivities(options: UseRealtimeActivitiesOptions = {}
         })
         
         // For event attendance updates, we need to refetch activities to get the updated event status
-        fetch('/api/activities?memberId=all')
+        fetch('/api/activities?companyId=all')
           .then(res => {
             if (!res.ok) {
               throw new Error(`HTTP error! status: ${res.status}`)
@@ -353,7 +353,7 @@ export function useRealtimeActivities(options: UseRealtimeActivitiesOptions = {}
         })
         
         // For break session updates, we need to refetch activities to get the updated break status
-        fetch('/api/activities?memberId=all')
+        fetch('/api/activities?companyId=all')
           .then(res => {
             if (!res.ok) {
               throw new Error(`HTTP error! status: ${res.status}`)
@@ -397,7 +397,7 @@ export function useRealtimeActivities(options: UseRealtimeActivitiesOptions = {}
         })
         
         // For clinic status updates, we need to refetch activities to get the updated clinic status
-        fetch('/api/activities?memberId=all')
+        fetch('/api/activities?companyId=all')
           .then(res => {
             if (!res.ok) {
               throw new Error(`HTTP error! status: ${res.status}`)
@@ -436,7 +436,7 @@ export function useRealtimeActivities(options: UseRealtimeActivitiesOptions = {}
         // For restroom status updates, we can be more efficient by only refetching for the specific user
         if (message.type === 'restroom_status_update') {
           // Refetch activities data to get complete information
-          fetch('/api/activities?memberId=all')
+          fetch('/api/activities?companyId=all')
             .then(res => {
               if (!res.ok) {
                 throw new Error(`HTTP error! status: ${res.status}`)
@@ -468,7 +468,7 @@ export function useRealtimeActivities(options: UseRealtimeActivitiesOptions = {}
             })
         } else {
           // For regular activity updates, use the existing logic
-          fetch('/api/activities?memberId=all')
+          fetch('/api/activities?companyId=all')
             .then(res => {
               if (!res.ok) {
                 throw new Error(`HTTP error! status: ${res.status}`)

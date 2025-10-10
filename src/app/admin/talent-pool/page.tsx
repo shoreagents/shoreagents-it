@@ -59,8 +59,8 @@ interface Applicant {
   resolver_first_name?: string | null
   resolver_last_name?: string | null
   user_type?: string | null
-  member_name?: string | null
-  member_color?: string | null
+  company_name?: string | null
+  company_color?: string | null
   job_title?: string | null
   company_name?: string | null
   user_position?: string | null
@@ -174,8 +174,8 @@ export default function TalentPoolPage() {
       resolver_first_name: rawData.resolver_first_name || null,
       resolver_last_name: rawData.resolver_last_name || null,
       user_type: rawData.user_type || null,
-      member_name: rawData.member_name || null,
-      member_color: rawData.member_color || null,
+      company_name: rawData.company_name || null,
+      company_color: rawData.company_color || null,
       job_title: rawData.job_title || null,
       company_name: rawData.company_name || null,
       user_position: rawData.user_position || null,

@@ -1,8 +1,8 @@
 import pool from './database';
 
-export interface MembersActivityLog {
+export interface CompaniesActivityLog {
   id: number;
-  member_id: number;
+  company_id: number;
   field_name: string;
   action: 'created' | 'set' | 'updated' | 'removed' | 'selected' | 'deselected';
   old_value: string | null;
@@ -12,33 +12,33 @@ export interface MembersActivityLog {
   user_name?: string; // From users table via JOIN
 }
 
-export class MembersActivityLogger {
+export class CompaniesActivityLogger {
   /**
    * Log any activity
    */
   static async logActivity(params: {
-    memberId: number;
+    companyId: number;
     fieldName: string;
     action: 'created' | 'set' | 'updated' | 'removed' | 'selected' | 'deselected';
     oldValue?: string | null;
     newValue?: string | null;
     userId?: number | null;
   }): Promise<void> {
-    const { memberId, fieldName, action, oldValue, newValue, userId } = params;
+    const { companyId, fieldName, action, oldValue, newValue, userId } = params;
     
-    console.log('🔍 logActivity called with params:', { memberId, fieldName, action, oldValue, newValue, userId });
+    console.log('🔍 logActivity called with params:', { companyId, fieldName, action, oldValue, newValue, userId });
     
     try {
       const result = await pool.query(`
-        INSERT INTO public.members_activity_log 
-        (member_id, field_name, action, old_value, new_value, user_id)
+        INSERT INTO public.companies_activity_log 
+        (company_id, field_name, action, old_value, new_value, user_id)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id
-      `, [memberId, fieldName, action, oldValue, newValue, userId]);
+      `, [companyId, fieldName, action, oldValue, newValue, userId]);
       
       console.log('✅ Activity logged successfully:', {
         id: result.rows[0]?.id,
-        memberId,
+        companyId,
         fieldName,
         action,
         oldValue,
@@ -61,7 +61,7 @@ export class MembersActivityLogger {
   /**
    * Log agent assignment changes using 'selected' and 'deselected' actions
    */
-  static async logAgentAssignmentChange(memberId: number, oldAgentIds: number[], newAgentIds: number[], userId?: number): Promise<void> {
+  static async logAgentAssignmentChange(companyId: number, oldAgentIds: number[], newAgentIds: number[], userId?: number): Promise<void> {
     // Find newly added and removed agents
     const addedAgentIds = newAgentIds.filter(id => !oldAgentIds.includes(id));
     const removedAgentIds = oldAgentIds.filter(id => !newAgentIds.includes(id));
@@ -73,7 +73,7 @@ export class MembersActivityLogger {
         const addedNames = addedAgentNames.length > 0 ? addedAgentNames.join(', ') : `${addedAgentIds.length} agent(s)`;
         
         await this.logActivity({
-          memberId,
+          companyId,
           fieldName: 'Agents',
           action: 'selected',
           newValue: addedNames,
@@ -93,7 +93,7 @@ export class MembersActivityLogger {
         const removedNames = removedAgentNames.length > 0 ? removedAgentNames.join(', ') : `${removedAgentIds.length} agent(s)`;
         
         await this.logActivity({
-          memberId,
+          companyId,
           fieldName: 'Agents',
           action: 'deselected',
           oldValue: removedNames,
@@ -110,7 +110,7 @@ export class MembersActivityLogger {
   /**
    * Log client assignment changes using 'selected' and 'deselected' actions
    */
-  static async logClientAssignmentChange(memberId: number, oldClientIds: number[], newClientIds: number[], userId?: number): Promise<void> {
+  static async logClientAssignmentChange(companyId: number, oldClientIds: number[], newClientIds: number[], userId?: number): Promise<void> {
     // Find newly added and removed clients
     const addedClientIds = newClientIds.filter(id => !oldClientIds.includes(id));
     const removedClientIds = oldClientIds.filter(id => !newClientIds.includes(id));
@@ -122,7 +122,7 @@ export class MembersActivityLogger {
         const addedNames = addedClientNames.length > 0 ? addedClientNames.join(', ') : `${addedClientIds.length} client(s)`;
         
         await this.logActivity({
-          memberId,
+          companyId,
           fieldName: 'Clients',
           action: 'selected',
           newValue: addedNames,
@@ -142,7 +142,7 @@ export class MembersActivityLogger {
         const removedNames = removedClientNames.length > 0 ? removedClientNames.join(', ') : `${removedClientIds.length} client(s)`;
         
         await this.logActivity({
-          memberId,
+          companyId,
           fieldName: 'Clients',
           action: 'deselected',
           oldValue: removedNames,
@@ -205,12 +205,12 @@ export class MembersActivityLogger {
   /**
    * Log company creation
    */
-  static async logCompanyCreated(memberId: number, companyName: string, userId?: number): Promise<void> {
-    console.log('🔍 logCompanyCreated called:', { memberId, companyName, userId });
+  static async logCompanyCreated(companyId: number, companyName: string, userId?: number): Promise<void> {
+    console.log('🔍 logCompanyCreated called:', { companyId, companyName, userId });
     
     try {
       await this.logActivity({
-        memberId,
+        companyId,
         fieldName: 'Company',
         action: 'created',
         newValue: companyName,
@@ -227,9 +227,9 @@ export class MembersActivityLogger {
   /**
    * Log field creation
    */
-  static async logFieldCreated(memberId: number, fieldName: string, value: string, userId?: number): Promise<void> {
+  static async logFieldCreated(companyId: number, fieldName: string, value: string, userId?: number): Promise<void> {
     await this.logActivity({
-      memberId,
+      companyId,
       fieldName,
       action: 'created',
       newValue: value,
@@ -240,12 +240,12 @@ export class MembersActivityLogger {
   /**
    * Log field being set
    */
-  static async logFieldSet(memberId: number, fieldName: string, value: string, userId?: number): Promise<void> {
-    console.log('🔍 logFieldSet called:', { memberId, fieldName, value, userId });
+  static async logFieldSet(companyId: number, fieldName: string, value: string, userId?: number): Promise<void> {
+    console.log('🔍 logFieldSet called:', { companyId, fieldName, value, userId });
     
     try {
       await this.logActivity({
-        memberId,
+        companyId,
         fieldName,
         action: 'set',
         newValue: value,
@@ -262,9 +262,9 @@ export class MembersActivityLogger {
   /**
    * Log field update
    */
-  static async logFieldUpdated(memberId: number, fieldName: string, oldValue: string, newValue: string, userId?: number): Promise<void> {
+  static async logFieldUpdated(companyId: number, fieldName: string, oldValue: string, newValue: string, userId?: number): Promise<void> {
     await this.logActivity({
-      memberId,
+      companyId,
       fieldName,
       action: 'updated',
       oldValue,
@@ -276,9 +276,9 @@ export class MembersActivityLogger {
   /**
    * Log field removal
    */
-  static async logFieldRemoved(memberId: number, fieldName: string, oldValue: string, userId?: number): Promise<void> {
+  static async logFieldRemoved(companyId: number, fieldName: string, oldValue: string, userId?: number): Promise<void> {
     await this.logActivity({
-      memberId,
+      companyId,
       fieldName,
       action: 'removed',
       oldValue,
@@ -287,14 +287,14 @@ export class MembersActivityLogger {
   }
 
   /**
-   * Get activity log for a specific member
+   * Get activity log for a specific company
    */
-  static async getMemberActivityLog(memberId: number, limit: number = 50): Promise<MembersActivityLog[]> {
+  static async getCompanyActivityLog(companyId: number, limit: number = 50): Promise<CompaniesActivityLog[]> {
     try {
       const result = await pool.query(`
         SELECT 
           mal.id,
-          mal.member_id,
+          mal.company_id,
           mal.field_name,
           mal.action,
           mal.old_value,
@@ -302,20 +302,20 @@ export class MembersActivityLogger {
           mal.user_id,
           mal.created_at,
           COALESCE(pi.first_name || ' ' || pi.last_name, u.email) as user_name
-        FROM public.members_activity_log mal
+        FROM public.companies_activity_log mal
         LEFT JOIN public.users u ON mal.user_id = u.id
         LEFT JOIN public.personal_info pi ON u.id = pi.user_id
-        WHERE mal.member_id = $1
+        WHERE mal.company_id = $1
         ORDER BY mal.created_at DESC
         LIMIT $2
-      `, [memberId, limit]);
+      `, [companyId, limit]);
 
       return result.rows.map(row => ({
         ...row,
         created_at: new Date(row.created_at)
       }));
     } catch (error) {
-      console.error('Failed to get member activity log:', error);
+      console.error('Failed to get company activity log:', error);
       return [];
     }
   }
@@ -323,8 +323,8 @@ export class MembersActivityLogger {
   /**
    * Log website changes (handles array format)
    */
-  static async logWebsiteChange(memberId: number, oldWebsite: any, newWebsite: any, userId?: number): Promise<void> {
-    console.log('🔍 logWebsiteChange called:', { memberId, oldWebsite, newWebsite, userId });
+  static async logWebsiteChange(companyId: number, oldWebsite: any, newWebsite: any, userId?: number): Promise<void> {
+    console.log('🔍 logWebsiteChange called:', { companyId, oldWebsite, newWebsite, userId });
     
     try {
       // Convert arrays to strings for comparison and logging
@@ -335,15 +335,15 @@ export class MembersActivityLogger {
       
       if (!oldWebsiteStr && newWebsiteStr) {
         // Website was set for the first time
-        await this.logFieldSet(memberId, 'Website', newWebsiteStr, userId);
+        await this.logFieldSet(companyId, 'Website', newWebsiteStr, userId);
         console.log('✅ Website set logged successfully');
       } else if (oldWebsiteStr && !newWebsiteStr) {
         // Website was removed
-        await this.logFieldRemoved(memberId, 'Website', oldWebsiteStr, userId);
+        await this.logFieldRemoved(companyId, 'Website', oldWebsiteStr, userId);
         console.log('✅ Website removal logged successfully');
       } else if (oldWebsiteStr !== newWebsiteStr) {
         // Website was updated
-        await this.logFieldUpdated(memberId, 'Website', oldWebsiteStr, newWebsiteStr, userId);
+        await this.logFieldUpdated(companyId, 'Website', oldWebsiteStr, newWebsiteStr, userId);
         console.log('✅ Website update logged successfully');
       } else {
         console.log('ℹ️ No website change detected');
@@ -357,12 +357,12 @@ export class MembersActivityLogger {
   /**
    * Get activity log for a specific user
    */
-  static async getUserActivityLog(userId: number, limit: number = 50): Promise<MembersActivityLog[]> {
+  static async getUserActivityLog(userId: number, limit: number = 50): Promise<CompaniesActivityLog[]> {
     try {
       const result = await pool.query(`
         SELECT 
           mal.id,
-          mal.member_id,
+          mal.company_id,
           mal.field_name,
           mal.action,
           mal.old_value,
@@ -370,7 +370,7 @@ export class MembersActivityLogger {
           mal.user_id,
           mal.created_at,
           COALESCE(pi.first_name || ' ' || pi.last_name, u.email) as user_name
-        FROM public.members_activity_log mal
+        FROM public.companies_activity_log mal
         LEFT JOIN public.users u ON mal.user_id = u.id
         LEFT JOIN public.personal_info pi ON u.id = pi.user_id
         WHERE mal.user_id = $1
@@ -390,7 +390,7 @@ export class MembersActivityLogger {
 }
 
 // Helper function to format activity text for display
-export function formatActivityText(activity: MembersActivityLog): string {
+export function formatActivityText(activity: CompaniesActivityLog): string {
   console.log('🔍 formatActivityText called with:', {
     field_name: activity.field_name,
     action: activity.action,

@@ -22,7 +22,7 @@ async function testTicketData() {
       console.log(`  User ID: ${ticket.user_id}`);
       console.log(`  First Name: ${ticket.first_name}`);
       console.log(`  Last Name: ${ticket.last_name}`);
-      console.log(`  Member Name: ${ticket.member_name}`);
+      console.log(`  Company Name: ${ticket.company_name}`);
       console.log(`  User Type: ${ticket.user_type}`);
       console.log(`  Profile Picture: ${ticket.profile_picture}`);
       console.log(`  Concern: ${ticket.concern}`);
@@ -42,7 +42,7 @@ async function testTicketData() {
       console.log('Individual ticket data:');
       console.log(`  First Name: ${individualTicket.first_name}`);
       console.log(`  Last Name: ${individualTicket.last_name}`);
-      console.log(`  Member Name: ${individualTicket.member_name}`);
+      console.log(`  Company Name: ${individualTicket.company_name}`);
       console.log(`  User Type: ${individualTicket.user_type}`);
     }
     

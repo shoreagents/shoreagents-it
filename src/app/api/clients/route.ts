@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getClientsPaginated, getClientMembers } from '@/lib/db-utils'
+import { getClientsPaginated, getClientCompanies } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,13 +7,13 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '40', 10)
     const search = searchParams.get('search') || ''
-    const memberId = searchParams.get('memberId') || 'all'
+    const companyId = searchParams.get('companyId') || 'all'
     const sortField = searchParams.get('sortField') || 'first_name'
     const sortDirection = (searchParams.get('sortDirection') as 'asc' | 'desc') || 'asc'
 
-    const parsedMemberId = memberId === 'none' ? 'none' : (memberId === 'all' ? undefined : parseInt(memberId, 10))
+    const parsedCompanyId = companyId === 'none' ? 'none' : (companyId === 'all' ? undefined : parseInt(companyId, 10))
 
-    const { agents, totalCount } = await getClientsPaginated({ search, page, limit, memberId: parsedMemberId as any, sortField, sortDirection })
+    const { agents, totalCount } = await getClientsPaginated({ search, page, limit, companyId: parsedCompanyId as any, sortField, sortDirection })
     const totalPages = Math.ceil(totalCount / Math.max(1, limit))
 
     return NextResponse.json({
@@ -33,11 +33,11 @@ export async function GET(request: NextRequest) {
 
 export async function OPTIONS() {
   try {
-    const members = await getClientMembers()
-    return NextResponse.json({ members })
+    const companies = await getClientCompanies()
+    return NextResponse.json({ companies })
   } catch (error) {
-    console.error('Failed to fetch members:', error)
-    return NextResponse.json({ error: 'Failed to fetch members' }, { status: 500 })
+    console.error('Failed to fetch companies:', error)
+    return NextResponse.json({ error: 'Failed to fetch companies' }, { status: 500 })
   }
 }
 

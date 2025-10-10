@@ -49,9 +49,9 @@ async function startListening() {
     // Listen for main database changes
     await notificationClient.query('LISTEN ticket_changes')
     await notificationClient.query('LISTEN applicant_changes')
-    await notificationClient.query('LISTEN member_changes')
-    await notificationClient.query('LISTEN member_comment_changes')
-    await notificationClient.query('LISTEN member_activity_changes')
+    await notificationClient.query('LISTEN company_changes')
+    await notificationClient.query('LISTEN company_comment_changes')
+    await notificationClient.query('LISTEN company_activity_changes')
     await notificationClient.query('LISTEN activity_data_change')
     await notificationClient.query('LISTEN agent_assignment_changes')
     await notificationClient.query('LISTEN client_assignment_changes')
@@ -123,14 +123,14 @@ async function startListening() {
         let messageType = 'ticket_update'
         if (msg.channel === 'applicant_changes') {
           messageType = 'applicant_update'
-        } else if (msg.channel === 'member_changes') {
-          messageType = 'member_update'
-        } else if (msg.channel === 'member_detail_changes') {
-          messageType = 'member_comment_update'
-        } else if (msg.channel === 'member_comment_changes') {
-          messageType = 'member_comment_update'
-        } else if (msg.channel === 'member_activity_changes') {
-          messageType = 'member_activity_update'
+        } else if (msg.channel === 'company_changes') {
+          messageType = 'company_update'
+        } else if (msg.channel === 'company_detail_changes') {
+          messageType = 'company_comment_update'
+        } else if (msg.channel === 'company_comment_changes') {
+          messageType = 'company_comment_update'
+        } else if (msg.channel === 'company_activity_changes') {
+          messageType = 'company_activity_update'
         } else if (msg.channel === 'activity_data_change') {
           messageType = 'activity_update'
         } else if (msg.channel === 'agent_assignment_changes') {

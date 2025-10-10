@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useId } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { AppSidebar } from "@/components/app-sidebar"
 import { AppHeader } from "@/components/app-header"
@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator, SelectGroup, SelectLabel } from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 import {
   ChartConfig,
   ChartContainer,
@@ -37,6 +37,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { ReloadButton } from "@/components/ui/reload-button"
 import { NoData } from "@/components/ui/no-data"
+import { calculateProductivityScore, formatTimeDuration, calculateActivePercentage } from "@/lib/utils"
+import { LeaderboardModal } from "@/components/modals/leaderboard-modal"
 
 interface LeaderboardEntry {
   id: number
@@ -52,13 +54,17 @@ interface LeaderboardEntry {
   total_seconds: number
   active_percentage: number
   rank: number
+  company_id?: number | null
 }
 
 export default function LeaderboardPage() {
   const { user } = useAuth()
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([])
+  const [allLeaderboardData, setAllLeaderboardData] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Tab state for daily/weekly/monthly
+  const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly'>('monthly')
   // Default month used for daily/weekly trend; timeframe selector removed but month selector kept
   const [timeframe] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly')
   const [selectedMonth, setSelectedMonth] = useState<number>(() => {
@@ -74,6 +80,11 @@ export default function LeaderboardPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })
 
+  // Unique IDs for each tab instance to prevent animation conflicts
+  const tabId1 = useId()
+  const tabId2 = useId()
+  const tabId3 = useId()
+
   // Update monthYear when month or year changes
   useEffect(() => {
     setMonthYear(`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`)
@@ -86,6 +97,7 @@ export default function LeaderboardPage() {
     last_name: string
     profile_picture: string | null
     points: number
+    inactive_seconds?: number
   }
   interface DailyTrendPoint {
     date: string // YYYY-MM-DD
@@ -107,13 +119,84 @@ export default function LeaderboardPage() {
   const [sortField, setSortField] = useState<'rank' | 'name' | 'points'>('rank')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
-  // Member filter state
-  const [memberId, setMemberId] = useState<string>('all')
-  const [memberOptions, setMemberOptions] = useState<{ id: number; company: string }[]>([])
+  // Company filter state
+  const [companyId, setCompanyId] = useState<string>('all')
+  const [companyOptions, setCompanyOptions] = useState<{ id: number; company: string; badge_color: string | null }[]>([])
+
+  // Leaderboard modal state
+  const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false)
+  const [selectedAgent, setSelectedAgent] = useState<LeaderboardEntry | null>(null)
+
+  // Handle row click to open leaderboard modal
+  const handleRowClick = (entry: LeaderboardEntry) => {
+    setSelectedAgent(entry)
+    setIsLeaderboardModalOpen(true)
+  }
+
+  // Calculate filtered leaderboard data based on company selection
+  const getFilteredLeaderboardData = () => {
+    // Safety check to prevent undefined errors
+    if (!allLeaderboardData || !Array.isArray(allLeaderboardData)) {
+      console.warn('⚠️ allLeaderboardData is not available:', allLeaderboardData)
+      return []
+    }
+    
+    let filteredData = allLeaderboardData
+    
+    console.log('🔍 Filtering leaderboard data:', {
+      companyId,
+      totalData: allLeaderboardData.length,
+      sampleData: allLeaderboardData.slice(0, 2).map(entry => ({
+        name: `${entry.first_name} ${entry.last_name}`,
+        company_id: entry.company_id
+      }))
+    })
+    
+    if (companyId !== 'all') {
+      if (companyId === 'none') {
+        // Show only entries with no company assignment
+        filteredData = allLeaderboardData.filter(entry => !entry.company_id)
+        console.log('🔍 Filtered for "none" company:', filteredData.length)
+      } else {
+        // Show only entries from the selected company
+        const selectedCompanyId = parseInt(companyId)
+        filteredData = allLeaderboardData.filter(entry => entry.company_id === selectedCompanyId)
+        console.log('🔍 Filtered for company', selectedCompanyId, ':', filteredData.length)
+      }
+    }
+    
+    // Calculate productivity scores from activity data
+    const processedData = filteredData.map(entry => {
+      const calculatedScore = calculateProductivityScore(
+        entry.total_active_seconds || 0,
+        entry.total_inactive_seconds || 0
+      )
+      
+      const calculatedPercentage = calculateActivePercentage(
+        entry.total_active_seconds || 0,
+        entry.total_inactive_seconds || 0
+      )
+      
+      return {
+        ...entry,
+        productivity_score: calculatedScore,
+        active_percentage: calculatedPercentage
+      }
+    })
+    
+    // Re-rank the filtered data
+    const rankedData = processedData.map((entry, index) => ({
+      ...entry,
+      rank: index + 1
+    }))
+    
+    console.log('🔍 Final filtered data with calculated scores:', rankedData.length, 'entries')
+    return rankedData
+  }
 
   // Fetch productivity scores data
   const fetchProductivityScores = async () => {
-    console.log('🔍 Fetching productivity scores for memberId:', memberId)
+    console.log('🔍 Fetching productivity scores for all companies')
     console.log('🔍 Full user data:', user)
     
     // Clear any previous errors and set loading
@@ -123,9 +206,18 @@ export default function LeaderboardPage() {
     try {
       console.log('📡 Making API request to /api/productivity-scores')
       const params = new URLSearchParams({
-        memberId: String(memberId),
-        timeframe: timeframe
+        companyId: 'all', // Always fetch all data
+        timeframe: activeTab === 'daily' ? 'monthly' : activeTab === 'weekly' ? 'monthly' : 'quarterly'
       })
+      
+      // Add trend parameter for daily, monthly and weekly tabs to use their respective data sources
+      if (activeTab === 'daily') {
+        params.append('trend', 'daily')
+      } else if (activeTab === 'monthly') {
+        params.append('trend', 'monthly')
+      } else if (activeTab === 'weekly') {
+        params.append('trend', 'weekly')
+      }
       
       if (monthYear) {
         params.append('monthYear', monthYear)
@@ -144,11 +236,34 @@ export default function LeaderboardPage() {
       const data = await response.json()
       console.log('✅ Productivity scores data received:', data)
       
-      setLeaderboardData(data.productivityScores)
-      setError(null) // Clear any previous errors
+      // Handle API response structure
+      if (data) {
+        if (activeTab === 'monthly' && data.source === 'monthly_activity_summary' && Array.isArray(data.productivityScores)) {
+          // Monthly tab using monthly_activity_summary table
+      setAllLeaderboardData(data.productivityScores)
+          setError(null)
+        } else if (activeTab === 'weekly' && data.source === 'weekly_activity_summary' && Array.isArray(data.productivityScores)) {
+          // Weekly tab using weekly_activity_summary table
+          setAllLeaderboardData(data.productivityScores)
+          setError(null)
+        } else if (activeTab === 'daily' && data.source === 'activity_data' && Array.isArray(data.productivityScores)) {
+          // Daily tab using activity_data table
+          setAllLeaderboardData(data.productivityScores)
+          setError(null)
+        } else {
+          console.warn('⚠️ Invalid API response structure for', activeTab, 'tab:', data)
+          setAllLeaderboardData([])
+          setError('Invalid data format received from server')
+        }
+      } else {
+        console.warn('⚠️ No data received from API')
+        setAllLeaderboardData([])
+        setError('No data received from server')
+      }
     } catch (err) {
       console.error('❌ Fetch error:', err)
       setError(err instanceof Error ? err.message : 'Failed to fetch productivity scores')
+      setAllLeaderboardData([]) // Ensure it's always an array
     } finally {
       setLoading(false)
     }
@@ -159,21 +274,21 @@ export default function LeaderboardPage() {
     if (user) {
       fetchProductivityScores()
     }
-  }, [user, timeframe, monthYear, memberId])
+  }, [user, activeTab, monthYear])
 
-  // Fetch member options
+  // Fetch company options
   useEffect(() => {
-    const fetchMembers = async () => {
+    const fetchCompanies = async () => {
       try {
         const res = await fetch('/api/agents', { method: 'OPTIONS' })
         const data = await res.json()
-        setMemberOptions(data.members || [])
+        setCompanyOptions(data.companies || [])
       } catch (e) {
-        console.error('❌ Failed to fetch members:', e)
-        setMemberOptions([])
+        console.error('❌ Failed to fetch companies:', e)
+        setCompanyOptions([])
       }
     }
-    fetchMembers()
+    fetchCompanies()
   }, [])
 
   // Reload function
@@ -185,9 +300,18 @@ export default function LeaderboardPage() {
       
       console.log('📡 Making API request to /api/productivity-scores')
       const params = new URLSearchParams({
-        memberId: String(memberId),
-        timeframe: timeframe
+        companyId: 'all', // Always fetch all data
+        timeframe: activeTab === 'daily' ? 'monthly' : activeTab === 'weekly' ? 'monthly' : 'quarterly'
       })
+      
+      // Add trend parameter for daily, monthly and weekly tabs to use their respective data sources
+      if (activeTab === 'daily') {
+        params.append('trend', 'daily')
+      } else if (activeTab === 'monthly') {
+        params.append('trend', 'monthly')
+      } else if (activeTab === 'weekly') {
+        params.append('trend', 'weekly')
+      }
       
       if (monthYear) {
         params.append('monthYear', monthYear)
@@ -206,12 +330,35 @@ export default function LeaderboardPage() {
       const data = await response.json()
       console.log('✅ Productivity scores data received:', data)
       
-      setLeaderboardData(data.productivityScores)
-      setError(null) // Clear any previous errors
+      // Handle API response structure
+      if (data) {
+        if (activeTab === 'monthly' && data.source === 'monthly_activity_summary' && Array.isArray(data.productivityScores)) {
+          // Monthly tab using monthly_activity_summary table
+      setAllLeaderboardData(data.productivityScores)
+          setError(null)
+        } else if (activeTab === 'weekly' && data.source === 'weekly_activity_summary' && Array.isArray(data.productivityScores)) {
+          // Weekly tab using weekly_activity_summary table
+          setAllLeaderboardData(data.productivityScores)
+          setError(null)
+        } else if (activeTab === 'daily' && data.source === 'activity_data' && Array.isArray(data.productivityScores)) {
+          // Daily tab using activity_data table
+          setAllLeaderboardData(data.productivityScores)
+          setError(null)
+        } else {
+          console.warn('⚠️ Invalid API response structure for', activeTab, 'tab:', data)
+          setAllLeaderboardData([])
+          setError('Invalid data format received from server')
+        }
+      } else {
+        console.warn('⚠️ No data received from API')
+        setAllLeaderboardData([])
+        setError('No data received from server')
+      }
       
     } catch (err) {
       console.error('❌ Reload error:', err)
       setError(err instanceof Error ? err.message : 'Failed to reload productivity scores')
+      setAllLeaderboardData([]) // Ensure it's always an array
     } finally {
       setReloading(false)
     }
@@ -278,7 +425,7 @@ export default function LeaderboardPage() {
       <IconArrowDown className="h-4 w-4 text-primary" />
   }
 
-  const sortedLeaderboardData = [...leaderboardData].sort((a, b) => {
+  const sortedLeaderboardData = [...getFilteredLeaderboardData()].sort((a, b) => {
     let aValue: string | number
     let bValue: string | number
 
@@ -292,8 +439,9 @@ export default function LeaderboardPage() {
         bValue = `${b.first_name} ${b.last_name}`.toLowerCase()
         break
       case 'points':
-        aValue = a.productivity_score
-        bValue = b.productivity_score
+        // Use calculated productivity score for sorting
+        aValue = calculateProductivityScore(a.total_active_seconds || 0, a.total_inactive_seconds || 0)
+        bValue = calculateProductivityScore(b.total_active_seconds || 0, b.total_inactive_seconds || 0)
         break
       default:
         return 0
@@ -343,6 +491,27 @@ export default function LeaderboardPage() {
 
   const yearOptions = generateYearOptions()
 
+  // Helper function to get current week range (Monday to Sunday)
+  const getCurrentWeekRange = () => {
+    const now = new Date()
+    const dayOfWeek = now.getDay() // 0 = Sunday, 1 = Monday, etc.
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek // Adjust for Monday start
+    
+    const monday = new Date(now)
+    monday.setDate(now.getDate() + mondayOffset)
+    
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    
+    return `${monday.toISOString().slice(0, 10)},${sunday.toISOString().slice(0, 10)}`
+  }
+
+  // Helper function to get today's date
+  const getTodayDate = () => {
+    const today = new Date()
+    return today.toISOString().slice(0, 10) // Returns "2025-01-15"
+  }
+
   // Fetch daily trend (activity_data) for selected month
   useEffect(() => {
     const fetchDailyTrend = async () => {
@@ -351,9 +520,10 @@ export default function LeaderboardPage() {
         setTrendError(null)
         setTrendLoading(true)
         const params = new URLSearchParams({
-          memberId: String(memberId),
-          trend: 'daily',
-          monthYear,
+          companyId: 'all', // Always fetch all data
+          trend: activeTab === 'monthly' ? 'daily' : activeTab === 'weekly' ? 'daily' : activeTab, // Monthly and weekly tabs should show daily data
+          monthYear: activeTab === 'daily' ? getTodayDate() : activeTab === 'weekly' ? getCurrentWeekRange() : monthYear, // Daily = today, Weekly = current week, Monthly = current month
+          forChart: 'true' // Indicate this is for chart data, not leaderboard
         })
         const res = await fetch(`/api/productivity-scores?${params}`)
         if (!res.ok) {
@@ -369,7 +539,7 @@ export default function LeaderboardPage() {
       }
     }
     fetchDailyTrend()
-  }, [user, monthYear, memberId])
+  }, [user, activeTab, monthYear])
 
   // Selected month label helpers
   const selectedMonthDate = new Date(monthYear + '-01')
@@ -388,6 +558,24 @@ export default function LeaderboardPage() {
   const dailyChartData = trendDaily.filter((d) =>
     (d.total_active_seconds ?? 0) > 0 || (d.total_inactive_seconds ?? 0) > 0
   )
+
+  // Get today's data for circle chart
+  const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+  const todayData = trendDaily.find(d => d.date === today)
+  
+  // Prepare data for circle chart (active vs inactive)
+  const circleChartData = todayData ? [
+    {
+      name: 'Active',
+      value: todayData.total_active_seconds || 0,
+      color: 'hsl(12 76% 61%)'
+    },
+    {
+      name: 'Inactive', 
+      value: todayData.total_inactive_seconds || 0,
+      color: 'hsl(0 0% 85%)'
+    }
+  ] : []
 
   if (loading) {
     return (
@@ -413,6 +601,37 @@ export default function LeaderboardPage() {
                         </div>
                       </div>
                       
+                      {/* Custom Tabs */}
+                      <div className="mb-6 flex-shrink-0">
+                        <div className="rounded-xl p-1 w-fit bg-gray-100/80 dark:bg-white/5 border border-gray-200 dark:border-white/10">
+                          <div className="flex gap-1 relative">
+                            {[
+                              { title: "Monthly", value: "monthly" },
+                              { title: "Weekly", value: "weekly" },
+                              { title: "Daily", value: "daily" }
+                            ].map((tab, idx) => (
+                              <button
+                                key={tab.value}
+                                onClick={() => setActiveTab(tab.value as 'daily' | 'weekly' | 'monthly')}
+                                className="relative px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 text-black dark:text-white hover:text-foreground"
+                                style={{ transformStyle: "preserve-3d" }}
+                              >
+                                {activeTab === tab.value && (
+                                  <motion.div
+                                    layoutId={`clickedbutton-${tabId1}`}
+                                    transition={{ type: "spring", bounce: 0.3, duration: 0.6 }}
+                                    className="absolute inset-0 bg-primary/10 rounded-lg"
+                                  />
+                                )}
+                                <span className="relative block text-gray-900 dark:text-white">
+                                  {tab.title}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      
                       <Card className="overflow-hidden">
                         <CardContent className="p-0">
                           <div className="">
@@ -432,7 +651,7 @@ export default function LeaderboardPage() {
                               </TableHeader>
                               <TableBody>
                                 {Array.from({ length: 20 }).map((_, i) => (
-                                  <TableRow key={i} className={`h-14 ${i < 3 ? "bg-muted/50" : ""}`}>
+                                  <TableRow key={i} className="h-14 cursor-pointer hover:bg-muted/50 transition-colors">
                                     <TableCell className="font-medium">
                                       <Skeleton className="h-4 w-8" />
                                     </TableCell>
@@ -490,21 +709,21 @@ export default function LeaderboardPage() {
                           </SelectContent>
                         </Select>
                         <div className="w-56">
-                          <Select value={memberId} onValueChange={(v: string) => setMemberId(v)}>
+                          <Select value={companyId} onValueChange={(v: string) => setCompanyId(v)}>
                             <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Filter by member">
-                                {memberId === 'all' ? 'All Agents' : 
-                                 memberId === 'none' ? 'No Assigned Members' :
-                                 memberOptions.find(m => String(m.id) === memberId)?.company || 'Filter by member'}
+                              <SelectValue placeholder="Filter by company">
+                                {companyId === 'all' ? 'All Agents' : 
+                                 companyId === 'none' ? 'No Assigned Companies' :
+                                 companyOptions.find(m => String(m.id) === companyId)?.company || 'Filter by company'}
                               </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="all">All Agents</SelectItem>
-                              <SelectItem value="none">No Assigned Members</SelectItem>
+                              <SelectItem value="none">No Assigned Companies</SelectItem>
                               <SelectSeparator className="bg-border mx-2" />
                               <SelectGroup>
-                                <SelectLabel className="text-muted-foreground">Members</SelectLabel>
-                                {memberOptions.map((m) => (
+                                <SelectLabel className="text-muted-foreground">Companies</SelectLabel>
+                                {companyOptions.map((m) => (
                                   <SelectItem key={m.id} value={String(m.id)}>{m.company}</SelectItem>
                                 ))}
                               </SelectGroup>
@@ -530,16 +749,17 @@ export default function LeaderboardPage() {
                             </CardTitle>
                           </div>
                           <CardDescription>
-                            Highlighting those who lead in activity and stay consistently engaged this month.
+                            {activeTab === 'daily' ? (
+                              'Highlighting those who lead in activity and stay consistently engaged today.'
+                            ) : activeTab === 'weekly' ? (
+                              'Highlighting those who lead in activity and stay consistently engaged this week.'
+                            ) : (
+                              'Highlighting those who lead in activity and stay consistently engaged this month.'
+                            )}
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="p-0">
                           <div className="relative">
-                            {/* Month label: desktop bottom-left */}
-                            <CardTitle className="hidden lg:flex absolute left-6 bottom-4 items-center gap-2">
-                              {selectedMonthName} {selectedYearValue}
-                            </CardTitle>
-                            
                             {/* Podium Base */}
                             <div className="flex items-end justify-center gap-4 h-80">
                               {/* 2nd Place Pillar */}
@@ -594,15 +814,24 @@ export default function LeaderboardPage() {
                         </CardContent>
                       </Card>
 
-                      {/* Daily Performance */}
+                      {/* Productivity Trends Chart - Static Loading State */}
                       <Card className="mt-6 @container/card">
                         <CardHeader className="relative pb-0">
                           <CardTitle className="flex items-center gap-2">
-                            Daily Performance
+                            {activeTab === 'daily' ? 'Daily' : activeTab === 'weekly' ? 'Weekly' : 'Monthly'} Breakdown
                           </CardTitle>
                           <CardDescription>
-                            <span className="@[540px]/card:block hidden">Track daily points for {selectedMonthName}—tap or hover to reveal the top 5 stars.</span>
-                            <span className="@[540px]/card:hidden">Track daily points for {selectedMonthName}—tap or hover to reveal the top 5 stars.</span>
+                            {activeTab === 'daily' ? (
+                              <>
+                                <span className="@[540px]/card:block hidden">Track daily points for {selectedMonthName}—hover to reveal the top 5 stars.</span>
+                                <span className="@[540px]/card:hidden">Track daily points for {selectedMonthName}—hover to reveal the top 5 stars.</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="@[540px]/card:block hidden">Track {activeTab} points for {selectedMonthName}—hover to reveal the top 5 stars.</span>
+                                <span className="@[540px]/card:hidden">Track {activeTab} points for {selectedMonthName}—hover to reveal the top 5 stars.</span>
+                              </>
+                            )}
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="px-0 pt-4 sm:px-0 sm:pt-6">
@@ -615,9 +844,9 @@ export default function LeaderboardPage() {
                                 <Skeleton key={i} className="h-3 w-8" />
                               ))}
                             </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
                   </div>
                 </div>
@@ -649,6 +878,37 @@ export default function LeaderboardPage() {
                           <p className="text-sm text-muted-foreground">
                             View team rankings based on productivity scores and activity metrics.
                           </p>
+                        </div>
+                      </div>
+                      
+                      {/* Custom Tabs */}
+                      <div className="mb-6 flex-shrink-0">
+                        <div className="rounded-xl p-1 w-fit bg-gray-100/80 dark:bg-white/5 border border-gray-200 dark:border-white/10">
+                          <div className="flex gap-1 relative">
+                            {[
+                              { title: "Daily", value: "daily" },
+                              { title: "Weekly", value: "weekly" },
+                              { title: "Monthly", value: "monthly" }
+                            ].map((tab, idx) => (
+                              <button
+                                key={tab.value}
+                                onClick={() => setActiveTab(tab.value as 'daily' | 'weekly' | 'monthly')}
+                                className="relative px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 text-black dark:text-white hover:text-foreground"
+                                style={{ transformStyle: "preserve-3d" }}
+                              >
+                                {activeTab === tab.value && (
+                                  <motion.div
+                                    layoutId={`clickedbutton-${tabId2}`}
+                                    transition={{ type: "spring", bounce: 0.3, duration: 0.6 }}
+                                    className="absolute inset-0 bg-primary/10 rounded-lg"
+                                  />
+                                )}
+                                <span className="relative block text-black dark:text-white">
+                                  {tab.title}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
                       
@@ -700,6 +960,37 @@ export default function LeaderboardPage() {
                       </div>
                     </div>
                     
+                    {/* Custom Tabs */}
+                    <div className="mb-6 flex-shrink-0">
+                      <div className="rounded-xl p-1 w-fit bg-gray-100/80 dark:bg-white/5 border border-gray-200 dark:border-white/10">
+                        <div className="flex gap-1 relative">
+                          {[
+                            { title: "Monthly", value: "monthly" },
+                            { title: "Weekly", value: "weekly" },
+                            { title: "Daily", value: "daily" }
+                          ].map((tab, idx) => (
+                            <button
+                              key={tab.value}
+                              onClick={() => setActiveTab(tab.value as 'daily' | 'weekly' | 'monthly')}
+                              className="relative px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 text-black dark:text-white hover:text-foreground"
+                              style={{ transformStyle: "preserve-3d" }}
+                            >
+                              {activeTab === tab.value && (
+                                <motion.div
+                                  layoutId={`clickedbutton-${tabId3}`}
+                                  transition={{ type: "spring", bounce: 0.3, duration: 0.6 }}
+                                  className="absolute inset-0 bg-primary/10 rounded-lg"
+                                />
+                              )}
+                              <span className="relative block text-gray-900 dark:text-white">
+                                {tab.title}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    
                     <Card className="overflow-hidden">
                       <CardContent className="p-0">
                         <div className="">
@@ -737,7 +1028,11 @@ export default function LeaderboardPage() {
                             </TableHeader>
                             <TableBody>
                               {sortedLeaderboardData.map((entry, index) => (
-                                <TableRow key={`${entry.id}-${index}`} className={`h-14 ${index < 3 ? "bg-muted/50" : ""}`}>
+                                <TableRow 
+                                  key={`${entry.id}-${index}`} 
+                                  className="h-14 cursor-pointer hover:bg-muted/50 transition-colors"
+                                  onClick={() => handleRowClick(entry)}
+                                >
                                   <TableCell className="font-medium">
                                     <span className={`text-sm font-medium ${
                                       entry.rank === 1 ? 'text-yellow-500' :
@@ -765,7 +1060,7 @@ export default function LeaderboardPage() {
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-center">
-                                    <span className="text-sm">{formatPoints(entry.productivity_score)}</span>
+                                    <span className="text-sm">{calculateProductivityScore(entry.total_active_seconds || 0, entry.total_inactive_seconds || 0).toFixed(2)}</span>
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -807,21 +1102,21 @@ export default function LeaderboardPage() {
                         </SelectContent>
                       </Select>
                       <div className="w-56">
-                        <Select value={memberId} onValueChange={(v: string) => setMemberId(v)}>
+                        <Select value={companyId} onValueChange={(v: string) => setCompanyId(v)}>
                           <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Filter by member">
-                              {memberId === 'all' ? 'All Agents' : 
-                               memberId === 'none' ? 'No Assigned Members' :
-                               memberOptions.find(m => String(m.id) === memberId)?.company || 'Filter by member'}
+                            <SelectValue placeholder="Filter by company">
+                              {companyId === 'all' ? 'All Agents' : 
+                               companyId === 'none' ? 'No Assigned Companies' :
+                               companyOptions.find(m => String(m.id) === companyId)?.company || 'Filter by company'}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="all">All Agents</SelectItem>
-                            <SelectItem value="none">No Assigned Members</SelectItem>
+                            <SelectItem value="none">No Assigned Companies</SelectItem>
                             <SelectSeparator className="bg-border mx-2" />
                             <SelectGroup>
-                              <SelectLabel className="text-muted-foreground">Members</SelectLabel>
-                              {memberOptions.map((m) => (
+                              <SelectLabel className="text-muted-foreground">Companies</SelectLabel>
+                              {companyOptions.map((m) => (
                                 <SelectItem key={m.id} value={String(m.id)}>{m.company}</SelectItem>
                               ))}
                             </SelectGroup>
@@ -846,28 +1141,29 @@ export default function LeaderboardPage() {
                           </CardTitle>
                         </div>
                         <CardDescription>
-                          Highlighting those who lead in activity and stay consistently engaged this month.
+                          {activeTab === 'daily' ? (
+                            'Highlighting those who lead in activity and stay consistently engaged today.'
+                          ) : activeTab === 'weekly' ? (
+                            'Highlighting those who lead in activity and stay consistently engaged this week.'
+                          ) : (
+                            'Highlighting those who lead in activity and stay consistently engaged this month.'
+                          )}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="p-0">
                         <div className="relative">
                           {/* Removed decorative trophy image */}
                           
-                          {/* Month label: desktop bottom-left */}
-                          <CardTitle className="hidden lg:flex absolute left-6 bottom-4 items-center gap-2">
-                            {selectedMonthName} {selectedYearValue}
-                          </CardTitle>
-                          
                           {/* Podium Base */}
                           <div className="flex items-end justify-center gap-4 h-80">
                             {/* 2nd Place Pillar */}
-                            {leaderboardData[1] && (
+                            {sortedLeaderboardData[1] && (
                               <div className="flex flex-col items-center">
                                 <div className="relative mb-2">
                                   <Avatar className="h-16 w-16 border-4 border-gray-300">
-                                    <AvatarImage src={leaderboardData[1].profile_picture || undefined} />
+                                    <AvatarImage src={sortedLeaderboardData[1].profile_picture || undefined} />
                                     <AvatarFallback className="text-lg">
-                                      {leaderboardData[1].first_name?.[0]}{leaderboardData[1].last_name?.[0]}
+                                      {sortedLeaderboardData[1].first_name?.[0]}{sortedLeaderboardData[1].last_name?.[0]}
                                     </AvatarFallback>
                                   </Avatar>
                                   <div className="absolute -top-1 -right-1 bg-gray-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
@@ -877,22 +1173,22 @@ export default function LeaderboardPage() {
                                 </div>
                                 <div className="text-center mb-2">
                                   <div className="font-semibold text-sm">
-                                    {leaderboardData[1].first_name} {leaderboardData[1].last_name}
+                                    {sortedLeaderboardData[1].first_name} {sortedLeaderboardData[1].last_name}
                                   </div>
-                                  <div className="text-xs text-muted-foreground">Points: {formatPoints(leaderboardData[1].productivity_score)}</div>
+                                  <div className="text-xs text-muted-foreground">Points: {calculateProductivityScore(sortedLeaderboardData[1].total_active_seconds || 0, sortedLeaderboardData[1].total_inactive_seconds || 0).toFixed(2)}</div>
                                 </div>
                                 <div className="w-20 h-32 bg-gradient-to-t from-gray-400/20 to-gray-300/10 rounded-t-lg backdrop-blur-sm border border-gray-200/20"></div>
                               </div>
                             )}
 
                             {/* 1st Place Pillar */}
-                            {leaderboardData[0] && (
+                            {sortedLeaderboardData[0] && (
                               <div className="flex flex-col items-center">
                                 <div className="relative mb-2">
                                   <Avatar className="h-20 w-20 border-4 border-yellow-400">
-                                    <AvatarImage src={leaderboardData[0].profile_picture || undefined} />
+                                    <AvatarImage src={sortedLeaderboardData[0].profile_picture || undefined} />
                                     <AvatarFallback className="text-xl">
-                                      {leaderboardData[0].first_name?.[0]}{leaderboardData[0].last_name?.[0]}
+                                      {sortedLeaderboardData[0].first_name?.[0]}{sortedLeaderboardData[0].last_name?.[0]}
                                     </AvatarFallback>
                                   </Avatar>
                                   <div className="absolute -top-1 -right-1 bg-yellow-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
@@ -902,22 +1198,22 @@ export default function LeaderboardPage() {
                                 </div>
                                 <div className="text-center mb-2">
                                   <div className="font-bold text-sm">
-                                    {leaderboardData[0].first_name} {leaderboardData[0].last_name}
+                                    {sortedLeaderboardData[0].first_name} {sortedLeaderboardData[0].last_name}
                                   </div>
-                                  <div className="text-xs text-muted-foreground">Points: {formatPoints(leaderboardData[0].productivity_score)}</div>
+                                  <div className="text-xs text-muted-foreground">Points: {calculateProductivityScore(sortedLeaderboardData[0].total_active_seconds || 0, sortedLeaderboardData[0].total_inactive_seconds || 0).toFixed(2)}</div>
                                 </div>
                                 <div className="w-24 h-40 bg-gradient-to-t from-yellow-400/20 to-yellow-300/10 rounded-t-lg backdrop-blur-sm border border-yellow-200/20"></div>
                               </div>
                             )}
 
                             {/* 3rd Place Pillar */}
-                            {leaderboardData[2] && (
+                            {sortedLeaderboardData[2] && (
                               <div className="flex flex-col items-center">
                                 <div className="relative mb-2">
                                   <Avatar className="h-16 w-16 border-4 border-amber-600">
-                                    <AvatarImage src={leaderboardData[2].profile_picture || undefined} />
+                                    <AvatarImage src={sortedLeaderboardData[2].profile_picture || undefined} />
                                     <AvatarFallback className="text-lg">
-                                      {leaderboardData[2].first_name?.[0]}{leaderboardData[2].last_name?.[0]}
+                                      {sortedLeaderboardData[2].first_name?.[0]}{sortedLeaderboardData[2].last_name?.[0]}
                                     </AvatarFallback>
                                   </Avatar>
                                   <div className="absolute -top-1 -right-1 bg-amber-700 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
@@ -927,9 +1223,9 @@ export default function LeaderboardPage() {
                                 </div>
                                 <div className="text-center mb-2">
                                   <div className="font-semibold text-sm">
-                                    {leaderboardData[2].first_name} {leaderboardData[2].last_name}
+                                    {sortedLeaderboardData[2].first_name} {sortedLeaderboardData[2].last_name}
                                   </div>
-                                  <div className="text-xs text-muted-foreground">Points: {formatPoints(leaderboardData[2].productivity_score)}</div>
+                                  <div className="text-xs text-muted-foreground">Points: {calculateProductivityScore(sortedLeaderboardData[2].total_active_seconds || 0, sortedLeaderboardData[2].total_inactive_seconds || 0).toFixed(2)}</div>
                                 </div>
                                 <div className="w-20 h-32 bg-gradient-to-t from-amber-600/20 to-amber-500/10 rounded-t-lg backdrop-blur-sm border border-amber-400/20"></div>
                               </div>
@@ -943,11 +1239,20 @@ export default function LeaderboardPage() {
                     <Card className="mt-6 @container/card">
                       <CardHeader className="relative pb-0">
                         <CardTitle className="flex items-center gap-2">
-                          Daily Performance
+                          {activeTab === 'daily' ? 'Daily' : activeTab === 'weekly' ? 'Weekly' : 'Monthly'} Breakdown
                         </CardTitle>
                         <CardDescription>
-                          <span className="@[540px]/card:block hidden">Track daily points for {selectedMonthName}—tap or hover to reveal the top 5 stars.</span>
-                          <span className="@[540px]/card:hidden">Track daily points for {selectedMonthName}—tap or hover to reveal the top 5 stars.</span>
+                          {activeTab === 'daily' ? (
+                            <>
+                              <span className="@[540px]/card:block hidden">Track daily points for {selectedMonthName}—hover to reveal the top 5 stars.</span>
+                              <span className="@[540px]/card:hidden">Track daily points for {selectedMonthName}—hover to reveal the top 5 stars.</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="@[540px]/card:block hidden">Track {activeTab} points for {selectedMonthName}—hover to reveal the top 5 stars.</span>
+                              <span className="@[540px]/card:hidden">Track {activeTab} points for {selectedMonthName}—hover to reveal the top 5 stars.</span>
+                            </>
+                          )}
                         </CardDescription>
                         {/* No range toggle for daily chart; controlled by month selector above */}
                       </CardHeader>
@@ -958,13 +1263,209 @@ export default function LeaderboardPage() {
                         {!trendLoading && !trendError && dailyChartData.length === 0 && (
                           <NoData message="No Activity Data" />
                         )}
-                        {!trendLoading && !trendError && dailyChartData.length > 0 && (
+                            {!trendLoading && !trendError && activeTab === 'daily' && trendDaily.length > 0 && (
+                              <ChartContainer
+                                config={chartConfig}
+                                className="aspect-auto h-[250px] w-full"
+                              >
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <AreaChart data={trendDaily}>
+                                    <defs>
+                                      <linearGradient id="fillActive" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="hsl(12 76% 61%)" stopOpacity={0.8}/>
+                                        <stop offset="95%" stopColor="hsl(12 76% 61%)" stopOpacity={0.1}/>
+                                      </linearGradient>
+                                    </defs>
+                                    <XAxis
+                                      dataKey="date"
+                                      tickLine={false}
+                                      axisLine={false}
+                                      tickMargin={8}
+                                      minTickGap={32}
+                                      tickFormatter={(value) => {
+                                        const date = new Date(value)
+                                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                      }}
+                                    />
+                                    <YAxis
+                                      tickLine={false}
+                                      axisLine={false}
+                                      tickMargin={8}
+                                      domain={[1, 'dataMax']}
+                                      tickFormatter={(value: number) => {
+                                        const points = Math.round(value)
+                                        return points === 0 ? '' : `${points}pts`
+                                      }}
+                                    />
+                                    <ChartTooltip
+                                      cursor={false}
+                                      content={
+                                        <ChartTooltipContent
+                                          className="min-w-[16rem]"
+                                          labelClassName="text-center w-full"
+                                          labelFormatter={(value) => {
+                                            const date = new Date(value)
+                                            const dateText = date.toLocaleDateString("en-US", {
+                                              month: "long",
+                                              day: "numeric",
+                                              year: "numeric",
+                                            })
+                                            return (
+                                              <div className="flex w-full flex-col items-center">
+                                                <span>{dateText}</span>
+                                                <div className="h-px w-full bg-foreground/20 my-1" />
+                                              </div>
+                                            )
+                                          }}
+                                          indicator="dot"
+                                          formatter={(val, name, item, _idx, point: any) => {
+                                            const d = point as any
+                                            return (
+                                              <div className="flex w-full flex-col gap-1">
+                                                <div className="flex w-full items-center justify-between text-muted-foreground">
+                                                  <span>Top</span>
+                                                  <span>Points</span>
+                                                </div>
+                                                {([1,2,3,4,5] as const).map((rank) => {
+                                                  const user = d?.[`top${rank}` as const] as any | null | undefined
+                                                  return (
+                                                    <div key={rank} className="flex w-full items-center justify-between">
+                                                      <span className="flex items-center gap-2">
+                                                        <span className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-muted text-[10px]">{rank}</span>
+                                                        {user ? `${user.first_name} ${user.last_name}` : '—'}
+                                                      </span>
+                                                      <span>{user ? calculateProductivityScore(user.points || 0, user.inactive_seconds || 0).toLocaleString() : '—'}</span>
+                                                    </div>
+                                                  )
+                                                })}
+                                              </div>
+                                            )
+                                          }}
+                                        />
+                                      }
+                                    />
+                                    <Area
+                                      dataKey={(entry: any) => {
+                                        // Calculate productivity score from individual user data (top1)
+                                        const topUser = entry.top1
+                                        if (!topUser) return 0
+                                        return calculateProductivityScore(topUser.points || 0, topUser.inactive_seconds || 0)
+                                      }}
+                                      type="natural"
+                                      fill="url(#fillActive)"
+                                      fillOpacity={0.4}
+                                      stroke="hsl(12 76% 61%)"
+                                      stackId="a"
+                                    />
+                                  </AreaChart>
+                                </ResponsiveContainer>
+                              </ChartContainer>
+                            )}
+                        {!trendLoading && !trendError && activeTab === 'monthly' && trendDaily.length > 0 && (
+                          <ChartContainer
+                            config={chartConfig}
+                            className="aspect-auto h-[250px] w-full"
+                          >
+                            <ResponsiveContainer width="100%" height="100%">
+                              <AreaChart data={trendDaily}>
+                                <defs>
+                                  <linearGradient id="fillMonthly" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="hsl(12 76% 61%)" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="hsl(12 76% 61%)" stopOpacity={0.1}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis
+                                  dataKey="date"
+                                  tickLine={false}
+                                  axisLine={false}
+                                  tickMargin={8}
+                                  minTickGap={32}
+                                  tickFormatter={(value) => {
+                                    const date = new Date(value)
+                                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                  }}
+                                />
+                                <YAxis
+                                  tickLine={false}
+                                  axisLine={false}
+                                  tickMargin={8}
+                                  domain={[1, 'dataMax']}
+                                  tickFormatter={(value: number) => {
+                                    const points = Math.round(value)
+                                    return points === 0 ? '' : `${points}pts`
+                                  }}
+                                />
+                                <ChartTooltip
+                                  cursor={false}
+                                  content={
+                                    <ChartTooltipContent
+                                      className="min-w-[16rem]"
+                                      labelClassName="text-center w-full"
+                                      labelFormatter={(value) => {
+                                        const date = new Date(value)
+                                        const dateText = date.toLocaleDateString("en-US", {
+                                          month: "long",
+                                          day: "numeric",
+                                          year: "numeric",
+                                        })
+                                        return (
+                                          <div className="flex w-full flex-col items-center">
+                                            <span>{dateText}</span>
+                                            <div className="h-px w-full bg-foreground/20 my-1" />
+                                          </div>
+                                        )
+                                      }}
+                                      indicator="dot"
+                                      formatter={(val, name, item, _idx, point: any) => {
+                                        const d = point as any
+                                        return (
+                                          <div className="flex w-full flex-col gap-1">
+                                            <div className="flex w-full items-center justify-between text-muted-foreground">
+                                              <span>Top</span>
+                                              <span>Points</span>
+                                            </div>
+                                            {([1,2,3,4,5] as const).map((rank) => {
+                                              const user = d?.[`top${rank}` as const] as any | null | undefined
+                                              return (
+                                                <div key={rank} className="flex w-full items-center justify-between">
+                                                  <span className="flex items-center gap-2">
+                                                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-muted text-[10px]">{rank}</span>
+                                                    {user ? `${user.first_name} ${user.last_name}` : '—'}
+                                                  </span>
+                                                  <span>{user ? calculateProductivityScore(user.points || 0, user.inactive_seconds || 0).toLocaleString() : '—'}</span>
+                                                </div>
+                                              )
+                                            })}
+                                          </div>
+                                        )
+                                      }}
+                                    />
+                                  }
+                                />
+                                <Area
+                                  dataKey={(entry: any) => {
+                                    // Calculate productivity score from individual user data (top1)
+                                    const topUser = entry.top1
+                                    if (!topUser) return 0
+                                    return calculateProductivityScore(topUser.points || 0, topUser.inactive_seconds || 0)
+                                  }}
+                                  type="natural"
+                                  fill="url(#fillMonthly)"
+                                  fillOpacity={0.4}
+                                  stroke="hsl(12 76% 61%)"
+                                  stackId="a"
+                                />
+                              </AreaChart>
+                            </ResponsiveContainer>
+                          </ChartContainer>
+                        )}
+                         {!trendLoading && !trendError && activeTab === 'weekly' && trendDaily.length > 0 && (
                           <div className="relative">
                             <ChartContainer
                               config={chartConfig}
                               className="aspect-auto h-[250px] w-full"
                             >
-                            <AreaChart data={dailyChartData} margin={{ top: 10, right: 0, bottom: 0, left: 0 }}>
+                             <AreaChart data={trendDaily} margin={{ top: 10, right: 0, bottom: 0, left: 0 }}>
                             <defs>
                           <linearGradient id="fillTotalActive" x1="0" y1="0" x2="0" y2="1">
                                 <stop
@@ -992,6 +1493,16 @@ export default function LeaderboardPage() {
                                   month: "short",
                                   day: "numeric",
                                 })
+                              }}
+                            />
+                            <YAxis
+                              tickLine={false}
+                              axisLine={false}
+                              tickMargin={8}
+                              domain={[1, 'dataMax']}
+                              tickFormatter={(value: number) => {
+                                const points = Math.round(value)
+                                return points === 0 ? '' : `${points}pts`
                               }}
                             />
                             <ChartTooltip
@@ -1031,7 +1542,7 @@ export default function LeaderboardPage() {
                                                 <span className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-muted text-[10px]">{rank}</span>
                                                 {user ? `${user.first_name} ${user.last_name}` : '—'}
                                               </span>
-                                              <span>{user?.points?.toLocaleString?.() || '—'}</span>
+                                               <span>{user ? calculateProductivityScore(user.points || 0, user.inactive_seconds || 0).toLocaleString() : '—'}</span>
                                             </div>
                                           )
                                         })}
@@ -1042,7 +1553,12 @@ export default function LeaderboardPage() {
                               }
                             />
                             <Area
-                              dataKey="total_active_seconds"
+                              dataKey={(entry: any) => {
+                                // Calculate productivity score from individual user data (top1)
+                                const topUser = entry.top1
+                                if (!topUser) return 0
+                                return calculateProductivityScore(topUser.points || 0, topUser.inactive_seconds || 0)
+                              }}
                               type="natural"
                               fill="url(#fillTotalActive)"
                               stroke="var(--color-totalActive)"
@@ -1064,6 +1580,51 @@ export default function LeaderboardPage() {
           </div>
         </div>
       </SidebarInset>
+
+      {/* Leaderboard Modal */}
+      {selectedAgent && (
+        <LeaderboardModal
+          isOpen={isLeaderboardModalOpen}
+          onClose={() => {
+            setIsLeaderboardModalOpen(false)
+            setSelectedAgent(null)
+          }}
+          agentId={selectedAgent.user_id.toString()}
+          agentData={{
+            user_id: selectedAgent.user_id,
+            email: selectedAgent.email,
+            user_type: "Agent",
+            first_name: selectedAgent.first_name,
+            middle_name: null,
+            last_name: selectedAgent.last_name,
+            nickname: null,
+            profile_picture: selectedAgent.profile_picture,
+            phone: null,
+            birthday: null,
+            city: null,
+            address: null,
+            gender: null,
+            employee_id: null,
+            job_title: null,
+            work_email: null,
+            shift_period: null,
+            shift_schedule: null,
+            shift_time: null,
+            work_setup: null,
+            employment_status: null,
+            hire_type: null,
+            staff_source: null,
+            start_date: null,
+            exit_date: null,
+            company_id: selectedAgent.company_id || null,
+            company_name: selectedAgent.company_id ? companyOptions.find(c => c.id === selectedAgent.company_id)?.company || null : null,
+            company_badge_color: selectedAgent.company_id ? companyOptions.find(c => c.id === selectedAgent.company_id)?.badge_color || null : null,
+            department_id: null,
+            department_name: selectedAgent.department_name,
+            station_id: null
+          }}
+        />
+      )}
     </>
   )
 }

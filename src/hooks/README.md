@@ -18,9 +18,9 @@ A comprehensive hook that combines comments and activity logs functionality with
 ### Basic Usage
 
 ```tsx
-import { useRealtimeActivityLogs, createMembersConfig } from '@/hooks/use-realtime-activity-logs'
+import { useRealtimeActivityLogs, createCompaniesConfig } from '@/hooks/use-realtime-activity-logs'
 
-function MembersComponent({ memberId }: { memberId: number }) {
+function CompaniesComponent({ companyId }: { companyId: number }) {
   const { 
     comments, 
     activityLogs, 
@@ -31,7 +31,7 @@ function MembersComponent({ memberId }: { memberId: number }) {
     addComment, 
     deleteComment, 
     refreshData 
-  } = useRealtimeActivityLogs(createMembersConfig(memberId))
+  } = useRealtimeActivityLogs(createCompaniesConfig(companyId))
 
   // Use the data and functions...
 }
@@ -41,9 +41,9 @@ function MembersComponent({ memberId }: { memberId: number }) {
 
 The hook comes with several pre-configured setups for common tables:
 
-#### 1. Members Table
+#### 1. Companies Table
 ```tsx
-const config = createMembersConfig(memberId)
+const config = createCompaniesConfig(companyId)
 ```
 
 #### 2. Tickets Table
@@ -108,7 +108,7 @@ interface CommentRecord {
   last_name?: string | null
   profile_picture?: string | null
   user_name?: string
-  [key: string]: any // Additional fields like member_id, ticket_id, etc.
+  [key: string]: any // Additional fields like company_id, ticket_id, etc.
 }
 ```
 
@@ -127,7 +127,7 @@ interface ActivityLogRecord {
   last_name?: string | null
   profile_picture?: string | null
   user_name?: string
-  [key: string]: any // Additional fields like member_id, ticket_id, etc.
+  [key: string]: any // Additional fields like company_id, ticket_id, etc.
 }
 ```
 
@@ -137,7 +137,7 @@ The hook expects WebSocket messages in this format:
 
 ```tsx
 {
-  type: 'your_message_type', // e.g., 'member_comment_update'
+  type: 'your_message_type', // e.g., 'company_comment_update'
   data: {
     action: 'INSERT' | 'UPDATE' | 'DELETE',
     record: CommentRecord | ActivityLogRecord,
@@ -182,17 +182,17 @@ If you're migrating from the old `use-realtime-comments.ts`:
    import { useRealtimeComments } from '@/hooks/use-realtime-comments'
    
    // New
-   import { useRealtimeActivityLogs, createMembersConfig } from '@/hooks/use-realtime-activity-logs'
+   import { useRealtimeActivityLogs, createCompaniesConfig } from '@/hooks/use-realtime-activity-logs'
    ```
 
 2. **Update the hook call**:
    ```tsx
    // Old
-   const { comments, loading, error } = useRealtimeComments(memberId)
+   const { comments, loading, error } = useRealtimeComments(companyId)
    
    // New
    const { comments, activityLogs, allEntries, loading, error } = useRealtimeActivityLogs(
-     createMembersConfig(memberId)
+     createCompaniesConfig(companyId)
    )
    ```
 
@@ -204,6 +204,6 @@ If you're migrating from the old `use-realtime-comments.ts`:
 ### Examples
 
 See the component files for complete usage examples:
-- `src/components/members-activity-log.tsx` - Members table usage
+- `src/components/companies-activity-log.tsx` - Companies table usage
 - Future components can use the same pattern for other tables
 

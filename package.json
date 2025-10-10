@@ -23,11 +23,11 @@
     "test-redis": "node scripts/test-redis.js",
     "check-redis": "node scripts/check-redis-data.js",
     "create-accounts": "node scripts/create-supabase-accounts.js",
-    "apply-member-triggers": "psql $DATABASE_URL -f scripts/create-member-triggers.sql",
-    "test-member-realtime": "node scripts/test-member-realtime.js",
-    "apply-members-activity-log": "psql $DATABASE_URL -f scripts/apply-members-activity-log.sql",
-    "apply-members-activity-log-simple": "psql $DATABASE_URL -f scripts/apply-members-activity-log-simple.sql",
-    "apply-members-activity-log-fields": "psql $DATABASE_URL -f scripts/apply-members-activity-log-fields.sql",
+    "apply-company-triggers": "psql $DATABASE_URL -f scripts/create-company-triggers.sql",
+    "test-company-realtime": "node scripts/test-company-realtime.js",
+    "apply-companies-activity-log": "psql $DATABASE_URL -f scripts/apply-companies-activity-log.sql",
+    "apply-companies-activity-log-simple": "psql $DATABASE_URL -f scripts/apply-companies-activity-log-simple.sql",
+    "apply-companies-activity-log-fields": "psql $DATABASE_URL -f scripts/apply-companies-activity-log-fields.sql",
     "setup-ai-chat": "node scripts/setup-ai-chat.js"
   },
   "dependencies": {

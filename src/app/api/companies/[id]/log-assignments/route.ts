@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { MembersActivityLogger } from '@/lib/logs-utils'
+import { CompaniesActivityLogger } from '@/lib/logs-utils'
 
 export async function POST(
   request: NextRequest,
@@ -7,10 +7,10 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const memberId = parseInt(id, 10)
+    const companyId = parseInt(id, 10)
     
-    if (isNaN(memberId)) {
-      return NextResponse.json({ error: 'Invalid member ID' }, { status: 400 })
+    if (isNaN(companyId)) {
+      return NextResponse.json({ error: 'Invalid company ID' }, { status: 400 })
     }
 
     const { 
@@ -23,7 +23,7 @@ export async function POST(
 
     // Debug logging
     console.log('🔍 Assignment logging request:', {
-      memberId,
+      companyId,
       originalAgentIds,
       currentAgentIds,
       originalClientIds,
@@ -38,14 +38,14 @@ export async function POST(
     // Log agent assignment changes
     if (originalAgentIds !== undefined && currentAgentIds !== undefined) {
       console.log('🔍 Logging agent assignment change:', {
-        memberId,
+        companyId,
         originalAgentIds,
         currentAgentIds,
         userId
       })
       
-      await MembersActivityLogger.logAgentAssignmentChange(
-        memberId,
+      await CompaniesActivityLogger.logAgentAssignmentChange(
+        companyId,
         originalAgentIds,
         currentAgentIds,
         userId
@@ -57,14 +57,14 @@ export async function POST(
     // Log client assignment changes
     if (originalClientIds !== undefined && currentClientIds !== undefined) {
       console.log('🔍 Logging client assignment change:', {
-        memberId,
+        companyId,
         originalClientIds,
         currentClientIds,
         userId
       })
       
-      await MembersActivityLogger.logClientAssignmentChange(
-        memberId,
+      await CompaniesActivityLogger.logClientAssignmentChange(
+        companyId,
         originalClientIds,
         currentClientIds,
         userId

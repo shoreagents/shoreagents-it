@@ -4,17 +4,17 @@ import { getBreakSessions, getBreakStats } from '@/lib/db-utils'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const memberId = searchParams.get('memberId')
+    const companyId = searchParams.get('companyId')
     const date = searchParams.get('date')
 
-    console.log('📊 API: Fetching break sessions for memberId:', memberId, 'date:', date)
+    console.log('📊 API: Fetching break sessions for companyId:', companyId, 'date:', date)
 
-    if (!memberId) {
-      return NextResponse.json({ error: 'Member ID is required' }, { status: 400 })
+    if (!companyId) {
+      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
-    const breakSessions = await getBreakSessions(memberId, date!)
-    const stats = await getBreakStats(memberId, date!)
+    const breakSessions = await getBreakSessions(companyId, date!)
+    const stats = await getBreakStats(companyId, date!)
 
     return NextResponse.json({ breakSessions, stats })
 

@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 
 import { IconCalendar, IconClock, IconUser, IconBuilding, IconMapPin, IconFile, IconMessage, IconEdit, IconTrash, IconShare, IconCopy, IconDownload, IconEye, IconTag, IconPhone, IconMail, IconId, IconBriefcase, IconCalendarTime, IconCircle, IconAlertCircle, IconInfoCircle, IconGlobe, IconWorld, IconCreditCard, IconPlus, IconUpload, IconX, IconSearch, IconLink, IconMinus, IconCheck, IconSun, IconMoon, IconTrophy, IconMedal, IconCrown, IconStar } from "@tabler/icons-react"
-import { useRealtimeMembers } from '@/hooks/use-realtime-members'
+import { useRealtimeCompanies } from '@/hooks/use-realtime-companies'
 import { SendHorizontal, Target } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
@@ -25,7 +25,7 @@ import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/auth-context"
 import { ColorPicker } from "@/components/ui/color-picker"
 import { LinkPreview } from "@/components/ui/link-preview"
-import { MembersActivityLog } from "@/components/members-activity-log"
+import { CompaniesActivityLog } from "@/components/companies-activity-log"
 import { Comment } from "@/components/ui/comment"
 import { AgentSelection, type Agent } from "@/components/agent-selection"
 import { ClientSelection, type Client } from "@/components/client-selection"
@@ -58,8 +58,8 @@ interface CompanyData {
   // Storage fields for selected agents and clients
   selectedAgentIds?: number[]
   selectedClientIds?: number[]
-  selectedAgentsData?: Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>
-  selectedClientsData?: Array<{user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>
+  selectedAgentsData?: Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, company_name: string | null, company_badge_color: string | null}>
+  selectedClientsData?: Array<{user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, company_name: string | null, company_badge_color: string | null}>
 }
 
 const serviceOptions = [
@@ -102,36 +102,36 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   const { theme } = useTheme()
   const { user } = useAuth()
   
-  // Real-time updates for member changes
-  const { isConnected } = useRealtimeMembers({
+  // Real-time updates for company changes
+  const { isConnected } = useRealtimeCompanies({
     autoConnect: true,
-    onMemberUpdated: (updatedMember, oldMember) => {
-      if (companyToEdit?.id && updatedMember.id === companyToEdit.id) {
-        console.log('🔄 Real-time member update received:', updatedMember)
-        console.log('🔍 Old member data:', oldMember)
-        console.log('🔍 New member data:', updatedMember)
+    onCompanyUpdated: (updatedCompany, oldCompany) => {
+      if (companyToEdit?.id && updatedCompany.id === companyToEdit.id) {
+        console.log('🔄 Real-time company update received:', updatedCompany)
+        console.log('🔍 Old company data:', oldCompany)
+        console.log('🔍 New company data:', updatedCompany)
         
         // Update the company data with real-time changes
         // Handle null values properly by checking if the field exists in the update
         console.log('🔄 Updating form data with real-time changes:')
-        console.log('  Service field in update:', updatedMember.service)
-        console.log('  Service field type:', typeof updatedMember.service)
-        console.log('  Service field exists:', updatedMember.hasOwnProperty('service'))
+        console.log('  Service field in update:', updatedCompany.service)
+        console.log('  Service field type:', typeof updatedCompany.service)
+        console.log('  Service field exists:', updatedCompany.hasOwnProperty('service'))
         
         setFormData(prev => {
           console.log('  Current form data service:', prev.service)
           
           const newData = {
             ...prev,
-            company: updatedMember.hasOwnProperty('company') ? updatedMember.company : prev.company,
-            address: updatedMember.hasOwnProperty('address') ? updatedMember.address : prev.address,
-            phone: updatedMember.hasOwnProperty('phone') ? updatedMember.phone : prev.phone,
-            country: updatedMember.hasOwnProperty('country') ? updatedMember.country : prev.country,
-            service: updatedMember.hasOwnProperty('service') ? updatedMember.service : prev.service,
-            website: updatedMember.hasOwnProperty('website') ? updatedMember.website : prev.website,
-            shift: updatedMember.hasOwnProperty('shift') ? updatedMember.shift : prev.shift,
-            badge_color: updatedMember.hasOwnProperty('badge_color') ? updatedMember.badge_color : prev.badge_color,
-            status: updatedMember.hasOwnProperty('status') ? updatedMember.status : prev.status
+            company: updatedCompany.hasOwnProperty('company') ? updatedCompany.company : prev.company,
+            address: updatedCompany.hasOwnProperty('address') ? updatedCompany.address : prev.address,
+            phone: updatedCompany.hasOwnProperty('phone') ? updatedCompany.phone : prev.phone,
+            country: updatedCompany.hasOwnProperty('country') ? updatedCompany.country : prev.country,
+            service: updatedCompany.hasOwnProperty('service') ? updatedCompany.service : prev.service,
+            website: updatedCompany.hasOwnProperty('website') ? updatedCompany.website : prev.website,
+            shift: updatedCompany.hasOwnProperty('shift') ? updatedCompany.shift : prev.shift,
+            badge_color: updatedCompany.hasOwnProperty('badge_color') ? updatedCompany.badge_color : prev.badge_color,
+            status: updatedCompany.hasOwnProperty('status') ? updatedCompany.status : prev.status
           }
           
           console.log('🔄 New form data after real-time update:', newData)
@@ -139,21 +139,21 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         })
         
         // Also update localShift state if shift field was updated
-        if (updatedMember.hasOwnProperty('shift')) {
-          console.log('🔄 Updating localShift with real-time shift value:', updatedMember.shift)
-          setLocalShift(updatedMember.shift)
+        if (updatedCompany.hasOwnProperty('shift')) {
+          console.log('🔄 Updating localShift with real-time shift value:', updatedCompany.shift)
+          setLocalShift(updatedCompany.shift)
         }
       }
     },
-    onAgentMemberChanged: (agent, oldAgent) => {
-      console.log('🔍 Agent member change detected:', { agent, oldAgent, companyToEditId: companyToEdit?.id })
+    onAgentCompanyChanged: (agent, oldAgent) => {
+      console.log('🔍 Agent company change detected:', { agent, oldAgent, companyToEditId: companyToEdit?.id })
       
-      if (companyToEdit?.id && agent.member_id === companyToEdit.id) {
+      if (companyToEdit?.id && agent.company_id === companyToEdit.id) {
         console.log('🔄 Real-time agent assignment change:', agent)
         console.log('🔍 Agent data fields available:', Object.keys(agent))
         console.log('🔍 Company data available:', { company: companyToEdit.company, badge_color: companyToEdit.badge_color })
         
-        // Agent was assigned to this member
+        // Agent was assigned to this company
         setSelectedAgents(prev => {
           const newSet = new Set(prev)
           newSet.add(agent.user_id)
@@ -181,8 +181,8 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
               profile_picture: agent.profile_picture || null,
               employee_id: agent.employee_id || null,
               job_title: agent.job_title || null,
-              member_company: companyToEdit.company || null,
-              member_badge_color: companyToEdit.badge_color || null
+              company_name: companyToEdit.company || null,
+              company_badge_color: companyToEdit.badge_color || null
             }
             
             console.log('✅ Adding new agent to selectedAgentsData with complete data:', agentData)
@@ -192,7 +192,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           } else {
             // If we don't have complete data, fetch it
             console.log('⚠️ Agent data incomplete, fetching complete data for user_id:', agent.user_id)
-            fetch(`/api/agents/modal?memberId=${companyToEdit.id}&limit=1000`)
+            fetch(`/api/agents/modal?companyId=${companyToEdit.id}&limit=1000`)
               .then(response => response.json())
               .then(data => {
                 const companyAgents = data.agents || []
@@ -215,9 +215,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             return prev
           }
         })
-      } else if (companyToEdit?.id && oldAgent?.member_id === companyToEdit.id && agent.member_id !== companyToEdit.id) {
+      } else if (companyToEdit?.id && oldAgent?.company_id === companyToEdit.id && agent.company_id !== companyToEdit.id) {
         console.log('🔄 Real-time agent unassignment:', agent)
-        // Agent was unassigned from this member
+        // Agent was unassigned from this company
         setSelectedAgents(prev => {
           const newSet = new Set(prev)
           newSet.delete(agent.user_id)
@@ -231,21 +231,21 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         })
       } else {
         console.log('❌ Agent change not relevant for current company:', {
-          agentMemberId: agent.member_id,
-          oldAgentMemberId: oldAgent?.member_id,
+          agentCompanyId: agent.company_id,
+          oldAgentCompanyId: oldAgent?.company_id,
           companyToEditId: companyToEdit?.id
         })
       }
     },
-    onClientMemberChanged: (client, oldClient) => {
-      console.log('🔍 Client member change detected:', { client, oldClient, companyToEditId: companyToEdit?.id })
+    onClientCompanyChanged: (client, oldClient) => {
+      console.log('🔍 Client company change detected:', { client, oldClient, companyToEditId: companyToEdit?.id })
       
-      if (companyToEdit?.id && client.member_id === companyToEdit.id) {
+      if (companyToEdit?.id && client.company_id === companyToEdit.id) {
         console.log('🔄 Real-time client assignment change:', client)
         console.log('🔍 Client data fields available:', Object.keys(client))
         console.log('🔍 Company data available:', { company: companyToEdit.company, badge_color: companyToEdit.badge_color })
         
-        // Client was assigned to this member
+        // Client was assigned to this company
         setSelectedClients(prev => {
           const newSet = new Set(prev)
           newSet.add(client.user_id)
@@ -271,8 +271,8 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
               first_name: client.first_name,
               last_name: client.last_name,
               profile_picture: client.profile_picture || null,
-              member_company: companyToEdit.company || null,
-              member_badge_color: companyToEdit.badge_color || null
+              company_name: companyToEdit.company || null,
+              company_badge_color: companyToEdit.badge_color || null
             }
             
             console.log('✅ Adding new client to selectedClientsData with complete data:', clientData)
@@ -282,7 +282,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           } else {
             // If we don't have complete data, fetch it
             console.log('⚠️ Client data incomplete, fetching complete data for user_id:', client.user_id)
-            fetch(`/api/clients/modal?memberId=${companyToEdit.id}&limit=1000`)
+            fetch(`/api/clients/modal?companyId=${companyToEdit.id}&limit=1000`)
               .then(response => response.json())
               .then(data => {
                 const companyClients = data.clients || []
@@ -305,9 +305,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             return prev
           }
         })
-      } else if (companyToEdit?.id && oldClient?.member_id === companyToEdit.id && client.member_id !== companyToEdit.id) {
+      } else if (companyToEdit?.id && oldClient?.company_id === companyToEdit.id && client.company_id !== companyToEdit.id) {
         console.log('🔄 Real-time client unassignment:', client)
-        // Client was unassigned from this member
+        // Client was unassigned from this company
         setSelectedClients(prev => {
           const newSet = new Set(prev)
           newSet.delete(client.user_id)
@@ -321,8 +321,8 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         })
       } else {
         console.log('❌ Client change not relevant for current company:', {
-          clientMemberId: client.member_id,
-          oldClientMemberId: oldClient?.member_id,
+          clientCompanyId: client.company_id,
+          oldClientCompanyId: oldClient?.company_id,
           companyToEditId: companyToEdit?.id
         })
       }
@@ -347,12 +347,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
         const message = JSON.parse(event.data)
         console.log('🔍 WebSocket message received:', message)
         
-        // Handle member comment updates
-        if (message.type === 'member_comment_update') {
+        // Handle company comment updates
+        if (message.type === 'company_comment_update') {
           const { action, record, old_record } = message.data
           console.log('🔍 Processing comment update:', { action, record, old_record, companyToEditId: companyToEdit.id })
           
-          if (record && record.member_id === companyToEdit.id) {
+          if (record && record.company_id === companyToEdit.id) {
             console.log('🔄 Real-time comment update received:', { action, record })
             
             setCommentsList(prevComments => {
@@ -402,32 +402,32 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             })
           } else {
             console.log('❌ Comment update not relevant for current company:', {
-              recordMemberId: record?.member_id,
+              recordCompanyId: record?.company_id,
               companyToEditId: companyToEdit.id
             })
           }
         }
         
-        // Handle member activity updates
-        if (message.type === 'member_activity_update') {
+        // Handle company activity updates
+        if (message.type === 'company_activity_update') {
           const { action, record, old_record } = message.data
           console.log('🔍 Processing activity update:', { action, record, old_record, companyToEditId: companyToEdit.id })
           
-          if (record && record.member_id === companyToEdit.id) {
+          if (record && record.company_id === companyToEdit.id) {
             console.log('🔄 Real-time activity update received:', { action, record })
             
             // Real-time updates will automatically refresh the activity log
-            // The MembersActivityLog component will receive live updates
+            // The CompaniesActivityLog component will receive live updates
           } else {
             console.log('❌ Activity update not relevant for current company:', {
-              recordMemberId: record?.member_id,
+              recordCompanyId: record?.company_id,
               companyToEditId: companyToEdit.id
             })
           }
         }
         
         // Log any other message types for debugging
-        if (message.type !== 'member_comment_update' && message.type !== 'member_activity_update') {
+        if (message.type !== 'company_comment_update' && message.type !== 'company_activity_update') {
           console.log('🔍 Other WebSocket message type:', message.type, message)
         }
       } catch (error) {
@@ -595,9 +595,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   const [isSubmittingComment, setIsSubmittingComment] = React.useState(false)
   const [commentsList, setCommentsList] = React.useState<Array<{id: string, comment: string, user_name: string, created_at: string}>>([])
   const [isEditingCompany, setIsEditingCompany] = React.useState(false)
-  const [agents, setAgents] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
+  const [agents, setAgents] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, company_name: string | null, company_badge_color: string | null}>>([])
   const [selectedAgents, setSelectedAgents] = React.useState<Set<number>>(new Set())
-  const [selectedAgentsData, setSelectedAgentsData] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
+  const [selectedAgentsData, setSelectedAgentsData] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, employee_id: string | null, job_title: string | null, profile_picture: string | null, company_name: string | null, company_badge_color: string | null}>>([])
   const [isLoadingAgents, setIsLoadingAgents] = React.useState(false)
   const [isLoadingMore, setIsLoadingMore] = React.useState(false)
   const [isLoadingCompany, setIsLoadingCompany] = React.useState(false)
@@ -607,12 +607,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   
   // Client-related state variables
   const [selectedClients, setSelectedClients] = React.useState<Set<number>>(new Set())
-  const [selectedClientsData, setSelectedClientsData] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
+  const [selectedClientsData, setSelectedClientsData] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, company_name: string | null, company_badge_color: string | null}>>([])
   const [showClientSelection, setShowClientSelection] = React.useState(false)
   const [clientSearch, setClientSearch] = React.useState('')
   const [isLoadingClients, setIsLoadingClients] = React.useState(false)
-  const [clients, setClients] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
-  const [displayClients, setDisplayClients] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, member_company: string | null, member_badge_color: string | null}>>([])
+  const [clients, setClients] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, company_name: string | null, company_badge_color: string | null}>>([])
+  const [displayClients, setDisplayClients] = React.useState<Array<{user_id: number, first_name: string | null, last_name: string | null, profile_picture: string | null, company_name: string | null, company_badge_color: string | null}>>([])
   const [hasMoreClients, setHasMoreClients] = React.useState(true)
   const [isLoadingMoreClients, setIsLoadingMoreClients] = React.useState(false)
   const [currentClientPage, setCurrentClientPage] = React.useState(1)
@@ -761,7 +761,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       
       console.log('🔄 FormData contents:', Array.from(formDataToSend.entries()))
       
-      const dbResponse = await fetch(`/api/members/${companyToEdit.id}`, {
+      const dbResponse = await fetch(`/api/companies/${companyToEdit.id}`, {
         method: 'PATCH',
         body: formDataToSend
       })
@@ -786,7 +786,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       console.log(`🔄 Real-time ${type} assignment update:`, { agentId, isSelected, companyId: companyToEdit.id })
       
       const endpoint = type === 'agent' ? `/api/agents/${agentId}` : `/api/clients/${agentId}`
-      const body = { member_id: isSelected ? companyToEdit.id : null }
+      const body = { company_id: isSelected ? companyToEdit.id : null }
       
       const response = await fetch(endpoint, {
         method: 'PATCH',
@@ -818,7 +818,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             }
             
             // Log the agent assignment change
-            await fetch(`/api/members/${companyToEdit.id}/log-assignments`, {
+            await fetch(`/api/companies/${companyToEdit.id}/log-assignments`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -843,7 +843,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             }
             
             // Log the client assignment change
-            await fetch(`/api/members/${companyToEdit.id}/log-assignments`, {
+            await fetch(`/api/companies/${companyToEdit.id}/log-assignments`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -938,7 +938,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           const agentResponse = await fetch(`/api/agents/${agentId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ member_id: companyToEdit.id })
+            body: JSON.stringify({ company_id: companyToEdit.id })
           })
           
           if (!agentResponse.ok) {
@@ -972,7 +972,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           const clientResponse = await fetch(`/api/clients/${clientId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ member_id: companyToEdit.id })
+            body: JSON.stringify({ company_id: companyToEdit.id })
           })
           
           if (!clientResponse.ok) {
@@ -1011,7 +1011,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             const agentResponse = await fetch(`/api/agents/${agentId}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ member_id: null })
+              body: JSON.stringify({ company_id: null })
             })
             
             if (!agentResponse.ok) {
@@ -1050,7 +1050,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             const clientResponse = await fetch(`/api/clients/${clientId}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ member_id: null })
+              body: JSON.stringify({ company_id: null })
             })
             
             if (!clientResponse.ok) {
@@ -1090,7 +1090,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           
           // Debug logging
           console.log('🔍 Sending assignment data to API:', {
-            memberId: companyToEdit.id,
+            companyId: companyToEdit.id,
             originalAgentIds,
             currentAgentIds,
             originalClientIds,
@@ -1101,7 +1101,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             hasOriginalClientIds: 'originalClientIds' in formData
           })
           
-          const response = await fetch(`/api/members/${companyToEdit.id}/log-assignments`, {
+          const response = await fetch(`/api/companies/${companyToEdit.id}/log-assignments`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1364,11 +1364,11 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     }
   }
 
-  const fetchCompanyAgents = async (memberId: number) => {
+  const fetchCompanyAgents = async (companyId: number) => {
     try {
-      console.log('🔄 fetchCompanyAgents called with memberId:', memberId)
+      console.log('🔄 fetchCompanyAgents called with companyId:', companyId)
       setIsLoadingCompany(true)
-      const response = await fetch(`/api/agents/modal?memberId=${memberId}&limit=1000`)
+      const response = await fetch(`/api/agents/modal?companyId=${companyId}&limit=1000`)
       console.log('🔄 fetchCompanyAgents response status:', response.status)
       if (response.ok) {
         const data = await response.json()
@@ -1402,11 +1402,11 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
     }
   }
 
-  const fetchCompanyClients = async (memberId: number) => {
+  const fetchCompanyClients = async (companyId: number) => {
     try {
-      console.log('🔄 fetchCompanyClients called with memberId:', memberId)
-      // Use the utility function to get clients for the member
-      const response = await fetch(`/api/clients/modal?memberId=${memberId}&limit=1000`)
+      console.log('🔄 fetchCompanyClients called with companyId:', companyId)
+      // Use the utility function to get clients for the company
+      const response = await fetch(`/api/clients/modal?companyId=${companyId}&limit=1000`)
       console.log('🔄 fetchCompanyClients response status:', response.status)
       if (response.ok) {
         const data = await response.json()
@@ -1487,7 +1487,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       }
       
         // Create new company
-      const response = await fetch('/api/members', {
+      const response = await fetch('/api/companies', {
           method: 'POST',
         headers: {
           'x-user-id': user?.id || ''
@@ -1503,13 +1503,13 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       const result = await response.json()
         console.log('Company created successfully:', result.company)
       
-      // Update selected agents with the new member_id if any agents are selected
+      // Update selected agents with the new company_id if any agents are selected
       if (selectedAgents.size > 0) {
-        const memberId = result.company.id
+        const companyId = result.company.id
         const agentIds = Array.from(selectedAgents)
         
         try {
-          // Update each selected agent with the new member_id
+          // Update each selected agent with the new company_id
           const updatePromises = agentIds.map(async (agentId) => {
             const updateResponse = await fetch(`/api/agents/${agentId}`, {
               method: 'PATCH',
@@ -1517,7 +1517,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                member_id: memberId
+                company_id: companyId
               })
             })
             
@@ -1533,12 +1533,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           const successCount = results.filter(Boolean).length
           
           if (successCount === agentIds.length) {
-            console.log('All selected agents updated successfully with member_id:', memberId)
+            console.log('All selected agents updated successfully with company_id:', companyId)
           } else {
             console.warn(`${successCount}/${agentIds.length} agents updated successfully`)
           }
         } catch (error) {
-          console.error('Error updating agents with member_id:', error)
+          console.error('Error updating agents with company_id:', error)
         }
       }
 
@@ -1551,9 +1551,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           // Find agents that were deselected (in original but not in current selection)
           const deselectedAgentIds = originalAgentIds.filter(id => !selectedAgents.has(id))
           
-          // Remove member_id from deselected agents
+          // Remove company_id from deselected agents
           if (deselectedAgentIds.length > 0) {
-            console.log('Removing member_id from deselected agents:', deselectedAgentIds)
+            console.log('Removing company_id from deselected agents:', deselectedAgentIds)
             
             const removePromises = deselectedAgentIds.map(async (agentId) => {
               const updateResponse = await fetch(`/api/agents/${agentId}`, {
@@ -1562,12 +1562,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                  member_id: null
+                  company_id: null
                 })
               })
               
               if (!updateResponse.ok) {
-                console.error(`Failed to remove member_id from agent ${agentId}`)
+                console.error(`Failed to remove company_id from agent ${agentId}`)
                 return false
               }
               
@@ -1578,7 +1578,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             const removeSuccessCount = removeResults.filter(Boolean).length
             
             if (removeSuccessCount === deselectedAgentIds.length) {
-              console.log('All deselected agents updated successfully (member_id removed)')
+              console.log('All deselected agents updated successfully (company_id removed)')
             } else {
               console.warn(`${removeSuccessCount}/${deselectedAgentIds.length} deselected agents updated successfully`)
             }
@@ -1590,11 +1590,11 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
 
       // Handle client assignments
       if (selectedClients.size > 0) {
-        const memberId = result.company.id
+        const companyId = result.company.id
         const clientIds = Array.from(selectedClients)
         
         try {
-          // Update each selected client with the new member_id
+          // Update each selected client with the new company_id
           const updatePromises = clientIds.map(async (clientId) => {
             const updateResponse = await fetch(`/api/clients/${clientId}`, {
               method: 'PATCH',
@@ -1602,7 +1602,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                member_id: memberId
+                company_id: companyId
               })
             })
             
@@ -1618,12 +1618,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           const successCount = results.filter(Boolean).length
           
           if (successCount === clientIds.length) {
-            console.log('All selected clients updated successfully with member_id:', memberId)
+            console.log('All selected clients updated successfully with company_id:', companyId)
           } else {
             console.warn(`${successCount}/${clientIds.length} clients updated successfully`)
           }
         } catch (error) {
-          console.error('Error updating clients with member_id:', error)
+          console.error('Error updating clients with company_id:', error)
         }
       }
 
@@ -1636,9 +1636,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           // Find clients that were deselected (in original but not in current selection)
           const deselectedClientIds = originalClientIds.filter(id => !selectedClients.has(id))
           
-          // Remove member_id from deselected clients
+          // Remove company_id from deselected clients
           if (deselectedClientIds.length > 0) {
-            console.log('Removing member_id from deselected clients:', deselectedClientIds)
+            console.log('Removing company_id from deselected clients:', deselectedClientIds)
             
             const removePromises = deselectedClientIds.map(async (clientId) => {
               const updateResponse = await fetch(`/api/clients/${clientId}`, {
@@ -1647,12 +1647,12 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                  member_id: null
+                  company_id: null
                 })
               })
               
               if (!updateResponse.ok) {
-                console.error(`Failed to remove member_id from client ${clientId}`)
+                console.error(`Failed to remove company_id from client ${clientId}`)
                 return false
               }
               
@@ -1663,7 +1663,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             const removeSuccessCount = removeResults.filter(Boolean).length
             
             if (removeSuccessCount === deselectedClientIds.length) {
-              console.log('All deselected clients updated successfully (member_id removed)')
+              console.log('All deselected clients updated successfully (company_id removed)')
             } else {
               console.warn(`${removeSuccessCount}/${deselectedClientIds.length} deselected clients updated successfully`)
             }
@@ -1718,9 +1718,9 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
   }
 
   // Load existing comments for the company
-  const loadComments = async (memberId: number) => {
+  const loadComments = async (companyId: number) => {
     try {
-      const response = await fetch(`/api/members/${memberId}/comments`)
+      const response = await fetch(`/api/companies/${companyId}/comments`)
       if (response.ok) {
         const data = await response.json()
         setCommentsList(data.comments || [])
@@ -1754,7 +1754,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       setComment("")
       
       // Save comment to database
-      const response = await fetch(`/api/members/${companyToEdit.id}/comments`, {
+      const response = await fetch(`/api/companies/${companyToEdit.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1788,7 +1788,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       console.log('Company data:', companyToEdit)
       
       // Delete the company
-      const response = await fetch(`/api/members/${companyToEdit.id}`, {
+      const response = await fetch(`/api/companies/${companyToEdit.id}`, {
         method: 'DELETE'
       })
       
@@ -2021,7 +2021,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
           // Fetch current assignments from database and set original IDs
         if (companyToEdit.id) {
             // Fetch agents and set original IDs
-            const agentsResponse = await fetch(`/api/agents/modal?memberId=${companyToEdit.id}&limit=1000`)
+            const agentsResponse = await fetch(`/api/agents/modal?companyId=${companyToEdit.id}&limit=1000`)
             if (agentsResponse.ok) {
               const agentsData = await agentsResponse.json()
               const companyAgents = agentsData.agents || []
@@ -2040,7 +2040,7 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
             }
             
             // Fetch clients and set original IDs
-            const clientsResponse = await fetch(`/api/clients/modal?memberId=${companyToEdit.id}&limit=1000`)
+            const clientsResponse = await fetch(`/api/clients/modal?companyId=${companyToEdit.id}&limit=1000`)
             if (clientsResponse.ok) {
               const clientsData = await clientsResponse.json()
               console.log('🔍 Clients API response:', clientsData)
@@ -2339,10 +2339,10 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
       try {
         const monthYear = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
         
-        console.log('📊 Fetching productivity scores for member:', companyToEdit.id, 'monthYear:', monthYear)
+        console.log('📊 Fetching productivity scores for company:', companyToEdit.id, 'monthYear:', monthYear)
         
         const params = new URLSearchParams({
-          memberId: String(companyToEdit.id),
+          companyId: String(companyToEdit.id),
           timeframe: 'monthly',
           monthYear: monthYear
         })
@@ -3525,8 +3525,8 @@ export function AddCompanyModal({ isOpen, onClose, onCompanyAdded, companyToEdit
                 // Activity Content - Shows company activity and recent changes
                 <div>
                   {companyToEdit?.id ? (
-                    <MembersActivityLog 
-                      memberId={companyToEdit.id} 
+                    <CompaniesActivityLog 
+                      companyId={companyToEdit.id} 
                       companyName={companyToEdit.company || 'Unknown Company'} 
                       onRefresh={() => {
                         // Real-time updates handle refresh automatically

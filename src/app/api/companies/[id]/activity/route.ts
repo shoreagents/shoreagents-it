@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getMemberActivityPaginated, createMemberActivityLog } from '@/lib/db-utils'
+import { getCompanyActivityPaginated, createCompanyActivityLog } from '@/lib/db-utils'
 
 export async function GET(
   request: NextRequest,
@@ -7,10 +7,10 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const memberId = parseInt(id, 10)
+    const companyId = parseInt(id, 10)
     
-    if (isNaN(memberId)) {
-      return NextResponse.json({ error: 'Invalid member ID' }, { status: 400 })
+    if (isNaN(companyId)) {
+      return NextResponse.json({ error: 'Invalid company ID' }, { status: 400 })
     }
 
     const { searchParams } = request.nextUrl
@@ -18,14 +18,14 @@ export async function GET(
     const limit = parseInt(searchParams.get('limit') || '20', 10)
     const action = searchParams.get('action') || null
 
-    const result = await getMemberActivityPaginated(memberId, page, limit, action)
+    const result = await getCompanyActivityPaginated(companyId, page, limit, action)
 
     return NextResponse.json(result)
 
   } catch (error) {
-    console.error('Error fetching member activity and comments:', error)
+    console.error('Error fetching company activity and comments:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch member activity and comments' },
+      { error: 'Failed to fetch company activity and comments' },
       { status: 500 }
     )
   }
@@ -37,10 +37,10 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const memberId = parseInt(id, 10)
+    const companyId = parseInt(id, 10)
     
-    if (isNaN(memberId)) {
-      return NextResponse.json({ error: 'Invalid member ID' }, { status: 400 })
+    if (isNaN(companyId)) {
+      return NextResponse.json({ error: 'Invalid company ID' }, { status: 400 })
     }
 
     const { action, fieldName, oldValue, newValue, userId } = await request.json()
@@ -49,7 +49,7 @@ export async function POST(
       return NextResponse.json({ error: 'Action is required' }, { status: 400 })
     }
 
-    const logId = await createMemberActivityLog(memberId, fieldName || '', action, oldValue || null, newValue || null, userId || null)
+    const logId = await createCompanyActivityLog(companyId, fieldName || '', action, oldValue || null, newValue || null, userId || null)
 
     return NextResponse.json({
       success: true,
